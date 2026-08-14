@@ -42,6 +42,7 @@ model User {
   memberships     StoreMember[]
   sessions        Session[]
   auditLogs       AuditLog[]
+  shopifyOAuthStates ShopifyOAuthState[]
 
   @@map("users")
 }
@@ -59,6 +60,8 @@ model Store {
   auditLogs AuditLog[]
   products  Product[]
   checkouts Checkout[]
+  shopifyConnection ShopifyConnection?
+  shopifyOAuthStates ShopifyOAuthState[]
 
   @@map("stores")
 }
@@ -107,6 +110,42 @@ model Checkout {
   @@index([storeId, status, createdAt(sort: Desc)])
   @@index([storeId, productId])
   @@map("checkouts")
+}
+
+model ShopifyConnection {
+  id                    String    @id @default(uuid()) @db.Uuid
+  storeId               String    @unique @map("store_id") @db.Uuid
+  shopDomain            String    @unique @map("shop_domain") @db.VarChar(255)
+  accessTokenEncrypted  String    @map("access_token_encrypted") @db.Text
+  refreshTokenEncrypted String?   @map("refresh_token_encrypted") @db.Text
+  scopes                String    @db.Text
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at") @db.Timestamptz(3)
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at") @db.Timestamptz(3)
+  connectedAt           DateTime  @default(now()) @map("connected_at") @db.Timestamptz(3)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  revokedAt             DateTime? @map("revoked_at") @db.Timestamptz(3)
+  store                 Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([shopDomain, revokedAt])
+  @@map("shopify_connections")
+}
+
+model ShopifyOAuthState {
+  id         String    @id @default(uuid()) @db.Uuid
+  stateHash  String    @unique @map("state_hash") @db.Char(64)
+  storeId    String    @map("store_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  sessionId  String    @map("session_id") @db.Uuid
+  shopDomain String    @map("shop_domain") @db.VarChar(255)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt     DateTime? @map("used_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  store      Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, expiresAt])
+  @@index([sessionId, expiresAt])
+  @@map("shopify_oauth_states")
 }
 
 model StoreMember {

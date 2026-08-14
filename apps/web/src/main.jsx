@@ -13,6 +13,7 @@ import { createStore, getApiHealth, getSession, getStores, login, logout, select
 import Login, { SessionLoading } from './Auth';
 import AccountSettings from './AccountSettings';
 import StoreSwitcher from './StoreSwitcher';
+import ShopifyIntegration from './ShopifyIntegration';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -121,7 +122,7 @@ function Checkout({ onBack, customConfig }) {
 }
 
 function App(){
-  const [sidebar,setSidebar]=useState(false); const [page,setPage]=useState('Visão geral'); const [checkout,setCheckout]=useState(false); const [editor,setEditor]=useState(false); const [previewConfig,setPreviewConfig]=useState(null); const [apiStatus,setApiStatus]=useState('checking');
+  const [sidebar,setSidebar]=useState(false); const [page,setPage]=useState(()=>window.location.hash.startsWith('#/integrations')?'Integrações':'Visão geral'); const [checkout,setCheckout]=useState(false); const [editor,setEditor]=useState(false); const [previewConfig,setPreviewConfig]=useState(null); const [apiStatus,setApiStatus]=useState('checking');
   const [auth,setAuth]=useState({status:'checking',user:null,csrfToken:null});
   const [stores,setStores]=useState([]); const [storeBusy,setStoreBusy]=useState(false);
   useEffect(()=>{let active=true; getApiHealth().then(()=>active&&setApiStatus('online')).catch(()=>active&&setApiStatus('offline')); getSession().then(result=>active&&setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken})).catch(()=>active&&setAuth({status:'anonymous',user:null,csrfToken:null})); return()=>{active=false}},[]);
@@ -135,7 +136,8 @@ function App(){
   if(window.location.hash==='#/login')window.history.replaceState({},'', '/');
   if(editor) return <CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/>;
   if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>;
-  return <div className="app"><Sidebar open={sidebar} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout} stores={stores} storeBusy={storeBusy} onSelectStore={handleSelectStore} onCreateStore={handleCreateStore}/><div className="main-shell"><Header toggleSidebar={()=>setSidebar(true)} onCheckout={()=>setCheckout(true)} apiStatus={apiStatus}/>{page==='Visão geral'?<Dashboard setPage={setPage}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)}/>}</div></div>
+  const activeStore=stores.find(store=>store.active);
+  return <div className="app"><Sidebar open={sidebar} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout} stores={stores} storeBusy={storeBusy} onSelectStore={handleSelectStore} onCreateStore={handleCreateStore}/><div className="main-shell"><Header toggleSidebar={()=>setSidebar(true)} onCheckout={()=>setCheckout(true)} apiStatus={apiStatus}/>{page==='Visão geral'?<Dashboard setPage={setPage}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)}/>}</div></div>
 }
 
 createRoot(document.getElementById('root')).render(<App/>);

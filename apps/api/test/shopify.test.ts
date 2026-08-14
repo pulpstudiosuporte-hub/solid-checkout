@@ -1,0 +1,19 @@
+import { createHash } from 'node:crypto';
+import { describe, expect, it } from 'vitest';
+import type { AppEnvironment } from '@solid/config';
+import { buildApp } from '../src/app.js';
+import type { AuthRepository, LoginUser, SessionUser } from '../src/auth-repository.js';
+import { decryptSecret, encryptSecret } from '../src/shopify-crypto.js';
+import type { OAuthStateRecord, ShopifyContext, ShopifyRepository, ShopifyStatus } from '../src/shopify-repository.js';
+
+const origin='http://localhost:5173'; const sessionToken='shopify-session'; const csrfToken='shopify-csrf'; const sha256=(value:string)=>createHash('sha256').update(value).digest('hex');
+const env: AppEnvironment={NODE_ENV:'test',API_HOST:'127.0.0.1',API_PORT:3333,LOG_LEVEL:'silent',CORS_ORIGINS:[origin],TRUST_PROXY:false,APP_URL:origin,SHOPIFY_CLIENT_ID:'client-id',SHOPIFY_CLIENT_SECRET:'0123456789abcdef0123456789abcdef',SHOPIFY_REDIRECT_URI:'http://127.0.0.1:3333/integrations/shopify/callback',APP_ENCRYPTION_KEY:Buffer.alloc(32,7).toString('base64')};
+class MemoryAuth implements AuthRepository { findUserByEmail():Promise<LoginUser|null>{return Promise.resolve(null)} createSession():Promise<void>{return Promise.resolve()} findActiveSession(hash:string):Promise<SessionUser|null>{return Promise.resolve(hash===sha256(sessionToken)?{sessionId:'00000000-0000-0000-0000-000000000001',userId:'00000000-0000-0000-0000-000000000002',csrfTokenHash:sha256(csrfToken),expiresAt:new Date(Date.now()+60_000),absoluteExpiresAt:new Date(Date.now()+60_000),user:{publicId:'user-a',name:'Owner',email:'owner@example.com'}}:null)} touchSession():Promise<void>{return Promise.resolve()} revokeSession():Promise<void>{return Promise.resolve()} updatePasswordAndRevokeOtherSessions():Promise<void>{return Promise.resolve()} }
+class MemoryShopify implements ShopifyRepository { created=false; context():Promise<ShopifyContext>{return Promise.resolve({storeId:'00000000-0000-0000-0000-000000000003',storePublicId:'store-a',role:'OWNER'})} status():Promise<ShopifyStatus>{return Promise.resolve({connected:false})} createState():Promise<void>{this.created=true;return Promise.resolve()} consumeState():Promise<OAuthStateRecord|null>{return Promise.resolve(null)} connect():Promise<void>{return Promise.resolve()} disconnect():Promise<void>{return Promise.resolve()} }
+const headers={origin,cookie:`solid_session=${sessionToken}; solid_csrf=${csrfToken}`,'x-csrf-token':csrfToken};
+
+describe('integraÃ§Ã£o Shopify',()=>{
+  it('criptografa tokens com AES-GCM autenticado',()=>{const key=Buffer.alloc(32,4).toString('base64');const encrypted=encryptSecret('shpat_secret',key);expect(encrypted).not.toContain('shpat_secret');expect(decryptSecret(encrypted,key)).toBe('shpat_secret')});
+  it('exige sessÃ£o para consultar status',async()=>{const app=buildApp(env,{authRepository:new MemoryAuth(),shopifyRepository:new MemoryShopify()});expect((await app.inject({method:'GET',url:'/integrations/shopify/status'})).statusCode).toBe(401);await app.close()});
+  it('valida o domÃ­nio e cria autorizaÃ§Ã£o com state de uso Ãºnico',async()=>{const repository=new MemoryShopify();const app=buildApp(env,{authRepository:new MemoryAuth(),shopifyRepository:repository});expect((await app.inject({method:'POST',url:'/integrations/shopify/connect',headers,payload:{shop:'evil.example.com'}})).statusCode).toBe(400);const response=await app.inject({method:'POST',url:'/integrations/shopify/connect',headers,payload:{shop:'minha-loja'}});expect(response.statusCode).toBe(200);expect(response.json<{authorizationUrl:string}>().authorizationUrl).toContain('minha-loja.myshopify.com/admin/oauth/authorize');expect(repository.created).toBe(true);expect(response.headers['set-cookie']).toContain('solid_shopify_oauth=');await app.close()});
+});

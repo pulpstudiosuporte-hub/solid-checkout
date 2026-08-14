@@ -10,8 +10,10 @@ import type { CatalogRepository } from './catalog-repository.js';
 import { registerCatalogRoutes } from './catalog-routes.js';
 import type { StoreRepository } from './store-repository.js';
 import { registerStoreRoutes } from './store-routes.js';
+import type { ShopifyRepository } from './shopify-repository.js';
+import { registerShopifyRoutes } from './shopify-routes.js';
 
-export function buildApp(environment: AppEnvironment, dependencies: { authRepository?: AuthRepository; catalogRepository?: CatalogRepository; storeRepository?: StoreRepository } = {}): FastifyInstance {
+export function buildApp(environment: AppEnvironment, dependencies: { authRepository?: AuthRepository; catalogRepository?: CatalogRepository; storeRepository?: StoreRepository; shopifyRepository?: ShopifyRepository } = {}): FastifyInstance {
   const app = Fastify({
     logger: environment.NODE_ENV === 'test' ? false : { level: environment.LOG_LEVEL, redact: { paths: ['req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie', '*.password', '*.token', '*.cpf'], censor: '[REDACTED]' } },
     trustProxy: environment.TRUST_PROXY,
@@ -25,6 +27,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
   void app.register(rateLimit, { max: 100, timeWindow: '1 minute', ban: 3, errorResponseBuilder: (_request, context) => ({ error: { code: 'RATE_LIMITED', message: `Muitas requisições. Tente novamente em ${context.after}.`, requestId: _request.id } }) });
   if (dependencies.authRepository) registerAuthRoutes(app, environment, dependencies.authRepository);
   if (dependencies.authRepository && dependencies.storeRepository) registerStoreRoutes(app, environment, dependencies.authRepository, dependencies.storeRepository);
+  if (dependencies.authRepository && dependencies.shopifyRepository) registerShopifyRoutes(app, environment, dependencies.authRepository, dependencies.shopifyRepository);
   if (dependencies.authRepository && dependencies.catalogRepository) registerCatalogRoutes(app, environment, dependencies.authRepository, dependencies.catalogRepository);
 
   app.get<{ Reply: HealthResponse }>('/health/live', () => ({ status: 'ok', service: 'solid-api', version: '0.1.0', timestamp: new Date().toISOString() }));

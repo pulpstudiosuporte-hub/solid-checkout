@@ -32,7 +32,8 @@ export function registerStoreRoutes(app: FastifyInstance, environment: AppEnviro
     const session = await authenticate(request, true);
     if (!session) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
     const name = typeof request.body?.name === 'string' ? request.body.name.trim() : '';
-    if (name.length < 3 || name.length > 120 || /[\u0000-\u001f\u007f]/.test(name)) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'O nome da loja deve ter entre 3 e 120 caracteres.'));
+    const hasControlCharacter = Array.from(name).some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127);
+    if (name.length < 3 || name.length > 120 || hasControlCharacter) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'O nome da loja deve ter entre 3 e 120 caracteres.'));
     const slug = `${slugify(name)}-${randomBytes(4).toString('hex')}`;
     const store = await stores.createForUser(session.userId, session.sessionId, name, slug, request.id);
     if (!store) return reply.code(409).send(errorBody(request, 'STORE_LIMIT_REACHED', 'Limite de lojas atingido.'));
