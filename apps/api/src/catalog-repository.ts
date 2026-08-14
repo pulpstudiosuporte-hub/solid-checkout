@@ -9,6 +9,7 @@ export type ProductListResult = Readonly<{ items: readonly object[]; total: numb
 export interface CatalogRepository {
   resolveStoreContext(userId: string, sessionId: string): Promise<StoreContext | null>;
   listProducts(context: StoreContext, query: ProductListQuery): Promise<ProductListResult>;
+  getProduct(context: StoreContext, publicId: string): Promise<object | null>;
   createProduct(context: StoreContext, input: ProductInput, requestId: string): Promise<object>;
   listCheckouts(context: StoreContext): Promise<readonly object[]>;
   createCheckout(context: StoreContext, input: CheckoutInput, requestId: string): Promise<object | null>;
@@ -30,6 +31,9 @@ export class PrismaCatalogRepository implements CatalogRepository {
     const where: Prisma.ProductWhereInput = { storeId: context.storeId, ...(query.status ? { active: query.status === 'active' } : {}), ...(query.source ? { source: query.source } : {}), ...(query.search ? { OR: [{ checkoutTitle: { contains: query.search, mode: 'insensitive' } }, { sourceTitle: { contains: query.search, mode: 'insensitive' } }, { vendor: { contains: query.search, mode: 'insensitive' } }, { handle: { contains: query.search, mode: 'insensitive' } }] } : {}) };
     const [items, total] = await this.database.$transaction([this.database.product.findMany({ where, orderBy: { updatedAt: 'desc' }, skip: (query.page - 1) * query.pageSize, take: query.pageSize, select: productSelect }), this.database.product.count({ where })]);
     return { items, total };
+  }
+  getProduct(context: StoreContext, publicId: string): Promise<object | null> {
+    return this.database.product.findFirst({ where: { storeId: context.storeId, publicId }, select: { ...productSelect, sourceDescriptionHtml: true, tags: true, variants: { orderBy: { createdAt: 'asc' }, select: { publicId: true, title: true, sku: true, barcode: true, priceCents: true, compareAtCents: true, inventoryQuantity: true, availableForSale: true, imageUrl: true, selectedOptions: true } }, images: { orderBy: { position: 'asc' }, select: { id: true, url: true, altText: true, width: true, height: true, position: true } }, collections: { select: { collection: { select: { publicId: true, title: true, handle: true, imageUrl: true } } } } } });
   }
   async createProduct(context: StoreContext, input: ProductInput, requestId: string): Promise<object> {
     return this.database.$transaction(async transaction => {

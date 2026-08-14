@@ -39,6 +39,16 @@ export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvi
     return reply.send({ ...result, page, pageSize, pages: Math.max(1, Math.ceil(result.total / pageSize)) });
   });
 
+  app.get<{ Params: { productId: string } }>('/products/:productId', async (request, reply) => {
+    const context = await authenticate(request);
+    if (!context) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
+    const productId = text(request.params.productId, 32);
+    if (!productId) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Produto inválido.'));
+    const product = await catalog.getProduct(context, productId);
+    if (!product) return reply.code(404).send(errorBody(request, 'PRODUCT_NOT_FOUND', 'Produto não encontrado.'));
+    return reply.send({ product });
+  });
+
   app.post<{ Body: Record<string, unknown> }>('/products', async (request, reply) => {
     const context = await authenticate(request, true);
     if (!context) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));

@@ -25,6 +25,7 @@ class MemoryCatalog implements CatalogRepository {
   checkouts: Array<Record<string, unknown>> = [];
   resolveStoreContext(userId: string, sessionId: string): Promise<StoreContext | null> { return Promise.resolve({ userId, sessionId, storeId: 'store-a', role: this.role }); }
   listProducts(context: StoreContext) { const items = this.products.filter(product => product.storeId === context.storeId); return Promise.resolve({ items, total: items.length }); }
+  getProduct(context: StoreContext, publicId: string) { return Promise.resolve(this.products.find(product => product.storeId === context.storeId && product.publicId === publicId) ?? null); }
   createProduct(context: StoreContext, input: ProductInput): Promise<object> { const product = { publicId: 'new-product', storeId: context.storeId, checkoutTitle: input.title, ...input }; this.products.push(product); return Promise.resolve(product); }
   listCheckouts(context: StoreContext): Promise<readonly object[]> { return Promise.resolve(this.checkouts.filter(checkout => checkout.storeId === context.storeId)); }
   createCheckout(context: StoreContext, input: CheckoutInput): Promise<object | null> { if (!this.products.some(product => product.publicId === input.productPublicId && product.storeId === context.storeId)) return Promise.resolve(null); const checkout = { publicId: 'new-checkout', storeId: context.storeId, ...input }; this.checkouts.push(checkout); return Promise.resolve(checkout); }
@@ -38,6 +39,8 @@ describe('catálogo isolado por loja', () => {
     expect((await app.inject({ method: 'GET', url: '/products' })).statusCode).toBe(401);
     const response = await app.inject({ method: 'GET', url: '/products', headers: { cookie: `solid_session=${sessionToken}` } });
     expect(response.statusCode).toBe(200); expect(response.json<{ items: Array<{ storeId: string }> }>().items).toHaveLength(1); expect(response.json<{ items: Array<{ storeId: string }> }>().items[0]?.storeId).toBe('store-a');
+    expect((await app.inject({ method: 'GET', url: '/products/product-a', headers: { cookie: `solid_session=${sessionToken}` } })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/products/product-b', headers: { cookie: `solid_session=${sessionToken}` } })).statusCode).toBe(404);
     await app.close();
   });
 
