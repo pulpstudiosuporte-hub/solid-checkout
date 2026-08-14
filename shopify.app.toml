@@ -1,0 +1,25 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "7f047a2e645fed7adf0cdc3baac62829"
+application_url = "https://app.solidcheckout.xyz"
+embedded = false
+name = "SOLID Checkout"
+
+[app_proxy]
+url = "https://api.solidcheckout.xyz/integrations/shopify/proxy"
+subpath = "solid-checkout"
+prefix = "apps"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_products"
+optional_scopes = [ ]
+use_legacy_install_flow = true
+
+[auth]
+redirect_urls = [
+  "https://api.solidcheckout.xyz/integrations/shopify/callback"
+]
+
+[webhooks]
+api_version = "2026-07"
