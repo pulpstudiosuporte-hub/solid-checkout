@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@solid/database';
 
 export type LoginUser = Readonly<{ id: string; publicId: string; name: string; email: string; passwordHash: string | null; disabledAt: Date | null }>;
-export type SessionUser = Readonly<{ sessionId: string; csrfTokenHash: string; user: { publicId: string; name: string; email: string }; expiresAt: Date; absoluteExpiresAt: Date }>;
+export type SessionUser = Readonly<{ sessionId: string; userId: string; csrfTokenHash: string; user: { publicId: string; name: string; email: string }; expiresAt: Date; absoluteExpiresAt: Date }>;
 
 export interface AuthRepository {
   findUserByEmail(email: string): Promise<LoginUser | null>;
@@ -23,9 +23,9 @@ export class PrismaAuthRepository implements AuthRepository {
   async findActiveSession(tokenHash: string, now: Date): Promise<SessionUser | null> {
     const session = await this.database.session.findFirst({
       where: { tokenHash, revokedAt: null, expiresAt: { gt: now }, absoluteExpiresAt: { gt: now }, user: { disabledAt: null } },
-      select: { id: true, csrfTokenHash: true, expiresAt: true, absoluteExpiresAt: true, user: { select: { publicId: true, name: true, email: true } } }
+      select: { id: true, userId: true, csrfTokenHash: true, expiresAt: true, absoluteExpiresAt: true, user: { select: { publicId: true, name: true, email: true } } }
     });
-    return session ? { sessionId: session.id, csrfTokenHash: session.csrfTokenHash, expiresAt: session.expiresAt, absoluteExpiresAt: session.absoluteExpiresAt, user: session.user } : null;
+    return session ? { sessionId: session.id, userId: session.userId, csrfTokenHash: session.csrfTokenHash, expiresAt: session.expiresAt, absoluteExpiresAt: session.absoluteExpiresAt, user: session.user } : null;
   }
   async touchSession(sessionId: string, expiresAt: Date, now: Date): Promise<void> {
     await this.database.session.update({ where: { id: sessionId }, data: { expiresAt, lastSeenAt: now } });

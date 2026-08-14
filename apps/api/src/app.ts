@@ -6,8 +6,10 @@ import type { AppEnvironment } from '@solid/config';
 import type { ErrorResponse, HealthResponse } from '@solid/contracts';
 import type { AuthRepository } from './auth-repository.js';
 import { registerAuthRoutes } from './auth-routes.js';
+import type { CatalogRepository } from './catalog-repository.js';
+import { registerCatalogRoutes } from './catalog-routes.js';
 
-export function buildApp(environment: AppEnvironment, dependencies: { authRepository?: AuthRepository } = {}): FastifyInstance {
+export function buildApp(environment: AppEnvironment, dependencies: { authRepository?: AuthRepository; catalogRepository?: CatalogRepository } = {}): FastifyInstance {
   const app = Fastify({
     logger: environment.NODE_ENV === 'test' ? false : { level: environment.LOG_LEVEL, redact: { paths: ['req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie', '*.password', '*.token', '*.cpf'], censor: '[REDACTED]' } },
     trustProxy: environment.TRUST_PROXY,
@@ -20,6 +22,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
   void app.register(cors, { origin: environment.CORS_ORIGINS, credentials: true, methods: ['GET', 'POST', 'PATCH', 'DELETE'], allowedHeaders: ['content-type', 'x-csrf-token', 'x-request-id'], maxAge: 600 });
   void app.register(rateLimit, { max: 100, timeWindow: '1 minute', ban: 3, errorResponseBuilder: (_request, context) => ({ error: { code: 'RATE_LIMITED', message: `Muitas requisições. Tente novamente em ${context.after}.`, requestId: _request.id } }) });
   if (dependencies.authRepository) registerAuthRoutes(app, environment, dependencies.authRepository);
+  if (dependencies.authRepository && dependencies.catalogRepository) registerCatalogRoutes(app, environment, dependencies.authRepository, dependencies.catalogRepository);
 
   app.get<{ Reply: HealthResponse }>('/health/live', () => ({ status: 'ok', service: 'solid-api', version: '0.1.0', timestamp: new Date().toISOString() }));
   app.get<{ Reply: HealthResponse }>('/health/ready', () => ({ status: 'ok', service: 'solid-api', version: '0.1.0', timestamp: new Date().toISOString() }));

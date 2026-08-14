@@ -18,6 +18,17 @@ enum AuditActorType {
   SYSTEM
 }
 
+enum ProductSource {
+  MANUAL
+  SHOPIFY
+}
+
+enum CheckoutStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 model User {
   id              String        @id @default(uuid()) @db.Uuid
   publicId        String        @unique @default(cuid()) @map("public_id") @db.VarChar(32)
@@ -46,8 +57,56 @@ model Store {
   updatedAt DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
   members   StoreMember[]
   auditLogs AuditLog[]
+  products  Product[]
+  checkouts Checkout[]
 
   @@map("stores")
+}
+
+model Product {
+  id                  String        @id @default(uuid()) @db.Uuid
+  publicId            String        @unique @default(cuid()) @map("public_id") @db.VarChar(32)
+  storeId             String        @map("store_id") @db.Uuid
+  source              ProductSource @default(MANUAL)
+  sourceExternalId    String?       @map("source_external_id") @db.VarChar(128)
+  sourceTitle         String        @map("source_title") @db.VarChar(240)
+  checkoutTitle       String        @map("checkout_title") @db.VarChar(240)
+  checkoutDescription String?       @map("checkout_description") @db.Text
+  imageUrl            String?       @map("image_url") @db.VarChar(2048)
+  priceCents          Int           @map("price_cents")
+  compareAtCents      Int?          @map("compare_at_cents")
+  stockQuantity       Int?          @map("stock_quantity")
+  trackInventory      Boolean       @default(false) @map("track_inventory")
+  maxPerOrder         Int           @default(10) @map("max_per_order")
+  active              Boolean       @default(true)
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  store               Store         @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  checkouts           Checkout[]
+
+  @@unique([storeId, source, sourceExternalId])
+  @@index([storeId, active, createdAt(sort: Desc)])
+  @@map("products")
+}
+
+model Checkout {
+  id          String         @id @default(uuid()) @db.Uuid
+  publicId    String         @unique @default(cuid()) @map("public_id") @db.VarChar(32)
+  storeId     String         @map("store_id") @db.Uuid
+  productId   String         @map("product_id") @db.Uuid
+  name        String         @db.VarChar(120)
+  slug        String         @db.VarChar(80)
+  status      CheckoutStatus @default(DRAFT)
+  draftConfig Json           @default("{}") @map("draft_config")
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  store       Store          @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  product     Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([storeId, slug])
+  @@index([storeId, status, createdAt(sort: Desc)])
+  @@index([storeId, productId])
+  @@map("checkouts")
 }
 
 model StoreMember {
