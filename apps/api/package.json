@@ -9,7 +9,8 @@
     "start": "node dist/src/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --dir test",
-    "auth:bootstrap": "node dist/src/bootstrap-admin.js"
+    "auth:bootstrap": "node dist/src/bootstrap-admin.js",
+    "auth:reset-password": "node dist/src/reset-admin-password.js"
   },
   "dependencies": {
     "@fastify/cookie": "11.1.2",
