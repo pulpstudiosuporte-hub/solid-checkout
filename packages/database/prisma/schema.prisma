@@ -29,6 +29,13 @@ enum CheckoutStatus {
   ARCHIVED
 }
 
+enum CheckoutSessionStatus {
+  OPEN
+  EXPIRED
+  COMPLETED
+  CANCELLED
+}
+
 model User {
   id              String        @id @default(uuid()) @db.Uuid
   publicId        String        @unique @default(cuid()) @map("public_id") @db.VarChar(32)
@@ -121,6 +128,7 @@ model ProductVariant {
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
   product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  checkoutSessions CheckoutSession[]
 
   @@unique([productId, sourceExternalId])
   @@index([productId])
@@ -190,11 +198,37 @@ model Checkout {
   updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
   store       Store          @relation(fields: [storeId], references: [id], onDelete: Restrict)
   product     Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  sessions    CheckoutSession[]
 
   @@unique([storeId, slug])
   @@index([storeId, status, createdAt(sort: Desc)])
   @@index([storeId, productId])
   @@map("checkouts")
+}
+
+model CheckoutSession {
+  id                String                @id @default(uuid()) @db.Uuid
+  publicId          String                @unique @default(cuid()) @map("public_id") @db.VarChar(32)
+  tokenHash         String                @unique @map("token_hash") @db.Char(64)
+  checkoutId        String                @map("checkout_id") @db.Uuid
+  variantId         String?               @map("variant_id") @db.Uuid
+  quantity          Int
+  unitPriceCents    Int                   @map("unit_price_cents")
+  totalCents        Int                   @map("total_cents")
+  currency          String                @default("BRL") @db.Char(3)
+  status            CheckoutSessionStatus @default(OPEN)
+  source             String                @default("DIRECT") @db.VarChar(32)
+  sourceCartId       String?               @map("source_cart_id") @db.VarChar(255)
+  expiresAt         DateTime              @map("expires_at") @db.Timestamptz(3)
+  completedAt       DateTime?             @map("completed_at") @db.Timestamptz(3)
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  checkout          Checkout              @relation(fields: [checkoutId], references: [id], onDelete: Restrict)
+  variant           ProductVariant?       @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([checkoutId, status, expiresAt])
+  @@index([expiresAt])
+  @@map("checkout_sessions")
 }
 
 model ShopifyConnection {

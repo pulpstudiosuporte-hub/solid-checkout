@@ -78,4 +78,14 @@ export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvi
     if (!checkout) return reply.code(404).send(errorBody(request, 'PRODUCT_NOT_FOUND', 'Produto não encontrado.'));
     return reply.code(201).send({ checkout });
   });
+
+  app.post<{ Params: { checkoutId: string } }>('/checkouts/:checkoutId/publish', async (request, reply) => {
+    const context = await authenticate(request, true);
+    if (!context || !canWrite(context)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    const checkoutId = text(request.params.checkoutId, 32);
+    if (!checkoutId) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Checkout inválido.'));
+    const checkout = await catalog.publishCheckout(context, checkoutId, request.id);
+    if (!checkout) return reply.code(404).send(errorBody(request, 'CHECKOUT_NOT_FOUND', 'Checkout não encontrado ou produto indisponível.'));
+    return reply.send({ checkout });
+  });
 }

@@ -15,6 +15,7 @@ import AccountSettings from './AccountSettings';
 import StoreSwitcher from './StoreSwitcher';
 import ShopifyIntegration from './ShopifyIntegration';
 import ProductsPage from './ProductsPage';
+import PublicCheckout from './PublicCheckout';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -128,10 +129,12 @@ function App(){
   const [stores,setStores]=useState([]); const [storeBusy,setStoreBusy]=useState(false);
   useEffect(()=>{let active=true; getApiHealth().then(()=>active&&setApiStatus('online')).catch(()=>active&&setApiStatus('offline')); getSession().then(result=>active&&setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken})).catch(()=>active&&setAuth({status:'anonymous',user:null,csrfToken:null})); return()=>{active=false}},[]);
   useEffect(()=>{if(auth.status!=='authenticated')return;let active=true;getStores().then(result=>active&&setStores(result.items)).catch(()=>active&&setApiStatus('offline'));return()=>{active=false}},[auth.status]);
+  const publicMatch = window.location.pathname.match(/^\/c\/([a-z0-9-]+)\/([a-z0-9-]+)\/?$/) || window.location.hash.match(/^#\/c\/([a-z0-9-]+)\/([a-z0-9-]+)\/?$/);
   async function handleLogin(email,password){const result=await login(email,password); setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken}); window.history.replaceState({},'', '/');}
   async function handleLogout(){try{await logout(auth.csrfToken);}finally{setAuth({status:'anonymous',user:null,csrfToken:null});setStores([]);setCheckout(false);setEditor(false);window.history.replaceState({},'', '/#/login');}}
   async function handleSelectStore(storeId){setStoreBusy(true);try{await selectStore(storeId,auth.csrfToken);setStores(current=>current.map(store=>({...store,active:store.publicId===storeId})));setPage('Visão geral');}finally{setStoreBusy(false)}}
   async function handleCreateStore(name){setStoreBusy(true);try{const result=await createStore(name,auth.csrfToken);setStores(current=>[...current.map(store=>({...store,active:false})),result.store]);setPage('Visão geral');}finally{setStoreBusy(false)}}
+  if(publicMatch) return <PublicCheckout storeSlug={publicMatch[1]} checkoutSlug={publicMatch[2]}/>;
   if(auth.status==='checking') return <SessionLoading/>;
   if(auth.status==='anonymous'){if(window.location.hash!=='#/login')window.history.replaceState({},'', '/#/login');return <Login onSubmit={handleLogin}/>;}
   if(window.location.hash==='#/login')window.history.replaceState({},'', '/');

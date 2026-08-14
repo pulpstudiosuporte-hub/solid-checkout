@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { AppEnvironment } from '@solid/config';
 import { buildApp } from '../src/app.js';
 import type { AuthRepository, LoginUser, SessionUser } from '../src/auth-repository.js';
-import type { CatalogRepository, CheckoutInput, ProductInput, StoreContext } from '../src/catalog-repository.js';
+import type { CatalogRepository, CheckoutInput, CheckoutSessionInput, ProductInput, StoreContext } from '../src/catalog-repository.js';
 
 const origin = 'http://localhost:5173';
 const env: AppEnvironment = { NODE_ENV: 'test', API_HOST: '127.0.0.1', API_PORT: 3333, LOG_LEVEL: 'silent', CORS_ORIGINS: [origin], TRUST_PROXY: false };
@@ -29,6 +29,10 @@ class MemoryCatalog implements CatalogRepository {
   createProduct(context: StoreContext, input: ProductInput): Promise<object> { const product = { publicId: 'new-product', storeId: context.storeId, checkoutTitle: input.title, ...input }; this.products.push(product); return Promise.resolve(product); }
   listCheckouts(context: StoreContext): Promise<readonly object[]> { return Promise.resolve(this.checkouts.filter(checkout => checkout.storeId === context.storeId)); }
   createCheckout(context: StoreContext, input: CheckoutInput): Promise<object | null> { if (!this.products.some(product => product.publicId === input.productPublicId && product.storeId === context.storeId)) return Promise.resolve(null); const checkout = { publicId: 'new-checkout', storeId: context.storeId, ...input }; this.checkouts.push(checkout); return Promise.resolve(checkout); }
+  publishCheckout(context: StoreContext, publicId: string): Promise<object | null> { const checkout = this.checkouts.find(item => item.storeId === context.storeId && item.publicId === publicId); if (checkout) checkout.status = 'PUBLISHED'; return Promise.resolve(checkout ?? null); }
+  getPublicCheckout(storeSlug: string, checkoutSlug: string): Promise<object | null> { return Promise.resolve(storeSlug === 'store-a' && checkoutSlug === 'checkout-a' ? { slug: checkoutSlug, product: this.products[0] } : null); }
+  createPublicCheckoutSession(input: CheckoutSessionInput): Promise<object | null> { return Promise.resolve(input.storeSlug === 'store-a' && input.checkoutSlug === 'checkout-a' ? { publicId: 'session-a', totalCents: 9900 * input.quantity } : null); }
+  getPublicCheckoutSession(publicId: string, tokenHash: string): Promise<object | null> { return Promise.resolve(publicId === 'session-a' && tokenHash ? { publicId, totalCents: 9900 } : null); }
 }
 
 const authenticatedHeaders = { origin, cookie: `solid_session=${sessionToken}; solid_csrf=${csrfToken}`, 'x-csrf-token': csrfToken };
@@ -60,6 +64,24 @@ describe('catálogo isolado por loja', () => {
     catalog.role = 'ANALYST';
     const forbidden = await app.inject({ method: 'POST', url: '/products', headers: authenticatedHeaders, payload: { title: 'Produto', priceCents: 1000 } });
     expect(forbidden.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it('cria sessão pública com token opaco e preço calculado no servidor', async () => {
+    const app = buildApp(env, { authRepository: new MemoryAuth(), catalogRepository: new MemoryCatalog() });
+    expect((await app.inject({ method: 'GET', url: '/public/checkouts/store-b/checkout-a' })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'GET', url: '/public/checkouts/store-a/checkout-a' })).statusCode).toBe(200);
+    const created = await app.inject({ method: 'POST', url: '/public/checkouts/store-a/checkout-a/sessions', payload: { quantity: 2 } });
+    expect(created.statusCode).toBe(201);
+    expect(created.json<{ session: { publicId: string; totalCents: number } }>().session).toMatchObject({ publicId: 'session-a', totalCents: 19800 });
+    expect(created.json<{ token: string }>().token.length).toBeGreaterThanOrEqual(43);
+    await app.close();
+  });
+
+  it('recusa quantidade e variante manipuladas no checkout público', async () => {
+    const app = buildApp(env, { authRepository: new MemoryAuth(), catalogRepository: new MemoryCatalog() });
+    expect((await app.inject({ method: 'POST', url: '/public/checkouts/store-a/checkout-a/sessions', payload: { quantity: 0 } })).statusCode).toBe(400);
+    expect((await app.inject({ method: 'POST', url: '/public/checkouts/store-a/checkout-a/sessions', payload: { quantity: 1, variantId: '../foreign' } })).statusCode).toBe(400);
     await app.close();
   });
 });
