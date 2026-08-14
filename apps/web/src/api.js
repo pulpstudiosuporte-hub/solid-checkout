@@ -62,3 +62,18 @@ export async function changePassword(currentPassword, newPassword, csrfToken) {
   });
   if (response.status !== 204) await readJson(response);
 }
+
+export async function getStores() {
+  const response = await fetch(`${apiBaseUrl}/stores`, { credentials: 'include', headers: { Accept: 'application/json' } });
+  return readJson(response);
+}
+
+export async function createStore(name, csrfToken) {
+  const response = await fetch(`${apiBaseUrl}/stores`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify({ name }) });
+  return readJson(response);
+}
+
+export async function selectStore(storeId, csrfToken) {
+  const response = await fetch(`${apiBaseUrl}/stores/${encodeURIComponent(storeId)}/select`, { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken } });
+  return readJson(response);
+}

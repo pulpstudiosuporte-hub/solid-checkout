@@ -18,7 +18,10 @@ const checkoutSelect = { publicId: true, name: true, slug: true, status: true, d
 export class PrismaCatalogRepository implements CatalogRepository {
   constructor(private readonly database: PrismaClient) {}
   async resolveStoreContext(userId: string, sessionId: string): Promise<StoreContext | null> {
-    const membership = await this.database.storeMember.findFirst({ where: { userId, store: { active: true } }, orderBy: { createdAt: 'asc' }, select: { storeId: true, role: true } });
+    const session = await this.database.session.findFirst({ where: { id: sessionId, userId, revokedAt: null }, select: { activeStoreId: true } });
+    const membership = session?.activeStoreId
+      ? await this.database.storeMember.findFirst({ where: { userId, storeId: session.activeStoreId, store: { active: true } }, select: { storeId: true, role: true } })
+      : await this.database.storeMember.findFirst({ where: { userId, store: { active: true } }, orderBy: { createdAt: 'asc' }, select: { storeId: true, role: true } });
     return membership ? { storeId: membership.storeId, userId, sessionId, role: membership.role } : null;
   }
   listProducts(context: StoreContext): Promise<readonly unknown[]> {

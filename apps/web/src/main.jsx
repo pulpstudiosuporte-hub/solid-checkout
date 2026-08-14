@@ -9,9 +9,10 @@ import {
 } from 'lucide-react';
 import './styles.css';
 import CheckoutEditor, { defaultCheckoutConfig } from './CheckoutEditor';
-import { getApiHealth, getSession, login, logout } from './api';
+import { createStore, getApiHealth, getSession, getStores, login, logout, selectStore } from './api';
 import Login, { SessionLoading } from './Auth';
 import AccountSettings from './AccountSettings';
+import StoreSwitcher from './StoreSwitcher';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -38,12 +39,12 @@ function Logo({ compact = false }) {
 
 function Badge({ children, tone = 'neutral' }) { return <span className={`badge ${tone}`}>{children}</span>; }
 
-function Sidebar({ open, onClose, page, setPage, user, onLogout }) {
+function Sidebar({ open, onClose, page, setPage, user, onLogout, stores, storeBusy, onSelectStore, onCreateStore }) {
   return <>
     {open && <button className="backdrop" onClick={onClose} aria-label="Fechar menu" />}
     <aside className={`sidebar ${open ? 'open' : ''}`}>
       <div className="side-head"><Logo /><button className="icon-btn mobile-only" onClick={onClose}><X size={19}/></button></div>
-      <button className="store-switch"><span className="store-avatar">S</span><span><b>Solid Store</b><small>solid-demo</small></span><ChevronDown size={16}/></button>
+      <StoreSwitcher stores={stores} busy={storeBusy} onSelect={onSelectStore} onCreate={onCreateStore}/>
       <nav aria-label="Menu principal">
         <small className="nav-title">GESTÃO</small>
         {nav.map(item => <button key={item.label} className={page === item.label ? 'nav-item active' : 'nav-item'} onClick={() => { setPage(item.label); onClose(); }}>
@@ -122,15 +123,19 @@ function Checkout({ onBack, customConfig }) {
 function App(){
   const [sidebar,setSidebar]=useState(false); const [page,setPage]=useState('Visão geral'); const [checkout,setCheckout]=useState(false); const [editor,setEditor]=useState(false); const [previewConfig,setPreviewConfig]=useState(null); const [apiStatus,setApiStatus]=useState('checking');
   const [auth,setAuth]=useState({status:'checking',user:null,csrfToken:null});
+  const [stores,setStores]=useState([]); const [storeBusy,setStoreBusy]=useState(false);
   useEffect(()=>{let active=true; getApiHealth().then(()=>active&&setApiStatus('online')).catch(()=>active&&setApiStatus('offline')); getSession().then(result=>active&&setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken})).catch(()=>active&&setAuth({status:'anonymous',user:null,csrfToken:null})); return()=>{active=false}},[]);
+  useEffect(()=>{if(auth.status!=='authenticated')return;let active=true;getStores().then(result=>active&&setStores(result.items)).catch(()=>active&&setApiStatus('offline'));return()=>{active=false}},[auth.status]);
   async function handleLogin(email,password){const result=await login(email,password); setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken}); window.history.replaceState({},'', '/');}
-  async function handleLogout(){try{await logout(auth.csrfToken);}finally{setAuth({status:'anonymous',user:null,csrfToken:null});setCheckout(false);setEditor(false);window.history.replaceState({},'', '/#/login');}}
+  async function handleLogout(){try{await logout(auth.csrfToken);}finally{setAuth({status:'anonymous',user:null,csrfToken:null});setStores([]);setCheckout(false);setEditor(false);window.history.replaceState({},'', '/#/login');}}
+  async function handleSelectStore(storeId){setStoreBusy(true);try{await selectStore(storeId,auth.csrfToken);setStores(current=>current.map(store=>({...store,active:store.publicId===storeId})));setPage('Visão geral');}finally{setStoreBusy(false)}}
+  async function handleCreateStore(name){setStoreBusy(true);try{const result=await createStore(name,auth.csrfToken);setStores(current=>[...current.map(store=>({...store,active:false})),result.store]);setPage('Visão geral');}finally{setStoreBusy(false)}}
   if(auth.status==='checking') return <SessionLoading/>;
   if(auth.status==='anonymous'){if(window.location.hash!=='#/login')window.history.replaceState({},'', '/#/login');return <Login onSubmit={handleLogin}/>;}
   if(window.location.hash==='#/login')window.history.replaceState({},'', '/');
   if(editor) return <CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/>;
   if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>;
-  return <div className="app"><Sidebar open={sidebar} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout}/><div className="main-shell"><Header toggleSidebar={()=>setSidebar(true)} onCheckout={()=>setCheckout(true)} apiStatus={apiStatus}/>{page==='Visão geral'?<Dashboard setPage={setPage}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)}/>}</div></div>
+  return <div className="app"><Sidebar open={sidebar} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout} stores={stores} storeBusy={storeBusy} onSelectStore={handleSelectStore} onCreateStore={handleCreateStore}/><div className="main-shell"><Header toggleSidebar={()=>setSidebar(true)} onCheckout={()=>setCheckout(true)} apiStatus={apiStatus}/>{page==='Visão geral'?<Dashboard setPage={setPage}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)}/>}</div></div>
 }
 
 createRoot(document.getElementById('root')).render(<App/>);
