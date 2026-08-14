@@ -3,16 +3,19 @@ import { hashPassword } from './password.js';
 
 const databaseUrl = process.env['DATABASE_URL'];
 const email = process.env['SOLID_RESET_EMAIL']?.trim().toLowerCase();
-const password = process.env['SOLID_RESET_PASSWORD'];
+const encodedPassword = process.env['SOLID_RESET_PASSWORD_BASE64URL'];
 const confirmation = process.env['SOLID_RESET_CONFIRM'];
 
-if (!databaseUrl || !email || !password) {
-  throw new Error('DATABASE_URL, SOLID_RESET_EMAIL e SOLID_RESET_PASSWORD são obrigatórias');
+if (!databaseUrl || !email || !encodedPassword) {
+  throw new Error('DATABASE_URL, SOLID_RESET_EMAIL e SOLID_RESET_PASSWORD_BASE64URL são obrigatórias');
 }
 if (confirmation !== 'RESET_PASSWORD') {
   throw new Error('Reset recusado: defina SOLID_RESET_CONFIRM=RESET_PASSWORD');
 }
 if (!/^\S+@\S+\.\S+$/.test(email) || email.length > 320) throw new Error('SOLID_RESET_EMAIL inválido');
+if (!/^[A-Za-z0-9_-]+$/.test(encodedPassword)) throw new Error('SOLID_RESET_PASSWORD_BASE64URL inválida');
+const password = Buffer.from(encodedPassword, 'base64url').toString('utf8');
+if (Buffer.from(password, 'utf8').toString('base64url') !== encodedPassword) throw new Error('SOLID_RESET_PASSWORD_BASE64URL inválida');
 
 const database = createDatabaseClient(databaseUrl);
 try {
