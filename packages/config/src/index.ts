@@ -38,6 +38,6 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): AppEnvironment {
   }
   if (result.data.NODE_ENV === 'production' && !result.data.DATABASE_URL) throw new Error('DATABASE_URL é obrigatória em produção');
   const shopifyValues = [result.data.APP_URL, result.data.SHOPIFY_CLIENT_ID, result.data.SHOPIFY_CLIENT_SECRET, result.data.SHOPIFY_REDIRECT_URI, result.data.APP_ENCRYPTION_KEY];
-  if (shopifyValues.some(Boolean) && !shopifyValues.every(Boolean)) throw new Error('A configuraÃ§Ã£o Shopify estÃ¡ incompleta');
+  if (shopifyValues.some(Boolean) && !shopifyValues.every(Boolean)) throw new Error('A configuração Shopify está incompleta');
   return { ...result.data, TRUST_PROXY: result.data.TRUST_PROXY === 'true' };
 }

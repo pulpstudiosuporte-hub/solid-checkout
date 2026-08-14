@@ -23,18 +23,18 @@ export function registerShopifyRoutes(app: FastifyInstance, environment: AppEnvi
   const redirectResult = (result: string): string => `${environment.APP_URL}/#/integrations?shopify=${encodeURIComponent(result)}`;
 
   app.get('/integrations/shopify/status', async (request, reply) => {
-    const current = await session(request); if (!current) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'AutenticaÃ§Ã£o necessÃ¡ria.'));
+    const current = await session(request); if (!current) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     const context = await repository.context(current.userId, current.sessionId); if (!context) return reply.code(409).send(errorBody(request, 'STORE_REQUIRED', 'Selecione uma loja.'));
     return reply.send({ configured, ...(await repository.status(context.storeId)) });
   });
 
   app.post<{ Body: { shop?: unknown } }>('/integrations/shopify/connect', async (request, reply) => {
     const current = await session(request); if (!current || !csrfValid(request, current)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
-    if (!configured) return reply.code(503).send(errorBody(request, 'SHOPIFY_NOT_CONFIGURED', 'A integraÃ§Ã£o Shopify ainda nÃ£o foi configurada no servidor.'));
-    const context = await repository.context(current.userId, current.sessionId); if (!context || context.role === 'ANALYST') return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Somente proprietÃ¡rios e administradores podem conectar integraÃ§Ãµes.'));
+    if (!configured) return reply.code(503).send(errorBody(request, 'SHOPIFY_NOT_CONFIGURED', 'A integração Shopify ainda não foi configurada no servidor.'));
+    const context = await repository.context(current.userId, current.sessionId); if (!context || context.role === 'ANALYST') return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Somente proprietários e administradores podem conectar integrações.'));
     const rawShop = typeof request.body?.shop === 'string' ? request.body.shop.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '') : '';
     const shop = rawShop.includes('.') ? rawShop : `${rawShop}.myshopify.com`;
-    if (!shopPattern.test(shop)) return reply.code(400).send(errorBody(request, 'INVALID_SHOP', 'Informe um domÃ­nio myshopify.com vÃ¡lido.'));
+    if (!shopPattern.test(shop)) return reply.code(400).send(errorBody(request, 'INVALID_SHOP', 'Informe um domínio myshopify.com válido.'));
     const state = randomBytes(32).toString('base64url'); const expiresAt = new Date(Date.now() + 10 * 60_000);
     await repository.createState({ stateHash: sha256(state), storeId: context.storeId, userId: current.userId, sessionId: current.sessionId, shopDomain: shop, expiresAt });
     const signature = createHmac('sha256', environment.SHOPIFY_CLIENT_SECRET!).update(state).digest('base64url');
@@ -43,7 +43,7 @@ export function registerShopifyRoutes(app: FastifyInstance, environment: AppEnvi
   });
 
   app.get<{ Querystring: Record<string, string | undefined> }>('/integrations/shopify/callback', async (request, reply) => {
-    if (!configured) return reply.code(503).send(errorBody(request, 'SHOPIFY_NOT_CONFIGURED', 'IntegraÃ§Ã£o indisponÃ­vel.'));
+    if (!configured) return reply.code(503).send(errorBody(request, 'SHOPIFY_NOT_CONFIGURED', 'Integração indisponível.'));
     const current = await session(request); const { code, hmac, shop, state, timestamp } = request.query;
     const cookie = request.cookies[oauthCookie]; const [cookieState, cookieSignature] = cookie?.split('.') ?? [];
     const expectedCookieSignature = cookieState ? createHmac('sha256', environment.SHOPIFY_CLIENT_SECRET!).update(cookieState).digest('base64url') : '';
