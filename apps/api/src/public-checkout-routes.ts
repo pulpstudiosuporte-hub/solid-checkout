@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
 import type { CatalogRepository } from './catalog-repository.js';
 import { encryptSecret } from './shopify-crypto.js';
+import { lookupBrazilianPostalCode, PostalCodeLookupError } from './postal-code.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const slug = (value: unknown): string | null => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) && value.length <= 80 ? value : null;
@@ -20,6 +21,19 @@ const validProxySignature = (query: Record<string, string | string[] | undefined
 };
 
 export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: AppEnvironment, catalog: CatalogRepository): void {
+  app.get<{ Params: { postalCode: string } }>('/public/postal-codes/:postalCode', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const postalCode = digits(request.params.postalCode);
+    if (postalCode.length !== 8) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'CEP inválido.'));
+    try {
+      const address = await lookupBrazilianPostalCode(postalCode);
+      return reply.header('cache-control', 'public, max-age=86400, stale-while-revalidate=604800').send({ address });
+    } catch (lookupError) {
+      if (lookupError instanceof PostalCodeLookupError && lookupError.code === 'NOT_FOUND') return reply.code(404).send(errorBody(request, 'POSTAL_CODE_NOT_FOUND', 'CEP não encontrado. Confira os números ou preencha o endereço manualmente.'));
+      request.log.warn({ err: lookupError }, 'postal code provider unavailable');
+      return reply.code(503).send(errorBody(request, 'POSTAL_CODE_UNAVAILABLE', 'Não foi possível consultar o CEP agora. Preencha o endereço manualmente.'));
+    }
+  });
+
   app.get<{ Params: { storeSlug: string; checkoutSlug: string } }>('/public/checkouts/:storeSlug/:checkoutSlug', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (request, reply) => {
     const storeSlug = slug(request.params.storeSlug); const checkoutSlug = slug(request.params.checkoutSlug);
     if (!storeSlug || !checkoutSlug) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Checkout inválido.'));
