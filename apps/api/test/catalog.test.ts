@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { AppEnvironment } from '@solid/config';
 import { buildApp } from '../src/app.js';
 import type { AuthRepository, LoginUser, SessionUser } from '../src/auth-repository.js';
-import type { CatalogRepository, CheckoutInput, CheckoutSessionInput, ProductInput, StoreContext } from '../src/catalog-repository.js';
+import type { CatalogRepository, CheckoutInput, CheckoutSessionInput, ProductInput, ShopifyCartSessionInput, StoreContext } from '../src/catalog-repository.js';
 
 const origin = 'http://localhost:5173';
 const env: AppEnvironment = { NODE_ENV: 'test', API_HOST: '127.0.0.1', API_PORT: 3333, LOG_LEVEL: 'silent', CORS_ORIGINS: [origin], TRUST_PROXY: false };
@@ -33,6 +33,7 @@ class MemoryCatalog implements CatalogRepository {
   getPublicCheckout(storeSlug: string, checkoutSlug: string): Promise<object | null> { return Promise.resolve(storeSlug === 'store-a' && checkoutSlug === 'checkout-a' ? { slug: checkoutSlug, product: this.products[0] } : null); }
   createPublicCheckoutSession(input: CheckoutSessionInput): Promise<object | null> { return Promise.resolve(input.storeSlug === 'store-a' && input.checkoutSlug === 'checkout-a' ? { publicId: 'session-a', totalCents: 9900 * input.quantity } : null); }
   getPublicCheckoutSession(publicId: string, tokenHash: string): Promise<object | null> { return Promise.resolve(publicId === 'session-a' && tokenHash ? { publicId, totalCents: 9900 } : null); }
+  createShopifyCartSession(input: ShopifyCartSessionInput): Promise<object | null> { return Promise.resolve(input.shopDomain === 'store-a.myshopify.com' ? { publicId: 'shopify-session', totalCents: 9900 } : null); }
 }
 
 const authenticatedHeaders = { origin, cookie: `solid_session=${sessionToken}; solid_csrf=${csrfToken}`, 'x-csrf-token': csrfToken };

@@ -1,0 +1,22 @@
+{% comment %}SOLID uses an app proxy so Shopify signs every cart-session request.{% endcomment %}
+<script
+  src="{{ 'solid-checkout.js' | asset_url }}"
+  defer
+  data-solid-checkout
+  data-proxy-path="/apps/solid-checkout/checkout-session"
+  data-pay-url="{{ block.settings.pay_url | escape }}"
+  data-checkout-slug="{{ block.settings.checkout_slug | escape }}"
+  data-fallback="{{ block.settings.native_fallback }}"
+></script>
+
+{% schema %}
+{
+  "name": "SOLID Checkout",
+  "target": "body",
+  "settings": [
+    { "type": "text", "id": "checkout_slug", "label": "Identificador do checkout", "default": "principal" },
+    { "type": "url", "id": "pay_url", "label": "Domínio do checkout" },
+    { "type": "checkbox", "id": "native_fallback", "label": "Usar checkout Shopify se o SOLID estiver indisponível", "default": true }
+  ]
+}
+{% endschema %}

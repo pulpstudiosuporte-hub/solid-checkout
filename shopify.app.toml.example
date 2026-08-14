@@ -1,0 +1,16 @@
+# Execute `shopify app config link` para gerar shopify.app.toml com o client_id real.
+name = "SOLID Checkout"
+client_id = "SUBSTITUIDO_PELA_SHOPIFY_CLI"
+application_url = "https://app.solidcheckout.xyz"
+embedded = false
+
+[access_scopes]
+scopes = "read_products"
+
+[auth]
+redirect_urls = ["https://api.solidcheckout.xyz/integrations/shopify/callback"]
+
+[app_proxy]
+url = "https://api.solidcheckout.xyz/integrations/shopify/proxy"
+subpath = "solid-checkout"
+prefix = "apps"
