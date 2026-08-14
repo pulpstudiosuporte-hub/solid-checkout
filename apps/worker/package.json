@@ -1,0 +1,5 @@
+{
+  "name": "@solid/worker", "version": "0.1.0", "private": true, "type": "module",
+  "scripts": { "dev": "tsx watch src/index.ts", "build": "tsc -p tsconfig.json", "start": "node dist/index.js", "typecheck": "tsc --noEmit" },
+  "dependencies": { "@solid/config": "0.1.0" }
+}

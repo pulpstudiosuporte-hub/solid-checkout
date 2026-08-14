@@ -1,0 +1,25 @@
+name: solid-checkout
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: solid_dev
+      POSTGRES_USER: solid
+      POSTGRES_PASSWORD: local-development-only
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - solid_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U solid -d solid_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  solid_postgres_data:

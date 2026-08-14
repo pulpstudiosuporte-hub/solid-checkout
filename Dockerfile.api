@@ -1,0 +1,51 @@
+FROM node:22.12.0-bookworm-slim AS build
+
+WORKDIR /app
+ENV NODE_ENV=development
+
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY packages/config/package.json packages/config/package.json
+COPY packages/contracts/package.json packages/contracts/package.json
+COPY packages/database/package.json packages/database/package.json
+
+RUN npm ci --ignore-scripts
+
+COPY apps/api apps/api
+COPY packages/config packages/config
+COPY packages/contracts packages/contracts
+COPY packages/database packages/database
+
+RUN npm run build --workspace=@solid/config \
+ && npm run build --workspace=@solid/contracts \
+ && npm run build --workspace=@solid/database \
+ && npm run build --workspace=@solid/api \
+ && npm prune --omit=dev
+
+FROM node:22.12.0-bookworm-slim AS runtime
+
+ENV NODE_ENV=production
+WORKDIR /app
+
+RUN groupmod --gid 10001 node \
+ && usermod --uid 10001 --gid 10001 node
+
+COPY --from=build --chown=node:node /app/package.json /app/package-lock.json ./
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/apps/api/package.json ./apps/api/package.json
+COPY --from=build --chown=node:node /app/apps/api/dist ./apps/api/dist
+COPY --from=build --chown=node:node /app/packages/config/package.json ./packages/config/package.json
+COPY --from=build --chown=node:node /app/packages/config/dist ./packages/config/dist
+COPY --from=build --chown=node:node /app/packages/contracts/package.json ./packages/contracts/package.json
+COPY --from=build --chown=node:node /app/packages/contracts/dist ./packages/contracts/dist
+COPY --from=build --chown=node:node /app/packages/database/package.json ./packages/database/package.json
+COPY --from=build --chown=node:node /app/packages/database/prisma ./packages/database/prisma
+COPY --from=build --chown=node:node /app/packages/database/prisma.config.ts ./packages/database/prisma.config.ts
+
+USER node
+EXPOSE 3333
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:3333/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+
+CMD ["sh", "-c", "npm run db:deploy --workspace=@solid/database && npm run start --workspace=@solid/api"]

@@ -1,0 +1,35 @@
+{
+  "name": "solid-checkout",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.12.0", "npm": ">=10.0.0" },
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "npm run dev --workspace=@solid/web",
+    "dev:web": "npm run dev --workspace=@solid/web",
+    "dev:api": "npm run dev --workspace=@solid/api",
+    "dev:worker": "npm run dev --workspace=@solid/worker",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint .",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "audit:prod": "npm audit --omit=dev --audit-level=high",
+    "db:generate": "npm run generate --workspace=@solid/database",
+    "db:migrate": "npm run db:migrate --workspace=@solid/database",
+    "db:deploy": "npm run db:deploy --workspace=@solid/database",
+    "db:seed": "npm run db:seed --workspace=@solid/database"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.2",
+    "@types/node": "24.10.13",
+    "eslint": "9.39.2",
+    "globals": "16.5.0",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.54.0",
+    "vitest": "4.1.10"
+  },
+  "overrides": { "esbuild": "0.28.1" }
+}

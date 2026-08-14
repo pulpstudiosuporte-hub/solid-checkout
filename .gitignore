@@ -1,0 +1,13 @@
+node_modules/
+dist/
+**/dist/
+.env
+.env.local
+.env.*
+!.env.example
+*.log
+coverage/
+.DS_Store
+desktop.ini
+Captura de tela*.png
+packages/database/generated/
