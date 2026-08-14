@@ -7,6 +7,10 @@ ENV NODE_ENV=development
 # DATABASE_URL when the application starts.
 ENV DATABASE_URL=postgresql://prisma:prisma@127.0.0.1:5432/solid_build
 
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl \
+ && rm -rf /var/lib/apt/lists/*
+
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY packages/config/package.json packages/config/package.json
@@ -31,7 +35,10 @@ FROM node:22.12.0-bookworm-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 
-RUN groupmod --gid 10001 node \
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl \
+ && rm -rf /var/lib/apt/lists/* \
+ && groupmod --gid 10001 node \
  && usermod --uid 10001 --gid 10001 node
 
 COPY --from=build --chown=node:node /app/package.json /app/package-lock.json ./
@@ -43,6 +50,7 @@ COPY --from=build --chown=node:node /app/packages/config/dist ./packages/config/
 COPY --from=build --chown=node:node /app/packages/contracts/package.json ./packages/contracts/package.json
 COPY --from=build --chown=node:node /app/packages/contracts/dist ./packages/contracts/dist
 COPY --from=build --chown=node:node /app/packages/database/package.json ./packages/database/package.json
+COPY --from=build --chown=node:node /app/packages/database/dist ./packages/database/dist
 COPY --from=build --chown=node:node /app/packages/database/prisma ./packages/database/prisma
 COPY --from=build --chown=node:node /app/packages/database/prisma.config.ts ./packages/database/prisma.config.ts
 
