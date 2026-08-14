@@ -24,7 +24,7 @@ class MemoryCatalog implements CatalogRepository {
   products: Array<{ publicId: string; storeId: string; checkoutTitle: string; priceCents: number; [key: string]: unknown }> = [{ publicId: 'product-a', storeId: 'store-a', checkoutTitle: 'Produto A', priceCents: 9900 }, { publicId: 'product-b', storeId: 'store-b', checkoutTitle: 'Produto B', priceCents: 5000 }];
   checkouts: Array<Record<string, unknown>> = [];
   resolveStoreContext(userId: string, sessionId: string): Promise<StoreContext | null> { return Promise.resolve({ userId, sessionId, storeId: 'store-a', role: this.role }); }
-  listProducts(context: StoreContext): Promise<readonly object[]> { return Promise.resolve(this.products.filter(product => product.storeId === context.storeId)); }
+  listProducts(context: StoreContext) { const items = this.products.filter(product => product.storeId === context.storeId); return Promise.resolve({ items, total: items.length }); }
   createProduct(context: StoreContext, input: ProductInput): Promise<object> { const product = { publicId: 'new-product', storeId: context.storeId, checkoutTitle: input.title, ...input }; this.products.push(product); return Promise.resolve(product); }
   listCheckouts(context: StoreContext): Promise<readonly object[]> { return Promise.resolve(this.checkouts.filter(checkout => checkout.storeId === context.storeId)); }
   createCheckout(context: StoreContext, input: CheckoutInput): Promise<object | null> { if (!this.products.some(product => product.publicId === input.productPublicId && product.storeId === context.storeId)) return Promise.resolve(null); const checkout = { publicId: 'new-checkout', storeId: context.storeId, ...input }; this.checkouts.push(checkout); return Promise.resolve(checkout); }

@@ -29,10 +29,14 @@ export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvi
   };
   const canWrite = (context: StoreContext): boolean => context.role === 'OWNER' || context.role === 'ADMIN';
 
-  app.get('/products', async (request, reply) => {
+  app.get<{ Querystring: Record<string, string | undefined> }>('/products', async (request, reply) => {
     const context = await authenticate(request);
     if (!context) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
-    return reply.send({ items: await catalog.listProducts(context) });
+    const page = Number(request.query.page ?? '1'); const pageSize = Number(request.query.pageSize ?? '20');
+    const search = request.query.search?.trim(); const status = request.query.status; const source = request.query.source?.toUpperCase();
+    if (!Number.isInteger(page) || page < 1 || !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100 || (search && search.length > 120) || (status && status !== 'active' && status !== 'inactive') || (source && source !== 'MANUAL' && source !== 'SHOPIFY')) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Filtros de produtos inválidos.'));
+    const result = await catalog.listProducts(context, { page, pageSize, ...(search ? { search } : {}), ...(status ? { status: status as 'active' | 'inactive' } : {}), ...(source ? { source: source as 'MANUAL' | 'SHOPIFY' } : {}) });
+    return reply.send({ ...result, page, pageSize, pages: Math.max(1, Math.ceil(result.total / pageSize)) });
   });
 
   app.post<{ Body: Record<string, unknown> }>('/products', async (request, reply) => {

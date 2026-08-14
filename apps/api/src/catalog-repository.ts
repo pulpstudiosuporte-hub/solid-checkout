@@ -3,16 +3,18 @@ import type { Prisma, PrismaClient } from '@solid/database';
 export type StoreContext = Readonly<{ storeId: string; userId: string; sessionId: string; role: 'OWNER' | 'ADMIN' | 'ANALYST' }>;
 export type ProductInput = Readonly<{ title: string; description?: string; imageUrl?: string; priceCents: number; compareAtCents?: number; stockQuantity?: number; trackInventory: boolean; maxPerOrder: number; active: boolean }>;
 export type CheckoutInput = Readonly<{ name: string; slug: string; productPublicId: string; draftConfig: Record<string, unknown> }>;
+export type ProductListQuery = Readonly<{ search?: string; status?: 'active' | 'inactive'; source?: 'MANUAL' | 'SHOPIFY'; page: number; pageSize: number }>;
+export type ProductListResult = Readonly<{ items: readonly object[]; total: number }>;
 
 export interface CatalogRepository {
   resolveStoreContext(userId: string, sessionId: string): Promise<StoreContext | null>;
-  listProducts(context: StoreContext): Promise<readonly object[]>;
+  listProducts(context: StoreContext, query: ProductListQuery): Promise<ProductListResult>;
   createProduct(context: StoreContext, input: ProductInput, requestId: string): Promise<object>;
   listCheckouts(context: StoreContext): Promise<readonly object[]>;
   createCheckout(context: StoreContext, input: CheckoutInput, requestId: string): Promise<object | null>;
 }
 
-const productSelect = { publicId: true, checkoutTitle: true, checkoutDescription: true, imageUrl: true, priceCents: true, compareAtCents: true, stockQuantity: true, trackInventory: true, maxPerOrder: true, active: true, source: true, createdAt: true, updatedAt: true } as const;
+const productSelect = { publicId: true, sourceTitle: true, checkoutTitle: true, checkoutDescription: true, handle: true, vendor: true, productType: true, tags: true, imageUrl: true, priceCents: true, compareAtCents: true, stockQuantity: true, trackInventory: true, maxPerOrder: true, active: true, source: true, syncedAt: true, createdAt: true, updatedAt: true, _count: { select: { variants: true, images: true, collections: true } } } as const;
 const checkoutSelect = { publicId: true, name: true, slug: true, status: true, draftConfig: true, createdAt: true, updatedAt: true, product: { select: { publicId: true, checkoutTitle: true, priceCents: true, active: true } } } as const;
 
 export class PrismaCatalogRepository implements CatalogRepository {
@@ -24,8 +26,10 @@ export class PrismaCatalogRepository implements CatalogRepository {
       : await this.database.storeMember.findFirst({ where: { userId, store: { active: true } }, orderBy: { createdAt: 'asc' }, select: { storeId: true, role: true } });
     return membership ? { storeId: membership.storeId, userId, sessionId, role: membership.role } : null;
   }
-  listProducts(context: StoreContext): Promise<readonly object[]> {
-    return this.database.product.findMany({ where: { storeId: context.storeId }, orderBy: { createdAt: 'desc' }, take: 100, select: productSelect });
+  async listProducts(context: StoreContext, query: ProductListQuery): Promise<ProductListResult> {
+    const where: Prisma.ProductWhereInput = { storeId: context.storeId, ...(query.status ? { active: query.status === 'active' } : {}), ...(query.source ? { source: query.source } : {}), ...(query.search ? { OR: [{ checkoutTitle: { contains: query.search, mode: 'insensitive' } }, { sourceTitle: { contains: query.search, mode: 'insensitive' } }, { vendor: { contains: query.search, mode: 'insensitive' } }, { handle: { contains: query.search, mode: 'insensitive' } }] } : {}) };
+    const [items, total] = await this.database.$transaction([this.database.product.findMany({ where, orderBy: { updatedAt: 'desc' }, skip: (query.page - 1) * query.pageSize, take: query.pageSize, select: productSelect }), this.database.product.count({ where })]);
+    return { items, total };
   }
   async createProduct(context: StoreContext, input: ProductInput, requestId: string): Promise<object> {
     return this.database.$transaction(async transaction => {
