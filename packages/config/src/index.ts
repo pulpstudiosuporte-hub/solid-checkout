@@ -6,7 +6,8 @@ const environmentSchema = z.object({
   API_PORT: z.coerce.number().int().min(1024).max(65535).default(3333),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   CORS_ORIGINS: z.string().default('http://localhost:5173').transform(value => value.split(',').map(origin => origin.trim()).filter(Boolean)),
-  TRUST_PROXY: z.enum(['true', 'false']).default('false')
+  TRUST_PROXY: z.enum(['true', 'false']).default('false'),
+  DATABASE_URL: z.string().regex(/^postgres(?:ql)?:\/\//, 'deve ser uma URL PostgreSQL').optional()
 }).strict();
 
 type RawEnvironment = z.infer<typeof environmentSchema>;
@@ -15,7 +16,8 @@ export type AppEnvironment = Omit<RawEnvironment, 'TRUST_PROXY'> & { TRUST_PROXY
 export function parseEnvironment(input: NodeJS.ProcessEnv): AppEnvironment {
   const known = {
     NODE_ENV: input.NODE_ENV, API_HOST: input.API_HOST, API_PORT: input.API_PORT,
-    LOG_LEVEL: input.LOG_LEVEL, CORS_ORIGINS: input.CORS_ORIGINS, TRUST_PROXY: input.TRUST_PROXY
+    LOG_LEVEL: input.LOG_LEVEL, CORS_ORIGINS: input.CORS_ORIGINS, TRUST_PROXY: input.TRUST_PROXY,
+    DATABASE_URL: input.DATABASE_URL
   };
   const result = environmentSchema.safeParse(known);
   if (!result.success) {
@@ -25,5 +27,6 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): AppEnvironment {
   if (result.data.NODE_ENV === 'production' && result.data.CORS_ORIGINS.some(origin => origin.includes('localhost'))) {
     throw new Error('CORS_ORIGINS não pode usar localhost em produção');
   }
+  if (result.data.NODE_ENV === 'production' && !result.data.DATABASE_URL) throw new Error('DATABASE_URL é obrigatória em produção');
   return { ...result.data, TRUST_PROXY: result.data.TRUST_PROXY === 'true' };
 }

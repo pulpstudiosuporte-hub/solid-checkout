@@ -70,6 +70,7 @@ model StoreMember {
 model Session {
   id              String   @id @default(uuid()) @db.Uuid
   tokenHash       String   @unique @map("token_hash") @db.Char(64)
+  csrfTokenHash   String   @map("csrf_token_hash") @db.Char(64)
   userId          String   @map("user_id") @db.Uuid
   activeStoreId   String?  @map("active_store_id") @db.Uuid
   ipHash          String?  @map("ip_hash") @db.Char(64)

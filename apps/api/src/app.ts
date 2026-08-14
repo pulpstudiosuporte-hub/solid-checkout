@@ -4,8 +4,10 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
 import type { ErrorResponse, HealthResponse } from '@solid/contracts';
+import type { AuthRepository } from './auth-repository.js';
+import { registerAuthRoutes } from './auth-routes.js';
 
-export function buildApp(environment: AppEnvironment): FastifyInstance {
+export function buildApp(environment: AppEnvironment, dependencies: { authRepository?: AuthRepository } = {}): FastifyInstance {
   const app = Fastify({
     logger: environment.NODE_ENV === 'test' ? false : { level: environment.LOG_LEVEL, redact: { paths: ['req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie', '*.password', '*.token', '*.cpf'], censor: '[REDACTED]' } },
     trustProxy: environment.TRUST_PROXY,
@@ -17,6 +19,7 @@ export function buildApp(environment: AppEnvironment): FastifyInstance {
   void app.register(helmet, { global: true, contentSecurityPolicy: false, hsts: environment.NODE_ENV === 'production' ? { maxAge: 31_536_000, includeSubDomains: true, preload: true } : false });
   void app.register(cors, { origin: environment.CORS_ORIGINS, credentials: true, methods: ['GET', 'POST', 'PATCH', 'DELETE'], allowedHeaders: ['content-type', 'x-csrf-token', 'x-request-id'], maxAge: 600 });
   void app.register(rateLimit, { max: 100, timeWindow: '1 minute', ban: 3, errorResponseBuilder: (_request, context) => ({ error: { code: 'RATE_LIMITED', message: `Muitas requisições. Tente novamente em ${context.after}.`, requestId: _request.id } }) });
+  if (dependencies.authRepository) registerAuthRoutes(app, environment, dependencies.authRepository);
 
   app.get<{ Reply: HealthResponse }>('/health/live', () => ({ status: 'ok', service: 'solid-api', version: '0.1.0', timestamp: new Date().toISOString() }));
   app.get<{ Reply: HealthResponse }>('/health/ready', () => ({ status: 'ok', service: 'solid-api', version: '0.1.0', timestamp: new Date().toISOString() }));

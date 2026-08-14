@@ -56,3 +56,11 @@ Tudo vindo do navegador, query string, webhook ou integração externa é não c
 - Health readiness ainda não verifica banco/Redis porque esses serviços não foram adicionados.
 
 Revisar este documento a cada integração, nova categoria de dado ou mudança de fronteira de confiança.
+# Autenticação administrativa
+
+- Não existe cadastro público. O primeiro proprietário é criado por um comando de bootstrap que recusa execução quando já existe usuário.
+- Senhas são derivadas com scrypt (`N=32768`, `r=8`, `p=1`) e salt aleatório; senha e token de sessão nunca são persistidos em claro.
+- Sessões usam tokens opacos, expiração ociosa de 8 horas, limite absoluto de 7 dias e revogação server-side.
+- Cookies de produção usam prefixo `__Host-`, `Secure`, `HttpOnly`, `SameSite=Strict` e `Path=/`.
+- Login e logout exigem origem explicitamente permitida e token CSRF ligado à sessão. O login possui rate limit dedicado e resposta genérica contra enumeração de usuários.
+- Por exigir cookies `Secure`, autenticação administrativa não deve ser ativada nos domínios HTTP temporários.
