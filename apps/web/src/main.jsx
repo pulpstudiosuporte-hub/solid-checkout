@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   ArrowRight, BarChart3, Bell, Box, Check, CheckCircle2, ChevronDown,
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import './styles.css';
 import CheckoutEditor, { defaultCheckoutConfig } from './CheckoutEditor';
+import { getApiHealth } from './api';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -55,11 +56,12 @@ function Sidebar({ open, onClose, page, setPage }) {
   </>;
 }
 
-function Header({ toggleSidebar, onCheckout }) {
+function Header({ toggleSidebar, onCheckout, apiStatus }) {
+  const statusLabel = apiStatus === 'online' ? 'API conectada' : apiStatus === 'offline' ? 'API indisponível' : 'Conectando à API';
   return <header className="topbar">
     <button className="icon-btn menu-btn" onClick={toggleSidebar} aria-label="Abrir menu"><Menu size={21}/></button>
     <div className="search"><Search size={18}/><input aria-label="Buscar" placeholder="Buscar pedidos, clientes ou produtos..."/><kbd>⌘ K</kbd></div>
-    <div className="top-actions"><button className="sandbox"><span/> Ambiente sandbox</button><button className="icon-btn bell" aria-label="Notificações"><Bell size={19}/><i/></button><button className="primary small" onClick={onCheckout}><Eye size={17}/> Ver checkout</button></div>
+    <div className="top-actions"><span className={`sandbox api-status ${apiStatus}`} role="status"><span/> {statusLabel}</span><button className="icon-btn bell" aria-label="Notificações"><Bell size={19}/><i/></button><button className="primary small" onClick={onCheckout}><Eye size={17}/> Ver checkout</button></div>
   </header>;
 }
 
@@ -115,6 +117,6 @@ function Checkout({ onBack, customConfig }) {
   </div><footer className="checkout-footer"><Logo/><span>© 2026 Solid Commerce. Todos os direitos reservados.</span><div><a href="#">Privacidade</a><a href="#">Termos</a></div></footer></div>;
 }
 
-function App(){ const [sidebar,setSidebar]=useState(false); const [page,setPage]=useState('Visão geral'); const [checkout,setCheckout]=useState(false); const [editor,setEditor]=useState(false); const [previewConfig,setPreviewConfig]=useState(null); if(editor) return <CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/>; if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>; return <div className="app"><Sidebar open={sidebar} onClose={()=>setSidebar(false)} page={page} setPage={setPage}/><div className="main-shell"><Header toggleSidebar={()=>setSidebar(true)} onCheckout={()=>setCheckout(true)}/>{page==='Visão geral'?<Dashboard setPage={setPage}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)}/>}</div></div> }
+function App(){ const [sidebar,setSidebar]=useState(false); const [page,setPage]=useState('Visão geral'); const [checkout,setCheckout]=useState(false); const [editor,setEditor]=useState(false); const [previewConfig,setPreviewConfig]=useState(null); const [apiStatus,setApiStatus]=useState('checking'); useEffect(()=>{let active=true; getApiHealth().then(()=>active&&setApiStatus('online')).catch(()=>active&&setApiStatus('offline')); return()=>{active=false}},[]); if(editor) return <CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/>; if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>; return <div className="app"><Sidebar open={sidebar} onClose={()=>setSidebar(false)} page={page} setPage={setPage}/><div className="main-shell"><Header toggleSidebar={()=>setSidebar(true)} onCheckout={()=>setCheckout(true)} apiStatus={apiStatus}/>{page==='Visão geral'?<Dashboard setPage={setPage}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)}/>}</div></div> }
 
 createRoot(document.getElementById('root')).render(<App/>);
