@@ -2,11 +2,16 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
 import type { CatalogRepository } from './catalog-repository.js';
+import { encryptSecret } from './shopify-crypto.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const slug = (value: unknown): string | null => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) && value.length <= 80 ? value : null;
 const publicId = (value: unknown): string | null => typeof value === 'string' && /^[A-Za-z0-9_-]{8,32}$/.test(value) ? value : null;
 const errorBody = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
+const digits = (value: unknown): string => typeof value === 'string' ? value.replace(/\D/g, '') : '';
+const validCpf = (value: string): boolean => { if (!/^\d{11}$/.test(value) || /^(\d)\1{10}$/.test(value)) return false; const check = (length: number) => { let sum = 0; for (let index = 0; index < length; index += 1) sum += Number(value[index]) * (length + 1 - index); const mod = sum % 11; return mod < 2 ? 0 : 11 - mod; }; return check(9) === Number(value[9]) && check(10) === Number(value[10]); };
+const validCnpj = (value: string): boolean => { if (!/^\d{14}$/.test(value) || /^(\d)\1{13}$/.test(value)) return false; const calculate = (length: number) => { const weights = length === 12 ? [5,4,3,2,9,8,7,6,5,4,3,2] : [6,5,4,3,2,9,8,7,6,5,4,3,2]; const sum = weights.reduce((total, weight, index) => total + Number(value[index]) * weight, 0); const mod = sum % 11; return mod < 2 ? 0 : 11 - mod; }; return calculate(12) === Number(value[12]) && calculate(13) === Number(value[13]); };
+const sessionCredentials = (sessionIdValue: unknown, authorization: string | undefined): { sessionId: string; tokenHash: string } | null => { const sessionId = publicId(sessionIdValue); const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : ''; return sessionId && token.length >= 32 && token.length <= 128 ? { sessionId, tokenHash: sha256(token) } : null; };
 const validProxySignature = (query: Record<string, string | string[] | undefined>, secret: string): boolean => {
   const signature = query.signature; if (typeof signature !== 'string' || !/^[a-f0-9]{64}$/.test(signature)) return false;
   const message = Object.entries(query).filter(([key]) => key !== 'signature').map(([key, value]) => `${key}=${Array.isArray(value) ? value.join(',') : value ?? ''}`).sort().join('');
@@ -42,6 +47,29 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     const session = await catalog.getPublicCheckoutSession(sessionId, sha256(token), new Date());
     if (!session) return reply.code(404).send(errorBody(request, 'SESSION_NOT_FOUND', 'Sessão expirada ou indisponível.'));
     return reply.header('cache-control', 'no-store').send({ session });
+  });
+
+  app.put<{ Params: { sessionId: string }; Headers: { authorization?: string }; Body: Record<string, unknown> }>('/public/checkout-sessions/:sessionId/customer', { config: { rateLimit: { max: 12, timeWindow: '1 minute' } } }, async (request, reply) => {
+    if (!environment.APP_ENCRYPTION_KEY) return reply.code(503).send(errorBody(request, 'SERVICE_UNAVAILABLE', 'Proteção de dados indisponível.'));
+    const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization); const name = typeof request.body?.name === 'string' ? request.body.name.trim().replace(/\s+/g, ' ') : ''; const email = typeof request.body?.email === 'string' ? request.body.email.trim().toLowerCase() : ''; const phone = digits(request.body?.phone); const document = digits(request.body?.document);
+    if (!credentials || name.length < 3 || name.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 320 || phone.length < 10 || phone.length > 13 || (!validCpf(document) && !validCnpj(document))) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Dados de identificação inválidos.'));
+    const hmacKey = createHmac('sha256', Buffer.from(environment.APP_ENCRYPTION_KEY, 'base64')).update('solid-checkout-pii-index-v1').digest();
+    const hmac = (value: string) => createHmac('sha256', hmacKey).update(value).digest('hex');
+    const encryptedData = encryptSecret(JSON.stringify({ name, email, phone, document }), environment.APP_ENCRYPTION_KEY);
+    const result = await catalog.updatePublicCheckoutCustomer(credentials.sessionId, credentials.tokenHash, new Date(), { encryptedData, emailHash: hmac(email), documentHash: hmac(document) });
+    if (!result) return reply.code(404).send(errorBody(request, 'SESSION_NOT_FOUND', 'Sessão expirada ou indisponível.'));
+    return reply.header('cache-control', 'no-store').send(result);
+  });
+
+  app.put<{ Params: { sessionId: string }; Headers: { authorization?: string }; Body: Record<string, unknown> }>('/public/checkout-sessions/:sessionId/shipping', { config: { rateLimit: { max: 12, timeWindow: '1 minute' } } }, async (request, reply) => {
+    if (!environment.APP_ENCRYPTION_KEY) return reply.code(503).send(errorBody(request, 'SERVICE_UNAVAILABLE', 'Proteção de dados indisponível.'));
+    const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization); const postalCode = digits(request.body?.postalCode); const state = typeof request.body?.state === 'string' ? request.body.state.trim().toUpperCase() : ''; const read = (key: string, max: number) => typeof request.body?.[key] === 'string' && (request.body[key] as string).trim().length <= max ? (request.body[key] as string).trim() : '';
+    const street = read('street', 180); const number = read('number', 30); const complement = read('complement', 120); const neighborhood = read('neighborhood', 120); const city = read('city', 120);
+    if (!credentials || postalCode.length !== 8 || street.length < 3 || !number || neighborhood.length < 2 || city.length < 2 || !/^[A-Z]{2}$/.test(state)) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Endereço de entrega inválido.'));
+    const encryptedData = encryptSecret(JSON.stringify({ postalCode, street, number, complement, neighborhood, city, state, country: 'BR' }), environment.APP_ENCRYPTION_KEY);
+    const result = await catalog.updatePublicCheckoutShipping(credentials.sessionId, credentials.tokenHash, new Date(), { encryptedData });
+    if (!result) return reply.code(409).send(errorBody(request, 'CUSTOMER_REQUIRED', 'Informe a identificação antes do endereço.'));
+    return reply.header('cache-control', 'no-store').send(result);
   });
 
   app.post<{ Querystring: Record<string, string | string[] | undefined>; Body: Record<string, unknown> }>('/integrations/shopify/proxy/checkout-session', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {

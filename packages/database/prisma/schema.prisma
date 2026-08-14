@@ -223,6 +223,12 @@ model CheckoutSession {
   status            CheckoutSessionStatus @default(OPEN)
   source             String                @default("DIRECT") @db.VarChar(32)
   sourceCartId       String?               @map("source_cart_id") @db.VarChar(255)
+  customerDataEncrypted String?            @map("customer_data_encrypted") @db.Text
+  customerEmailHash  String?               @map("customer_email_hash") @db.Char(64)
+  customerDocumentHash String?             @map("customer_document_hash") @db.Char(64)
+  shippingAddressEncrypted String?         @map("shipping_address_encrypted") @db.Text
+  customerCapturedAt DateTime?             @map("customer_captured_at") @db.Timestamptz(3)
+  shippingCapturedAt DateTime?             @map("shipping_captured_at") @db.Timestamptz(3)
   expiresAt         DateTime              @map("expires_at") @db.Timestamptz(3)
   completedAt       DateTime?             @map("completed_at") @db.Timestamptz(3)
   createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -233,6 +239,7 @@ model CheckoutSession {
 
   @@index([checkoutId, status, expiresAt])
   @@index([expiresAt])
+  @@index([customerEmailHash])
   @@map("checkout_sessions")
 }
 

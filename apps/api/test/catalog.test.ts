@@ -35,6 +35,8 @@ class MemoryCatalog implements CatalogRepository {
   createPublicCheckoutSession(input: CheckoutSessionInput): Promise<object | null> { return Promise.resolve(input.storeSlug === 'store-a' && input.checkoutSlug === 'checkout-a' ? { publicId: 'session-a', totalCents: 9900 * input.quantity } : null); }
   getPublicCheckoutSession(publicId: string, tokenHash: string): Promise<object | null> { return Promise.resolve(publicId === 'session-a' && tokenHash ? { publicId, totalCents: 9900 } : null); }
   createShopifyCartSession(input: ShopifyCartSessionInput): Promise<object | null> { return Promise.resolve(input.shopDomain === 'store-a.myshopify.com' ? { publicId: 'shopify-session', totalCents: 9900 } : null); }
+  updatePublicCheckoutCustomer(publicId: string, tokenHash: string): Promise<object | null> { return Promise.resolve(publicId === 'session-a' && tokenHash ? { customerCaptured: true, shippingCaptured: false } : null); }
+  updatePublicCheckoutShipping(publicId: string, tokenHash: string): Promise<object | null> { return Promise.resolve(publicId === 'session-a' && tokenHash ? { customerCaptured: true, shippingCaptured: true } : null); }
 }
 
 const authenticatedHeaders = { origin, cookie: `solid_session=${sessionToken}; solid_csrf=${csrfToken}`, 'x-csrf-token': csrfToken };
@@ -94,6 +96,17 @@ describe('catálogo isolado por loja', () => {
     const app = buildApp(env, { authRepository: new MemoryAuth(), catalogRepository: new MemoryCatalog() });
     expect((await app.inject({ method: 'POST', url: '/public/checkouts/store-a/checkout-a/sessions', payload: { quantity: 0 } })).statusCode).toBe(400);
     expect((await app.inject({ method: 'POST', url: '/public/checkouts/store-a/checkout-a/sessions', payload: { quantity: 1, variantId: '../foreign' } })).statusCode).toBe(400);
+    await app.close();
+  });
+  it('valida identificação e endereço sem expor dados na resposta', async () => {
+    const secureEnv = { ...env, APP_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64') };
+    const app = buildApp(secureEnv, { authRepository: new MemoryAuth(), catalogRepository: new MemoryCatalog() });
+    const headers = { authorization: `Bearer ${'a'.repeat(43)}`, origin };
+    const customer = await app.inject({ method: 'PUT', url: '/public/checkout-sessions/session-a/customer', headers, payload: { name: 'Maria da Silva', email: 'maria@example.com', phone: '(11) 99999-9999', document: '529.982.247-25' } });
+    expect(customer.statusCode).toBe(200); expect(customer.body).not.toContain('52998224725'); expect(customer.json()).toEqual({ customerCaptured: true, shippingCaptured: false });
+    const shipping = await app.inject({ method: 'PUT', url: '/public/checkout-sessions/session-a/shipping', headers, payload: { postalCode: '01310-100', street: 'Avenida Paulista', number: '1000', complement: '', neighborhood: 'Bela Vista', city: 'São Paulo', state: 'SP' } });
+    expect(shipping.statusCode).toBe(200); expect(shipping.json()).toEqual({ customerCaptured: true, shippingCaptured: true });
+    expect((await app.inject({ method: 'PUT', url: '/public/checkout-sessions/session-a/customer', headers, payload: { name: 'Teste', email: 'x@example.com', phone: '11999999999', document: '111.111.111-11' } })).statusCode).toBe(400);
     await app.close();
   });
 });
