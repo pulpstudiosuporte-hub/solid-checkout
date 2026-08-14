@@ -1,16 +1,24 @@
 import type { PrismaClient } from '@solid/database';
 
 export type ShopifyContext = Readonly<{ storeId: string; storePublicId: string; role: 'OWNER' | 'ADMIN' | 'ANALYST' }>;
-export type ShopifyStatus = Readonly<{ connected: boolean; shopDomain?: string; scopes?: string; connectedAt?: Date }>;
+export type ShopifyStatus = Readonly<{ connected: boolean; shopDomain?: string; scopes?: string; connectedAt?: Date; lastSyncedAt?: Date }>;
 export type OAuthStateRecord = Readonly<{ id: string; storeId: string; userId: string; sessionId: string; shopDomain: string }>;
+export type ShopifyCredentials = Readonly<{ shopDomain: string; accessTokenEncrypted: string; refreshTokenEncrypted?: string; accessTokenExpiresAt?: Date; refreshTokenExpiresAt?: Date }>;
+export type ShopifyCatalog = Readonly<{
+  products: readonly Readonly<{ id: string; title: string; handle: string; descriptionHtml: string; vendor: string; productType: string; tags: readonly string[]; status: string; updatedAt: string; featuredImage?: string | undefined; variants: readonly Readonly<{ id: string; title: string; sku?: string | undefined; barcode?: string | undefined; price: string; compareAtPrice?: string | undefined; inventoryQuantity?: number | undefined; availableForSale: boolean; imageUrl?: string | undefined; selectedOptions: readonly Readonly<{ name: string; value: string }>[] }>[]; images: readonly Readonly<{ id: string; url: string; altText?: string | undefined; width?: number | undefined; height?: number | undefined }>[]; collectionIds: readonly string[] }>[];
+  collections: readonly Readonly<{ id: string; title: string; handle: string; descriptionHtml: string; imageUrl?: string | undefined; updatedAt: string }>[];
+}>;
+export type ShopifySyncResult = Readonly<{ products: number; variants: number; images: number; collections: number; syncedAt: Date }>;
 
 export interface ShopifyRepository {
   context(userId: string, sessionId: string): Promise<ShopifyContext | null>;
   status(storeId: string): Promise<ShopifyStatus>;
+  credentials(storeId: string): Promise<ShopifyCredentials | null>;
   createState(input: { stateHash: string; storeId: string; userId: string; sessionId: string; shopDomain: string; expiresAt: Date }): Promise<void>;
   consumeState(stateHash: string, userId: string, sessionId: string, now: Date): Promise<OAuthStateRecord | null>;
   connect(input: { storeId: string; userId: string; shopDomain: string; accessTokenEncrypted: string; refreshTokenEncrypted?: string; scopes: string; accessTokenExpiresAt?: Date; refreshTokenExpiresAt?: Date; requestId: string }): Promise<void>;
   disconnect(storeId: string, userId: string, requestId: string): Promise<void>;
+  syncCatalog(storeId: string, userId: string, requestId: string, catalog: ShopifyCatalog): Promise<ShopifySyncResult>;
 }
 
 export class PrismaShopifyRepository implements ShopifyRepository {
@@ -22,8 +30,12 @@ export class PrismaShopifyRepository implements ShopifyRepository {
     return membership?.store.active ? { storeId: membership.store.id, storePublicId: membership.store.publicId, role: membership.role } : null;
   }
   async status(storeId: string): Promise<ShopifyStatus> {
-    const connection = await this.database.shopifyConnection.findFirst({ where: { storeId, revokedAt: null }, select: { shopDomain: true, scopes: true, connectedAt: true } });
-    return connection ? { connected: true, ...connection } : { connected: false };
+    const connection = await this.database.shopifyConnection.findFirst({ where: { storeId, revokedAt: null }, select: { shopDomain: true, scopes: true, connectedAt: true, lastSyncedAt: true } });
+    return connection ? { connected: true, shopDomain: connection.shopDomain, scopes: connection.scopes, connectedAt: connection.connectedAt, ...(connection.lastSyncedAt ? { lastSyncedAt: connection.lastSyncedAt } : {}) } : { connected: false };
+  }
+  async credentials(storeId: string): Promise<ShopifyCredentials | null> {
+    const value = await this.database.shopifyConnection.findFirst({ where: { storeId, revokedAt: null }, select: { shopDomain: true, accessTokenEncrypted: true, refreshTokenEncrypted: true, accessTokenExpiresAt: true, refreshTokenExpiresAt: true } });
+    return value ? { shopDomain: value.shopDomain, accessTokenEncrypted: value.accessTokenEncrypted, ...(value.refreshTokenEncrypted ? { refreshTokenEncrypted: value.refreshTokenEncrypted } : {}), ...(value.accessTokenExpiresAt ? { accessTokenExpiresAt: value.accessTokenExpiresAt } : {}), ...(value.refreshTokenExpiresAt ? { refreshTokenExpiresAt: value.refreshTokenExpiresAt } : {}) } : null;
   }
   async createState(input: { stateHash: string; storeId: string; userId: string; sessionId: string; shopDomain: string; expiresAt: Date }): Promise<void> {
     await this.database.$transaction([this.database.shopifyOAuthState.deleteMany({ where: { sessionId: input.sessionId } }), this.database.shopifyOAuthState.create({ data: input })]);
@@ -46,4 +58,37 @@ export class PrismaShopifyRepository implements ShopifyRepository {
   async disconnect(storeId: string, userId: string, requestId: string): Promise<void> {
     await this.database.$transaction([this.database.shopifyConnection.updateMany({ where: { storeId, revokedAt: null }, data: { revokedAt: new Date() } }), this.database.auditLog.create({ data: { storeId, actorUserId: userId, actorType: 'USER', action: 'integration.shopify_disconnected', targetType: 'shopify_connection', requestId } })]);
   }
+  async syncCatalog(storeId: string, userId: string, requestId: string, catalog: ShopifyCatalog): Promise<ShopifySyncResult> {
+    const syncedAt = new Date(); let variantCount = 0; let imageCount = 0;
+    await this.database.$transaction(async tx => {
+      const collectionIds = new Map<string, string>();
+      for (const collection of catalog.collections) {
+        const saved = await tx.shopifyCollection.upsert({ where: { storeId_sourceExternalId: { storeId, sourceExternalId: collection.id } }, create: { storeId, sourceExternalId: collection.id, title: collection.title, handle: collection.handle, descriptionHtml: collection.descriptionHtml || null, imageUrl: collection.imageUrl ?? null, sourceUpdatedAt: new Date(collection.updatedAt), syncedAt }, update: { title: collection.title, handle: collection.handle, descriptionHtml: collection.descriptionHtml || null, imageUrl: collection.imageUrl ?? null, sourceUpdatedAt: new Date(collection.updatedAt), syncedAt } });
+        collectionIds.set(collection.id, saved.id);
+      }
+      const seenProducts: string[] = [];
+      for (const item of catalog.products) {
+        const firstVariant = item.variants[0]; const priceCents = moneyToCents(firstVariant?.price); const compareAtCents = moneyToOptionalCents(firstVariant?.compareAtPrice);
+        const product = await tx.product.upsert({ where: { storeId_source_sourceExternalId: { storeId, source: 'SHOPIFY', sourceExternalId: item.id } }, create: { storeId, source: 'SHOPIFY', sourceExternalId: item.id, sourceTitle: item.title, checkoutTitle: item.title, checkoutDescription: item.descriptionHtml || null, sourceDescriptionHtml: item.descriptionHtml || null, handle: item.handle, vendor: item.vendor || null, productType: item.productType || null, tags: [...item.tags], sourceStatus: item.status, sourceUpdatedAt: new Date(item.updatedAt), syncedAt, imageUrl: item.featuredImage ?? null, priceCents, compareAtCents, stockQuantity: totalInventory(item.variants), trackInventory: item.variants.some(variant => variant.inventoryQuantity !== undefined), active: item.status === 'ACTIVE' }, update: { sourceTitle: item.title, sourceDescriptionHtml: item.descriptionHtml || null, handle: item.handle, vendor: item.vendor || null, productType: item.productType || null, tags: [...item.tags], sourceStatus: item.status, sourceUpdatedAt: new Date(item.updatedAt), syncedAt, imageUrl: item.featuredImage ?? null, priceCents, compareAtCents, stockQuantity: totalInventory(item.variants), trackInventory: item.variants.some(variant => variant.inventoryQuantity !== undefined), active: item.status === 'ACTIVE' } });
+        seenProducts.push(product.id);
+        const seenVariants: string[] = [];
+        for (const variant of item.variants) { await tx.productVariant.upsert({ where: { productId_sourceExternalId: { productId: product.id, sourceExternalId: variant.id } }, create: { productId: product.id, sourceExternalId: variant.id, title: variant.title, sku: variant.sku ?? null, barcode: variant.barcode ?? null, priceCents: moneyToCents(variant.price), compareAtCents: moneyToOptionalCents(variant.compareAtPrice), inventoryQuantity: variant.inventoryQuantity ?? null, availableForSale: variant.availableForSale, imageUrl: variant.imageUrl ?? null, selectedOptions: [...variant.selectedOptions] }, update: { title: variant.title, sku: variant.sku ?? null, barcode: variant.barcode ?? null, priceCents: moneyToCents(variant.price), compareAtCents: moneyToOptionalCents(variant.compareAtPrice), inventoryQuantity: variant.inventoryQuantity ?? null, availableForSale: variant.availableForSale, imageUrl: variant.imageUrl ?? null, selectedOptions: [...variant.selectedOptions] } }); seenVariants.push(variant.id); variantCount += 1; }
+        await tx.productVariant.deleteMany({ where: { productId: product.id, sourceExternalId: { notIn: seenVariants } } });
+        await tx.productImage.deleteMany({ where: { productId: product.id } });
+        if (item.images.length) await tx.productImage.createMany({ data: item.images.map((image, position) => ({ productId: product.id, sourceExternalId: image.id, url: image.url, altText: image.altText ?? null, width: image.width ?? null, height: image.height ?? null, position })) });
+        imageCount += item.images.length;
+        await tx.productCollection.deleteMany({ where: { productId: product.id } });
+        const memberships = item.collectionIds.map(id => collectionIds.get(id)).filter((id): id is string => Boolean(id));
+        if (memberships.length) await tx.productCollection.createMany({ data: memberships.map(collectionId => ({ productId: product.id, collectionId })), skipDuplicates: true });
+      }
+      await tx.product.updateMany({ where: { storeId, source: 'SHOPIFY', id: { notIn: seenProducts } }, data: { active: false, syncedAt } });
+      await tx.shopifyConnection.update({ where: { storeId }, data: { lastSyncedAt: syncedAt } });
+      await tx.auditLog.create({ data: { storeId, actorUserId: userId, actorType: 'USER', action: 'integration.shopify_catalog_synced', targetType: 'shopify_connection', requestId, metadata: { products: catalog.products.length, variants: variantCount, images: imageCount, collections: catalog.collections.length } } });
+    }, { timeout: 60_000 });
+    return { products: catalog.products.length, variants: variantCount, images: imageCount, collections: catalog.collections.length, syncedAt };
+  }
 }
+
+const moneyToCents = (value?: string): number => value && /^\d+(\.\d{1,2})?$/.test(value) ? Math.round(Number(value) * 100) : 0;
+const moneyToOptionalCents = (value?: string): number | null => value && /^\d+(\.\d{1,2})?$/.test(value) ? Math.round(Number(value) * 100) : null;
+const totalInventory = (variants: ShopifyCatalog['products'][number]['variants']): number | null => { const known = variants.flatMap(variant => variant.inventoryQuantity === undefined ? [] : [variant.inventoryQuantity]); return known.length ? known.reduce((total, quantity) => total + quantity, 0) : null; };

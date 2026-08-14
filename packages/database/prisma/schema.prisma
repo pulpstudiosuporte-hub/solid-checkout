@@ -59,6 +59,7 @@ model Store {
   members   StoreMember[]
   auditLogs AuditLog[]
   products  Product[]
+  shopifyCollections ShopifyCollection[]
   checkouts Checkout[]
   shopifyConnection ShopifyConnection?
   shopifyOAuthStates ShopifyOAuthState[]
@@ -75,6 +76,14 @@ model Product {
   sourceTitle         String        @map("source_title") @db.VarChar(240)
   checkoutTitle       String        @map("checkout_title") @db.VarChar(240)
   checkoutDescription String?       @map("checkout_description") @db.Text
+  sourceDescriptionHtml String?     @map("source_description_html") @db.Text
+  handle              String?       @db.VarChar(255)
+  vendor              String?       @db.VarChar(255)
+  productType         String?       @map("product_type") @db.VarChar(255)
+  tags                String[]      @default([])
+  sourceStatus        String?       @map("source_status") @db.VarChar(32)
+  sourceUpdatedAt     DateTime?     @map("source_updated_at") @db.Timestamptz(3)
+  syncedAt            DateTime?     @map("synced_at") @db.Timestamptz(3)
   imageUrl            String?       @map("image_url") @db.VarChar(2048)
   priceCents          Int           @map("price_cents")
   compareAtCents      Int?          @map("compare_at_cents")
@@ -86,10 +95,86 @@ model Product {
   updatedAt           DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
   store               Store         @relation(fields: [storeId], references: [id], onDelete: Restrict)
   checkouts           Checkout[]
+  variants            ProductVariant[]
+  images              ProductImage[]
+  collections         ProductCollection[]
 
   @@unique([storeId, source, sourceExternalId])
   @@index([storeId, active, createdAt(sort: Desc)])
   @@map("products")
+}
+
+model ProductVariant {
+  id               String   @id @default(uuid()) @db.Uuid
+  publicId         String   @unique @default(cuid()) @map("public_id") @db.VarChar(32)
+  productId        String   @map("product_id") @db.Uuid
+  sourceExternalId String   @map("source_external_id") @db.VarChar(128)
+  title            String   @db.VarChar(240)
+  sku              String?  @db.VarChar(255)
+  barcode          String?  @db.VarChar(255)
+  priceCents       Int      @map("price_cents")
+  compareAtCents   Int?     @map("compare_at_cents")
+  inventoryQuantity Int?    @map("inventory_quantity")
+  availableForSale Boolean  @default(true) @map("available_for_sale")
+  imageUrl         String?  @map("image_url") @db.VarChar(2048)
+  selectedOptions  Json     @default("[]") @map("selected_options")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, sourceExternalId])
+  @@index([productId])
+  @@map("product_variants")
+}
+
+model ProductImage {
+  id               String   @id @default(uuid()) @db.Uuid
+  productId        String   @map("product_id") @db.Uuid
+  sourceExternalId String   @map("source_external_id") @db.VarChar(128)
+  url              String   @db.VarChar(2048)
+  altText          String?  @map("alt_text") @db.VarChar(512)
+  width            Int?
+  height           Int?
+  position         Int
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, sourceExternalId])
+  @@index([productId, position])
+  @@map("product_images")
+}
+
+model ShopifyCollection {
+  id               String   @id @default(uuid()) @db.Uuid
+  publicId         String   @unique @default(cuid()) @map("public_id") @db.VarChar(32)
+  storeId          String   @map("store_id") @db.Uuid
+  sourceExternalId String   @map("source_external_id") @db.VarChar(128)
+  title            String   @db.VarChar(240)
+  handle           String   @db.VarChar(255)
+  descriptionHtml  String?  @map("description_html") @db.Text
+  imageUrl         String?  @map("image_url") @db.VarChar(2048)
+  sourceUpdatedAt  DateTime? @map("source_updated_at") @db.Timestamptz(3)
+  syncedAt         DateTime @map("synced_at") @db.Timestamptz(3)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  store            Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  products         ProductCollection[]
+
+  @@unique([storeId, sourceExternalId])
+  @@index([storeId, title])
+  @@map("shopify_collections")
+}
+
+model ProductCollection {
+  productId    String @map("product_id") @db.Uuid
+  collectionId String @map("collection_id") @db.Uuid
+  product      Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  collection   ShopifyCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@id([productId, collectionId])
+  @@index([collectionId])
+  @@map("product_collections")
 }
 
 model Checkout {
@@ -124,6 +209,7 @@ model ShopifyConnection {
   connectedAt           DateTime  @default(now()) @map("connected_at") @db.Timestamptz(3)
   updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   revokedAt             DateTime? @map("revoked_at") @db.Timestamptz(3)
+  lastSyncedAt          DateTime? @map("last_synced_at") @db.Timestamptz(3)
   store                 Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@index([shopDomain, revokedAt])
