@@ -3,8 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.12.0", "npm": ">=10.0.0" },
-  "workspaces": ["apps/*", "packages/*"],
+  "engines": {
+    "node": ">=22.12.0",
+    "npm": ">=10.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "npm run dev --workspace=@solid/web",
     "dev:web": "npm run dev --workspace=@solid/web",
@@ -23,6 +29,7 @@
   },
   "devDependencies": {
     "@eslint/js": "9.39.2",
+    "@shopify/cli": "4.6.1",
     "@types/node": "24.10.13",
     "eslint": "9.39.2",
     "globals": "16.5.0",
@@ -31,5 +38,7 @@
     "typescript-eslint": "8.54.0",
     "vitest": "4.1.10"
   },
-  "overrides": { "esbuild": "0.28.1" }
+  "overrides": {
+    "esbuild": "0.28.1"
+  }
 }
