@@ -2,6 +2,10 @@ FROM node:22.12.0-bookworm-slim AS build
 
 WORKDIR /app
 ENV NODE_ENV=development
+# Prisma needs a syntactically valid URL while generating the client. This
+# build-only value never reaches the runtime image; Dokploy supplies the real
+# DATABASE_URL when the application starts.
+ENV DATABASE_URL=postgresql://prisma:prisma@127.0.0.1:5432/solid_build
 
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY apps/api/package.json apps/api/package.json
