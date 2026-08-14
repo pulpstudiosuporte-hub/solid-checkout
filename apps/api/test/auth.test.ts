@@ -11,14 +11,20 @@ beforeAll(async () => { passwordHash = await hashPassword('correct horse battery
 
 class MemoryAuthRepository implements AuthRepository {
   readonly sessions = new Map<string, SessionUser>();
+  storedPasswordHash = passwordHash;
   user: LoginUser = { id: 'internal-user-id', publicId: 'public-user-id', name: 'Owner', email: 'owner@example.com', passwordHash: null, disabledAt: null };
-  findUserByEmail(email: string): Promise<LoginUser | null> { return Promise.resolve(email === this.user.email ? { ...this.user, passwordHash } : null); }
+  findUserByEmail(email: string): Promise<LoginUser | null> { return Promise.resolve(email === this.user.email ? { ...this.user, passwordHash: this.storedPasswordHash } : null); }
   createSession(input: { tokenHash: string; csrfTokenHash: string; userId: string; userAgent?: string; expiresAt: Date; absoluteExpiresAt: Date }): Promise<void> {
     this.sessions.set(input.tokenHash, { sessionId: 'session-id', csrfTokenHash: input.csrfTokenHash, expiresAt: input.expiresAt, absoluteExpiresAt: input.absoluteExpiresAt, user: { publicId: this.user.publicId, name: this.user.name, email: this.user.email } }); return Promise.resolve();
   }
   findActiveSession(tokenHash: string): Promise<SessionUser | null> { return Promise.resolve(this.sessions.get(tokenHash) ?? null); }
   touchSession(): Promise<void> { return Promise.resolve(); }
   revokeSession(tokenHash: string): Promise<void> { this.sessions.delete(tokenHash); return Promise.resolve(); }
+  updatePasswordAndRevokeOtherSessions(_userId: string, updatedHash: string, currentSessionId: string): Promise<void> {
+    this.storedPasswordHash = updatedHash;
+    for (const [tokenHash, session] of this.sessions) if (session.sessionId !== currentSessionId) this.sessions.delete(tokenHash);
+    return Promise.resolve();
+  }
 }
 
 const cookiePair = (setCookie: string | string[] | undefined, name: string): string => {
@@ -50,5 +56,20 @@ describe('autenticação administrativa', () => {
     const csrfToken = csrf.json<{ csrfToken: string }>().csrfToken; const csrfCookie = cookiePair(csrf.headers['set-cookie'], 'solid_csrf');
     const response = await app.inject({ method: 'POST', url: '/auth/login', headers: { origin, cookie: csrfCookie, 'x-csrf-token': csrfToken }, payload: { email: 'missing@example.com', password: 'wrong password' } });
     await app.close(); expect(response.statusCode).toBe(401); expect(response.json<{ error: { message: string } }>().error.message).toBe('E-mail ou senha inválidos.');
+  });
+
+  it('altera a senha autenticada', async () => {
+    const repository = new MemoryAuthRepository();
+    const app = buildApp(env, { authRepository: repository });
+    const csrf = await app.inject({ method: 'GET', url: '/auth/csrf', headers: { origin } });
+    const initialCsrf = csrf.json<{ csrfToken: string }>().csrfToken;
+    const login = await app.inject({ method: 'POST', url: '/auth/login', headers: { origin, cookie: cookiePair(csrf.headers['set-cookie'], 'solid_csrf'), 'x-csrf-token': initialCsrf }, payload: { email: 'owner@example.com', password: 'correct horse battery staple' } });
+    const loginCsrf = login.json<{ csrfToken: string }>().csrfToken;
+    const cookies = `${cookiePair(login.headers['set-cookie'], 'solid_session')}; ${cookiePair(login.headers['set-cookie'], 'solid_csrf')}`;
+    const response = await app.inject({ method: 'POST', url: '/auth/change-password', headers: { origin, cookie: cookies, 'x-csrf-token': loginCsrf }, payload: { currentPassword: 'correct horse battery staple', newPassword: 'another secure password value' } });
+    expect(response.statusCode).toBe(204);
+    const { verifyPassword } = await import('../src/password.js');
+    expect(await verifyPassword('another secure password value', repository.storedPasswordHash)).toBe(true);
+    await app.close();
   });
 });

@@ -11,6 +11,7 @@ import './styles.css';
 import CheckoutEditor, { defaultCheckoutConfig } from './CheckoutEditor';
 import { getApiHealth, getSession, login, logout } from './api';
 import Login, { SessionLoading } from './Auth';
+import AccountSettings from './AccountSettings';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -50,7 +51,7 @@ function Sidebar({ open, onClose, page, setPage, user, onLogout }) {
         </button>)}
       </nav>
       <div className="side-bottom">
-        <button className="nav-item"><Settings size={19}/><span>Configurações</span></button>
+        <button className={page === 'Configurações' ? 'nav-item active' : 'nav-item'} onClick={() => { setPage('Configurações'); onClose(); }}><Settings size={19}/><span>Configurações</span></button>
         <div className="profile"><div className="avatar">{user?.name?.split(' ').slice(0,2).map(part=>part[0]).join('').toUpperCase() || 'AD'}</div><span><b>{user?.name || 'Administrador'}</b><small>Administrador</small></span><button className="icon-btn" onClick={onLogout} aria-label="Sair do painel" title="Sair"><LogOut size={17}/></button></div>
       </div>
     </aside>
@@ -129,7 +130,7 @@ function App(){
   if(window.location.hash==='#/login')window.history.replaceState({},'', '/');
   if(editor) return <CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/>;
   if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>;
-  return <div className="app"><Sidebar open={sidebar} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout}/><div className="main-shell"><Header toggleSidebar={()=>setSidebar(true)} onCheckout={()=>setCheckout(true)} apiStatus={apiStatus}/>{page==='Visão geral'?<Dashboard setPage={setPage}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)}/>}</div></div>
+  return <div className="app"><Sidebar open={sidebar} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout}/><div className="main-shell"><Header toggleSidebar={()=>setSidebar(true)} onCheckout={()=>setCheckout(true)} apiStatus={apiStatus}/>{page==='Visão geral'?<Dashboard setPage={setPage}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)}/>}</div></div>
 }
 
 createRoot(document.getElementById('root')).render(<App/>);

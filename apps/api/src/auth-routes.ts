@@ -3,7 +3,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
 import type { AuthRepository } from './auth-repository.js';
-import { verifyPassword } from './password.js';
+import { hashPassword, verifyPassword } from './password.js';
 
 const SESSION_SECONDS = 8 * 60 * 60;
 const ABSOLUTE_SESSION_SECONDS = 7 * 24 * 60 * 60;
@@ -66,5 +66,22 @@ export function registerAuthRoutes(app: FastifyInstance, environment: AppEnviron
     if (!session || !validCsrf(request, session.csrfTokenHash)) return reply.code(403).send(errorBody(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
     await repository.revokeSession(sha256(token), new Date());
     return reply.clearCookie(sessionCookie, cookieBase).clearCookie(csrfCookie, cookieBase).code(204).send();
+  });
+
+  app.post<{ Body: { currentPassword?: unknown; newPassword?: unknown } }>('/auth/change-password', { config: { rateLimit: { max: 5, timeWindow: '5 minutes' } } }, async (request, reply) => {
+    const token = request.cookies[sessionCookie];
+    if (!token || !allowedOrigin(request)) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
+    const session = await repository.findActiveSession(sha256(token), new Date());
+    if (!session || !validCsrf(request, session.csrfTokenHash)) return reply.code(403).send(errorBody(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
+    const currentPassword = typeof request.body?.currentPassword === 'string' ? request.body.currentPassword : '';
+    const newPassword = typeof request.body?.newPassword === 'string' ? request.body.newPassword : '';
+    if (newPassword.length < 14 || newPassword.length > 128) return reply.code(400).send(errorBody(request, 'PASSWORD_INVALID', 'A nova senha deve ter entre 14 e 128 caracteres.'));
+    const user = await repository.findUserByEmail(session.user.email);
+    const currentValid = user?.passwordHash ? await verifyPassword(currentPassword, user.passwordHash) : false;
+    if (!user || !currentValid) return reply.code(401).send(errorBody(request, 'CURRENT_PASSWORD_INVALID', 'A senha atual está incorreta.'));
+    if (await verifyPassword(newPassword, user.passwordHash!)) return reply.code(400).send(errorBody(request, 'PASSWORD_UNCHANGED', 'A nova senha deve ser diferente da senha atual.'));
+    const passwordHash = await hashPassword(newPassword);
+    await repository.updatePasswordAndRevokeOtherSessions(user.id, passwordHash, session.sessionId, new Date());
+    return reply.code(204).send();
   });
 }

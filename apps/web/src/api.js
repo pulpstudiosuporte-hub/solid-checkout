@@ -53,3 +53,12 @@ export async function logout(csrfToken) {
   });
   if (!response.ok && response.status !== 401) await readJson(response);
 }
+
+export async function changePassword(currentPassword, newPassword, csrfToken) {
+  const response = await fetch(`${apiBaseUrl}/auth/change-password`, {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  if (response.status !== 204) await readJson(response);
+}

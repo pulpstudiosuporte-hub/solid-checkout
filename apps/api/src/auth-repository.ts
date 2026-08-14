@@ -9,6 +9,7 @@ export interface AuthRepository {
   findActiveSession(tokenHash: string, now: Date): Promise<SessionUser | null>;
   touchSession(sessionId: string, expiresAt: Date, now: Date): Promise<void>;
   revokeSession(tokenHash: string, now: Date): Promise<void>;
+  updatePasswordAndRevokeOtherSessions(userId: string, passwordHash: string, currentSessionId: string, now: Date): Promise<void>;
 }
 
 export class PrismaAuthRepository implements AuthRepository {
@@ -31,5 +32,12 @@ export class PrismaAuthRepository implements AuthRepository {
   }
   async revokeSession(tokenHash: string, now: Date): Promise<void> {
     await this.database.session.updateMany({ where: { tokenHash, revokedAt: null }, data: { revokedAt: now } });
+  }
+  async updatePasswordAndRevokeOtherSessions(userId: string, passwordHash: string, currentSessionId: string, now: Date): Promise<void> {
+    await this.database.$transaction([
+      this.database.user.update({ where: { id: userId }, data: { passwordHash } }),
+      this.database.session.updateMany({ where: { userId, id: { not: currentSessionId }, revokedAt: null }, data: { revokedAt: now } }),
+      this.database.auditLog.create({ data: { actorType: 'USER', actorUserId: userId, action: 'auth.password_changed', targetType: 'user', targetId: userId, metadata: { otherSessionsRevoked: true } } }),
+    ]);
   }
 }
