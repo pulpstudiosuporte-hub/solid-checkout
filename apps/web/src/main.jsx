@@ -5,11 +5,12 @@ import {
   CircleDollarSign, Clock3, Copy, CreditCard, ExternalLink, Eye, FileText,
   Home, LayoutTemplate, Link2, Menu, Package, PanelLeftClose, Plug, Plus,
   Search, Settings, ShieldCheck, ShoppingBag, ShoppingCart, Sparkles, Store,
-  Tag, TrendingUp, Users, X, Zap
+  Tag, TrendingUp, Users, X, Zap, LogOut
 } from 'lucide-react';
 import './styles.css';
 import CheckoutEditor, { defaultCheckoutConfig } from './CheckoutEditor';
-import { getApiHealth } from './api';
+import { getApiHealth, getSession, login, logout } from './api';
+import Login, { SessionLoading } from './Auth';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -36,7 +37,7 @@ function Logo({ compact = false }) {
 
 function Badge({ children, tone = 'neutral' }) { return <span className={`badge ${tone}`}>{children}</span>; }
 
-function Sidebar({ open, onClose, page, setPage }) {
+function Sidebar({ open, onClose, page, setPage, user, onLogout }) {
   return <>
     {open && <button className="backdrop" onClick={onClose} aria-label="Fechar menu" />}
     <aside className={`sidebar ${open ? 'open' : ''}`}>
@@ -50,7 +51,7 @@ function Sidebar({ open, onClose, page, setPage }) {
       </nav>
       <div className="side-bottom">
         <button className="nav-item"><Settings size={19}/><span>Configurações</span></button>
-        <div className="profile"><div className="avatar">RC</div><span><b>Ragnar Costa</b><small>Administrador</small></span><ChevronDown size={15}/></div>
+        <div className="profile"><div className="avatar">{user?.name?.split(' ').slice(0,2).map(part=>part[0]).join('').toUpperCase() || 'AD'}</div><span><b>{user?.name || 'Administrador'}</b><small>Administrador</small></span><button className="icon-btn" onClick={onLogout} aria-label="Sair do painel" title="Sair"><LogOut size={17}/></button></div>
       </div>
     </aside>
   </>;
@@ -117,6 +118,18 @@ function Checkout({ onBack, customConfig }) {
   </div><footer className="checkout-footer"><Logo/><span>© 2026 Solid Commerce. Todos os direitos reservados.</span><div><a href="#">Privacidade</a><a href="#">Termos</a></div></footer></div>;
 }
 
-function App(){ const [sidebar,setSidebar]=useState(false); const [page,setPage]=useState('Visão geral'); const [checkout,setCheckout]=useState(false); const [editor,setEditor]=useState(false); const [previewConfig,setPreviewConfig]=useState(null); const [apiStatus,setApiStatus]=useState('checking'); useEffect(()=>{let active=true; getApiHealth().then(()=>active&&setApiStatus('online')).catch(()=>active&&setApiStatus('offline')); return()=>{active=false}},[]); if(editor) return <CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/>; if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>; return <div className="app"><Sidebar open={sidebar} onClose={()=>setSidebar(false)} page={page} setPage={setPage}/><div className="main-shell"><Header toggleSidebar={()=>setSidebar(true)} onCheckout={()=>setCheckout(true)} apiStatus={apiStatus}/>{page==='Visão geral'?<Dashboard setPage={setPage}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)}/>}</div></div> }
+function App(){
+  const [sidebar,setSidebar]=useState(false); const [page,setPage]=useState('Visão geral'); const [checkout,setCheckout]=useState(false); const [editor,setEditor]=useState(false); const [previewConfig,setPreviewConfig]=useState(null); const [apiStatus,setApiStatus]=useState('checking');
+  const [auth,setAuth]=useState({status:'checking',user:null,csrfToken:null});
+  useEffect(()=>{let active=true; getApiHealth().then(()=>active&&setApiStatus('online')).catch(()=>active&&setApiStatus('offline')); getSession().then(result=>active&&setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken})).catch(()=>active&&setAuth({status:'anonymous',user:null,csrfToken:null})); return()=>{active=false}},[]);
+  async function handleLogin(email,password){const result=await login(email,password); setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken}); window.history.replaceState({},'', '/');}
+  async function handleLogout(){try{await logout(auth.csrfToken);}finally{setAuth({status:'anonymous',user:null,csrfToken:null});setCheckout(false);setEditor(false);window.history.replaceState({},'', '/login');}}
+  if(auth.status==='checking') return <SessionLoading/>;
+  if(auth.status==='anonymous'){if(window.location.pathname!=='/login')window.history.replaceState({},'', '/login');return <Login onSubmit={handleLogin}/>;}
+  if(window.location.pathname==='/login')window.history.replaceState({},'', '/');
+  if(editor) return <CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/>;
+  if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>;
+  return <div className="app"><Sidebar open={sidebar} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout}/><div className="main-shell"><Header toggleSidebar={()=>setSidebar(true)} onCheckout={()=>setCheckout(true)} apiStatus={apiStatus}/>{page==='Visão geral'?<Dashboard setPage={setPage}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)}/>}</div></div>
+}
 
 createRoot(document.getElementById('root')).render(<App/>);

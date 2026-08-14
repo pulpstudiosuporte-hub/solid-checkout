@@ -53,8 +53,10 @@ export function registerAuthRoutes(app: FastifyInstance, environment: AppEnviron
     if (!token) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     const now = new Date(); const session = await repository.findActiveSession(sha256(token), now);
     if (!session) return reply.clearCookie(sessionCookie, cookieBase).code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
+    const csrfToken = request.cookies[csrfCookie];
+    if (!csrfToken || !safeEqual(sha256(csrfToken), session.csrfTokenHash)) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     await repository.touchSession(session.sessionId, new Date(Math.min(now.getTime() + SESSION_SECONDS * 1000, session.absoluteExpiresAt.getTime())), now);
-    return reply.send({ user: session.user });
+    return reply.send({ user: session.user, csrfToken });
   });
 
   app.post('/auth/logout', async (request, reply) => {
