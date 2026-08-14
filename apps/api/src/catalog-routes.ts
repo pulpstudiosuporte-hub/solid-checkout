@@ -2,7 +2,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
 import type { AuthRepository } from './auth-repository.js';
-import type { CatalogRepository, CheckoutInput, ProductInput, StoreContext } from './catalog-repository.js';
+import type { CatalogRepository, CheckoutConfigInput, CheckoutInput, ProductInput, StoreContext } from './catalog-repository.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const safeEqual = (left: string, right: string): boolean => timingSafeEqual(Buffer.from(sha256(left), 'hex'), Buffer.from(sha256(right), 'hex'));
@@ -10,6 +10,22 @@ const errorBody = (request: FastifyRequest, code: string, message: string) => ({
 const text = (value: unknown, max: number): string | null => typeof value === 'string' && value.trim().length > 0 && value.trim().length <= max ? value.trim() : null;
 const optionalText = (value: unknown, max: number): string | undefined | null => value === undefined || value === null || value === '' ? undefined : text(value, max);
 const integer = (value: unknown, min: number, max: number): number | null => typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max ? value : null;
+const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const input = value as Record<string, unknown>; const result: Record<string, unknown> = {};
+  const enums: Record<string, readonly string[]> = { template: ['minimal', 'conversion', 'compact'], font: ['Plus Jakarta Sans', 'Inter', 'Arial', 'Georgia'], language: ['pt-BR', 'en-US', 'es'], currency: ['BRL', 'USD', 'EUR'], buttonEffect: ['lift', 'pulse', 'none'] };
+  const limits: Record<string, number> = { logoText: 24, timerText: 80, title: 120, subtitle: 300, buttonText: 60, footerText: 300 };
+  const booleans = ['secureHeader', 'timer', 'showCoupon', 'showBump', 'showSummary'];
+  const colors = ['primary', 'pageBg', 'cardBg', 'textColor', 'borderColor', 'inputBg'];
+  for (const [key, allowed] of Object.entries(enums)) { if (typeof input[key] !== 'string' || !allowed.includes(input[key])) return null; result[key] = input[key]; }
+  for (const [key, max] of Object.entries(limits)) { if (typeof input[key] !== 'string' || input[key].trim().length < 1 || input[key].trim().length > max) return null; result[key] = input[key].trim(); }
+  for (const key of booleans) { if (typeof input[key] !== 'boolean') return null; result[key] = input[key]; }
+  for (const key of colors) { if (typeof input[key] !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(input[key])) return null; result[key] = input[key].toLowerCase(); }
+  const radius = integer(input.radius, 0, 28); const timerMinutes = integer(input.timerMinutes, 1, 60); if (radius === null || timerMinutes === null) return null;
+  result.radius = radius; result.timerMinutes = timerMinutes;
+  for (const key of ['privacyUrl', 'termsUrl', 'successUrl']) { const url = input[key]; if (typeof url !== 'string' || url.length > 2048 || url && url !== '#' && !url.startsWith('https://')) return null; result[key] = url; }
+  return result;
+};
 
 export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvironment, auth: AuthRepository, catalog: CatalogRepository): void {
   const secure = environment.NODE_ENV === 'production';
@@ -86,6 +102,16 @@ export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvi
     if (!checkoutId) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Checkout inválido.'));
     const checkout = await catalog.publishCheckout(context, checkoutId, request.id);
     if (!checkout) return reply.code(404).send(errorBody(request, 'CHECKOUT_NOT_FOUND', 'Checkout não encontrado ou produto indisponível.'));
+    return reply.send({ checkout });
+  });
+
+  app.patch<{ Params: { checkoutId: string }; Body: Record<string, unknown> }>('/checkouts/:checkoutId/draft', async (request, reply) => {
+    const context = await authenticate(request, true);
+    if (!context || !canWrite(context)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    const checkoutId = text(request.params.checkoutId, 32); const config = checkoutConfig(request.body?.config);
+    if (!checkoutId || !config) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Personalização do checkout inválida.'));
+    const checkout = await catalog.updateCheckoutDraft(context, checkoutId, config, request.id);
+    if (!checkout) return reply.code(404).send(errorBody(request, 'CHECKOUT_NOT_FOUND', 'Checkout não encontrado.'));
     return reply.send({ checkout });
   });
 }

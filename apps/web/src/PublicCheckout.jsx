@@ -4,6 +4,8 @@ import { createPublicCheckoutSession, getPublicCheckout, getPublicCheckoutSessio
 import './public-session.css';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const publicConfig = value => ({ primary: '#7357e9', pageBg: '#f6f7f9', cardBg: '#ffffff', textColor: '#17171a', borderColor: '#e5e5e9', radius: 14, font: 'Plus Jakarta Sans', logoText: 'SOLID', secureHeader: true, ...(value || {}) });
+const configStyle = config => ({ '--public-primary': config.primary, '--public-bg': config.pageBg, '--public-card': config.cardBg, '--public-text': config.textColor, '--public-border': config.borderColor, '--public-radius': `${config.radius}px`, fontFamily: config.font });
 
 function safeQuantity(value, maximum) {
   return Math.max(1, Math.min(maximum, Number(value) || 1));
@@ -35,6 +37,7 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
   }, [storeSlug, checkoutSlug]);
 
   const product = state.checkout?.product;
+  const config = publicConfig(state.checkout?.publishedConfig);
   const variant = product?.variants?.find(item => item.publicId === variantId);
   const unitPrice = variant?.priceCents ?? product?.priceCents ?? 0;
   const total = useMemo(() => unitPrice * quantity, [unitPrice, quantity]);
@@ -56,8 +59,8 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
   if (state.loading) return <div className="public-checkout-state"><LoaderCircle className="spin" /><span>Preparando checkout seguro...</span></div>;
   if (!product) return <div className="public-checkout-state error"><ShoppingBag /><b>Checkout indisponível</b><span>{state.error || 'Confira o endereço e tente novamente.'}</span></div>;
 
-  return <main className="public-checkout">
-    <header><b>SOLID</b><span><ShieldCheck size={18} /> Pagamento seguro</span></header>
+  return <main className="public-checkout" style={configStyle(config)}>
+    <header><b>{config.logoText}</b>{config.secureHeader && <span><ShieldCheck size={18} /> Pagamento seguro</span>}</header>
     <div className="public-checkout-grid">
       <section>
         <p className="eyebrow">FINALIZE SEU PEDIDO</p>
@@ -98,9 +101,10 @@ function SessionContent({ session }) {
   }];
   const itemCount = items.reduce((total, item) => total + item.quantity, 0);
   const storeName = session.checkout?.store?.name || 'Loja SOLID';
+  const config = publicConfig(session.checkout?.publishedConfig);
 
-  return <main className="public-checkout session-checkout">
-    <header><b>SOLID</b><span><ShieldCheck size={18} /> Pagamento seguro</span></header>
+  return <main className="public-checkout session-checkout" style={configStyle(config)}>
+    <header><b>{config.logoText}</b>{config.secureHeader && <span><ShieldCheck size={18} /> Pagamento seguro</span>}</header>
     <div className="session-expiry" role="status"><Clock3 size={17} /><span>{expiry.remaining ? <>Sessão reservada por <strong>{expiry.label}</strong></> : <strong>Sessão expirada</strong>}</span></div>
     <div className="public-checkout-grid">
       <section>

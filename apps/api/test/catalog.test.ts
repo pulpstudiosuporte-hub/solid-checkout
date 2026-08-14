@@ -29,6 +29,7 @@ class MemoryCatalog implements CatalogRepository {
   createProduct(context: StoreContext, input: ProductInput): Promise<object> { const product = { publicId: 'new-product', storeId: context.storeId, checkoutTitle: input.title, ...input }; this.products.push(product); return Promise.resolve(product); }
   listCheckouts(context: StoreContext): Promise<readonly object[]> { return Promise.resolve(this.checkouts.filter(checkout => checkout.storeId === context.storeId)); }
   createCheckout(context: StoreContext, input: CheckoutInput): Promise<object | null> { if (!this.products.some(product => product.publicId === input.productPublicId && product.storeId === context.storeId)) return Promise.resolve(null); const checkout = { publicId: 'new-checkout', storeId: context.storeId, ...input }; this.checkouts.push(checkout); return Promise.resolve(checkout); }
+  updateCheckoutDraft(context: StoreContext, publicId: string, config: Record<string, unknown>): Promise<object | null> { const checkout = this.checkouts.find(item => item.storeId === context.storeId && item.publicId === publicId); if (checkout) checkout.draftConfig = config; return Promise.resolve(checkout ?? null); }
   publishCheckout(context: StoreContext, publicId: string): Promise<object | null> { const checkout = this.checkouts.find(item => item.storeId === context.storeId && item.publicId === publicId); if (checkout) checkout.status = 'PUBLISHED'; return Promise.resolve(checkout ?? null); }
   getPublicCheckout(storeSlug: string, checkoutSlug: string): Promise<object | null> { return Promise.resolve(storeSlug === 'store-a' && checkoutSlug === 'checkout-a' ? { slug: checkoutSlug, product: this.products[0] } : null); }
   createPublicCheckoutSession(input: CheckoutSessionInput): Promise<object | null> { return Promise.resolve(input.storeSlug === 'store-a' && input.checkoutSlug === 'checkout-a' ? { publicId: 'session-a', totalCents: 9900 * input.quantity } : null); }
@@ -65,6 +66,16 @@ describe('catálogo isolado por loja', () => {
     catalog.role = 'ANALYST';
     const forbidden = await app.inject({ method: 'POST', url: '/products', headers: authenticatedHeaders, payload: { title: 'Produto', priceCents: 1000 } });
     expect(forbidden.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it('valida e salva personalização somente na loja autenticada', async () => {
+    const catalog = new MemoryCatalog(); catalog.checkouts.push({ publicId: 'checkout-a', storeId: 'store-a', draftConfig: {} });
+    const app = buildApp(env, { authRepository: new MemoryAuth(), catalogRepository: catalog });
+    const config = { template: 'minimal', font: 'Inter', language: 'pt-BR', currency: 'BRL', buttonEffect: 'lift', logoText: 'SOLID', timerText: 'Oferta reservada por', title: 'Finalize seu pedido', subtitle: 'Preencha seus dados.', buttonText: 'Continuar', footerText: 'Todos os direitos reservados.', secureHeader: true, timer: true, showCoupon: false, showBump: false, showSummary: true, primary: '#7357e9', pageBg: '#f6f7f9', cardBg: '#ffffff', textColor: '#17171a', borderColor: '#e5e5e9', inputBg: '#ffffff', radius: 14, timerMinutes: 10, privacyUrl: '#', termsUrl: '#', successUrl: '' };
+    const response = await app.inject({ method: 'PATCH', url: '/checkouts/checkout-a/draft', headers: authenticatedHeaders, payload: { config } });
+    expect(response.statusCode).toBe(200); expect(catalog.checkouts[0]?.draftConfig).toMatchObject({ primary: '#7357e9', title: 'Finalize seu pedido' });
+    expect((await app.inject({ method: 'PATCH', url: '/checkouts/checkout-a/draft', headers: authenticatedHeaders, payload: { config: { ...config, primary: 'url(javascript:1)' } } })).statusCode).toBe(400);
     await app.close();
   });
 
