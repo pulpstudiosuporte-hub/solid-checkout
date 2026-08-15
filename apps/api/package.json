@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --dir test",
     "auth:bootstrap": "node dist/src/bootstrap-admin.js",
-    "auth:reset-password": "node dist/src/reset-admin-password.js"
+    "auth:reset-password": "node dist/src/reset-admin-password.js",
+    "auth:promote-owner": "node dist/src/promote-store-owner.js"
   },
   "dependencies": {
     "@fastify/cookie": "11.1.2",
