@@ -10,6 +10,10 @@ export type ShopifyCatalog = Readonly<{
 }>;
 export type ShopifySyncResult = Readonly<{ products: number; variants: number; images: number; collections: number; syncedAt: Date }>;
 
+export class ShopifyDomainInUseError extends Error {
+  constructor() { super('Shopify domain is already connected'); this.name = 'ShopifyDomainInUseError'; }
+}
+
 export interface ShopifyRepository {
   context(userId: string, sessionId: string): Promise<ShopifyContext | null>;
   status(storeId: string): Promise<ShopifyStatus>;
@@ -51,7 +55,14 @@ export class PrismaShopifyRepository implements ShopifyRepository {
   async connect(input: { storeId: string; userId: string; shopDomain: string; accessTokenEncrypted: string; refreshTokenEncrypted?: string; scopes: string; accessTokenExpiresAt?: Date; refreshTokenExpiresAt?: Date; requestId: string }): Promise<void> {
     await this.database.$transaction(async tx => {
       const tokenData = { accessTokenEncrypted: input.accessTokenEncrypted, ...(input.refreshTokenEncrypted ? { refreshTokenEncrypted: input.refreshTokenEncrypted } : {}), scopes: input.scopes, ...(input.accessTokenExpiresAt ? { accessTokenExpiresAt: input.accessTokenExpiresAt } : {}), ...(input.refreshTokenExpiresAt ? { refreshTokenExpiresAt: input.refreshTokenExpiresAt } : {}) };
-      await tx.shopifyConnection.upsert({ where: { storeId: input.storeId }, create: { storeId: input.storeId, shopDomain: input.shopDomain, ...tokenData }, update: { shopDomain: input.shopDomain, ...tokenData, revokedAt: null, connectedAt: new Date() } });
+      const domainConnection = await tx.shopifyConnection.findUnique({ where: { shopDomain: input.shopDomain }, select: { id: true, storeId: true, revokedAt: true } });
+      if (domainConnection && domainConnection.storeId !== input.storeId) {
+        if (!domainConnection.revokedAt) throw new ShopifyDomainInUseError();
+        await tx.shopifyConnection.deleteMany({ where: { storeId: input.storeId, id: { not: domainConnection.id } } });
+        await tx.shopifyConnection.update({ where: { id: domainConnection.id }, data: { storeId: input.storeId, ...tokenData, revokedAt: null, connectedAt: new Date(), lastSyncedAt: null } });
+      } else {
+        await tx.shopifyConnection.upsert({ where: { storeId: input.storeId }, create: { storeId: input.storeId, shopDomain: input.shopDomain, ...tokenData }, update: { shopDomain: input.shopDomain, ...tokenData, revokedAt: null, connectedAt: new Date() } });
+      }
       await tx.auditLog.create({ data: { storeId: input.storeId, actorUserId: input.userId, actorType: 'USER', action: 'integration.shopify_connected', targetType: 'shopify_connection', targetId: input.shopDomain, requestId: input.requestId } });
     });
   }

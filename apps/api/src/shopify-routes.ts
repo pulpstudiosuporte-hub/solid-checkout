@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
 import type { AuthRepository, SessionUser } from './auth-repository.js';
 import { decryptSecret, encryptSecret } from './shopify-crypto.js';
-import type { ShopifyCatalog, ShopifyRepository } from './shopify-repository.js';
+import { ShopifyDomainInUseError, type ShopifyCatalog, type ShopifyRepository } from './shopify-repository.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const equal = (left: string, right: string): boolean => { const a = Buffer.from(left); const b = Buffer.from(right); return a.length === b.length && timingSafeEqual(a, b); };
@@ -57,7 +57,12 @@ export function registerShopifyRoutes(app: FastifyInstance, environment: AppEnvi
     const token = await tokenResponse.json() as { access_token?: string; refresh_token?: string; scope?: string; expires_in?: number; refresh_token_expires_in?: number };
     if (!tokenResponse.ok || !token.access_token) return reply.clearCookie(oauthCookie, { path: '/integrations/shopify/callback' }).redirect(redirectResult('token_error'));
     const now = Date.now();
-    await repository.connect({ storeId: oauthState.storeId, userId: current.userId, shopDomain: shop, accessTokenEncrypted: encryptSecret(token.access_token, environment.APP_ENCRYPTION_KEY!), ...(token.refresh_token ? { refreshTokenEncrypted: encryptSecret(token.refresh_token, environment.APP_ENCRYPTION_KEY!) } : {}), scopes: token.scope ?? scopes, ...(token.expires_in ? { accessTokenExpiresAt: new Date(now + token.expires_in * 1000) } : {}), ...(token.refresh_token_expires_in ? { refreshTokenExpiresAt: new Date(now + token.refresh_token_expires_in * 1000) } : {}), requestId: request.id });
+    try {
+      await repository.connect({ storeId: oauthState.storeId, userId: current.userId, shopDomain: shop, accessTokenEncrypted: encryptSecret(token.access_token, environment.APP_ENCRYPTION_KEY!), ...(token.refresh_token ? { refreshTokenEncrypted: encryptSecret(token.refresh_token, environment.APP_ENCRYPTION_KEY!) } : {}), scopes: token.scope ?? scopes, ...(token.expires_in ? { accessTokenExpiresAt: new Date(now + token.expires_in * 1000) } : {}), ...(token.refresh_token_expires_in ? { refreshTokenExpiresAt: new Date(now + token.refresh_token_expires_in * 1000) } : {}), requestId: request.id });
+    } catch (error) {
+      if (error instanceof ShopifyDomainInUseError) return reply.clearCookie(oauthCookie, { path: '/integrations/shopify/callback' }).redirect(redirectResult('already_connected'));
+      throw error;
+    }
     return reply.clearCookie(oauthCookie, { path: '/integrations/shopify/callback' }).redirect(redirectResult('connected'));
   });
 
