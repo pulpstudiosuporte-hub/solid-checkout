@@ -20,6 +20,12 @@ class MemoryAuth implements AuthRepository {
 }
 
 class MemoryCatalog implements CatalogRepository {
+  shippingMethods = [{ publicId: 'shipping-a', name: 'Entrega padrão', priceCents: 1290, minDays: 3, maxDays: 5, active: true, position: 0 }];
+  listShippingMethods(): Promise<readonly object[]> { return Promise.resolve(this.shippingMethods); }
+  createShippingMethod(_context: StoreContext, input: { name: string; priceCents: number; minDays: number; maxDays: number; active: boolean }): Promise<object> { const method = { publicId: 'shipping-new', ...input, position: this.shippingMethods.length }; this.shippingMethods.push(method); return Promise.resolve(method); }
+  updateShippingMethod(_context: StoreContext, publicId: string, input: { name: string; priceCents: number; minDays: number; maxDays: number; active: boolean }): Promise<object | null> { return Promise.resolve(publicId === 'shipping-a' ? { publicId, ...input, position: 0 } : null); }
+  listPublicShippingMethods(publicId: string, tokenHash: string): Promise<readonly object[] | null> { return Promise.resolve(publicId === 'session-a' && tokenHash ? this.shippingMethods.filter(item => item.active) : null); }
+  selectPublicShippingMethod(publicId: string, tokenHash: string, methodPublicId: string): Promise<object | null> { const method = this.shippingMethods.find(item => item.publicId === methodPublicId && item.active); return Promise.resolve(publicId === 'session-a' && tokenHash && method ? { shippingMethod: method, subtotalCents: 9900, shippingPriceCents: method.priceCents, grandTotalCents: 9900 + method.priceCents } : null); }
   role: StoreContext['role'] = 'OWNER';
   products: Array<{ publicId: string; storeId: string; checkoutTitle: string; priceCents: number; [key: string]: unknown }> = [{ publicId: 'product-a', storeId: 'store-a', checkoutTitle: 'Produto A', priceCents: 9900 }, { publicId: 'product-b', storeId: 'store-b', checkoutTitle: 'Produto B', priceCents: 5000 }];
   checkouts: Array<Record<string, unknown>> = [];
@@ -107,6 +113,16 @@ describe('catálogo isolado por loja', () => {
     const shipping = await app.inject({ method: 'PUT', url: '/public/checkout-sessions/session-a/shipping', headers, payload: { postalCode: '01310-100', street: 'Avenida Paulista', number: '1000', complement: '', neighborhood: 'Bela Vista', city: 'São Paulo', state: 'SP' } });
     expect(shipping.statusCode).toBe(200); expect(shipping.json()).toEqual({ customerCaptured: true, shippingCaptured: true });
     expect((await app.inject({ method: 'PUT', url: '/public/checkout-sessions/session-a/customer', headers, payload: { name: 'Teste', email: 'x@example.com', phone: '11999999999', document: '111.111.111-11' } })).statusCode).toBe(400);
+    await app.close();
+  });
+  it('cria frete por loja e confirma o valor no servidor', async () => {
+    const app = buildApp(env, { authRepository: new MemoryAuth(), catalogRepository: new MemoryCatalog() });
+    const created = await app.inject({ method: 'POST', url: '/shipping-methods', headers: authenticatedHeaders, payload: { name: 'Entrega expressa', priceCents: 1590, minDays: 1, maxDays: 2, active: true } });
+    expect(created.statusCode).toBe(201); expect(created.json<{ method: { priceCents: number } }>().method.priceCents).toBe(1590);
+    const headers = { authorization: `Bearer ${'a'.repeat(43)}`, origin };
+    expect((await app.inject({ method: 'GET', url: '/public/checkout-sessions/session-a/shipping-methods', headers })).statusCode).toBe(200);
+    const selected = await app.inject({ method: 'PUT', url: '/public/checkout-sessions/session-a/shipping-method', headers, payload: { methodId: 'shipping-a' } });
+    expect(selected.statusCode).toBe(200); expect(selected.json()).toMatchObject({ shippingPriceCents: 1290, grandTotalCents: 11190 });
     await app.close();
   });
 });

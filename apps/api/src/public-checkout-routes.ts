@@ -86,6 +86,22 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     return reply.header('cache-control', 'no-store').send(result);
   });
 
+  app.get<{ Params: { sessionId: string }; Headers: { authorization?: string } }>('/public/checkout-sessions/:sessionId/shipping-methods', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization);
+    if (!credentials) return reply.code(401).send(errorBody(request, 'INVALID_SESSION', 'Sessão inválida.'));
+    const methods = await catalog.listPublicShippingMethods(credentials.sessionId, credentials.tokenHash, new Date());
+    if (!methods) return reply.code(409).send(errorBody(request, 'SHIPPING_ADDRESS_REQUIRED', 'Informe o endereço antes de escolher o frete.'));
+    return reply.header('cache-control', 'no-store').send({ items: methods });
+  });
+
+  app.put<{ Params: { sessionId: string }; Headers: { authorization?: string }; Body: Record<string, unknown> }>('/public/checkout-sessions/:sessionId/shipping-method', { config: { rateLimit: { max: 12, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization); const methodId = publicId(request.body?.methodId);
+    if (!credentials || !methodId) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Método de frete inválido.'));
+    const result = await catalog.selectPublicShippingMethod(credentials.sessionId, credentials.tokenHash, methodId, new Date());
+    if (!result) return reply.code(409).send(errorBody(request, 'SHIPPING_METHOD_UNAVAILABLE', 'Este método de frete não está mais disponível.'));
+    return reply.header('cache-control', 'no-store').send(result);
+  });
+
   app.post<{ Querystring: Record<string, string | string[] | undefined>; Body: Record<string, unknown> }>('/integrations/shopify/proxy/checkout-session', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
     if (!environment.SHOPIFY_CLIENT_SECRET || !validProxySignature(request.query, environment.SHOPIFY_CLIENT_SECRET)) return reply.code(401).send(errorBody(request, 'INVALID_PROXY_SIGNATURE', 'Solicitação Shopify inválida.'));
     const timestamp = typeof request.query.timestamp === 'string' ? Number(request.query.timestamp) : 0;

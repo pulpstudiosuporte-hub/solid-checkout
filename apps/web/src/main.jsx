@@ -5,7 +5,7 @@ import {
   CircleDollarSign, Clock3, Copy, CreditCard, ExternalLink, Eye, FileText,
   Home, LayoutTemplate, Link2, Menu, Package, PanelLeftClose, Plug, Plus,
   Search, Settings, ShieldCheck, ShoppingBag, ShoppingCart, Sparkles, Store,
-  Tag, TrendingUp, Users, X, Zap, LogOut
+  Tag, TrendingUp, Truck, Users, X, Zap, LogOut
 } from 'lucide-react';
 import './styles.css';
 import CheckoutEditor, { defaultCheckoutConfig } from './CheckoutEditor';
@@ -16,6 +16,7 @@ import StoreSwitcher from './StoreSwitcher';
 import ShopifyIntegration from './ShopifyIntegration';
 import ProductsPage from './ProductsPage';
 import CheckoutsPage from './CheckoutsPage';
+import LogisticsPage from './LogisticsPage';
 import PublicCheckout, { PublicSessionCheckout } from './PublicCheckout';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -32,6 +33,7 @@ const nav = [
   { label: 'Pedidos', icon: ShoppingBag, count: 12 },
   { label: 'Produtos', icon: Package },
   { label: 'Checkouts', icon: LayoutTemplate },
+  { label: 'Logística', icon: Truck },
   { label: 'Order bumps', icon: Sparkles },
   { label: 'Marketing', icon: BarChart3 },
   { label: 'Integrações', icon: Plug },
@@ -98,6 +100,7 @@ function Dashboard({ setPage }) {
 
 function SimplePage({ page, onCheckout, onEdit, csrfToken }) {
   if (page === 'Checkouts') return <CheckoutsPage csrfToken={csrfToken}/>;
+  if (page === 'Logística') return <LogisticsPage csrfToken={csrfToken}/>;
   const configs = {
     'Pedidos': ['Pedidos', 'Gerencie vendas, pagamentos e carrinhos abandonados.', ShoppingBag],
     'Produtos': ['Produtos', 'Seu catálogo sincronizado com a Shopify.', Package],

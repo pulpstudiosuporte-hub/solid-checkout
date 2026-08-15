@@ -8,6 +8,7 @@ export type CheckoutSessionInput = Readonly<{ storeSlug: string; checkoutSlug: s
 export type ShopifyCartSessionInput = Readonly<{ shopDomain: string; checkoutSlug: string; lines: readonly Readonly<{ variantId: string; quantity: number }>[]; tokenHash: string; sourceCartId?: string; expiresAt: Date }>;
 export type CheckoutCustomerInput = Readonly<{ encryptedData: string; emailHash: string; documentHash: string }>;
 export type CheckoutShippingInput = Readonly<{ encryptedData: string }>;
+export type ShippingMethodInput = Readonly<{ name: string; priceCents: number; minDays: number; maxDays: number; active: boolean }>;
 export type ProductListQuery = Readonly<{ search?: string; status?: 'active' | 'inactive'; source?: 'MANUAL' | 'SHOPIFY'; page: number; pageSize: number }>;
 export type ProductListResult = Readonly<{ items: readonly object[]; total: number }>;
 
@@ -26,6 +27,11 @@ export interface CatalogRepository {
   createShopifyCartSession(input: ShopifyCartSessionInput): Promise<object | null>;
   updatePublicCheckoutCustomer(publicId: string, tokenHash: string, now: Date, input: CheckoutCustomerInput): Promise<object | null>;
   updatePublicCheckoutShipping(publicId: string, tokenHash: string, now: Date, input: CheckoutShippingInput): Promise<object | null>;
+  listShippingMethods(context: StoreContext): Promise<readonly object[]>;
+  createShippingMethod(context: StoreContext, input: ShippingMethodInput, requestId: string): Promise<object>;
+  updateShippingMethod(context: StoreContext, publicId: string, input: ShippingMethodInput, requestId: string): Promise<object | null>;
+  listPublicShippingMethods(publicId: string, tokenHash: string, now: Date): Promise<readonly object[] | null>;
+  selectPublicShippingMethod(publicId: string, tokenHash: string, methodPublicId: string, now: Date): Promise<object | null>;
 }
 
 const productSelect = { publicId: true, sourceTitle: true, checkoutTitle: true, checkoutDescription: true, handle: true, vendor: true, productType: true, tags: true, imageUrl: true, priceCents: true, compareAtCents: true, stockQuantity: true, trackInventory: true, maxPerOrder: true, active: true, source: true, syncedAt: true, createdAt: true, updatedAt: true, _count: { select: { variants: true, images: true, collections: true } } } as const;
@@ -53,6 +59,25 @@ export class PrismaCatalogRepository implements CatalogRepository {
       const product = await transaction.product.create({ data: { storeId: context.storeId, sourceTitle: input.title, checkoutTitle: input.title, priceCents: input.priceCents, trackInventory: input.trackInventory, maxPerOrder: input.maxPerOrder, active: input.active, ...(input.description !== undefined ? { checkoutDescription: input.description } : {}), ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}), ...(input.compareAtCents !== undefined ? { compareAtCents: input.compareAtCents } : {}), ...(input.stockQuantity !== undefined ? { stockQuantity: input.stockQuantity } : {}) }, select: productSelect });
       await transaction.auditLog.create({ data: { storeId: context.storeId, actorUserId: context.userId, actorType: 'USER', action: 'product.created', targetType: 'product', targetId: product.publicId, requestId } });
       return product;
+    });
+  }
+  listShippingMethods(context: StoreContext): Promise<readonly object[]> {
+    return this.database.shippingMethod.findMany({ where: { storeId: context.storeId }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], select: { publicId: true, name: true, priceCents: true, minDays: true, maxDays: true, active: true, position: true } });
+  }
+  async createShippingMethod(context: StoreContext, input: ShippingMethodInput, requestId: string): Promise<object> {
+    return this.database.$transaction(async transaction => {
+      const position = await transaction.shippingMethod.count({ where: { storeId: context.storeId } });
+      const method = await transaction.shippingMethod.create({ data: { storeId: context.storeId, ...input, position }, select: { publicId: true, name: true, priceCents: true, minDays: true, maxDays: true, active: true, position: true } });
+      await transaction.auditLog.create({ data: { storeId: context.storeId, actorUserId: context.userId, actorType: 'USER', action: 'shipping_method.created', targetType: 'shipping_method', targetId: method.publicId, requestId } });
+      return method;
+    });
+  }
+  async updateShippingMethod(context: StoreContext, publicId: string, input: ShippingMethodInput, requestId: string): Promise<object | null> {
+    const existing = await this.database.shippingMethod.findFirst({ where: { storeId: context.storeId, publicId }, select: { id: true } }); if (!existing) return null;
+    return this.database.$transaction(async transaction => {
+      const method = await transaction.shippingMethod.update({ where: { id: existing.id }, data: input, select: { publicId: true, name: true, priceCents: true, minDays: true, maxDays: true, active: true, position: true } });
+      await transaction.auditLog.create({ data: { storeId: context.storeId, actorUserId: context.userId, actorType: 'USER', action: 'shipping_method.updated', targetType: 'shipping_method', targetId: method.publicId, requestId } });
+      return method;
     });
   }
   listCheckouts(context: StoreContext): Promise<readonly object[]> {
@@ -120,8 +145,25 @@ export class PrismaCatalogRepository implements CatalogRepository {
   }
 
   async updatePublicCheckoutShipping(publicId: string, tokenHash: string, now: Date, input: CheckoutShippingInput): Promise<object | null> {
-    const result = await this.database.checkoutSession.updateMany({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, customerCapturedAt: { not: null } }, data: { shippingAddressEncrypted: input.encryptedData, shippingCapturedAt: now } });
+    const result = await this.database.checkoutSession.updateMany({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, customerCapturedAt: { not: null } }, data: { shippingAddressEncrypted: input.encryptedData, shippingCapturedAt: now, shippingMethodPublicId: null, shippingMethodName: null, shippingPriceCents: 0, shippingMinDays: null, shippingMaxDays: null } });
     return result.count === 1 ? { customerCaptured: true, shippingCaptured: true } : null;
+  }
+
+  async listPublicShippingMethods(publicId: string, tokenHash: string, now: Date): Promise<readonly object[] | null> {
+    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, shippingCapturedAt: { not: null } }, select: { checkout: { select: { storeId: true } } } });
+    if (!session) return null;
+    return this.database.shippingMethod.findMany({ where: { storeId: session.checkout.storeId, active: true }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }], select: { publicId: true, name: true, priceCents: true, minDays: true, maxDays: true } });
+  }
+
+  async selectPublicShippingMethod(publicId: string, tokenHash: string, methodPublicId: string, now: Date): Promise<object | null> {
+    return this.database.$transaction(async transaction => {
+      const session = await transaction.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, shippingCapturedAt: { not: null } }, select: { id: true, totalCents: true, checkout: { select: { storeId: true } } } });
+      if (!session) return null;
+      const method = await transaction.shippingMethod.findFirst({ where: { publicId: methodPublicId, storeId: session.checkout.storeId, active: true }, select: { publicId: true, name: true, priceCents: true, minDays: true, maxDays: true } });
+      if (!method) return null;
+      await transaction.checkoutSession.update({ where: { id: session.id }, data: { shippingMethodPublicId: method.publicId, shippingMethodName: method.name, shippingPriceCents: method.priceCents, shippingMinDays: method.minDays, shippingMaxDays: method.maxDays } });
+      return { shippingMethod: method, subtotalCents: session.totalCents, shippingPriceCents: method.priceCents, grandTotalCents: session.totalCents + method.priceCents };
+    });
   }
 
   async createShopifyCartSession(input: ShopifyCartSessionInput): Promise<object | null> {

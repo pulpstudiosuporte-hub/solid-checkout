@@ -2,7 +2,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
 import type { AuthRepository } from './auth-repository.js';
-import type { CatalogRepository, CheckoutConfigInput, CheckoutInput, ProductInput, StoreContext } from './catalog-repository.js';
+import type { CatalogRepository, CheckoutConfigInput, CheckoutInput, ProductInput, ShippingMethodInput, StoreContext } from './catalog-repository.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const safeEqual = (left: string, right: string): boolean => timingSafeEqual(Buffer.from(sha256(left), 'hex'), Buffer.from(sha256(right), 'hex'));
@@ -81,6 +81,31 @@ export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvi
     const context = await authenticate(request);
     if (!context) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     return reply.send({ items: await catalog.listCheckouts(context) });
+  });
+
+  app.get('/shipping-methods', async (request, reply) => {
+    const context = await authenticate(request);
+    if (!context) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
+    return reply.send({ items: await catalog.listShippingMethods(context) });
+  });
+
+  app.post<{ Body: Record<string, unknown> }>('/shipping-methods', async (request, reply) => {
+    const context = await authenticate(request, true);
+    if (!context || !canWrite(context)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    const name = text(request.body?.name, 120); const priceCents = integer(request.body?.priceCents, 0, 2_000_000_000); const minDays = integer(request.body?.minDays, 0, 365); const maxDays = integer(request.body?.maxDays, 0, 365);
+    if (!name || priceCents === null || minDays === null || maxDays === null || maxDays < minDays || typeof request.body?.active !== 'boolean') return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Método de frete inválido.'));
+    const input: ShippingMethodInput = { name, priceCents, minDays, maxDays, active: request.body.active };
+    return reply.code(201).send({ method: await catalog.createShippingMethod(context, input, request.id) });
+  });
+
+  app.put<{ Params: { methodId: string }; Body: Record<string, unknown> }>('/shipping-methods/:methodId', async (request, reply) => {
+    const context = await authenticate(request, true);
+    if (!context || !canWrite(context)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    const methodId = text(request.params.methodId, 32); const name = text(request.body?.name, 120); const priceCents = integer(request.body?.priceCents, 0, 2_000_000_000); const minDays = integer(request.body?.minDays, 0, 365); const maxDays = integer(request.body?.maxDays, 0, 365);
+    if (!methodId || !name || priceCents === null || minDays === null || maxDays === null || maxDays < minDays || typeof request.body?.active !== 'boolean') return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Método de frete inválido.'));
+    const method = await catalog.updateShippingMethod(context, methodId, { name, priceCents, minDays, maxDays, active: request.body.active }, request.id);
+    if (!method) return reply.code(404).send(errorBody(request, 'SHIPPING_METHOD_NOT_FOUND', 'Método de frete não encontrado.'));
+    return reply.send({ method });
   });
 
   app.post<{ Body: Record<string, unknown> }>('/checkouts', async (request, reply) => {

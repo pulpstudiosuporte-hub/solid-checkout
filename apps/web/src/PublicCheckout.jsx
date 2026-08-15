@@ -8,15 +8,18 @@ import {
   MapPin,
   ShieldCheck,
   ShoppingBag,
+  Truck,
   UserRound,
 } from "lucide-react";
 import {
   createPublicCheckoutSession,
   getPublicCheckout,
   getPublicCheckoutSession,
+  getPublicShippingMethods,
   lookupPostalCode,
   savePublicCheckoutCustomer,
   savePublicCheckoutShipping,
+  selectPublicShippingMethod,
 } from "./api";
 import "./public-session.css";
 
@@ -263,6 +266,8 @@ function SessionContent({ session, token }) {
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [shippingOptions, setShippingOptions] = useState([]);
+  const [selectedShipping, setSelectedShipping] = useState(null);
   const [postalStatus, setPostalStatus] = useState({
     type: "idle",
     message: "",
@@ -364,6 +369,17 @@ function SessionContent({ session, token }) {
       setBusy(false);
     }
   };
+  useEffect(() => {
+    if (step !== 3) return;
+    setBusy(true); setError("");
+    getPublicShippingMethods(session.publicId, token).then(({ items: methods }) => setShippingOptions(methods)).catch(requestError => setError(requestError.message)).finally(() => setBusy(false));
+  }, [step, session.publicId, token]);
+  const chooseShipping = async (method) => {
+    setBusy(true); setError("");
+    try { const result = await selectPublicShippingMethod(session.publicId, token, method.publicId); setSelectedShipping(result); setStep(4); }
+    catch (requestError) { setError(requestError.message); }
+    finally { setBusy(false); }
+  };
   return (
     <main
       className="public-checkout session-checkout"
@@ -406,9 +422,9 @@ function SessionContent({ session, token }) {
           Entrega
         </span>
         <b />
-        <span>
-          <i>
-            <CreditCard size={15} />
+          <span className={step >= 4 ? "active" : ""}>
+            <i>
+              <CreditCard size={15} />
           </i>
           Pagamento
         </span>
@@ -654,7 +670,7 @@ function SessionContent({ session, token }) {
                 {busy ? (
                   <LoaderCircle className="spin" size={18} />
                 ) : (
-                  "Continuar para pagamento"
+                  "Continuar para escolher o frete"
                 )}
                 <ArrowRight size={19} />
               </button>
@@ -666,6 +682,14 @@ function SessionContent({ session, token }) {
                 Voltar para identificação
               </button>
             </form>
+          ) : step === 3 ? (
+            <div className="shipping-step">
+              <p className="eyebrow">ENTREGA</p><h1>Escolha como receber</h1>
+              <p className="customer-subtitle">Selecione uma opção para continuar. O valor é confirmado com segurança no servidor.</p>
+              {busy && shippingOptions.length === 0 ? <div className="shipping-loading"><LoaderCircle className="spin"/> Buscando opções...</div> : shippingOptions.length === 0 ? <div className="shipping-loading"><ShoppingBag/><b>Nenhuma entrega disponível</b><span>A loja ainda não configurou um método de frete ativo.</span></div> : <div className="public-shipping-options">{shippingOptions.map(method => <button type="button" key={method.publicId} onClick={() => chooseShipping(method)} disabled={busy}><span><Truck size={20}/></span><div><b>{method.name}</b><small><Clock3 size={13}/> {method.minDays === method.maxDays ? `${method.minDays} dias úteis` : `${method.minDays}–${method.maxDays} dias úteis`}</small></div><strong>{method.priceCents === 0 ? 'Grátis' : money.format(method.priceCents / 100)}</strong><ArrowRight size={18}/></button>)}</div>}
+              {error && <p className="public-error" role="alert">{error}</p>}
+              <button className="customer-back" type="button" onClick={() => setStep(2)}>Voltar e editar endereço</button>
+            </div>
           ) : (
             <div className="next-step-placeholder">
               <span>
@@ -674,11 +698,11 @@ function SessionContent({ session, token }) {
               <p className="eyebrow">PAGAMENTO</p>
               <h1>Dados salvos com segurança</h1>
               <p>
-                A identificação e o endereço foram criptografados. Agora podemos
-                conectar o frete e a WestPay sem pedir esses dados novamente.
+                O endereço e o frete foram confirmados. Agora podemos conectar a
+                WestPay sem pedir esses dados novamente.
               </p>
-              <button type="button" onClick={() => setStep(2)}>
-                Voltar e editar endereço
+              <button type="button" onClick={() => setStep(3)}>
+                Voltar e escolher outro frete
               </button>
             </div>
           )}
@@ -726,11 +750,11 @@ function SessionContent({ session, token }) {
               </div>
               <div>
                 <span>Frete</span>
-                <small>Calculado na próxima etapa</small>
+                <small>{selectedShipping ? (selectedShipping.shippingPriceCents === 0 ? "Grátis" : money.format(selectedShipping.shippingPriceCents / 100)) : "Escolha na etapa de entrega"}</small>
               </div>
               <div className="session-grand-total">
                 <span>Total</span>
-                <strong>{money.format(session.totalCents / 100)}</strong>
+                <strong>{money.format((selectedShipping?.grandTotalCents ?? session.totalCents) / 100)}</strong>
               </div>
             </div>
             <p className="session-security">
