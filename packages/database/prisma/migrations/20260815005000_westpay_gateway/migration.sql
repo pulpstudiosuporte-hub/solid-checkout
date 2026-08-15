@@ -1,0 +1,11 @@
+CREATE TYPE "PaymentStatus" AS ENUM ('PENDING', 'PAID', 'FAILED', 'CANCELLED', 'EXPIRED', 'REFUNDED');
+CREATE TABLE "gateway_connections" ("id" UUID NOT NULL,"store_id" UUID NOT NULL,"provider" VARCHAR(32) NOT NULL,"api_key_encrypted" TEXT NOT NULL,"public_key_encrypted" TEXT NOT NULL,"active" BOOLEAN NOT NULL DEFAULT true,"verified_at" TIMESTAMPTZ(3),"created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updated_at" TIMESTAMPTZ(3) NOT NULL,CONSTRAINT "gateway_connections_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "gateway_connections_store_id_provider_key" ON "gateway_connections"("store_id", "provider");
+ALTER TABLE "gateway_connections" ADD CONSTRAINT "gateway_connections_store_id_fkey" FOREIGN KEY ("store_id") REFERENCES "stores"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+CREATE TABLE "payment_attempts" ("id" UUID NOT NULL,"public_id" VARCHAR(32) NOT NULL,"checkout_session_id" UUID NOT NULL,"provider" VARCHAR(32) NOT NULL,"provider_transaction_id" VARCHAR(128),"idempotency_key" VARCHAR(128) NOT NULL,"amount_cents" INTEGER NOT NULL,"status" "PaymentStatus" NOT NULL DEFAULT 'PENDING',"pix_code_encrypted" TEXT,"expires_at" TIMESTAMPTZ(3),"paid_at" TIMESTAMPTZ(3),"created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updated_at" TIMESTAMPTZ(3) NOT NULL,CONSTRAINT "payment_attempts_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "payment_attempts_public_id_key" ON "payment_attempts"("public_id");
+CREATE UNIQUE INDEX "payment_attempts_provider_transaction_id_key" ON "payment_attempts"("provider_transaction_id");
+CREATE UNIQUE INDEX "payment_attempts_idempotency_key_key" ON "payment_attempts"("idempotency_key");
+CREATE INDEX "payment_attempts_checkout_session_id_created_at_idx" ON "payment_attempts"("checkout_session_id", "created_at" DESC);
+CREATE INDEX "payment_attempts_status_expires_at_idx" ON "payment_attempts"("status", "expires_at");
+ALTER TABLE "payment_attempts" ADD CONSTRAINT "payment_attempts_checkout_session_id_fkey" FOREIGN KEY ("checkout_session_id") REFERENCES "checkout_sessions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

@@ -5,11 +5,13 @@ import { PrismaAuthRepository } from './auth-repository.js';
 import { PrismaCatalogRepository } from './catalog-repository.js';
 import { PrismaStoreRepository } from './store-repository.js';
 import { PrismaShopifyRepository } from './shopify-repository.js';
+import { PrismaGatewayRepository } from './gateway-repository.js';
 
 const environment = parseEnvironment(process.env);
 if (!environment.DATABASE_URL) throw new Error('DATABASE_URL é obrigatória para iniciar a API');
 const database = createDatabaseClient(environment.DATABASE_URL);
-const app = buildApp(environment, { authRepository: new PrismaAuthRepository(database), catalogRepository: new PrismaCatalogRepository(database), storeRepository: new PrismaStoreRepository(database), shopifyRepository: new PrismaShopifyRepository(database) });
+const gatewayRepository = new PrismaGatewayRepository(database);
+const app = buildApp(environment, { authRepository: new PrismaAuthRepository(database), catalogRepository: new PrismaCatalogRepository(database), storeRepository: new PrismaStoreRepository(database), shopifyRepository: new PrismaShopifyRepository(database), gatewayRepository });
 
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, 'shutdown_started');

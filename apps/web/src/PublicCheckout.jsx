@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   Check,
+  Copy,
   Clock3,
   CreditCard,
   LoaderCircle,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   createPublicCheckoutSession,
+  createWestPayPix,
   getPublicCheckout,
   getPublicCheckoutSession,
   getPublicShippingMethods,
@@ -268,6 +270,8 @@ function SessionContent({ session, token }) {
   const [error, setError] = useState("");
   const [shippingOptions, setShippingOptions] = useState([]);
   const [selectedShipping, setSelectedShipping] = useState(null);
+  const [payment, setPayment] = useState(null);
+  const [copied, setCopied] = useState(false);
   const [postalStatus, setPostalStatus] = useState({
     type: "idle",
     message: "",
@@ -380,6 +384,13 @@ function SessionContent({ session, token }) {
     catch (requestError) { setError(requestError.message); }
     finally { setBusy(false); }
   };
+  const generatePix = async () => {
+    setBusy(true); setError("");
+    try { const result = await createWestPayPix(session.publicId, token); setPayment(result.payment); }
+    catch (requestError) { setError(requestError.message); }
+    finally { setBusy(false); }
+  };
+  const copyPix = async () => { await navigator.clipboard.writeText(payment.pixCode); setCopied(true); window.setTimeout(() => setCopied(false), 1800); };
   return (
     <main
       className="public-checkout session-checkout"
@@ -691,16 +702,14 @@ function SessionContent({ session, token }) {
               <button className="customer-back" type="button" onClick={() => setStep(2)}>Voltar e editar endereço</button>
             </div>
           ) : (
-            <div className="next-step-placeholder">
+            <div className="next-step-placeholder payment-step">
               <span>
                 <CreditCard size={25} />
               </span>
               <p className="eyebrow">PAGAMENTO</p>
-              <h1>Dados salvos com segurança</h1>
-              <p>
-                O endereço e o frete foram confirmados. Agora podemos conectar a
-                WestPay sem pedir esses dados novamente.
-              </p>
+              <h1>{payment ? 'Pague com Pix' : 'Tudo pronto para pagar'}</h1>
+              {payment ? <><p>Copie o código abaixo e pague no aplicativo do seu banco.</p><strong className="real-pix-total">{money.format(payment.amountCents / 100)}</strong><textarea className="pix-copy-code" readOnly value={payment.pixCode}/><button type="button" className="customer-continue" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? 'Código copiado' : 'Copiar código Pix'}</button>{payment.expiresAt && <small className="pix-expiration">Válido até {new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' }).format(new Date(payment.expiresAt))}</small>}</> : <><p>O total foi conferido no servidor. Gere o Pix seguro pela WestPay.</p><button type="button" className="customer-continue" onClick={generatePix} disabled={busy}>{busy ? <LoaderCircle className="spin" size={18}/> : 'Gerar Pix agora'} <ArrowRight size={19}/></button></>}
+              {error && <p className="public-error" role="alert">{error}</p>}
               <button type="button" onClick={() => setStep(3)}>
                 Voltar e escolher outro frete
               </button>

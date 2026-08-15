@@ -1,0 +1,58 @@
+import type { PrismaClient } from '@solid/database';
+
+export type GatewayContext = Readonly<{ storeId: string; role: 'OWNER' | 'ADMIN' | 'ANALYST' }>;
+type GatewayStatus = Readonly<{ active: boolean; verifiedAt: Date | null; updatedAt: Date }>;
+type GatewayCredentials = Readonly<{ apiKeyEncrypted: string; publicKeyEncrypted: string }>;
+type PaymentAttemptSummary = Readonly<{ id: string; publicId: string; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; amountCents: number; pixCodeEncrypted: string | null; expiresAt: Date | null }>;
+type CompletedAttempt = Readonly<{ publicId: string; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; amountCents: number; expiresAt: Date | null }>;
+type WebhookContext = Readonly<{ id: string; checkoutSessionId: string; amountCents: number; session: { checkout: { storeId: string } } }>;
+
+export class PrismaGatewayRepository {
+  constructor(private readonly database: PrismaClient) {}
+
+  async context(userId: string, sessionId: string): Promise<GatewayContext | null> {
+    const session = await this.database.session.findFirst({ where: { id: sessionId, userId, revokedAt: null }, select: { activeStoreId: true } });
+    if (!session?.activeStoreId) return null;
+    const member = await this.database.storeMember.findUnique({ where: { storeId_userId: { storeId: session.activeStoreId, userId } }, select: { role: true } });
+    return member ? { storeId: session.activeStoreId, role: member.role } : null;
+  }
+
+  status(storeId: string): Promise<GatewayStatus | null> {
+    return this.database.gatewayConnection.findUnique({ where: { storeId_provider: { storeId, provider: 'WESTPAY' } }, select: { active: true, verifiedAt: true, updatedAt: true } });
+  }
+
+  save(storeId: string, apiKeyEncrypted: string, publicKeyEncrypted: string): Promise<GatewayStatus> {
+    return this.database.gatewayConnection.upsert({ where: { storeId_provider: { storeId, provider: 'WESTPAY' } }, create: { storeId, provider: 'WESTPAY', apiKeyEncrypted, publicKeyEncrypted, active: true, verifiedAt: new Date() }, update: { apiKeyEncrypted, publicKeyEncrypted, active: true, verifiedAt: new Date() }, select: { active: true, verifiedAt: true, updatedAt: true } });
+  }
+
+  credentials(storeId: string): Promise<GatewayCredentials | null> {
+    return this.database.gatewayConnection.findFirst({ where: { storeId, provider: 'WESTPAY', active: true }, select: { apiKeyEncrypted: true, publicKeyEncrypted: true } });
+  }
+
+  async paymentContext(publicId: string, tokenHash: string, now: Date) {
+    return this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, customerDataEncrypted: { not: null }, shippingAddressEncrypted: { not: null }, shippingMethodPublicId: { not: null } }, select: { id: true, publicId: true, totalCents: true, shippingPriceCents: true, customerDataEncrypted: true, shippingAddressEncrypted: true, expiresAt: true, checkout: { select: { storeId: true, store: { select: { name: true } } } }, items: { select: { productId: true, titleSnapshot: true, unitPriceCents: true, quantity: true } } } });
+  }
+
+  latestAttempt(checkoutSessionId: string): Promise<PaymentAttemptSummary | null> {
+    return this.database.paymentAttempt.findFirst({ where: { checkoutSessionId, provider: 'WESTPAY' }, orderBy: { createdAt: 'desc' } });
+  }
+
+  createAttempt(checkoutSessionId: string, amountCents: number, idempotencyKey: string): Promise<PaymentAttemptSummary> {
+    return this.database.paymentAttempt.create({ data: { checkoutSessionId, provider: 'WESTPAY', amountCents, idempotencyKey } });
+  }
+
+  completeAttempt(id: string, providerTransactionId: string, pixCodeEncrypted: string, expiresAt: Date | null): Promise<CompletedAttempt> {
+    return this.database.paymentAttempt.update({ where: { id }, data: { providerTransactionId, pixCodeEncrypted, expiresAt }, select: { publicId: true, status: true, amountCents: true, expiresAt: true } });
+  }
+
+  webhookContext(providerTransactionId: string): Promise<WebhookContext | null> {
+    return this.database.paymentAttempt.findUnique({ where: { providerTransactionId }, select: { id: true, checkoutSessionId: true, amountCents: true, session: { select: { checkout: { select: { storeId: true } } } } } });
+  }
+
+  async confirmPayment(attemptId: string, checkoutSessionId: string, status: 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED', paidAt?: Date) {
+    await this.database.$transaction(async transaction => {
+      await transaction.paymentAttempt.update({ where: { id: attemptId }, data: { status, ...(paidAt ? { paidAt } : {}) } });
+      if (status === 'PAID') await transaction.checkoutSession.updateMany({ where: { id: checkoutSessionId, status: 'OPEN' }, data: { status: 'COMPLETED', completedAt: paidAt ?? new Date() } });
+    });
+  }
+}

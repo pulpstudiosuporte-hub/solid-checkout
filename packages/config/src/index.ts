@@ -9,6 +9,7 @@ const environmentSchema = z.object({
   TRUST_PROXY: z.enum(['true', 'false']).default('false'),
   DATABASE_URL: z.string().regex(/^postgres(?:ql)?:\/\//, 'deve ser uma URL PostgreSQL').optional(),
   APP_URL: z.string().url().optional(),
+  API_PUBLIC_URL: z.string().url().optional(),
   SHOPIFY_CLIENT_ID: z.string().min(1).optional(),
   SHOPIFY_CLIENT_SECRET: z.string().min(16).optional(),
   SHOPIFY_REDIRECT_URI: z.string().url().optional(),
@@ -23,7 +24,7 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): AppEnvironment {
   const known = {
     NODE_ENV: input.NODE_ENV, API_HOST: input.API_HOST, API_PORT: input.API_PORT,
     LOG_LEVEL: input.LOG_LEVEL, CORS_ORIGINS: input.CORS_ORIGINS, TRUST_PROXY: input.TRUST_PROXY,
-    DATABASE_URL: input.DATABASE_URL, APP_URL: input.APP_URL,
+    DATABASE_URL: input.DATABASE_URL, APP_URL: input.APP_URL, API_PUBLIC_URL: input.API_PUBLIC_URL,
     SHOPIFY_CLIENT_ID: input.SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET: input.SHOPIFY_CLIENT_SECRET,
     SHOPIFY_REDIRECT_URI: input.SHOPIFY_REDIRECT_URI, SHOPIFY_SCOPES: input.SHOPIFY_SCOPES,
     APP_ENCRYPTION_KEY: input.APP_ENCRYPTION_KEY
