@@ -6,10 +6,10 @@ import './logistics-page.css';
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const emptyForm = { name: '', price: '', minDays: '1', maxDays: '3', active: true };
 
-export default function LogisticsPage({ csrfToken }) {
+export default function LogisticsPage({ csrfToken, storeKey }) {
   const [state, setState] = useState({ loading: true, items: [], error: '' }); const [editing, setEditing] = useState(null); const [form, setForm] = useState(emptyForm); const [busy, setBusy] = useState(false);
   const load = () => getShippingMethods().then(({ items }) => setState({ loading: false, items, error: '' })).catch(error => setState({ loading: false, items: [], error: error.message }));
-  useEffect(load, []);
+  useEffect(() => { void load(); }, [storeKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const open = method => { setEditing(method || 'new'); setForm(method ? { name: method.name, price: (method.priceCents / 100).toFixed(2).replace('.', ','), minDays: String(method.minDays), maxDays: String(method.maxDays), active: method.active } : emptyForm); };
   const submit = async event => { event.preventDefault(); const price = Number(form.price.replace(',', '.')); const input = { name: form.name.trim(), priceCents: Math.round(price * 100), minDays: Number(form.minDays), maxDays: Number(form.maxDays), active: form.active }; if (!input.name || !Number.isFinite(price) || price < 0 || !Number.isInteger(input.minDays) || !Number.isInteger(input.maxDays) || input.maxDays < input.minDays) return; setBusy(true); try { if (editing === 'new') await createShippingMethod(input, csrfToken); else await updateShippingMethod(editing.publicId, input, csrfToken); setEditing(null); await load(); } catch (error) { setState(current => ({ ...current, error: error.message })); } finally { setBusy(false); } };
   const toggle = async method => { setBusy(true); try { await updateShippingMethod(method.publicId, { name: method.name, priceCents: method.priceCents, minDays: method.minDays, maxDays: method.maxDays, active: !method.active }, csrfToken); await load(); } finally { setBusy(false); } };

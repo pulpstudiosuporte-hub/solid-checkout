@@ -95,9 +95,9 @@ function Dashboard({ setPage, storeKey }) {
   </main>;
 }
 
-function SimplePage({ page, onCheckout, onEdit, csrfToken }) {
+function SimplePage({ page, onCheckout, onEdit, csrfToken, storeKey }) {
   if (page === 'Checkouts') return <CheckoutsPage csrfToken={csrfToken}/>;
-  if (page === 'Logística') return <LogisticsPage csrfToken={csrfToken}/>;
+  if (page === 'Logística') return <LogisticsPage csrfToken={csrfToken} storeKey={storeKey}/>;
   const configs = {
     'Pedidos': ['Pedidos', 'Gerencie vendas, pagamentos e carrinhos abandonados.', ShoppingBag],
     'Produtos': ['Produtos', 'Seu catálogo sincronizado com a Shopify.', Package],
@@ -145,7 +145,7 @@ function App(){
   if(editor) return <CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/>;
   if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>;
   const activeStore=stores.find(store=>store.active);
-  const pageContent=page==='Visão geral'?<Dashboard setPage={setPage} storeKey={activeStore?.publicId}/>:page==='Pedidos'?<OrdersPage storeKey={activeStore?.publicId}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Gateways'?<GatewaysPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Produtos'?<ProductsPage storeKey={activeStore?.publicId} onOpenIntegrations={()=>setPage('Integrações')}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)} csrfToken={auth.csrfToken}/>;
+  const pageContent=page==='Visão geral'?<Dashboard setPage={setPage} storeKey={activeStore?.publicId}/>:page==='Pedidos'?<OrdersPage storeKey={activeStore?.publicId}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Gateways'?<GatewaysPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Produtos'?<ProductsPage storeKey={activeStore?.publicId} onOpenIntegrations={()=>setPage('Integrações')}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>;
   return <div className="app"><Sidebar open={sidebar} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout} stores={stores} storeBusy={storeBusy} onSelectStore={handleSelectStore} onCreateStore={handleCreateStore}/><div className="main-shell"><Header toggleSidebar={()=>setSidebar(true)} onCheckout={()=>setCheckout(true)} apiStatus={apiStatus}/><PageErrorBoundary routeKey={`${activeStore?.publicId || 'store'}:${page}`} onHome={()=>setPage('Visão geral')}>{pageContent}</PageErrorBoundary></div></div>
 }
 
