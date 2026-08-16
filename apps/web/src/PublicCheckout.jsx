@@ -145,7 +145,7 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
   return (
     <main className="public-checkout" style={configStyle(config)}>
       <header>
-        <b>{config.logoText}</b>
+        <img className="public-brand" src="/brand/solid-wordmark-dark.png" alt={config.logoText || 'SOLID'} />
         {config.secureHeader && (
           <span>
             <ShieldCheck size={18} /> Pagamento seguro
@@ -409,7 +409,7 @@ function SessionContent({ session, token }) {
       style={configStyle(config)}
     >
       <header>
-        <b>{config.logoText}</b>
+        <img className="public-brand" src="/brand/solid-wordmark-dark.png" alt={config.logoText || 'SOLID'} />
         {config.secureHeader && (
           <span>
             <ShieldCheck size={18} /> Pagamento seguro

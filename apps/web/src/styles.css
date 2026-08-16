@@ -14,6 +14,9 @@
 @media(max-width:900px){.editor-layout{grid-template-columns:300px 1fr}.editor-action{font-size:0;padding:0 10px}.editor-action svg{margin:0}.editor-device.desktop{width:820px}.editor-search{width:170px}}
 @media(max-width:680px){.checkout-editor{overflow:auto}.editor-top{position:sticky;top:0}.editor-search,.editor-action{display:none}.device-picker{position:static;transform:none;margin-left:auto}.editor-actions{margin-left:0}.editor-layout{height:auto;display:block}.editor-panel{height:auto;min-height:calc(100vh - 64px);border:0}.editor-canvas{display:none}.publish-btn{font-size:0;padding:0 11px}.publish-btn svg{margin:0}.module-actions{flex-direction:column;width:100%}}
 
+/* SOLID brand assets */
+.brand{gap:9px;min-width:0}.brand-symbol{width:32px;height:32px;flex:none;object-fit:contain}.brand-wordmark{width:84px;height:28px;object-fit:contain;object-position:left center}.checkout-footer .brand-symbol{width:25px;height:25px}.checkout-footer .brand-wordmark{width:62px;height:22px}.login-brand img{display:block;width:156px;height:auto}.login-mobile-brand img{display:block;width:142px;height:auto}.loading-symbol{width:42px;height:42px;object-fit:contain}@media(max-width:760px){.checkout-head .brand-symbol{width:27px;height:27px}.checkout-head .brand-wordmark{width:72px;height:24px}}
+
 /* Authentication */
 .login-page{min-height:100vh;display:grid;grid-template-columns:minmax(360px,46%) 1fr;background:#fff;color:#17152a}
 .login-brand-panel{position:relative;overflow:hidden;display:flex;min-height:100vh;flex-direction:column;justify-content:space-between;padding:48px 64px;color:#fff;background:linear-gradient(145deg,#24115d 0%,#4c2ac7 55%,#7657f3 100%)}

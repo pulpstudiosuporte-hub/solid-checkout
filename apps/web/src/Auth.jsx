@@ -22,12 +22,12 @@ export default function Login({ onSubmit }) {
 
   return <main className="login-page">
     <section className="login-brand-panel" aria-label="SOLID Checkout">
-      <div className="login-brand"><span className="brand-mark"><span /></span><strong>SOLID</strong></div>
+      <div className="login-brand"><img src="/brand/solid-wordmark-light.png" alt="SOLID"/></div>
       <div className="login-message"><span className="login-kicker"><ShieldCheck size={16}/> Operação protegida</span><h1>Seu checkout.<br/>Sua operação.<br/><em>Sob controle.</em></h1><p>Acompanhe pedidos, personalize sua experiência e gerencie suas vendas em um só lugar.</p></div>
       <div className="login-security"><LockKeyhole size={18}/><span><strong>Acesso seguro</strong><small>Sessão criptografada e protegida</small></span></div>
     </section>
     <section className="login-form-panel"><form className="login-card" onSubmit={submit} noValidate>
-      <div className="login-mobile-brand"><span className="brand-mark"><span /></span><strong>SOLID</strong></div>
+      <div className="login-mobile-brand"><img src="/brand/solid-wordmark-dark.png" alt="SOLID"/></div>
       <p className="eyebrow">PAINEL ADMINISTRATIVO</p><h2>Bem-vindo de volta</h2><p className="login-subtitle">Entre com os dados cadastrados para acessar sua loja.</p>
       <label htmlFor="login-email">E-mail</label><input id="login-email" type="email" inputMode="email" autoComplete="username" value={email} onChange={event => setEmail(event.target.value)} placeholder="voce@empresa.com" required disabled={loading}/>
       <div className="password-label"><label htmlFor="login-password">Senha</label></div><div className="password-field"><input id="login-password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} placeholder="Digite sua senha" required disabled={loading}/><button type="button" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} aria-pressed={showPassword}>{showPassword ? <EyeOff size={19}/> : <Eye size={19}/>}</button></div>
@@ -38,4 +38,4 @@ export default function Login({ onSubmit }) {
   </main>;
 }
 
-export function SessionLoading() { return <main className="session-loading" role="status"><span className="brand-mark"><span /></span><LoaderCircle className="spin" size={24}/><span>Validando acesso seguro...</span></main>; }
+export function SessionLoading() { return <main className="session-loading" role="status"><img className="loading-symbol" src="/brand/solid-symbol.png" alt=""/><LoaderCircle className="spin" size={24}/><span>Validando acesso seguro...</span></main>; }

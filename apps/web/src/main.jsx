@@ -37,7 +37,7 @@ const nav = [
 ];
 
 function Logo({ compact = false }) {
-  return <div className="brand"><span className="brand-mark"><span /></span>{!compact && <span>SOLID</span>}</div>;
+  return <div className={`brand ${compact ? 'compact' : ''}`}><img className="brand-symbol" src="/brand/solid-symbol.png" alt=""/>{!compact && <img className="brand-wordmark" src="/brand/solid-wordmark-dark.png" alt="SOLID"/>}</div>;
 }
 
 function Badge({ children, tone = 'neutral' }) { return <span className={`badge ${tone}`}>{children}</span>; }

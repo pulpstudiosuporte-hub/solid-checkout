@@ -198,6 +198,14 @@
   border-color: var(--public-border, #e3e3e8);
   background: var(--public-card, #fff);
 }
+.public-brand {
+  display: block;
+  width: auto;
+  height: 30px;
+  max-width: min(150px, 42vw);
+  object-fit: contain;
+  object-position: left center;
+}
 .public-checkout-grid > section,
 .public-checkout-grid > aside {
   border-color: var(--public-border, #e0e0e6);
