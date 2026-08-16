@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   Check,
+  CheckCircle2,
   Copy,
   Clock3,
   CreditCard,
@@ -17,6 +18,7 @@ import {
   createWestPayPix,
   getPublicCheckout,
   getPublicCheckoutSession,
+  getLatestPublicPayment,
   getPublicShippingMethods,
   lookupPostalCode,
   savePublicCheckoutCustomer,
@@ -378,6 +380,16 @@ function SessionContent({ session, token }) {
     setBusy(true); setError("");
     getPublicShippingMethods(session.publicId, token).then(({ items: methods }) => setShippingOptions(methods)).catch(requestError => setError(requestError.message)).finally(() => setBusy(false));
   }, [step, session.publicId, token]);
+  useEffect(() => {
+    if (!payment || String(payment.status).toUpperCase() !== 'PENDING') return;
+    const controller = new AbortController();
+    const checkStatus = () => getLatestPublicPayment(session.publicId, token, controller.signal).then(result => {
+      setPayment(current => current ? { ...current, ...result.payment } : result.payment);
+    }).catch(() => {});
+    const interval = window.setInterval(checkStatus, 5000);
+    checkStatus();
+    return () => { controller.abort(); window.clearInterval(interval); };
+  }, [payment?.publicId, payment?.status, session.publicId, token]);
   const chooseShipping = async (method) => {
     setBusy(true); setError("");
     try { const result = await selectPublicShippingMethod(session.publicId, token, method.publicId); setSelectedShipping(result); setStep(4); }
@@ -707,12 +719,12 @@ function SessionContent({ session, token }) {
                 <CreditCard size={25} />
               </span>
               <p className="eyebrow">PAGAMENTO</p>
-              <h1>{payment ? 'Pague com Pix' : 'Tudo pronto para pagar'}</h1>
-              {payment ? <><p>Copie o código abaixo e pague no aplicativo do seu banco.</p><strong className="real-pix-total">{money.format(payment.amountCents / 100)}</strong><textarea className="pix-copy-code" readOnly value={payment.pixCode}/><button type="button" className="customer-continue" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? 'Código copiado' : 'Copiar código Pix'}</button>{payment.expiresAt && <small className="pix-expiration">Válido até {new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' }).format(new Date(payment.expiresAt))}</small>}</> : <><p>O total foi conferido no servidor. Gere o Pix seguro pela WestPay.</p><button type="button" className="customer-continue" onClick={generatePix} disabled={busy}>{busy ? <LoaderCircle className="spin" size={18}/> : 'Gerar Pix agora'} <ArrowRight size={19}/></button></>}
+              <h1>{String(payment?.status).toUpperCase() === 'PAID' ? 'Pagamento confirmado' : payment ? 'Pague com Pix' : 'Tudo pronto para pagar'}</h1>
+              {String(payment?.status).toUpperCase() === 'PAID' ? <div className="payment-confirmed" role="status"><CheckCircle2 size={38}/><p>Recebemos seu pagamento. O pedido já está confirmado e a loja foi avisada.</p>{config.successUrl && config.successUrl !== '#' && <a className="customer-continue" href={config.successUrl}>Continuar <ArrowRight size={19}/></a>}</div> : payment ? <><p>Copie o código abaixo e pague no aplicativo do seu banco. A confirmação acontece automaticamente.</p><strong className="real-pix-total">{money.format(payment.amountCents / 100)}</strong><textarea className="pix-copy-code" readOnly value={payment.pixCode}/><button type="button" className="customer-continue" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? 'Código copiado' : 'Copiar código Pix'}</button>{payment.expiresAt && <small className="pix-expiration">Válido até {new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' }).format(new Date(payment.expiresAt))}</small>}</> : <><p>O total foi conferido no servidor. Gere o Pix seguro pela WestPay.</p><button type="button" className="customer-continue" onClick={generatePix} disabled={busy}>{busy ? <LoaderCircle className="spin" size={18}/> : 'Gerar Pix agora'} <ArrowRight size={19}/></button></>}
               {error && <p className="public-error" role="alert">{error}</p>}
-              <button type="button" onClick={() => setStep(3)}>
+              {String(payment?.status).toUpperCase() !== 'PAID' && <button type="button" onClick={() => setStep(3)}>
                 Voltar e escolher outro frete
-              </button>
+              </button>}
             </div>
           )}
         </section>

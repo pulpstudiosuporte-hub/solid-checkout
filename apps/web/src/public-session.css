@@ -139,10 +139,11 @@
   font-size: 15px !important;
 }
 .session-grand-total strong {
-  font-size: 21px;
-  max-width: 60%;
-  overflow-wrap: anywhere;
+  flex: none;
+  font-size: clamp(17px, 2vw, 21px);
+  white-space: nowrap;
 }
+.payment-confirmed{display:flex;align-items:center;flex-direction:column;gap:12px;color:#168455}.payment-confirmed p{max-width:470px;margin:0;color:#575760;line-height:1.6}.payment-confirmed .customer-continue{margin-top:6px;color:#fff;text-decoration:none}
 .session-security {
   display: flex;
   align-items: center;

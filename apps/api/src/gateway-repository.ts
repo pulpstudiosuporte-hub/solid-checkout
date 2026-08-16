@@ -5,7 +5,7 @@ type GatewayStatus = Readonly<{ active: boolean; verifiedAt: Date | null; update
 type GatewayCredentials = Readonly<{ apiKeyEncrypted: string; publicKeyEncrypted: string }>;
 type PaymentAttemptSummary = Readonly<{ id: string; publicId: string; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; amountCents: number; pixCodeEncrypted: string | null; expiresAt: Date | null }>;
 type CompletedAttempt = Readonly<{ publicId: string; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; amountCents: number; expiresAt: Date | null }>;
-type WebhookContext = Readonly<{ id: string; checkoutSessionId: string; amountCents: number; session: { checkout: { storeId: string } } }>;
+type WebhookContext = Readonly<{ id: string; publicId: string; checkoutSessionId: string; amountCents: number; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; session: { checkout: { storeId: string } } }>;
 
 export class PrismaGatewayRepository {
   constructor(private readonly database: PrismaClient) {}
@@ -37,6 +37,18 @@ export class PrismaGatewayRepository {
     return this.database.paymentAttempt.findFirst({ where: { checkoutSessionId, provider: 'WESTPAY' }, orderBy: { createdAt: 'desc' } });
   }
 
+  async publicPaymentStatus(publicId: string, tokenHash: string) {
+    const session = await this.database.checkoutSession.findFirst({
+      where: { publicId, tokenHash },
+      select: {
+        status: true,
+        paymentAttempts: { where: { provider: 'WESTPAY', providerTransactionId: { not: null } }, orderBy: { createdAt: 'desc' }, take: 1, select: { publicId: true, status: true, amountCents: true, expiresAt: true, paidAt: true } }
+      }
+    });
+    if (!session?.paymentAttempts[0]) return null;
+    return { sessionStatus: session.status, ...session.paymentAttempts[0] };
+  }
+
   createAttempt(checkoutSessionId: string, amountCents: number, idempotencyKey: string): Promise<PaymentAttemptSummary> {
     return this.database.paymentAttempt.create({ data: { checkoutSessionId, provider: 'WESTPAY', amountCents, idempotencyKey } });
   }
@@ -46,11 +58,15 @@ export class PrismaGatewayRepository {
   }
 
   webhookContext(providerTransactionId: string): Promise<WebhookContext | null> {
-    return this.database.paymentAttempt.findUnique({ where: { providerTransactionId }, select: { id: true, checkoutSessionId: true, amountCents: true, session: { select: { checkout: { select: { storeId: true } } } } } });
+    return this.database.paymentAttempt.findUnique({ where: { providerTransactionId }, select: { id: true, publicId: true, checkoutSessionId: true, amountCents: true, status: true, session: { select: { checkout: { select: { storeId: true } } } } } });
   }
 
   async confirmPayment(attemptId: string, checkoutSessionId: string, status: 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED', paidAt?: Date) {
     await this.database.$transaction(async transaction => {
+      const current = await transaction.paymentAttempt.findUnique({ where: { id: attemptId }, select: { status: true } });
+      if (!current || current.status === 'REFUNDED' || current.status === status) return;
+      const canTransition = status === 'PAID' || current.status === 'PENDING' || current.status === 'PAID' && status === 'REFUNDED';
+      if (!canTransition) return;
       await transaction.paymentAttempt.update({ where: { id: attemptId }, data: { status, ...(paidAt ? { paidAt } : {}) } });
       if (status === 'PAID') await transaction.checkoutSession.updateMany({ where: { id: checkoutSessionId, status: 'OPEN' }, data: { status: 'COMPLETED', completedAt: paidAt ?? new Date() } });
     });

@@ -2,14 +2,29 @@ const baseUrl = 'https://api.gw.westpay.com.br';
 const userAgent = 'SOLID-Checkout/0.1 (+suporte@solidcheckout.xyz)';
 
 export type WestPayCredentials = Readonly<{ apiKey: string; publicKey: string }>;
-export type WestPayPix = Readonly<{ id: string; status: string; amount: number; pix?: { qrcode?: string; expiresAt?: string } }>;
+export type WestPayPix = Readonly<{ id: string; status: string; amount: number; externalRef?: string; pix?: { qrcode?: string; expiresAt?: string } }>;
+
+export class WestPayRequestError extends Error {
+  constructor(readonly status: number, readonly details: readonly string[]) {
+    super(`WestPay request failed (${status})`);
+    this.name = 'WestPayRequestError';
+  }
+}
 
 const headers = (credentials: WestPayCredentials) => ({ Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Basic ${Buffer.from(`${credentials.apiKey}:${credentials.publicKey}`).toString('base64')}`, 'User-Agent': userAgent });
 
 async function responseJson<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => null) as Record<string, unknown> | null;
-  const detail = typeof body?.message === 'string' ? body.message : typeof body?.error === 'string' ? body.error : 'erro desconhecido';
-  if (!response.ok) throw new Error(`WestPay request failed (${response.status}): ${detail}`);
+  if (!response.ok) {
+    const rawDetails = Array.isArray(body?.details) ? body.details : [];
+    const details = [body?.message, body?.error, ...rawDetails.flatMap(value => {
+      if (typeof value === 'string') return [value];
+      if (typeof value !== 'object' || value === null) return [];
+      const record = value as Record<string, unknown>;
+      return [record.message, record.reason].filter((item): item is string => typeof item === 'string');
+    })].filter((value): value is string => typeof value === 'string').map(value => value.slice(0, 300)).slice(0, 5);
+    throw new WestPayRequestError(response.status, details);
+  }
   return body as T;
 }
 

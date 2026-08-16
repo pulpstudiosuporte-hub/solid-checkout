@@ -4,7 +4,7 @@ import type { AppEnvironment } from '@solid/config';
 import type { CatalogRepository } from './catalog-repository.js';
 import { decryptSecret, encryptSecret } from './shopify-crypto.js';
 import type { PrismaGatewayRepository } from './gateway-repository.js';
-import { createWestPayPix, findWestPayPix, getWestPayPix } from './westpay-client.js';
+import { createWestPayPix, findWestPayPix, getWestPayPix, WestPayRequestError } from './westpay-client.js';
 import { lookupBrazilianPostalCode, PostalCodeLookupError } from './postal-code.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
@@ -132,7 +132,25 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       if (!transaction.id || !transaction.pix?.qrcode) throw new Error('WestPay returned an incomplete PIX response');
       const expiresAt = transaction.pix.expiresAt ? new Date(transaction.pix.expiresAt) : null; const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pix.qrcode, environment.APP_ENCRYPTION_KEY), expiresAt);
       return reply.header('cache-control', 'no-store').code(201).send({ payment: { ...saved, status: 'pending', pixCode: transaction.pix.qrcode } });
-    } catch (error) { request.log.warn({ err: error, checkoutSession: context.publicId }, 'westpay_pix_creation_failed'); return reply.code(502).send(errorBody(request, 'WESTPAY_UNAVAILABLE', 'Não foi possível gerar o Pix agora. Tente novamente.')); }
+    } catch (error) {
+      request.log.warn({ err: error, checkoutSession: context.publicId }, 'westpay_pix_creation_failed');
+      if (error instanceof WestPayRequestError && error.status === 422) {
+        const detail = error.details.find(value => /m[ií]nim|minimum|amount|valor/i.test(value)) ?? '';
+        const amount = detail.match(/R\$\s*\d+(?:[.,]\d{1,2})?/i)?.[0];
+        const message = amount ? `O valor mínimo permitido pela WestPay para este Pix é ${amount}.` : 'O valor ou os dados do pagamento não foram aceitos pela WestPay.';
+        return reply.code(422).send(errorBody(request, 'WESTPAY_VALIDATION_ERROR', message));
+      }
+      return reply.code(502).send(errorBody(request, 'WESTPAY_UNAVAILABLE', 'Não foi possível gerar o Pix agora. Tente novamente.'));
+    }
+  });
+
+  app.get<{ Params: { sessionId: string }; Headers: { authorization?: string } }>('/public/checkout-sessions/:sessionId/payments/latest', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
+    if (!gateways) return reply.code(503).send(errorBody(request, 'PAYMENT_NOT_CONFIGURED', 'Pagamento ainda não configurado no servidor.'));
+    const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization);
+    if (!credentials) return reply.code(401).send(errorBody(request, 'INVALID_SESSION', 'Sessão inválida.'));
+    const payment = await gateways.publicPaymentStatus(credentials.sessionId, credentials.tokenHash);
+    if (!payment) return reply.code(404).send(errorBody(request, 'PAYMENT_NOT_FOUND', 'Pagamento ainda não gerado.'));
+    return reply.header('cache-control', 'no-store').send({ payment });
   });
 
   app.post<{ Body: Record<string, unknown> }>('/webhooks/westpay', { config: { rateLimit: { max: 180, timeWindow: '1 minute' } } }, async (request, reply) => {
@@ -143,7 +161,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     const encryptedCredentials = await gateways.credentials(context.session.checkout.storeId); if (!encryptedCredentials) return reply.code(200).send({ received: true });
     try {
       const official = await getWestPayPix({ apiKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) }, objectId);
-      if (!official || official.id !== objectId || official.amount !== context.amountCents) return reply.code(200).send({ received: true });
+      if (!official || official.id !== objectId || official.amount !== context.amountCents || official.externalRef && official.externalRef !== `solid-${context.publicId}`) return reply.code(200).send({ received: true });
       const normalized = official.status.toUpperCase(); const mapped = normalized === 'PAID' ? 'PAID' : normalized === 'FAILED' ? 'FAILED' : normalized === 'CANCELLED' ? 'CANCELLED' : normalized === 'EXPIRED' ? 'EXPIRED' : normalized === 'REFUNDED' || normalized === 'PARTIALLY_REFUNDED' ? 'REFUNDED' : null;
       if (mapped) await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined);
       return reply.code(200).send({ received: true });

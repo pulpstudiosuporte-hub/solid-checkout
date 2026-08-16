@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   ArrowRight, BarChart3, Bell, Box, Check, CheckCircle2, ChevronDown,
-  CircleDollarSign, Clock3, Copy, CreditCard, ExternalLink, Eye, FileText,
+  CircleDollarSign, Clock3, Copy, CreditCard, Eye, FileText,
   Home, LayoutTemplate, Link2, Menu, Package, PanelLeftClose, Plug, Plus,
   Search, Settings, ShieldCheck, ShoppingBag, ShoppingCart, Sparkles, Store,
   Tag, TrendingUp, Truck, Users, X, Zap, LogOut
@@ -20,19 +20,13 @@ import LogisticsPage from './LogisticsPage';
 import GatewaysPage from './GatewaysPage';
 import PublicCheckout, { PublicSessionCheckout } from './PublicCheckout';
 import PageErrorBoundary from './PageErrorBoundary';
+import OrdersPage, { RecentOrders } from './OrdersPage';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const orders = [
-  { id: '#SLD-8F4K2', customer: 'Marina Costa', product: 'Kit Performance', value: 197, status: 'Pago', time: 'Há 12 min' },
-  { id: '#SLD-2H9Q7', customer: 'Lucas Almeida', product: 'Kit Performance', value: 148, status: 'Aguardando Pix', time: 'Há 28 min' },
-  { id: '#SLD-6B1M5', customer: 'Amanda Lima', product: 'Essencial Pro', value: 89.9, status: 'Pago', time: 'Há 44 min' },
-  { id: '#SLD-3P7X9', customer: 'Rafael Melo', product: 'Kit Performance', value: 197, status: 'Expirado', time: 'Há 1h' },
-];
-
 const nav = [
   { label: 'Visão geral', icon: Home },
-  { label: 'Pedidos', icon: ShoppingBag, count: 12 },
+  { label: 'Pedidos', icon: ShoppingBag },
   { label: 'Produtos', icon: Package },
   { label: 'Checkouts', icon: LayoutTemplate },
   { label: 'Logística', icon: Truck },
@@ -81,7 +75,7 @@ function Metric({ icon: Icon, label, value, delta, tone }) {
   return <div className="metric card"><div className={`metric-icon ${tone}`}><Icon size={20}/></div><div className="metric-copy"><span>{label}</span><strong>{value}</strong><small><TrendingUp size={13}/> {delta} <i>vs. período anterior</i></small></div></div>;
 }
 
-function Dashboard({ setPage }) {
+function Dashboard({ setPage, storeKey }) {
   const [period, setPeriod] = useState('Últimos 7 dias');
   return <main className="page dashboard">
     <section className="page-title"><div><p className="eyebrow">VISÃO GERAL</p><h1>Olá, Ragnar <span>👋</span></h1><p>Acompanhe o desempenho da sua operação hoje.</p></div><div className="title-actions"><select value={period} onChange={e=>setPeriod(e.target.value)}><option>Hoje</option><option>Últimos 7 dias</option><option>Este mês</option></select><button className="secondary"><FileText size={17}/> Exportar</button></div></section>
@@ -97,7 +91,7 @@ function Dashboard({ setPage }) {
         ['Criar sua loja Solid', true], ['Adicionar primeiro produto', true], ['Personalizar o checkout', true], ['Conectar gateway Pix', false], ['Publicar e testar', false]
       ].map(([t, done], i)=><button key={t} className={`task ${done?'done':''}`} onClick={()=>!done && setPage(i===3?'Integrações':'Checkouts')}><span>{done?<Check size={15}/>:i+1}</span><b>{t}</b>{!done&&<ArrowRight size={16}/>}</button>)}</div>
     </section>
-    <section className="card orders-card"><div className="card-head"><div><h2>Pedidos recentes</h2><p>Últimas movimentações do seu checkout</p></div><button className="ghost" onClick={()=>setPage('Pedidos')}>Ver todos <ArrowRight size={16}/></button></div><div className="table-wrap"><table><thead><tr><th>Pedido</th><th>Cliente</th><th>Produto</th><th>Valor</th><th>Status</th><th>Horário</th><th></th></tr></thead><tbody>{orders.map(o=><tr key={o.id}><td><b>{o.id}</b></td><td><div className="customer"><span>{o.customer.split(' ').map(x=>x[0]).join('')}</span>{o.customer}</div></td><td>{o.product}</td><td><b>{money.format(o.value)}</b></td><td><Badge tone={o.status==='Pago'?'green':o.status==='Expirado'?'neutral':'orange'}>{o.status}</Badge></td><td>{o.time}</td><td><button className="icon-btn"><ExternalLink size={16}/></button></td></tr>)}</tbody></table></div></section>
+    <RecentOrders storeKey={storeKey} onViewAll={()=>setPage('Pedidos')}/>
   </main>;
 }
 
@@ -151,7 +145,7 @@ function App(){
   if(editor) return <CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/>;
   if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>;
   const activeStore=stores.find(store=>store.active);
-  const pageContent=page==='Visão geral'?<Dashboard setPage={setPage}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Gateways'?<GatewaysPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Produtos'?<ProductsPage storeKey={activeStore?.publicId} onOpenIntegrations={()=>setPage('Integrações')}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)} csrfToken={auth.csrfToken}/>;
+  const pageContent=page==='Visão geral'?<Dashboard setPage={setPage} storeKey={activeStore?.publicId}/>:page==='Pedidos'?<OrdersPage storeKey={activeStore?.publicId}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Gateways'?<GatewaysPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Produtos'?<ProductsPage storeKey={activeStore?.publicId} onOpenIntegrations={()=>setPage('Integrações')}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)} csrfToken={auth.csrfToken}/>;
   return <div className="app"><Sidebar open={sidebar} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout} stores={stores} storeBusy={storeBusy} onSelectStore={handleSelectStore} onCreateStore={handleCreateStore}/><div className="main-shell"><Header toggleSidebar={()=>setSidebar(true)} onCheckout={()=>setCheckout(true)} apiStatus={apiStatus}/><PageErrorBoundary routeKey={`${activeStore?.publicId || 'store'}:${page}`} onHome={()=>setPage('Visão geral')}>{pageContent}</PageErrorBoundary></div></div>
 }
 
