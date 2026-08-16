@@ -8,6 +8,7 @@ export type OrderRecord = Readonly<{
   shippingPriceCents: number;
   currency: string;
   customerDataEncrypted: string | null;
+  shippingAddressEncrypted: string | null;
   shippingMethodName: string | null;
   createdAt: Date;
   completedAt: Date | null;
@@ -17,6 +18,7 @@ export type OrderRecord = Readonly<{
 export interface OrderRepository {
   context(userId: string, sessionId: string): Promise<OrderStoreContext | null>;
   list(storeId: string, page: number, pageSize: number): Promise<{ items: readonly OrderRecord[]; total: number }>;
+  find(storeId: string, publicId: string): Promise<OrderRecord | null>;
 }
 
 export class PrismaOrderRepository implements OrderRepository {
@@ -35,6 +37,13 @@ export class PrismaOrderRepository implements OrderRepository {
     return membership ? { storeId: session.activeStoreId } : null;
   }
 
+  private readonly orderSelect = {
+    publicId: true, status: true, totalCents: true, shippingPriceCents: true, currency: true,
+    customerDataEncrypted: true, shippingAddressEncrypted: true, shippingMethodName: true, createdAt: true, completedAt: true,
+    items: { select: { titleSnapshot: true, variantSnapshot: true, quantity: true, imageUrlSnapshot: true } },
+    paymentAttempts: { where: { providerTransactionId: { not: null } }, orderBy: { createdAt: 'desc' as const }, take: 1, select: { publicId: true, provider: true, status: true, createdAt: true, paidAt: true, expiresAt: true } }
+  };
+
   async list(storeId: string, page: number, pageSize: number) {
     const where = { checkout: { storeId }, paymentAttempts: { some: { providerTransactionId: { not: null } } } } as const;
     const [items, total] = await this.database.$transaction([
@@ -43,27 +52,14 @@ export class PrismaOrderRepository implements OrderRepository {
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        select: {
-          publicId: true,
-          status: true,
-          totalCents: true,
-          shippingPriceCents: true,
-          currency: true,
-          customerDataEncrypted: true,
-          shippingMethodName: true,
-          createdAt: true,
-          completedAt: true,
-          items: { select: { titleSnapshot: true, variantSnapshot: true, quantity: true, imageUrlSnapshot: true } },
-          paymentAttempts: {
-            where: { providerTransactionId: { not: null } },
-            orderBy: { createdAt: 'desc' },
-            take: 1,
-            select: { publicId: true, provider: true, status: true, createdAt: true, paidAt: true, expiresAt: true }
-          }
-        }
+        select: this.orderSelect
       }),
       this.database.checkoutSession.count({ where })
     ]);
     return { items, total };
+  }
+
+  async find(storeId: string, publicId: string): Promise<OrderRecord | null> {
+    return this.database.checkoutSession.findFirst({ where: { publicId, checkout: { storeId }, paymentAttempts: { some: { providerTransactionId: { not: null } } } }, select: this.orderSelect });
   }
 }
