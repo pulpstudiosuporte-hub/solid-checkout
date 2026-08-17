@@ -54,6 +54,10 @@ COPY --from=build --chown=node:node /app/packages/database/dist ./packages/datab
 COPY --from=build --chown=node:node /app/packages/database/prisma ./packages/database/prisma
 COPY --from=build --chown=node:node /app/packages/database/prisma.config.ts ./packages/database/prisma.config.ts
 
+# Docker copies this directory (and its node ownership) into a new named volume
+# on first mount, so uploaded assets stay writable after a redeploy.
+RUN mkdir -p /app/uploads && chown -R node:node /app/uploads
+
 USER node
 EXPOSE 3333
 
