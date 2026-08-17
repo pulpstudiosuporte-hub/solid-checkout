@@ -3,7 +3,7 @@ import { ArrowLeft, Check, ChevronDown, ChevronRight, Clock3, Eye, ImagePlus, La
 
 export const defaultCheckoutConfig={template:'minimal',primary:'#7357e9',pageBg:'#f6f7f9',cardBg:'#ffffff',textColor:'#17171a',borderColor:'#e5e5e9',inputBg:'#ffffff',radius:14,font:'Plus Jakarta Sans',logoText:'SOLID',secureHeader:true,timer:true,timerText:'Oferta reservada por',timerMinutes:10,title:'Você está a um passo.',subtitle:'Preencha seus dados para gerar o Pix. Leva menos de um minuto.',buttonText:'Gerar Pix agora',showCoupon:true,showBump:true,showSummary:true,footerText:'© 2026 Solid Commerce. Todos os direitos reservados.',privacyUrl:'#',termsUrl:'#',language:'pt-BR',currency:'BRL',successUrl:'',buttonEffect:'lift'};
 const groups=[['Modelos',LayoutTemplate],['Aparência',Type],['Cores',Palette],['Cabeçalho',Monitor],['Elementos',WalletCards],['Conteúdo das etapas',Type],['Pagamentos',WalletCards],['Rodapé',Type],['Políticas',ShieldCheck],['Efeitos dos botões',Save],['Escassez',Clock3],['Rastreamento de saída',Eye],['Campos personalizados',Type],['Moeda e idioma',WalletCards],['SEO',Monitor]];
-Object.assign(defaultCheckoutConfig,{orderBumpProductId:''});
+Object.assign(defaultCheckoutConfig,{orderBumpProductId:'',orderBumpTitle:'',orderBumpMessage:''});
 let editorProducts=[];
 let createOrderBump=async()=>{};
 let uploadOrderBumpImage=async()=>{};

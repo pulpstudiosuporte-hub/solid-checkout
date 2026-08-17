@@ -27,6 +27,10 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   const bumpProductId = input.orderBumpProductId;
   if (bumpProductId !== undefined && (typeof bumpProductId !== 'string' || bumpProductId.length > 32 || bumpProductId && !/^[A-Za-z0-9_-]+$/.test(bumpProductId))) return null;
   result.orderBumpProductId = typeof bumpProductId === 'string' ? bumpProductId : '';
+  for (const [key, max] of Object.entries({ orderBumpTitle: 120, orderBumpMessage: 300 })) {
+    const value = input[key]; if (value !== undefined && (typeof value !== 'string' || value.length > max)) return null;
+    result[key] = typeof value === 'string' ? value.trim() : '';
+  }
   return result;
 };
 

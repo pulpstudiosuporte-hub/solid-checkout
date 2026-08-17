@@ -539,7 +539,7 @@ function SessionContent({ session: initialSession, token }) {
                 <input type="checkbox" checked={Boolean(session.items?.some(item => item.isOrderBump))} disabled={busy} onChange={(event) => toggleOrderBump(event.target.checked)} />
                 <span className="public-order-bump-check"><Check size={14} /></span>
                 {session.orderBump.imageUrl ? <img src={session.orderBump.imageUrl} alt="" /> : <span className="public-order-bump-image"><ShoppingBag size={18}/></span>}
-                <span><b>Oferta especial</b><strong>{session.orderBump.checkoutTitle}</strong>{session.orderBump.checkoutDescription && <small>{session.orderBump.checkoutDescription}</small>}</span>
+                <span><b>{config.orderBumpTitle || 'Oferta especial'}</b><strong>{session.orderBump.checkoutTitle}</strong>{(config.orderBumpMessage || session.orderBump.checkoutDescription) && <small>{config.orderBumpMessage || session.orderBump.checkoutDescription}</small>}</span>
                 <em>+ {money.format(session.orderBump.priceCents / 100)}</em>
               </label>}
               {error && (
