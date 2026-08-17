@@ -333,6 +333,7 @@ model CheckoutSessionItem {
   titleSnapshot     String          @map("title_snapshot") @db.VarChar(240)
   variantSnapshot   String?         @map("variant_snapshot") @db.VarChar(240)
   imageUrlSnapshot  String?         @map("image_url_snapshot") @db.VarChar(2048)
+  isOrderBump       Boolean         @default(false) @map("is_order_bump")
   createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   session           CheckoutSession @relation(fields: [checkoutSessionId], references: [id], onDelete: Cascade)
   product           Product         @relation(fields: [productId], references: [id], onDelete: Restrict)

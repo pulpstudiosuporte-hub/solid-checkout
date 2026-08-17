@@ -42,7 +42,7 @@ export default function CheckoutsPage({ csrfToken }) {
     setData(current => ({ ...current, checkouts: current.checkouts.map(item => item.publicId === principal.publicId ? result.checkout : item) }));
   }
 
-  if (editing && principal) return <CheckoutEditor checkout={principal} onBack={() => setEditing(false)} onPreview={() => {}} onSaveDraft={saveDraft} onPublish={publish} />;
+  if (editing && principal) return <CheckoutEditor checkout={principal} products={data.products} onBack={() => setEditing(false)} onPreview={() => {}} onSaveDraft={saveDraft} onPublish={publish} />;
   if (data.loading) return <main className="page"><section className="card products-state"><LoaderCircle className="spin" /><span>Carregando checkouts...</span></section></main>;
 
   return <main className="page">

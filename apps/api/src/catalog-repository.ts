@@ -32,6 +32,7 @@ export interface CatalogRepository {
   updateShippingMethod(context: StoreContext, publicId: string, input: ShippingMethodInput, requestId: string): Promise<object | null>;
   listPublicShippingMethods(publicId: string, tokenHash: string, now: Date): Promise<readonly object[] | null>;
   selectPublicShippingMethod(publicId: string, tokenHash: string, methodPublicId: string, now: Date): Promise<object | null>;
+  setPublicOrderBump(publicId: string, tokenHash: string, enabled: boolean, now: Date): Promise<object | null>;
 }
 
 const productSelect = { publicId: true, sourceTitle: true, checkoutTitle: true, checkoutDescription: true, handle: true, vendor: true, productType: true, tags: true, imageUrl: true, priceCents: true, compareAtCents: true, stockQuantity: true, trackInventory: true, maxPerOrder: true, active: true, source: true, syncedAt: true, createdAt: true, updatedAt: true, _count: { select: { variants: true, images: true, collections: true } } } as const;
@@ -135,8 +136,39 @@ export class PrismaCatalogRepository implements CatalogRepository {
   }
 
   async getPublicCheckoutSession(publicId: string, tokenHash: string, now: Date): Promise<object | null> {
-    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { publicId: true, quantity: true, unitPriceCents: true, totalCents: true, currency: true, status: true, expiresAt: true, customerCapturedAt: true, shippingCapturedAt: true, checkout: { select: { slug: true, name: true, publishedConfig: true, store: { select: { name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, imageUrl: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true } } } });
-    return session ? { ...session, customerCaptured: Boolean(session.customerCapturedAt), shippingCaptured: Boolean(session.shippingCapturedAt), customerCapturedAt: undefined, shippingCapturedAt: undefined } : null;
+    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { publicId: true, quantity: true, unitPriceCents: true, totalCents: true, currency: true, status: true, expiresAt: true, customerCapturedAt: true, shippingCapturedAt: true, checkout: { select: { storeId: true, slug: true, name: true, publishedConfig: true, store: { select: { name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, imageUrl: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true, isOrderBump: true } } } });
+    if (!session) return null;
+    const config = session.checkout.publishedConfig as Record<string, unknown>;
+    const bumpId = typeof config.orderBumpProductId === 'string' ? config.orderBumpProductId : '';
+    const bump = bumpId ? await this.database.product.findFirst({ where: { publicId: bumpId, storeId: session.checkout.storeId, active: true }, select: { publicId: true, checkoutTitle: true, checkoutDescription: true, imageUrl: true, priceCents: true } }) : null;
+    const { storeId: _storeId, ...checkout } = session.checkout;
+    return { ...session, checkout, orderBump: bump, customerCaptured: Boolean(session.customerCapturedAt), shippingCaptured: Boolean(session.shippingCapturedAt), customerCapturedAt: undefined, shippingCapturedAt: undefined };
+  }
+
+  async setPublicOrderBump(publicId: string, tokenHash: string, enabled: boolean, now: Date): Promise<object | null> {
+    return this.database.$transaction(async transaction => {
+      const session = await transaction.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { id: true, totalCents: true, shippingPriceCents: true, checkout: { select: { storeId: true, publishedConfig: true } } } });
+      if (!session) return null;
+      const config = session.checkout.publishedConfig as Record<string, unknown>;
+      const bumpId = typeof config.orderBumpProductId === 'string' ? config.orderBumpProductId : '';
+      if (!bumpId) return null;
+      const product = await transaction.product.findFirst({ where: { publicId: bumpId, storeId: session.checkout.storeId, active: true }, select: { id: true, checkoutTitle: true, imageUrl: true, variants: { where: { availableForSale: true }, orderBy: { createdAt: 'asc' }, take: 1, select: { id: true, title: true, priceCents: true, imageUrl: true } } } });
+      const variant = product?.variants[0]; if (!product || !variant) return null;
+      const existing = await transaction.checkoutSessionItem.findFirst({ where: { checkoutSessionId: session.id, productId: product.id, isOrderBump: true }, select: { id: true, totalCents: true } });
+      if (enabled && !existing) {
+        await transaction.checkoutSessionItem.create({ data: { checkoutSessionId: session.id, productId: product.id, variantId: variant.id, quantity: 1, unitPriceCents: variant.priceCents, totalCents: variant.priceCents, titleSnapshot: product.checkoutTitle, variantSnapshot: variant.title, imageUrlSnapshot: variant.imageUrl ?? product.imageUrl, isOrderBump: true } });
+        const totalCents = session.totalCents + variant.priceCents;
+        await transaction.checkoutSession.update({ where: { id: session.id }, data: { totalCents } });
+        return { totalCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: totalCents + session.shippingPriceCents, enabled: true };
+      }
+      if (!enabled && existing) {
+        await transaction.checkoutSessionItem.delete({ where: { id: existing.id } });
+        const totalCents = session.totalCents - existing.totalCents;
+        await transaction.checkoutSession.update({ where: { id: session.id }, data: { totalCents } });
+        return { totalCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: totalCents + session.shippingPriceCents, enabled: false };
+      }
+      return { totalCents: session.totalCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: session.totalCents + session.shippingPriceCents, enabled };
+    });
   }
 
   async updatePublicCheckoutCustomer(publicId: string, tokenHash: string, now: Date, input: CheckoutCustomerInput): Promise<object | null> {

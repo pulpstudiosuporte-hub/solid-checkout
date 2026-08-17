@@ -25,6 +25,7 @@ import {
   savePublicCheckoutCustomer,
   savePublicCheckoutShipping,
   selectPublicShippingMethod,
+  setPublicOrderBump,
 } from "./api";
 import "./public-session.css";
 
@@ -49,6 +50,7 @@ const publicConfig = (value) => ({
   subtitle: "Preencha seus dados para continuar. Leva menos de um minuto.",
   buttonText: "Continuar para entrega",
   showSummary: true,
+  showBump: true,
   footerText: "© 2026 Solid Commerce. Todos os direitos reservados.",
   privacyUrl: "#",
   termsUrl: "#",
@@ -249,7 +251,8 @@ function useExpiry(expiresAt) {
   };
 }
 
-function SessionContent({ session, token }) {
+function SessionContent({ session: initialSession, token }) {
+  const [session, setSession] = useState(initialSession);
   const expiry = useExpiry(session.expiresAt);
   const [form, setForm] = useState({
     name: "",
@@ -336,6 +339,19 @@ function SessionContent({ session, token }) {
   const config = publicConfig(session.checkout?.publishedConfig);
   const update = (field, value) =>
     setForm((current) => ({ ...current, [field]: value }));
+  const toggleOrderBump = async (enabled) => {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await setPublicOrderBump(session.publicId, token, enabled);
+      setSession(result.session);
+      if (selectedShipping) setSelectedShipping((current) => current ? { ...current, subtotalCents: result.update.totalCents, grandTotalCents: result.update.grandTotalCents } : current);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  };
   const valid =
     form.name.trim().length >= 3 &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) &&
@@ -519,6 +535,13 @@ function SessionContent({ session, token }) {
                   />
                 </label>
               </div>
+              {config.showBump && session.orderBump && <label className="public-order-bump">
+                <input type="checkbox" checked={Boolean(session.items?.some(item => item.isOrderBump))} disabled={busy} onChange={(event) => toggleOrderBump(event.target.checked)} />
+                <span className="public-order-bump-check"><Check size={14} /></span>
+                {session.orderBump.imageUrl ? <img src={session.orderBump.imageUrl} alt="" /> : <span className="public-order-bump-image"><ShoppingBag size={18}/></span>}
+                <span><b>Oferta especial</b><strong>{session.orderBump.checkoutTitle}</strong>{session.orderBump.checkoutDescription && <small>{session.orderBump.checkoutDescription}</small>}</span>
+                <em>+ {money.format(session.orderBump.priceCents / 100)}</em>
+              </label>}
               {error && (
                 <p className="public-error" role="alert">
                   {error}

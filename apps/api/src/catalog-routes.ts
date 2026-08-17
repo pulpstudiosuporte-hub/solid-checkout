@@ -24,6 +24,9 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   const radius = integer(input.radius, 0, 28); const timerMinutes = integer(input.timerMinutes, 1, 60); if (radius === null || timerMinutes === null) return null;
   result.radius = radius; result.timerMinutes = timerMinutes;
   for (const key of ['privacyUrl', 'termsUrl', 'successUrl']) { const url = input[key]; if (typeof url !== 'string' || url.length > 2048 || url && url !== '#' && !url.startsWith('https://')) return null; result[key] = url; }
+  const bumpProductId = input.orderBumpProductId;
+  if (bumpProductId !== undefined && (typeof bumpProductId !== 'string' || bumpProductId.length > 32 || bumpProductId && !/^[A-Za-z0-9_-]+$/.test(bumpProductId))) return null;
+  result.orderBumpProductId = typeof bumpProductId === 'string' ? bumpProductId : '';
   return result;
 };
 
