@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowRight,
   Check,
@@ -722,6 +723,7 @@ function SessionContent({ session, token }) {
                 <CreditCard size={25} />
               </span>
               <p className="eyebrow">PAGAMENTO</p>
+              {payment && String(payment.status).toUpperCase() !== "PAID" && <div className="pix-qr-code"><QRCodeSVG value={payment.pixCode} size={188} level="M" includeMargin aria-label="QR Code para pagamento Pix" /></div>}
               <h1>{String(payment?.status).toUpperCase() === 'PAID' ? 'Pagamento confirmado' : payment ? 'Pague com Pix' : 'Tudo pronto para pagar'}</h1>
               {String(payment?.status).toUpperCase() === 'PAID' ? <div className="payment-confirmed" role="status"><CheckCircle2 size={38}/><p>Recebemos seu pagamento. O pedido já está confirmado e a loja foi avisada.</p>{config.successUrl && config.successUrl !== '#' && <a className="customer-continue" href={config.successUrl}>Continuar <ArrowRight size={19}/></a>}</div> : payment ? <><p>Copie o código abaixo e pague no aplicativo do seu banco. A confirmação acontece automaticamente.</p><strong className="real-pix-total">{money.format(payment.amountCents / 100)}</strong><textarea className="pix-copy-code" readOnly value={payment.pixCode}/><button type="button" className="customer-continue" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? 'Código copiado' : 'Copiar código Pix'}</button>{payment.expiresAt && <small className="pix-expiration">Válido até {new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' }).format(new Date(payment.expiresAt))}</small>}</> : <><p>O total foi conferido no servidor. Gere o Pix seguro pela WestPay.</p><button type="button" className="customer-continue" onClick={generatePix} disabled={busy}>{busy ? <LoaderCircle className="spin" size={18}/> : 'Gerar Pix agora'} <ArrowRight size={19}/></button></>}
               {error && <p className="public-error" role="alert">{error}</p>}
