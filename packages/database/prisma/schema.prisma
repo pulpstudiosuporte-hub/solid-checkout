@@ -247,6 +247,12 @@ model CheckoutSession {
   shippingMaxDays   Int?                   @map("shipping_max_days")
   expiresAt         DateTime              @map("expires_at") @db.Timestamptz(3)
   completedAt       DateTime?             @map("completed_at") @db.Timestamptz(3)
+  shopifyOrderId    String?               @unique @map("shopify_order_id") @db.VarChar(128)
+  shopifyOrderName  String?               @map("shopify_order_name") @db.VarChar(120)
+  shopifySyncStatus String?               @map("shopify_sync_status") @db.VarChar(16)
+  shopifySyncStartedAt DateTime?          @map("shopify_sync_started_at") @db.Timestamptz(3)
+  shopifySyncedAt   DateTime?             @map("shopify_synced_at") @db.Timestamptz(3)
+  shopifySyncError  String?               @map("shopify_sync_error") @db.VarChar(500)
   createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
   checkout          Checkout              @relation(fields: [checkoutId], references: [id], onDelete: Restrict)
@@ -257,6 +263,7 @@ model CheckoutSession {
   @@index([checkoutId, status, expiresAt])
   @@index([expiresAt])
   @@index([customerEmailHash])
+  @@index([shopifySyncStatus, shopifySyncStartedAt])
   @@map("checkout_sessions")
 }
 

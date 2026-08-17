@@ -4,6 +4,8 @@ import type { AppEnvironment } from '@solid/config';
 import type { CatalogRepository } from './catalog-repository.js';
 import { decryptSecret, encryptSecret } from './shopify-crypto.js';
 import type { PrismaGatewayRepository } from './gateway-repository.js';
+import type { ShopifyRepository } from './shopify-repository.js';
+import { syncPaidShopifyOrder } from './shopify-order-sync.js';
 import { createWestPayPix, findWestPayPix, getWestPayPix, WestPayRequestError } from './westpay-client.js';
 import { lookupBrazilianPostalCode, PostalCodeLookupError } from './postal-code.js';
 
@@ -22,7 +24,7 @@ const validProxySignature = (query: Record<string, string | string[] | undefined
   return timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'));
 };
 
-export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: AppEnvironment, catalog: CatalogRepository, gateways?: PrismaGatewayRepository): void {
+export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: AppEnvironment, catalog: CatalogRepository, gateways?: PrismaGatewayRepository, shopify?: ShopifyRepository): void {
   app.get<{ Params: { postalCode: string } }>('/public/postal-codes/:postalCode', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
     const postalCode = digits(request.params.postalCode);
     if (postalCode.length !== 8) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'CEP inválido.'));
@@ -163,7 +165,13 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       const official = await getWestPayPix({ apiKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) }, objectId);
       if (!official || official.id !== objectId || official.amount !== context.amountCents || official.externalRef && official.externalRef !== `solid-${context.publicId}`) return reply.code(200).send({ received: true });
       const normalized = official.status.toUpperCase(); const mapped = normalized === 'PAID' ? 'PAID' : normalized === 'FAILED' ? 'FAILED' : normalized === 'CANCELLED' ? 'CANCELLED' : normalized === 'EXPIRED' ? 'EXPIRED' : normalized === 'REFUNDED' || normalized === 'PARTIALLY_REFUNDED' ? 'REFUNDED' : null;
-      if (mapped) await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined);
+      if (mapped) {
+        await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined);
+        if (mapped === 'PAID' && shopify) {
+          try { await syncPaidShopifyOrder(environment, shopify, context.checkoutSessionId); }
+          catch (error) { request.log.error({ err: error, checkoutSessionId: context.checkoutSessionId }, 'shopify_order_sync_failed'); }
+        }
+      }
       return reply.code(200).send({ received: true });
     } catch (error) { request.log.warn({ err: error, providerTransactionId: objectId }, 'westpay_webhook_verification_failed'); return reply.code(503).send(); }
   });

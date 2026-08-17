@@ -36,7 +36,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
   if (dependencies.authRepository && dependencies.catalogRepository) registerCatalogRoutes(app, environment, dependencies.authRepository, dependencies.catalogRepository);
   if (dependencies.authRepository && dependencies.gatewayRepository) registerGatewayRoutes(app, environment, dependencies.authRepository, dependencies.gatewayRepository);
   if (dependencies.authRepository && dependencies.orderRepository) registerOrderRoutes(app, environment, dependencies.authRepository, dependencies.orderRepository);
-  if (dependencies.catalogRepository) registerPublicCheckoutRoutes(app, environment, dependencies.catalogRepository, dependencies.gatewayRepository);
+  if (dependencies.catalogRepository) registerPublicCheckoutRoutes(app, environment, dependencies.catalogRepository, dependencies.gatewayRepository, dependencies.shopifyRepository);
 
   app.get<{ Reply: HealthResponse }>('/health/live', () => ({ status: 'ok', service: 'solid-api', version: '0.1.0', timestamp: new Date().toISOString() }));
   app.get<{ Reply: HealthResponse }>('/health/ready', () => ({ status: 'ok', service: 'solid-api', version: '0.1.0', timestamp: new Date().toISOString() }));
