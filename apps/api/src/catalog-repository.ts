@@ -17,6 +17,7 @@ export interface CatalogRepository {
   listProducts(context: StoreContext, query: ProductListQuery): Promise<ProductListResult>;
   getProduct(context: StoreContext, publicId: string): Promise<object | null>;
   createProduct(context: StoreContext, input: ProductInput, requestId: string): Promise<object>;
+  deleteManualProduct(context: StoreContext, publicId: string, requestId: string): Promise<'deleted' | 'in_use' | 'not_found'>;
   listCheckouts(context: StoreContext): Promise<readonly object[]>;
   createCheckout(context: StoreContext, input: CheckoutInput, requestId: string): Promise<object | null>;
   updateCheckoutDraft(context: StoreContext, publicId: string, config: CheckoutConfigInput, requestId: string): Promise<object | null>;
@@ -71,6 +72,21 @@ export class PrismaCatalogRepository implements CatalogRepository {
       const product = await transaction.product.create({ data: { storeId: context.storeId, sourceTitle: input.title, checkoutTitle: input.title, priceCents: input.priceCents, trackInventory: input.trackInventory, maxPerOrder: input.maxPerOrder, active: input.active, ...(input.description !== undefined ? { checkoutDescription: input.description } : {}), ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}), ...(input.compareAtCents !== undefined ? { compareAtCents: input.compareAtCents } : {}), ...(input.stockQuantity !== undefined ? { stockQuantity: input.stockQuantity } : {}), variants: { create: { sourceExternalId: 'manual-default', title: 'Padrão', priceCents: input.priceCents, ...(input.compareAtCents !== undefined ? { compareAtCents: input.compareAtCents } : {}), ...(input.stockQuantity !== undefined ? { inventoryQuantity: input.stockQuantity } : {}), ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}) } } }, select: productSelect });
       await transaction.auditLog.create({ data: { storeId: context.storeId, actorUserId: context.userId, actorType: 'USER', action: 'product.created', targetType: 'product', targetId: product.publicId, requestId } });
       return product;
+    });
+  }
+
+  async deleteManualProduct(context: StoreContext, publicId: string, requestId: string): Promise<'deleted' | 'in_use' | 'not_found'> {
+    const product = await this.database.product.findFirst({ where: { storeId: context.storeId, publicId, source: 'MANUAL' }, select: { id: true } });
+    if (!product) return 'not_found';
+    return this.database.$transaction(async transaction => {
+      const [checkoutCount, itemCount] = await Promise.all([
+        transaction.checkout.count({ where: { productId: product.id } }),
+        transaction.checkoutSessionItem.count({ where: { productId: product.id } })
+      ]);
+      if (checkoutCount || itemCount) return 'in_use';
+      await transaction.product.delete({ where: { id: product.id } });
+      await transaction.auditLog.create({ data: { storeId: context.storeId, actorUserId: context.userId, actorType: 'USER', action: 'product.manual_deleted', targetType: 'product', targetId: publicId, requestId } });
+      return 'deleted';
     });
   }
   listShippingMethods(context: StoreContext): Promise<readonly object[]> {
