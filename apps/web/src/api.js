@@ -78,6 +78,10 @@ export async function selectStore(storeId, csrfToken) {
   return readJson(response);
 }
 export async function archiveStore(storeId, csrfToken) { const response = await fetch(`${apiBaseUrl}/stores/${encodeURIComponent(storeId)}`, { method: 'DELETE', credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken } }); if (!response.ok) return readJson(response); }
+export async function getStoreDomain() { return readJson(await fetch(`${apiBaseUrl}/store-domain`, { credentials: 'include', headers: { Accept: 'application/json' } })); }
+export async function saveStoreDomain(hostname, csrfToken) { return readJson(await fetch(`${apiBaseUrl}/store-domain`, { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify({ hostname }) })); }
+export async function verifyStoreDomain(domainId, csrfToken) { return readJson(await fetch(`${apiBaseUrl}/store-domain/${encodeURIComponent(domainId)}/verify`, { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken } })); }
+export async function deleteStoreDomain(domainId, csrfToken) { const response = await fetch(`${apiBaseUrl}/store-domain/${encodeURIComponent(domainId)}`, { method: 'DELETE', credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken } }); if (response.status !== 204) return readJson(response); }
 
 export async function getShopifyStatus() { return readJson(await fetch(`${apiBaseUrl}/integrations/shopify/status`, { credentials: 'include', headers: { Accept: 'application/json' } })); }
 export async function connectShopify(shop, csrfToken) { return readJson(await fetch(`${apiBaseUrl}/integrations/shopify/connect`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify({ shop }) })); }

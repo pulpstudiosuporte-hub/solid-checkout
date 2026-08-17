@@ -1,12 +1,18 @@
 import type { PrismaClient } from '@solid/database';
 
 export type StoreSummary = Readonly<{ publicId: string; name: string; slug: string; role: 'OWNER' | 'ADMIN' | 'ANALYST'; active: boolean }>;
+export type StoreDomainSummary = Readonly<{ publicId: string; hostname: string; status: string; verifiedAt: Date | null; lastCheckedAt: Date | null }>;
 
 export interface StoreRepository {
   listForUser(userId: string, sessionId: string): Promise<readonly StoreSummary[]>;
   createForUser(userId: string, sessionId: string, name: string, slug: string, requestId: string): Promise<StoreSummary | null>;
   selectForUser(userId: string, sessionId: string, storePublicId: string, requestId: string): Promise<StoreSummary | null>;
   archiveForUser(userId: string, sessionId: string, storePublicId: string, requestId: string): Promise<boolean>;
+  getDomainForUser(userId: string, sessionId: string): Promise<StoreDomainSummary | null>;
+  saveDomainForUser(userId: string, sessionId: string, hostname: string, requestId: string): Promise<StoreDomainSummary | null>;
+  updateDomainVerification(userId: string, sessionId: string, domainPublicId: string, verified: boolean, requestId: string): Promise<StoreDomainSummary | null>;
+  deleteDomainForUser(userId: string, sessionId: string, domainPublicId: string, requestId: string): Promise<boolean>;
+  isCheckoutDomainAllowed?(hostname: string): Promise<boolean>;
 }
 
 export class PrismaStoreRepository implements StoreRepository {
@@ -55,4 +61,46 @@ export class PrismaStoreRepository implements StoreRepository {
       return true;
     });
   }
+
+  private async activeStoreMember(userId: string, sessionId: string) {
+    const session = await this.database.session.findFirst({ where: { id: sessionId, userId, revokedAt: null }, select: { activeStoreId: true } });
+    if (!session?.activeStoreId) return null;
+    return this.database.storeMember.findFirst({ where: { userId, storeId: session.activeStoreId, store: { active: true } }, select: { role: true, storeId: true } });
+  }
+
+  async getDomainForUser(userId: string, sessionId: string): Promise<StoreDomainSummary | null> {
+    const membership = await this.activeStoreMember(userId, sessionId); if (!membership) return null;
+    return this.database.storeDomain.findUnique({ where: { storeId: membership.storeId }, select: { publicId: true, hostname: true, status: true, verifiedAt: true, lastCheckedAt: true } });
+  }
+
+  async saveDomainForUser(userId: string, sessionId: string, hostname: string, requestId: string): Promise<StoreDomainSummary | null> {
+    const membership = await this.activeStoreMember(userId, sessionId); if (!membership || (membership.role !== 'OWNER' && membership.role !== 'ADMIN')) return null;
+    return this.database.$transaction(async transaction => {
+      const domain = await transaction.storeDomain.upsert({ where: { storeId: membership.storeId }, create: { storeId: membership.storeId, hostname }, update: { hostname, status: 'PENDING_DNS', verifiedAt: null, lastCheckedAt: null }, select: { publicId: true, hostname: true, status: true, verifiedAt: true, lastCheckedAt: true } });
+      await transaction.auditLog.create({ data: { storeId: membership.storeId, actorUserId: userId, actorType: 'USER', action: 'store_domain.saved', targetType: 'store_domain', targetId: domain.publicId, requestId } });
+      return domain;
+    });
+  }
+
+  async updateDomainVerification(userId: string, sessionId: string, domainPublicId: string, verified: boolean, requestId: string): Promise<StoreDomainSummary | null> {
+    const membership = await this.activeStoreMember(userId, sessionId); if (!membership || (membership.role !== 'OWNER' && membership.role !== 'ADMIN')) return null;
+    return this.database.$transaction(async transaction => {
+      const existing = await transaction.storeDomain.findFirst({ where: { publicId: domainPublicId, storeId: membership.storeId }, select: { id: true, publicId: true } }); if (!existing) return null;
+      const now = new Date();
+      const domain = await transaction.storeDomain.update({ where: { id: existing.id }, data: { status: verified ? 'VERIFIED_DNS' : 'PENDING_DNS', verifiedAt: verified ? now : null, lastCheckedAt: now }, select: { publicId: true, hostname: true, status: true, verifiedAt: true, lastCheckedAt: true } });
+      await transaction.auditLog.create({ data: { storeId: membership.storeId, actorUserId: userId, actorType: 'USER', action: verified ? 'store_domain.verified' : 'store_domain.not_verified', targetType: 'store_domain', targetId: domain.publicId, requestId } });
+      return domain;
+    });
+  }
+
+  async deleteDomainForUser(userId: string, sessionId: string, domainPublicId: string, requestId: string): Promise<boolean> {
+    const membership = await this.activeStoreMember(userId, sessionId); if (!membership || (membership.role !== 'OWNER' && membership.role !== 'ADMIN')) return false;
+    return this.database.$transaction(async transaction => {
+      const deleted = await transaction.storeDomain.deleteMany({ where: { publicId: domainPublicId, storeId: membership.storeId } }); if (!deleted.count) return false;
+      await transaction.auditLog.create({ data: { storeId: membership.storeId, actorUserId: userId, actorType: 'USER', action: 'store_domain.deleted', targetType: 'store_domain', targetId: domainPublicId, requestId } });
+      return true;
+    });
+  }
+
+  async isCheckoutDomainAllowed(hostname: string): Promise<boolean> { return (await this.database.storeDomain.count({ where: { hostname, status: 'VERIFIED_DNS' } })) > 0; }
 }

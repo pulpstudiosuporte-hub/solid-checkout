@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { AppEnvironment } from '@solid/config';
 import { buildApp } from '../src/app.js';
 import type { AuthRepository, LoginUser, SessionUser } from '../src/auth-repository.js';
-import type { StoreRepository, StoreSummary } from '../src/store-repository.js';
+import type { StoreDomainSummary, StoreRepository, StoreSummary } from '../src/store-repository.js';
 
 const origin = 'http://localhost:5173';
 const env: AppEnvironment = { NODE_ENV: 'test', API_HOST: '127.0.0.1', API_PORT: 3333, LOG_LEVEL: 'silent', CORS_ORIGINS: [origin], TRUST_PROXY: false };
@@ -19,10 +19,15 @@ class MemoryAuth implements AuthRepository {
 
 class MemoryStores implements StoreRepository {
   items: StoreSummary[] = [{ publicId: 'store-a', name: 'Loja A', slug: 'loja-a', role: 'OWNER', active: true }];
+  domain: StoreDomainSummary | null = null;
   listForUser(): Promise<readonly StoreSummary[]> { return Promise.resolve(this.items); }
   createForUser(_userId: string, _sessionId: string, name: string, slug: string): Promise<StoreSummary> { this.items = this.items.map(item => ({...item, active: false})); const store: StoreSummary = { publicId: 'store-new', name, slug, role: 'OWNER', active: true }; this.items.push(store); return Promise.resolve(store); }
   selectForUser(_userId: string, _sessionId: string, storePublicId: string): Promise<StoreSummary | null> { const selected = this.items.find(item => item.publicId === storePublicId); if (!selected) return Promise.resolve(null); this.items = this.items.map(item => ({...item, active: item.publicId === storePublicId})); return Promise.resolve({...selected, active: true}); }
   archiveForUser(_userId: string, _sessionId: string, storePublicId: string): Promise<boolean> { if (this.items.length < 2 || !this.items.some(item => item.publicId === storePublicId)) return Promise.resolve(false); this.items = this.items.filter(item => item.publicId !== storePublicId); return Promise.resolve(true); }
+  getDomainForUser(): Promise<StoreDomainSummary | null> { return Promise.resolve(this.domain); }
+  saveDomainForUser(_userId: string, _sessionId: string, hostname: string): Promise<StoreDomainSummary> { this.domain = { publicId: 'domain-a', hostname, status: 'PENDING_DNS', verifiedAt: null, lastCheckedAt: null }; return Promise.resolve(this.domain); }
+  updateDomainVerification(_userId: string, _sessionId: string, domainPublicId: string, verified: boolean): Promise<StoreDomainSummary | null> { if (!this.domain || this.domain.publicId !== domainPublicId) return Promise.resolve(null); this.domain = { ...this.domain, status: verified ? 'VERIFIED_DNS' : 'PENDING_DNS', verifiedAt: verified ? new Date() : null, lastCheckedAt: new Date() }; return Promise.resolve(this.domain); }
+  deleteDomainForUser(_userId: string, _sessionId: string, domainPublicId: string): Promise<boolean> { if (!this.domain || this.domain.publicId !== domainPublicId) return Promise.resolve(false); this.domain = null; return Promise.resolve(true); }
 }
 
 const headers = { origin, cookie: `solid_session=${sessionToken}; solid_csrf=${csrfToken}`, 'x-csrf-token': csrfToken };

@@ -1,4 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { resolveCname } from 'node:dns/promises';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
 import type { AuthRepository, SessionUser } from './auth-repository.js';
@@ -8,6 +9,9 @@ const sha256 = (value: string): string => createHash('sha256').update(value).dig
 const safeEqual = (left: string, right: string): boolean => timingSafeEqual(Buffer.from(sha256(left), 'hex'), Buffer.from(sha256(right), 'hex'));
 const errorBody = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
 const slugify = (value: string): string => value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 64) || 'loja';
+const checkoutTarget = 'pay.solidcheckout.xyz';
+const normaliseHostname = (value: string): string => value.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+const validCheckoutHostname = (hostname: string): boolean => hostname.length <= 253 && hostname.split('.').length >= 3 && /^(?=.{1,253}$)(?!-)(?:[a-z0-9-]{1,63}\.)+[a-z]{2,63}$/.test(hostname) && !hostname.endsWith('.solidcheckout.xyz');
 
 export function registerStoreRoutes(app: FastifyInstance, environment: AppEnvironment, auth: AuthRepository, stores: StoreRepository): void {
   const secure = environment.NODE_ENV === 'production';
@@ -52,6 +56,42 @@ export function registerStoreRoutes(app: FastifyInstance, environment: AppEnviro
     const session = await authenticate(request, true); if (!session) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
     if (!/^[a-zA-Z0-9_-]{1,32}$/.test(request.params.storeId)) return reply.code(404).send(errorBody(request, 'STORE_NOT_FOUND', 'Loja não encontrada.'));
     if (!await stores.archiveForUser(session.userId, session.sessionId, request.params.storeId, request.id)) return reply.code(409).send(errorBody(request, 'STORE_ARCHIVE_NOT_ALLOWED', 'Não foi possível arquivar esta loja. Mantenha ao menos uma loja ativa.'));
+    return reply.code(204).send();
+  });
+
+  app.get('/store-domain', async (request, reply) => {
+    const session = await authenticate(request); if (!session) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
+    return reply.send({ domain: await stores.getDomainForUser(session.userId, session.sessionId), cnameTarget: checkoutTarget });
+  });
+
+  app.put<{ Body: { hostname?: unknown } }>('/store-domain', async (request, reply) => {
+    const session = await authenticate(request, true); if (!session) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    const hostname = typeof request.body?.hostname === 'string' ? normaliseHostname(request.body.hostname) : '';
+    if (!validCheckoutHostname(hostname)) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Use um subdomínio válido, como checkout.sualoja.com.'));
+    try {
+      const domain = await stores.saveDomainForUser(session.userId, session.sessionId, hostname, request.id);
+      if (!domain) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Somente proprietários e administradores podem alterar domínios.'));
+      return reply.send({ domain, cnameTarget: checkoutTarget });
+    } catch (error) {
+      if (typeof error === 'object' && error && 'code' in error && error.code === 'P2002') return reply.code(409).send(errorBody(request, 'DOMAIN_IN_USE', 'Este domínio já está conectado a outra loja SOLID.'));
+      throw error;
+    }
+  });
+
+  app.post<{ Params: { domainId: string } }>('/store-domain/:domainId/verify', async (request, reply) => {
+    const session = await authenticate(request, true); if (!session) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    const current = await stores.getDomainForUser(session.userId, session.sessionId);
+    if (!current || current.publicId !== request.params.domainId) return reply.code(404).send(errorBody(request, 'DOMAIN_NOT_FOUND', 'Domínio não encontrado.'));
+    let verified = false;
+    try { verified = (await resolveCname(current.hostname)).some(value => value.replace(/\.$/, '').toLowerCase() === checkoutTarget); } catch { verified = false; }
+    const domain = await stores.updateDomainVerification(session.userId, session.sessionId, current.publicId, verified, request.id);
+    if (!domain) return reply.code(404).send(errorBody(request, 'DOMAIN_NOT_FOUND', 'Domínio não encontrado.'));
+    return reply.send({ domain, cnameTarget: checkoutTarget, verified });
+  });
+
+  app.delete<{ Params: { domainId: string } }>('/store-domain/:domainId', async (request, reply) => {
+    const session = await authenticate(request, true); if (!session) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    if (!await stores.deleteDomainForUser(session.userId, session.sessionId, request.params.domainId, request.id)) return reply.code(404).send(errorBody(request, 'DOMAIN_NOT_FOUND', 'Domínio não encontrado.'));
     return reply.code(204).send();
   });
 }

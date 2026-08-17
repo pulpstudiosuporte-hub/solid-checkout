@@ -81,8 +81,25 @@ model Store {
   shopifyOAuthStates ShopifyOAuthState[]
   shippingMethods ShippingMethod[]
   gatewayConnections GatewayConnection[]
+  customDomain StoreDomain?
 
   @@map("stores")
+}
+
+model StoreDomain {
+  id            String    @id @default(uuid()) @db.Uuid
+  publicId      String    @unique @default(cuid()) @map("public_id") @db.VarChar(32)
+  storeId       String    @unique @map("store_id") @db.Uuid
+  hostname      String    @unique @db.VarChar(253)
+  status        String    @default("PENDING_DNS") @db.VarChar(24)
+  verifiedAt    DateTime? @map("verified_at") @db.Timestamptz(3)
+  lastCheckedAt DateTime? @map("last_checked_at") @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  store         Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("store_domains")
 }
 
 model Product {
