@@ -24,6 +24,8 @@ export class PrismaStoreRepository implements StoreRepository {
       this.database.session.findFirst({ where: { id: sessionId, userId, revokedAt: null }, select: { activeStoreId: true } }),
       this.database.storeMember.findMany({ where: { userId, store: { active: true } }, orderBy: { createdAt: 'asc' }, select: { role: true, store: { select: { id: true, publicId: true, name: true, slug: true } } } }),
     ]);
+    const fallbackStoreId = memberships[0]?.store.id;
+    if (!session?.activeStoreId && fallbackStoreId) await this.database.session.updateMany({ where: { id: sessionId, userId, revokedAt: null, activeStoreId: null }, data: { activeStoreId: fallbackStoreId } });
     return memberships.map(({ role, store }, index) => ({ publicId: store.publicId, name: store.name, slug: store.slug, role, active: session?.activeStoreId ? session.activeStoreId === store.id : index === 0 }));
   }
 
