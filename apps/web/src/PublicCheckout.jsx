@@ -403,6 +403,9 @@ function SessionContent({ session, token }) {
     finally { setBusy(false); }
   };
   const copyPix = async () => { await navigator.clipboard.writeText(payment.pixCode); setCopied(true); window.setTimeout(() => setCopied(false), 1800); };
+  if (String(payment?.status).toUpperCase() === "PAID") {
+    return <ThankYouPage session={session} items={items} itemCount={itemCount} selectedShipping={selectedShipping} config={config} />;
+  }
   return (
     <main
       className="public-checkout session-checkout"
@@ -792,6 +795,33 @@ function SessionContent({ session, token }) {
           {config.termsUrl && <a href={config.termsUrl}>Termos de uso</a>}
         </div>
       </footer>
+    </main>
+  );
+}
+
+function ThankYouPage({ session, items, itemCount, selectedShipping, config }) {
+  const total = selectedShipping?.grandTotalCents ?? session.totalCents;
+  return (
+    <main className="public-checkout thank-you-page" style={configStyle(config)}>
+      <header>
+        <img className="public-brand" src="/brand/solid-wordmark-dark.png" alt={config.logoText || "SOLID"} />
+        {config.secureHeader && <span><ShieldCheck size={18} aria-hidden="true" /> Pagamento seguro</span>}
+      </header>
+      <section className="thank-you-card" aria-labelledby="thank-you-title">
+        <div className="thank-you-icon" aria-hidden="true"><CheckCircle2 size={42} /></div>
+        <p className="eyebrow">PAGAMENTO CONFIRMADO</p>
+        <h1 id="thank-you-title">Obrigado pela sua compra!</h1>
+        <p className="thank-you-lead">Recebemos seu Pix e o seu pedido já está confirmado. Enviaremos as próximas atualizações para o e-mail informado.</p>
+        <div className="thank-you-order" aria-label="Resumo do pedido">
+          <div><span>Pedido SOLID</span><strong>#{session.publicId.slice(-8).toUpperCase()}</strong></div>
+          <div><span>Total pago</span><strong>{money.format(total / 100)}</strong></div>
+          <div><span>Itens</span><strong>{itemCount} {itemCount === 1 ? "item" : "itens"}</strong></div>
+        </div>
+        <div className="thank-you-items">{items.map((item) => <div key={`${item.titleSnapshot}-${item.variantSnapshot || "default"}`}><span>{item.quantity}× {item.titleSnapshot}</span><strong>{money.format(item.totalCents / 100)}</strong></div>)}</div>
+        {config.successUrl && config.successUrl !== "#" && <a className="customer-continue thank-you-cta" href={config.successUrl}>Continuar para a loja <ArrowRight size={19} aria-hidden="true" /></a>}
+        <p className="thank-you-help">Dúvidas sobre seu pedido? Entre em contato diretamente com a loja.</p>
+      </section>
+      <footer className="public-checkout-footer"><span>{config.footerText}</span><div>{config.privacyUrl && <a href={config.privacyUrl}>Privacidade</a>}{config.termsUrl && <a href={config.termsUrl}>Termos de uso</a>}</div></footer>
     </main>
   );
 }

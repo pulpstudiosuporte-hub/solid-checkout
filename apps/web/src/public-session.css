@@ -144,6 +144,23 @@
   white-space: nowrap;
 }
 .payment-confirmed{display:flex;align-items:center;flex-direction:column;gap:12px;color:#168455}.payment-confirmed p{max-width:470px;margin:0;color:#575760;line-height:1.6}.payment-confirmed .customer-continue{margin-top:6px;color:#fff;text-decoration:none}
+.thank-you-page { min-height: 100vh; display: flex; flex-direction: column; }
+.thank-you-card { width: min(100% - 32px, 620px); margin: clamp(48px, 9vh, 96px) auto 48px; padding: clamp(32px, 6vw, 56px); border: 1px solid var(--public-border); border-radius: calc(var(--public-radius) + 8px); background: var(--public-card); box-shadow: 0 24px 60px rgba(30, 23, 64, .1); text-align: center; }
+.thank-you-icon { display: grid; width: 84px; height: 84px; margin: 0 auto 22px; place-items: center; border-radius: 50%; background: #eaf8ee; color: #138b50; box-shadow: 0 0 0 7px #f6fcf7; }
+.thank-you-card h1 { margin: 7px 0 12px; font-size: clamp(28px, 5vw, 40px); letter-spacing: -.045em; color: var(--public-text); }
+.thank-you-lead { max-width: 460px; margin: 0 auto; color: #5c5c68; font-size: 16px; line-height: 1.65; }
+.thank-you-order { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 30px 0 14px; padding: 18px 12px; border: 1px solid #e8e6ed; border-radius: 14px; background: #fafafd; text-align: left; }
+.thank-you-order div { min-width: 0; padding: 0 12px; border-right: 1px solid #e8e6ed; }
+.thank-you-order div:last-child { border-right: 0; }
+.thank-you-order span { display: block; margin-bottom: 5px; color: #737380; font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+.thank-you-order strong { display: block; overflow: hidden; color: var(--public-text); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.thank-you-items { margin-top: 14px; border-top: 1px solid #eceaf0; text-align: left; }
+.thank-you-items div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 2px; border-bottom: 1px solid #eceaf0; color: #555561; font-size: 14px; }
+.thank-you-items strong { flex: none; color: var(--public-text); }
+.thank-you-cta { display: inline-flex !important; width: auto !important; margin-top: 28px !important; color: #fff; text-decoration: none; }
+.thank-you-help { margin: 22px 0 0; color: #70707a; font-size: 13px; line-height: 1.5; }
+.thank-you-page .public-checkout-footer { margin-top: auto; }
+@media (max-width: 560px) { .thank-you-card { width: min(100% - 24px, 620px); margin-top: 36px; padding: 30px 22px; } .thank-you-order { grid-template-columns: 1fr; gap: 14px; padding: 14px; } .thank-you-order div { padding: 0 2px 14px; border-right: 0; border-bottom: 1px solid #e8e6ed; } .thank-you-order div:last-child { padding-bottom: 0; border-bottom: 0; } }
 .session-security {
   display: flex;
   align-items: center;
