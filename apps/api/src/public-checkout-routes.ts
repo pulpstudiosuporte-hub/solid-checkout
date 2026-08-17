@@ -133,6 +133,10 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       });
       if (!transaction.id || !transaction.pix?.qrcode) throw new Error('WestPay returned an incomplete PIX response');
       const expiresAt = transaction.pix.expiresAt ? new Date(transaction.pix.expiresAt) : null; const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pix.qrcode, environment.APP_ENCRYPTION_KEY), expiresAt);
+      if (shopify) {
+        try { await syncPaidShopifyOrder(environment, shopify, context.id); }
+        catch (error) { request.log.error({ err: error, checkoutSessionId: context.id }, 'shopify_pending_order_sync_failed'); }
+      }
       return reply.header('cache-control', 'no-store').code(201).send({ payment: { ...saved, status: 'pending', pixCode: transaction.pix.qrcode } });
     } catch (error) {
       request.log.warn({ err: error, checkoutSession: context.publicId }, 'westpay_pix_creation_failed');

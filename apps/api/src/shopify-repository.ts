@@ -9,7 +9,7 @@ export type ShopifyCatalog = Readonly<{
   collections: readonly Readonly<{ id: string; title: string; handle: string; descriptionHtml: string; imageUrl?: string | undefined; updatedAt: string }>[];
 }>;
 export type ShopifySyncResult = Readonly<{ products: number; variants: number; images: number; collections: number; syncedAt: Date }>;
-export type ShopifyOrderSyncContext = Readonly<{ checkoutSessionId: string; publicId: string; storeId: string; currency: string; shippingPriceCents: number; shippingMethodName: string | null; customerDataEncrypted: string; shippingAddressEncrypted: string; items: readonly Readonly<{ variantExternalId: string; quantity: number; title: string }>[] }>;
+export type ShopifyOrderSyncContext = Readonly<{ checkoutSessionId: string; publicId: string; storeId: string; paid: boolean; currency: string; shippingPriceCents: number; shippingMethodName: string | null; customerDataEncrypted: string; shippingAddressEncrypted: string; items: readonly Readonly<{ variantExternalId: string; quantity: number; title: string }>[] }>;
 
 export class ShopifyDomainInUseError extends Error {
   constructor() { super('Shopify domain is already connected'); this.name = 'ShopifyDomainInUseError'; }
@@ -27,6 +27,7 @@ export interface ShopifyRepository {
   claimPaidOrderSync(checkoutSessionId: string, now: Date): Promise<ShopifyOrderSyncContext | null>;
   markOrderSynced(checkoutSessionId: string, order: { id: string; name?: string | null }, now: Date): Promise<void>;
   markOrderSyncFailed(checkoutSessionId: string, message: string): Promise<void>;
+  shopifyOrderId(checkoutSessionId: string): Promise<{ storeId: string; orderId: string } | null>;
 }
 
 export class PrismaShopifyRepository implements ShopifyRepository {
@@ -105,12 +106,12 @@ export class PrismaShopifyRepository implements ShopifyRepository {
   async claimPaidOrderSync(checkoutSessionId: string, now: Date): Promise<ShopifyOrderSyncContext | null> {
     return this.database.$transaction(async transaction => {
       const session = await transaction.checkoutSession.findUnique({ where: { id: checkoutSessionId }, select: { id: true, publicId: true, status: true, source: true, currency: true, shippingPriceCents: true, shippingMethodName: true, customerDataEncrypted: true, shippingAddressEncrypted: true, shopifyOrderId: true, shopifySyncStatus: true, shopifySyncStartedAt: true, checkout: { select: { storeId: true } }, items: { select: { quantity: true, titleSnapshot: true, variant: { select: { sourceExternalId: true } } } } } });
-      if (!session || session.status !== 'COMPLETED' || session.source !== 'SHOPIFY' || session.shopifyOrderId || !session.customerDataEncrypted || !session.shippingAddressEncrypted) return null;
+      if (!session || !['OPEN', 'COMPLETED'].includes(session.status) || session.source !== 'SHOPIFY' || session.shopifyOrderId || !session.customerDataEncrypted || !session.shippingAddressEncrypted) return null;
       const staleBefore = new Date(now.getTime() - 10 * 60_000);
       if (session.shopifySyncStatus === 'SYNCING' && session.shopifySyncStartedAt && session.shopifySyncStartedAt > staleBefore) return null;
       const updated = await transaction.checkoutSession.updateMany({ where: { id: session.id, shopifyOrderId: null, OR: [{ shopifySyncStatus: null }, { shopifySyncStatus: 'FAILED' }, { shopifySyncStatus: 'SYNCING', shopifySyncStartedAt: { lte: staleBefore } }] }, data: { shopifySyncStatus: 'SYNCING', shopifySyncStartedAt: now, shopifySyncError: null } });
       if (updated.count !== 1 || session.items.some(item => !item.variant.sourceExternalId)) return null;
-      return { checkoutSessionId: session.id, publicId: session.publicId, storeId: session.checkout.storeId, currency: session.currency, shippingPriceCents: session.shippingPriceCents, shippingMethodName: session.shippingMethodName, customerDataEncrypted: session.customerDataEncrypted, shippingAddressEncrypted: session.shippingAddressEncrypted, items: session.items.map(item => ({ variantExternalId: item.variant.sourceExternalId, quantity: item.quantity, title: item.titleSnapshot })) };
+      return { checkoutSessionId: session.id, publicId: session.publicId, storeId: session.checkout.storeId, paid: session.status === 'COMPLETED', currency: session.currency, shippingPriceCents: session.shippingPriceCents, shippingMethodName: session.shippingMethodName, customerDataEncrypted: session.customerDataEncrypted, shippingAddressEncrypted: session.shippingAddressEncrypted, items: session.items.map(item => ({ variantExternalId: item.variant.sourceExternalId, quantity: item.quantity, title: item.titleSnapshot })) };
     });
   }
   async markOrderSynced(checkoutSessionId: string, order: { id: string; name?: string | null }, now: Date): Promise<void> {
@@ -118,6 +119,10 @@ export class PrismaShopifyRepository implements ShopifyRepository {
   }
   async markOrderSyncFailed(checkoutSessionId: string, message: string): Promise<void> {
     await this.database.checkoutSession.updateMany({ where: { id: checkoutSessionId, shopifyOrderId: null }, data: { shopifySyncStatus: 'FAILED', shopifySyncError: message.slice(0, 500) } });
+  }
+  async shopifyOrderId(checkoutSessionId: string): Promise<{ storeId: string; orderId: string } | null> {
+    const session = await this.database.checkoutSession.findUnique({ where: { id: checkoutSessionId }, select: { shopifyOrderId: true, checkout: { select: { storeId: true } } } });
+    return session?.shopifyOrderId ? { storeId: session.checkout.storeId, orderId: session.shopifyOrderId } : null;
   }
 }
 

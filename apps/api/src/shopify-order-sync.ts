@@ -12,9 +12,14 @@ const CREATE_ORDER = `mutation SolidOrderCreate($order: OrderCreateOrderInput!) 
     userErrors { message }
   }
 }`;
+const MARK_ORDER_PAID = `mutation SolidOrderMarkAsPaid($input: OrderMarkAsPaidInput!) {
+  orderMarkAsPaid(input: $input) { order { id name } userErrors { message } }
+}`;
 
 export async function syncPaidShopifyOrder(environment: AppEnvironment, repository: ShopifyRepository, checkoutSessionId: string): Promise<void> {
   if (!environment.APP_ENCRYPTION_KEY) return;
+  const existing = await repository.shopifyOrderId(checkoutSessionId);
+  if (existing) return markAsPaid(environment, repository, existing.storeId, existing.orderId);
   const context = await repository.claimPaidOrderSync(checkoutSessionId, new Date());
   if (!context) return;
   try {
@@ -28,7 +33,7 @@ export async function syncPaidShopifyOrder(environment: AppEnvironment, reposito
       email: customer.email,
       phone: customer.phone,
       currency: context.currency,
-      financialStatus: 'PAID',
+      financialStatus: context.paid ? 'PAID' : 'PENDING',
       lineItems: context.items.map(item => ({ variantId: item.variantExternalId, quantity: item.quantity })),
       shippingAddress,
       billingAddress: shippingAddress,
@@ -42,11 +47,21 @@ export async function syncPaidShopifyOrder(environment: AppEnvironment, reposito
     const errors = data.orderCreate.userErrors.map(error => error.message).filter(Boolean);
     if (!data.orderCreate.order || errors.length) throw new Error(errors.join('; ') || 'A Shopify não retornou o pedido criado.');
     await repository.markOrderSynced(context.checkoutSessionId, data.orderCreate.order, new Date());
+    if (context.paid) await markAsPaid(environment, repository, context.storeId, data.orderCreate.order.id);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha desconhecida ao criar pedido Shopify.';
     await repository.markOrderSyncFailed(context.checkoutSessionId, message);
     throw error;
   }
+}
+
+async function markAsPaid(environment: AppEnvironment, repository: ShopifyRepository, storeId: string, orderId: string): Promise<void> {
+  if (!environment.APP_ENCRYPTION_KEY) return;
+  const credentials = await repository.credentials(storeId);
+  if (!credentials) throw new Error('A loja não possui uma conexão Shopify ativa.');
+  const data = await shopifyGraphql<{ orderMarkAsPaid: { userErrors: readonly { message: string }[] } }>(credentials.shopDomain, decryptSecret(credentials.accessTokenEncrypted, environment.APP_ENCRYPTION_KEY), MARK_ORDER_PAID, { input: { id: orderId } });
+  const errors = data.orderMarkAsPaid.userErrors.map(error => error.message).filter(Boolean);
+  if (errors.length && !errors.some(message => /already paid|já.*pag/i.test(message))) throw new Error(errors.join('; '));
 }
 
 async function shopifyGraphql<T>(shop: string, token: string, query: string, variables: Record<string, unknown>): Promise<T> {
