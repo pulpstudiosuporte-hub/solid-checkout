@@ -8,7 +8,7 @@ import { getWestPayPix } from './westpay-client.js';
 
 const paymentStatus = (value: string | undefined) => {
   const status = value?.toUpperCase();
-  if (['PAID', 'APPROVED', 'CONFIRMED', 'COMPLETED', 'SUCCESS'].includes(status ?? '')) return 'PAID' as const;
+  if (['PAID', 'APPROVED', 'CONFIRMED', 'COMPLETED', 'SUCCESS', 'SUCCEEDED', 'SETTLED'].includes(status ?? '')) return 'PAID' as const;
   if (status === 'FAILED') return 'FAILED' as const;
   if (status === 'CANCELLED') return 'CANCELLED' as const;
   if (status === 'EXPIRED') return 'EXPIRED' as const;
@@ -30,7 +30,11 @@ export function startWestPayReconciliation(environment: AppEnvironment, gateways
           if (!credentials) continue;
           const payment = await getWestPayPix({ apiKey: decryptSecret(credentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY!), publicKey: decryptSecret(credentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY!) }, attempt.providerTransactionId);
           const status = paymentStatus(payment?.status);
-          if (!status || payment?.amount !== attempt.amountCents) continue;
+          const amountMatches = payment && (Number(payment.amount) === attempt.amountCents || Number(payment.amount) * 100 === attempt.amountCents);
+          if (!status || !amountMatches) {
+            log.warn({ paymentAttemptId: attempt.id, providerStatus: payment?.status ?? null, providerAmount: payment?.amount ?? null, expectedAmountCents: attempt.amountCents }, 'westpay_reconciliation_unrecognized_payment');
+            continue;
+          }
           await gateways.confirmPayment(attempt.id, attempt.checkoutSessionId, status, status === 'PAID' ? new Date() : undefined);
           if (status === 'PAID') await syncPaidShopifyOrder(environment, shopify, attempt.checkoutSessionId);
         } catch (error) { log.warn({ err: error, paymentAttemptId: attempt.id }, 'westpay_reconciliation_item_failed'); }
