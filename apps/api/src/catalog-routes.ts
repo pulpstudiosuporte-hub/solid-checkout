@@ -104,7 +104,7 @@ export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvi
     if (!productId) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Produto inválido.'));
     const result = await catalog.deleteManualProduct(context, productId, request.id);
     if (result === 'not_found') return reply.code(404).send(errorBody(request, 'PRODUCT_NOT_FOUND', 'Produto manual não encontrado.'));
-    if (result === 'in_use') return reply.code(409).send(errorBody(request, 'PRODUCT_IN_USE', 'Este produto possui vendas ou é usado por outro checkout e não pode ser excluído.'));
+    if (result === 'archived') return reply.send({ archived: true });
     return reply.code(204).send();
   });
 

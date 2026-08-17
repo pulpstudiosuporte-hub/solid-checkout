@@ -17,7 +17,7 @@ export interface CatalogRepository {
   listProducts(context: StoreContext, query: ProductListQuery): Promise<ProductListResult>;
   getProduct(context: StoreContext, publicId: string): Promise<object | null>;
   createProduct(context: StoreContext, input: ProductInput, requestId: string): Promise<object>;
-  deleteManualProduct(context: StoreContext, publicId: string, requestId: string): Promise<'deleted' | 'in_use' | 'not_found'>;
+  deleteManualProduct(context: StoreContext, publicId: string, requestId: string): Promise<'deleted' | 'archived' | 'not_found'>;
   listCheckouts(context: StoreContext): Promise<readonly object[]>;
   createCheckout(context: StoreContext, input: CheckoutInput, requestId: string): Promise<object | null>;
   updateCheckoutDraft(context: StoreContext, publicId: string, config: CheckoutConfigInput, requestId: string): Promise<object | null>;
@@ -60,12 +60,12 @@ export class PrismaCatalogRepository implements CatalogRepository {
     return membership ? { storeId: membership.storeId, userId, sessionId, role: membership.role } : null;
   }
   async listProducts(context: StoreContext, query: ProductListQuery): Promise<ProductListResult> {
-    const where: Prisma.ProductWhereInput = { storeId: context.storeId, ...(query.status ? { active: query.status === 'active' } : {}), ...(query.source ? { source: query.source } : {}), ...(query.search ? { OR: [{ checkoutTitle: { contains: query.search, mode: 'insensitive' } }, { sourceTitle: { contains: query.search, mode: 'insensitive' } }, { vendor: { contains: query.search, mode: 'insensitive' } }, { handle: { contains: query.search, mode: 'insensitive' } }] } : {}) };
+    const where: Prisma.ProductWhereInput = { storeId: context.storeId, archivedAt: null, ...(query.status ? { active: query.status === 'active' } : {}), ...(query.source ? { source: query.source } : {}), ...(query.search ? { OR: [{ checkoutTitle: { contains: query.search, mode: 'insensitive' } }, { sourceTitle: { contains: query.search, mode: 'insensitive' } }, { vendor: { contains: query.search, mode: 'insensitive' } }, { handle: { contains: query.search, mode: 'insensitive' } }] } : {}) };
     const [items, total] = await this.database.$transaction([this.database.product.findMany({ where, orderBy: { updatedAt: 'desc' }, skip: (query.page - 1) * query.pageSize, take: query.pageSize, select: productSelect }), this.database.product.count({ where })]);
     return { items, total };
   }
   getProduct(context: StoreContext, publicId: string): Promise<object | null> {
-    return this.database.product.findFirst({ where: { storeId: context.storeId, publicId }, select: { ...productSelect, sourceDescriptionHtml: true, tags: true, variants: { orderBy: { createdAt: 'asc' }, select: { publicId: true, title: true, sku: true, barcode: true, priceCents: true, compareAtCents: true, inventoryQuantity: true, availableForSale: true, imageUrl: true, selectedOptions: true } }, images: { orderBy: { position: 'asc' }, select: { id: true, url: true, altText: true, width: true, height: true, position: true } }, collections: { select: { collection: { select: { publicId: true, title: true, handle: true, imageUrl: true } } } } } });
+    return this.database.product.findFirst({ where: { storeId: context.storeId, publicId, archivedAt: null }, select: { ...productSelect, sourceDescriptionHtml: true, tags: true, variants: { orderBy: { createdAt: 'asc' }, select: { publicId: true, title: true, sku: true, barcode: true, priceCents: true, compareAtCents: true, inventoryQuantity: true, availableForSale: true, imageUrl: true, selectedOptions: true } }, images: { orderBy: { position: 'asc' }, select: { id: true, url: true, altText: true, width: true, height: true, position: true } }, collections: { select: { collection: { select: { publicId: true, title: true, handle: true, imageUrl: true } } } } } });
   }
   async createProduct(context: StoreContext, input: ProductInput, requestId: string): Promise<object> {
     return this.database.$transaction(async transaction => {
@@ -75,15 +75,19 @@ export class PrismaCatalogRepository implements CatalogRepository {
     });
   }
 
-  async deleteManualProduct(context: StoreContext, publicId: string, requestId: string): Promise<'deleted' | 'in_use' | 'not_found'> {
-    const product = await this.database.product.findFirst({ where: { storeId: context.storeId, publicId, source: 'MANUAL' }, select: { id: true } });
+  async deleteManualProduct(context: StoreContext, publicId: string, requestId: string): Promise<'deleted' | 'archived' | 'not_found'> {
+    const product = await this.database.product.findFirst({ where: { storeId: context.storeId, publicId, source: 'MANUAL', archivedAt: null }, select: { id: true } });
     if (!product) return 'not_found';
     return this.database.$transaction(async transaction => {
       const [checkoutCount, itemCount] = await Promise.all([
         transaction.checkout.count({ where: { productId: product.id } }),
         transaction.checkoutSessionItem.count({ where: { productId: product.id } })
       ]);
-      if (checkoutCount || itemCount) return 'in_use';
+      if (checkoutCount || itemCount) {
+        await transaction.product.update({ where: { id: product.id }, data: { active: false, archivedAt: new Date() } });
+        await transaction.auditLog.create({ data: { storeId: context.storeId, actorUserId: context.userId, actorType: 'USER', action: 'product.manual_archived', targetType: 'product', targetId: publicId, requestId } });
+        return 'archived';
+      }
       await transaction.product.delete({ where: { id: product.id } });
       await transaction.auditLog.create({ data: { storeId: context.storeId, actorUserId: context.userId, actorType: 'USER', action: 'product.manual_deleted', targetType: 'product', targetId: publicId, requestId } });
       return 'deleted';
