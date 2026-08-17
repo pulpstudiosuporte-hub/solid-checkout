@@ -2,6 +2,15 @@ const fallbackApiUrl = 'http://127.0.0.1:3333';
 
 export const apiBaseUrl = (import.meta.env.VITE_API_URL || fallbackApiUrl).replace(/\/$/, '');
 
+// Imagens enviadas pelo painel são armazenadas e servidas pela API.  Mantemos
+// esse caminho centralizado para que registros antigos, que eventualmente
+// tenham salvo outro host, continuem funcionando após uma troca de domínio.
+export function resolveMediaUrl(value) {
+  if (typeof value !== 'string' || !value) return value;
+  const match = value.match(/\/media\/([0-9a-f-]{36}\.webp)(?:[?#].*)?$/i);
+  return match ? `${apiBaseUrl}/media/${match[1]}` : value;
+}
+
 export async function getApiHealth() {
   const response = await fetch(`${apiBaseUrl}/health/ready`, {
     method: 'GET',
