@@ -17,6 +17,16 @@ const digits = (value: unknown): string => typeof value === 'string' ? value.rep
 const validCpf = (value: string): boolean => { if (!/^\d{11}$/.test(value) || /^(\d)\1{10}$/.test(value)) return false; const check = (length: number) => { let sum = 0; for (let index = 0; index < length; index += 1) sum += Number(value[index]) * (length + 1 - index); const mod = sum % 11; return mod < 2 ? 0 : 11 - mod; }; return check(9) === Number(value[9]) && check(10) === Number(value[10]); };
 const validCnpj = (value: string): boolean => { if (!/^\d{14}$/.test(value) || /^(\d)\1{13}$/.test(value)) return false; const calculate = (length: number) => { const weights = length === 12 ? [5,4,3,2,9,8,7,6,5,4,3,2] : [6,5,4,3,2,9,8,7,6,5,4,3,2]; const sum = weights.reduce((total, weight, index) => total + Number(value[index]) * weight, 0); const mod = sum % 11; return mod < 2 ? 0 : 11 - mod; }; return calculate(12) === Number(value[12]) && calculate(13) === Number(value[13]); };
 const sessionCredentials = (sessionIdValue: unknown, authorization: string | undefined): { sessionId: string; tokenHash: string } | null => { const sessionId = publicId(sessionIdValue); const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : ''; return sessionId && token.length >= 32 && token.length <= 128 ? { sessionId, tokenHash: sha256(token) } : null; };
+const westPayPaymentStatus = (value: string | undefined) => {
+  const status = value?.toUpperCase();
+  if (['PAID', 'APPROVED', 'CONFIRMED', 'COMPLETED', 'SUCCESS', 'SUCCEEDED', 'SETTLED'].includes(status ?? '')) return 'PAID' as const;
+  if (status === 'FAILED') return 'FAILED' as const;
+  if (status === 'CANCELLED') return 'CANCELLED' as const;
+  if (status === 'EXPIRED') return 'EXPIRED' as const;
+  if (['REFUNDED', 'PARTIALLY_REFUNDED'].includes(status ?? '')) return 'REFUNDED' as const;
+  return null;
+};
+const westPayAmountMatches = (providerAmount: number | undefined, expectedCents: number): boolean => Number(providerAmount) === expectedCents || Number(providerAmount) * 100 === expectedCents;
 const validProxySignature = (query: Record<string, string | string[] | undefined>, secret: string): boolean => {
   const signature = query.signature; if (typeof signature !== 'string' || !/^[a-f0-9]{64}$/.test(signature)) return false;
   const message = Object.entries(query).filter(([key]) => key !== 'signature').map(([key, value]) => `${key}=${Array.isArray(value) ? value.join(',') : value ?? ''}`).sort().join('');
@@ -160,9 +170,8 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       if (encryptedCredentials) {
         try {
           const official = await getWestPayPix({ apiKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY!), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY!) }, verification.providerTransactionId);
-          const normalized = official?.status.toUpperCase();
-          const mapped = normalized === 'PAID' ? 'PAID' : normalized === 'FAILED' ? 'FAILED' : normalized === 'CANCELLED' ? 'CANCELLED' : normalized === 'EXPIRED' ? 'EXPIRED' : normalized === 'REFUNDED' || normalized === 'PARTIALLY_REFUNDED' ? 'REFUNDED' : null;
-          if (mapped) {
+          const mapped = westPayPaymentStatus(official?.status);
+          if (mapped && official && westPayAmountMatches(official.amount, verification.amountCents)) {
             await gateways.confirmPayment(verification.id, verification.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined);
             if (mapped === 'PAID' && shopify) {
               try { await syncPaidShopifyOrder(environment, shopify, verification.checkoutSessionId); }
@@ -185,8 +194,8 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     const encryptedCredentials = await gateways.credentials(context.session.checkout.storeId); if (!encryptedCredentials) return reply.code(200).send({ received: true });
     try {
       const official = await getWestPayPix({ apiKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) }, objectId);
-      if (!official || official.id !== objectId || official.amount !== context.amountCents || official.externalRef && official.externalRef !== `solid-${context.publicId}`) return reply.code(200).send({ received: true });
-      const normalized = official.status.toUpperCase(); const mapped = normalized === 'PAID' ? 'PAID' : normalized === 'FAILED' ? 'FAILED' : normalized === 'CANCELLED' ? 'CANCELLED' : normalized === 'EXPIRED' ? 'EXPIRED' : normalized === 'REFUNDED' || normalized === 'PARTIALLY_REFUNDED' ? 'REFUNDED' : null;
+      if (!official || official.id !== objectId || !westPayAmountMatches(official.amount, context.amountCents) || official.externalRef && official.externalRef !== `solid-${context.publicId}`) return reply.code(200).send({ received: true });
+      const mapped = westPayPaymentStatus(official.status);
       if (mapped) {
         await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined);
         if (mapped === 'PAID' && shopify) {
