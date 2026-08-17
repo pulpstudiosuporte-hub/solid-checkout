@@ -14,7 +14,7 @@ if (!environment.DATABASE_URL) throw new Error('DATABASE_URL é obrigatória par
 const database = createDatabaseClient(environment.DATABASE_URL);
 const gatewayRepository = new PrismaGatewayRepository(database);
 const shopifyRepository = new PrismaShopifyRepository(database);
-const app = buildApp(environment, { authRepository: new PrismaAuthRepository(database), catalogRepository: new PrismaCatalogRepository(database), storeRepository: new PrismaStoreRepository(database), shopifyRepository, gatewayRepository, orderRepository: new PrismaOrderRepository(database) });
+const app = buildApp(environment, { authRepository: new PrismaAuthRepository(database), catalogRepository: new PrismaCatalogRepository(database), storeRepository: new PrismaStoreRepository(database), shopifyRepository, gatewayRepository, orderRepository: new PrismaOrderRepository(database), database });
 const stopWestPayReconciliation = startWestPayReconciliation(environment, gatewayRepository, shopifyRepository, app.log);
 
 const shutdown = async (signal: string): Promise<void> => {

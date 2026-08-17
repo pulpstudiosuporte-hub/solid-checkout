@@ -19,8 +19,9 @@ import type { OrderRepository } from './order-repository.js';
 import { registerOrderRoutes } from './order-routes.js';
 import { registerMediaRoutes } from './media-routes.js';
 import { HttpDokployDomainClient, type DokployDomainClient } from './dokploy-client.js';
+import type { PrismaClient } from '@solid/database';
 
-export function buildApp(environment: AppEnvironment, dependencies: { authRepository?: AuthRepository; catalogRepository?: CatalogRepository; storeRepository?: StoreRepository; shopifyRepository?: ShopifyRepository; gatewayRepository?: PrismaGatewayRepository; orderRepository?: OrderRepository; dokployClient?: DokployDomainClient } = {}): FastifyInstance {
+export function buildApp(environment: AppEnvironment, dependencies: { authRepository?: AuthRepository; catalogRepository?: CatalogRepository; storeRepository?: StoreRepository; shopifyRepository?: ShopifyRepository; gatewayRepository?: PrismaGatewayRepository; orderRepository?: OrderRepository; dokployClient?: DokployDomainClient; database?: PrismaClient } = {}): FastifyInstance {
   const app = Fastify({
     logger: environment.NODE_ENV === 'test' ? false : { level: environment.LOG_LEVEL, redact: { paths: ['req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie', '*.password', '*.token', '*.cpf'], censor: '[REDACTED]' } },
     trustProxy: environment.TRUST_PROXY,
@@ -42,7 +43,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
   if (dependencies.authRepository && dependencies.storeRepository) registerStoreRoutes(app, environment, dependencies.authRepository, dependencies.storeRepository, dokployClient);
   if (dependencies.authRepository && dependencies.shopifyRepository) registerShopifyRoutes(app, environment, dependencies.authRepository, dependencies.shopifyRepository);
   if (dependencies.authRepository && dependencies.catalogRepository) registerCatalogRoutes(app, environment, dependencies.authRepository, dependencies.catalogRepository);
-  if (dependencies.authRepository && dependencies.catalogRepository) registerMediaRoutes(app, environment, dependencies.authRepository, dependencies.catalogRepository);
+  if (dependencies.authRepository && dependencies.catalogRepository && dependencies.database) registerMediaRoutes(app, environment, dependencies.authRepository, dependencies.catalogRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.gatewayRepository) registerGatewayRoutes(app, environment, dependencies.authRepository, dependencies.gatewayRepository);
   if (dependencies.authRepository && dependencies.orderRepository) registerOrderRoutes(app, environment, dependencies.authRepository, dependencies.orderRepository);
   if (dependencies.catalogRepository) registerPublicCheckoutRoutes(app, environment, dependencies.catalogRepository, dependencies.gatewayRepository, dependencies.shopifyRepository);

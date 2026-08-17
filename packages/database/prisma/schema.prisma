@@ -185,6 +185,16 @@ model ProductImage {
   @@map("product_images")
 }
 
+model MediaAsset {
+  id        String   @id @default(uuid()) @db.Uuid
+  filename  String   @unique @db.VarChar(64)
+  content   Bytes
+  sizeBytes Int      @map("size_bytes")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@map("media_assets")
+}
+
 model ShopifyCollection {
   id               String   @id @default(uuid()) @db.Uuid
   publicId         String   @unique @default(cuid()) @map("public_id") @db.VarChar(32)
