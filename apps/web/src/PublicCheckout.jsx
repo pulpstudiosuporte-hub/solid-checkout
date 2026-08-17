@@ -339,11 +339,11 @@ function SessionContent({ session: initialSession, token }) {
   const config = publicConfig(session.checkout?.publishedConfig);
   const update = (field, value) =>
     setForm((current) => ({ ...current, [field]: value }));
-  const toggleOrderBump = async (enabled) => {
+  const toggleOrderBump = async (productId, enabled) => {
     setBusy(true);
     setError("");
     try {
-      const result = await setPublicOrderBump(session.publicId, token, enabled);
+      const result = await setPublicOrderBump(session.publicId, token, productId, enabled);
       setSession(result.session);
       if (selectedShipping) setSelectedShipping((current) => current ? { ...current, subtotalCents: result.update.totalCents, grandTotalCents: result.update.grandTotalCents } : current);
     } catch (requestError) {
@@ -535,13 +535,13 @@ function SessionContent({ session: initialSession, token }) {
                   />
                 </label>
               </div>
-              {config.showBump && session.orderBump && <label className="public-order-bump">
-                <input type="checkbox" checked={Boolean(session.items?.some(item => item.isOrderBump))} disabled={busy} onChange={(event) => toggleOrderBump(event.target.checked)} />
+              {config.showBump && (session.orderBumps || (session.orderBump ? [session.orderBump] : [])).map((bump) => <label className="public-order-bump" key={bump.publicId}>
+                <input type="checkbox" checked={Boolean(session.items?.some(item => item.isOrderBump && item.product?.publicId === bump.publicId))} disabled={busy} onChange={(event) => toggleOrderBump(bump.publicId, event.target.checked)} />
                 <span className="public-order-bump-check"><Check size={14} /></span>
-                {session.orderBump.imageUrl ? <img src={session.orderBump.imageUrl} alt="" /> : <span className="public-order-bump-image"><ShoppingBag size={18}/></span>}
-                <span><b>{config.orderBumpTitle || 'Oferta especial'}</b><strong>{session.orderBump.checkoutTitle}</strong>{(config.orderBumpMessage || session.orderBump.checkoutDescription) && <small>{config.orderBumpMessage || session.orderBump.checkoutDescription}</small>}</span>
-                <em>+ {money.format(session.orderBump.priceCents / 100)}</em>
-              </label>}
+                {bump.imageUrl ? <img src={bump.imageUrl} alt="" /> : <span className="public-order-bump-image"><ShoppingBag size={18}/></span>}
+                <span><b>{bump.offerTitle || config.orderBumpTitle || 'Oferta especial'}</b><strong>{bump.checkoutTitle}</strong>{(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription) && <small>{bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription}</small>}</span>
+                <em>+ {money.format(bump.priceCents / 100)}</em>
+              </label>)}
               {error && (
                 <p className="public-error" role="alert">
                   {error}

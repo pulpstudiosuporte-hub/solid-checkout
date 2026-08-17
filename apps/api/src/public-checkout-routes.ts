@@ -186,10 +186,10 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     return reply.header('cache-control', 'no-store').send({ payment });
   });
 
-  app.put<{ Params: { sessionId: string }; Headers: { authorization?: string }; Body: { enabled?: unknown } }>('/public/checkout-sessions/:sessionId/order-bump', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
+  app.put<{ Params: { sessionId: string }; Headers: { authorization?: string }; Body: { productId?: unknown; enabled?: unknown } }>('/public/checkout-sessions/:sessionId/order-bump', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
     const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization);
-    if (!credentials || typeof request.body?.enabled !== 'boolean') return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Oferta complementar inválida.'));
-    const update = await catalog.setPublicOrderBump(credentials.sessionId, credentials.tokenHash, request.body.enabled, new Date());
+    if (!credentials || typeof request.body?.enabled !== 'boolean' || typeof request.body?.productId !== 'string' || !/^[A-Za-z0-9_-]{1,32}$/.test(request.body.productId)) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Oferta complementar inválida.'));
+    const update = await catalog.setPublicOrderBump(credentials.sessionId, credentials.tokenHash, request.body.productId, request.body.enabled, new Date());
     if (!update) return reply.code(404).send(errorBody(request, 'ORDER_BUMP_UNAVAILABLE', 'Esta oferta complementar não está disponível.'));
     const session = await catalog.getPublicCheckoutSession(credentials.sessionId, credentials.tokenHash, new Date());
     return reply.header('cache-control', 'no-store').send({ update, session });

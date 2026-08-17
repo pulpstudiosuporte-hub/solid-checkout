@@ -31,6 +31,18 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
     const value = input[key]; if (value !== undefined && (typeof value !== 'string' || value.length > max)) return null;
     result[key] = typeof value === 'string' ? value.trim() : '';
   }
+  if (input.orderBumps !== undefined) {
+    if (!Array.isArray(input.orderBumps) || input.orderBumps.length > 12) return null;
+    const productIds = new Set<string>();
+    const orderBumps = [] as { productId: string; title: string; message: string }[];
+    for (const value of input.orderBumps) {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+      const bump = value as Record<string, unknown>;
+      if (typeof bump.productId !== 'string' || !/^[A-Za-z0-9_-]{1,32}$/.test(bump.productId) || productIds.has(bump.productId) || (bump.title !== undefined && (typeof bump.title !== 'string' || bump.title.length > 120)) || (bump.message !== undefined && (typeof bump.message !== 'string' || bump.message.length > 300))) return null;
+      productIds.add(bump.productId); orderBumps.push({ productId: bump.productId, title: typeof bump.title === 'string' ? bump.title.trim() : '', message: typeof bump.message === 'string' ? bump.message.trim() : '' });
+    }
+    result.orderBumps = orderBumps;
+  }
   return result;
 };
 

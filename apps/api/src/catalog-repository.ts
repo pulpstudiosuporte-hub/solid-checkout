@@ -32,11 +32,21 @@ export interface CatalogRepository {
   updateShippingMethod(context: StoreContext, publicId: string, input: ShippingMethodInput, requestId: string): Promise<object | null>;
   listPublicShippingMethods(publicId: string, tokenHash: string, now: Date): Promise<readonly object[] | null>;
   selectPublicShippingMethod(publicId: string, tokenHash: string, methodPublicId: string, now: Date): Promise<object | null>;
-  setPublicOrderBump(publicId: string, tokenHash: string, enabled: boolean, now: Date): Promise<object | null>;
+  setPublicOrderBump(publicId: string, tokenHash: string, productPublicId: string, enabled: boolean, now: Date): Promise<object | null>;
 }
 
 const productSelect = { publicId: true, sourceTitle: true, checkoutTitle: true, checkoutDescription: true, handle: true, vendor: true, productType: true, tags: true, imageUrl: true, priceCents: true, compareAtCents: true, stockQuantity: true, trackInventory: true, maxPerOrder: true, active: true, source: true, syncedAt: true, createdAt: true, updatedAt: true, _count: { select: { variants: true, images: true, collections: true } } } as const;
 const checkoutSelect = { publicId: true, name: true, slug: true, status: true, draftConfig: true, publishedConfig: true, publishedAt: true, createdAt: true, updatedAt: true, product: { select: { publicId: true, checkoutTitle: true, priceCents: true, active: true } } } as const;
+type OrderBumpConfig = Readonly<{ productId: string; title: string; message: string }>;
+const configuredOrderBumps = (config: Record<string, unknown>): readonly OrderBumpConfig[] => {
+  const configured = Array.isArray(config.orderBumps) ? config.orderBumps.flatMap((value): OrderBumpConfig[] => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return [];
+    const bump = value as Record<string, unknown>;
+    return typeof bump.productId === 'string' && /^[A-Za-z0-9_-]{1,32}$/.test(bump.productId) ? [{ productId: bump.productId, title: typeof bump.title === 'string' ? bump.title : '', message: typeof bump.message === 'string' ? bump.message : '' }] : [];
+  }) : [];
+  if (configured.length) return configured;
+  return typeof config.orderBumpProductId === 'string' && /^[A-Za-z0-9_-]{1,32}$/.test(config.orderBumpProductId) ? [{ productId: config.orderBumpProductId, title: typeof config.orderBumpTitle === 'string' ? config.orderBumpTitle : '', message: typeof config.orderBumpMessage === 'string' ? config.orderBumpMessage : '' }] : [];
+};
 
 export class PrismaCatalogRepository implements CatalogRepository {
   constructor(private readonly database: PrismaClient) {}
@@ -136,23 +146,24 @@ export class PrismaCatalogRepository implements CatalogRepository {
   }
 
   async getPublicCheckoutSession(publicId: string, tokenHash: string, now: Date): Promise<object | null> {
-    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { publicId: true, quantity: true, unitPriceCents: true, totalCents: true, currency: true, status: true, expiresAt: true, customerCapturedAt: true, shippingCapturedAt: true, checkout: { select: { storeId: true, slug: true, name: true, publishedConfig: true, store: { select: { name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, imageUrl: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true, isOrderBump: true } } } });
+    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { publicId: true, quantity: true, unitPriceCents: true, totalCents: true, currency: true, status: true, expiresAt: true, customerCapturedAt: true, shippingCapturedAt: true, checkout: { select: { storeId: true, slug: true, name: true, publishedConfig: true, store: { select: { name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, imageUrl: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true, isOrderBump: true, product: { select: { publicId: true } } } } } });
     if (!session) return null;
     const config = session.checkout.publishedConfig as Record<string, unknown>;
-    const bumpId = typeof config.orderBumpProductId === 'string' ? config.orderBumpProductId : '';
-    const bump = bumpId ? await this.database.product.findFirst({ where: { publicId: bumpId, storeId: session.checkout.storeId, active: true }, select: { publicId: true, checkoutTitle: true, checkoutDescription: true, imageUrl: true, priceCents: true } }) : null;
+    const configured = configuredOrderBumps(config);
+    const products = configured.length ? await this.database.product.findMany({ where: { publicId: { in: configured.map(bump => bump.productId) }, storeId: session.checkout.storeId, active: true }, select: { publicId: true, checkoutTitle: true, checkoutDescription: true, imageUrl: true, priceCents: true } }) : [];
+    const byId = new Map(products.map(product => [product.publicId, product]));
+    const orderBumps = configured.flatMap(bump => { const product = byId.get(bump.productId); return product ? [{ ...product, offerTitle: bump.title, offerMessage: bump.message }] : []; });
     const { storeId: _storeId, ...checkout } = session.checkout;
-    return { ...session, checkout, orderBump: bump, customerCaptured: Boolean(session.customerCapturedAt), shippingCaptured: Boolean(session.shippingCapturedAt), customerCapturedAt: undefined, shippingCapturedAt: undefined };
+    return { ...session, checkout, orderBump: orderBumps[0] ?? null, orderBumps, customerCaptured: Boolean(session.customerCapturedAt), shippingCaptured: Boolean(session.shippingCapturedAt), customerCapturedAt: undefined, shippingCapturedAt: undefined };
   }
 
-  async setPublicOrderBump(publicId: string, tokenHash: string, enabled: boolean, now: Date): Promise<object | null> {
+  async setPublicOrderBump(publicId: string, tokenHash: string, productPublicId: string, enabled: boolean, now: Date): Promise<object | null> {
     return this.database.$transaction(async transaction => {
       const session = await transaction.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { id: true, totalCents: true, shippingPriceCents: true, checkout: { select: { storeId: true, publishedConfig: true } } } });
       if (!session) return null;
       const config = session.checkout.publishedConfig as Record<string, unknown>;
-      const bumpId = typeof config.orderBumpProductId === 'string' ? config.orderBumpProductId : '';
-      if (!bumpId) return null;
-      const product = await transaction.product.findFirst({ where: { publicId: bumpId, storeId: session.checkout.storeId, active: true }, select: { id: true, checkoutTitle: true, imageUrl: true, variants: { where: { availableForSale: true }, orderBy: { createdAt: 'asc' }, take: 1, select: { id: true, title: true, priceCents: true, imageUrl: true } } } });
+      if (!configuredOrderBumps(config).some(bump => bump.productId === productPublicId)) return null;
+      const product = await transaction.product.findFirst({ where: { publicId: productPublicId, storeId: session.checkout.storeId, active: true }, select: { id: true, checkoutTitle: true, imageUrl: true, variants: { where: { availableForSale: true }, orderBy: { createdAt: 'asc' }, take: 1, select: { id: true, title: true, priceCents: true, imageUrl: true } } } });
       const variant = product?.variants[0]; if (!product || !variant) return null;
       const existing = await transaction.checkoutSessionItem.findFirst({ where: { checkoutSessionId: session.id, productId: product.id, isOrderBump: true }, select: { id: true, totalCents: true } });
       if (enabled && !existing) {
