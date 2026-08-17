@@ -49,7 +49,7 @@ export function registerMediaRoutes(app: FastifyInstance, environment: AppEnviro
     if (!/^[0-9a-f-]{36}\.webp$/.test(filename)) return reply.code(404).send(error(request, 'NOT_FOUND', 'Imagem não encontrada.'));
     const path = join(root, filename);
     try { await stat(path); } catch { return reply.code(404).send(error(request, 'NOT_FOUND', 'Imagem não encontrada.')); }
-    reply.header('Cache-Control', 'public, max-age=31536000, immutable').type('image/webp');
+    reply.header('Cache-Control', 'public, max-age=31536000, immutable').header('Cross-Origin-Resource-Policy', 'cross-origin').type('image/webp');
     return reply.send(createReadStream(path));
   });
 }
