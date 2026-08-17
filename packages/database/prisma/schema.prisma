@@ -92,6 +92,8 @@ model StoreDomain {
   storeId       String    @unique @map("store_id") @db.Uuid
   hostname      String    @unique @db.VarChar(253)
   status        String    @default("PENDING_DNS") @db.VarChar(24)
+  dokployDomainId String? @unique @map("dokploy_domain_id") @db.VarChar(128)
+  activatedAt   DateTime? @map("activated_at") @db.Timestamptz(3)
   verifiedAt    DateTime? @map("verified_at") @db.Timestamptz(3)
   lastCheckedAt DateTime? @map("last_checked_at") @db.Timestamptz(3)
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)

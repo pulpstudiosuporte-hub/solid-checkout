@@ -15,6 +15,9 @@ const environmentSchema = z.object({
   SHOPIFY_CLIENT_SECRET: z.string().min(16).optional(),
   SHOPIFY_REDIRECT_URI: z.string().url().optional(),
   SHOPIFY_SCOPES: z.string().min(1).optional(),
+  DOKPLOY_URL: z.string().url().optional(),
+  DOKPLOY_API_KEY: z.string().min(16).optional(),
+  DOKPLOY_CHECKOUT_APPLICATION_ID: z.string().min(1).optional(),
   APP_ENCRYPTION_KEY: z.string().optional().refine(value => !value || Buffer.from(value, 'base64').length === 32, 'deve conter exatamente 32 bytes em base64')
 }).strict();
 
@@ -28,6 +31,7 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): AppEnvironment {
     DATABASE_URL: input.DATABASE_URL, APP_URL: input.APP_URL, API_PUBLIC_URL: input.API_PUBLIC_URL, MEDIA_STORAGE_PATH: input.MEDIA_STORAGE_PATH,
     SHOPIFY_CLIENT_ID: input.SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET: input.SHOPIFY_CLIENT_SECRET,
     SHOPIFY_REDIRECT_URI: input.SHOPIFY_REDIRECT_URI, SHOPIFY_SCOPES: input.SHOPIFY_SCOPES,
+    DOKPLOY_URL: input.DOKPLOY_URL, DOKPLOY_API_KEY: input.DOKPLOY_API_KEY, DOKPLOY_CHECKOUT_APPLICATION_ID: input.DOKPLOY_CHECKOUT_APPLICATION_ID,
     APP_ENCRYPTION_KEY: input.APP_ENCRYPTION_KEY
   };
   const result = environmentSchema.safeParse(known);
@@ -41,5 +45,7 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): AppEnvironment {
   if (result.data.NODE_ENV === 'production' && !result.data.DATABASE_URL) throw new Error('DATABASE_URL é obrigatória em produção');
   const shopifyValues = [result.data.APP_URL, result.data.SHOPIFY_CLIENT_ID, result.data.SHOPIFY_CLIENT_SECRET, result.data.SHOPIFY_REDIRECT_URI, result.data.APP_ENCRYPTION_KEY];
   if (shopifyValues.some(Boolean) && !shopifyValues.every(Boolean)) throw new Error('A configuração Shopify está incompleta');
+  const dokployValues = [result.data.DOKPLOY_URL, result.data.DOKPLOY_API_KEY, result.data.DOKPLOY_CHECKOUT_APPLICATION_ID];
+  if (dokployValues.some(Boolean) && !dokployValues.every(Boolean)) throw new Error('A configuração Dokploy está incompleta');
   return { ...result.data, TRUST_PROXY: result.data.TRUST_PROXY === 'true' };
 }
