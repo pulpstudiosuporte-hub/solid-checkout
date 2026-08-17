@@ -154,6 +154,24 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     if (!gateways) return reply.code(503).send(errorBody(request, 'PAYMENT_NOT_CONFIGURED', 'Pagamento ainda não configurado no servidor.'));
     const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization);
     if (!credentials) return reply.code(401).send(errorBody(request, 'INVALID_SESSION', 'Sessão inválida.'));
+    const verification = environment.APP_ENCRYPTION_KEY ? await gateways.publicPaymentVerification(credentials.sessionId, credentials.tokenHash) : null;
+    if (verification && verification.status === 'PENDING') {
+      const encryptedCredentials = await gateways.credentials(verification.storeId);
+      if (encryptedCredentials) {
+        try {
+          const official = await getWestPayPix({ apiKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY!), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY!) }, verification.providerTransactionId);
+          const normalized = official?.status.toUpperCase();
+          const mapped = normalized === 'PAID' ? 'PAID' : normalized === 'FAILED' ? 'FAILED' : normalized === 'CANCELLED' ? 'CANCELLED' : normalized === 'EXPIRED' ? 'EXPIRED' : normalized === 'REFUNDED' || normalized === 'PARTIALLY_REFUNDED' ? 'REFUNDED' : null;
+          if (mapped) {
+            await gateways.confirmPayment(verification.id, verification.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined);
+            if (mapped === 'PAID' && shopify) {
+              try { await syncPaidShopifyOrder(environment, shopify, verification.checkoutSessionId); }
+              catch (error) { request.log.error({ err: error, checkoutSessionId: verification.checkoutSessionId }, 'shopify_order_sync_failed'); }
+            }
+          }
+        } catch (error) { request.log.warn({ err: error, paymentAttemptId: verification.id }, 'westpay_payment_status_check_failed'); }
+      }
+    }
     const payment = await gateways.publicPaymentStatus(credentials.sessionId, credentials.tokenHash);
     if (!payment) return reply.code(404).send(errorBody(request, 'PAYMENT_NOT_FOUND', 'Pagamento ainda não gerado.'));
     return reply.header('cache-control', 'no-store').send({ payment });

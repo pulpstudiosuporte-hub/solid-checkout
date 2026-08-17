@@ -49,6 +49,12 @@ export class PrismaGatewayRepository {
     return { sessionStatus: session.status, ...session.paymentAttempts[0] };
   }
 
+  async publicPaymentVerification(publicId: string, tokenHash: string) {
+    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash }, select: { checkout: { select: { storeId: true } }, paymentAttempts: { where: { provider: 'WESTPAY', providerTransactionId: { not: null } }, orderBy: { createdAt: 'desc' }, take: 1, select: { id: true, checkoutSessionId: true, providerTransactionId: true, amountCents: true, status: true } } } });
+    const attempt = session?.paymentAttempts[0];
+    return session && attempt?.providerTransactionId ? { storeId: session.checkout.storeId, ...attempt, providerTransactionId: attempt.providerTransactionId } : null;
+  }
+
   createAttempt(checkoutSessionId: string, amountCents: number, idempotencyKey: string): Promise<PaymentAttemptSummary> {
     return this.database.paymentAttempt.create({ data: { checkoutSessionId, provider: 'WESTPAY', amountCents, idempotencyKey } });
   }
