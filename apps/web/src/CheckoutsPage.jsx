@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, LoaderCircle, Palette, Plus, Rocket } from 'lucide-react';
-import { createCheckout, createProduct, getCheckouts, getProducts, publishCheckout, updateCheckoutDraft } from './api';
+import { createCheckout, createProduct, getCheckouts, getProducts, publishCheckout, updateCheckoutDraft, uploadProductImage } from './api';
 import CheckoutEditor from './CheckoutEditor';
 import './checkouts-page.css';
 
@@ -47,7 +47,7 @@ export default function CheckoutsPage({ csrfToken }) {
     return result.product;
   }
 
-  if (editing && principal) return <CheckoutEditor checkout={principal} products={data.products} onCreateOrderBump={createOrderBump} onBack={() => setEditing(false)} onPreview={() => {}} onSaveDraft={saveDraft} onPublish={publish} />;
+  if (editing && principal) return <CheckoutEditor checkout={principal} products={data.products} onCreateOrderBump={createOrderBump} onUploadOrderBumpImage={(file) => uploadProductImage(file, csrfToken)} onBack={() => setEditing(false)} onPreview={() => {}} onSaveDraft={saveDraft} onPublish={publish} />;
   if (data.loading) return <main className="page"><section className="card products-state"><LoaderCircle className="spin" /><span>Carregando checkouts...</span></section></main>;
 
   return <main className="page">

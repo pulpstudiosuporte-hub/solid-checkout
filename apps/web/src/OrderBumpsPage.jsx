@@ -1,0 +1,12 @@
+import { useEffect, useState } from 'react';
+import { ArrowRight, ImageOff, LoaderCircle, PackagePlus, Sparkles } from 'lucide-react';
+import { getCheckouts, getProducts } from './api';
+
+const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+export default function OrderBumpsPage({ onOpenCheckouts }) {
+  const [state, setState] = useState({ loading: true, items: [], error: '' });
+  useEffect(() => { let alive = true; Promise.all([getCheckouts(), getProducts({ status: 'active', pageSize: 100 })]).then(([checkouts, products]) => { if (!alive) return; const byId = new Map(products.items.map(product => [product.publicId, product])); const items = checkouts.items.map(checkout => ({ checkout, product: byId.get(checkout.draftConfig?.orderBumpProductId) })).filter(item => item.product); setState({ loading: false, items, error: '' }); }).catch(error => alive && setState({ loading: false, items: [], error: error.message })); return () => { alive = false; }; }, []);
+  if (state.loading) return <main className="page"><section className="card products-state"><LoaderCircle className="spin"/><span>Carregando suas ofertas...</span></section></main>;
+  return <main className="page order-bumps-page"><section className="page-title"><div><p className="eyebrow">GESTÃO</p><h1>Order bumps</h1><p>Ofertas complementares exibidas antes do pagamento.</p></div><button className="primary" onClick={onOpenCheckouts}><PackagePlus size={17}/> Adicionar oferta</button></section>{state.error&&<p className="public-error" role="alert">{state.error}</p>}<section className="order-bump-list">{state.items.length ? state.items.map(({ checkout, product }) => <article className="card order-bump-card" key={checkout.publicId}><div className="order-bump-thumb">{product.imageUrl ? <img src={product.imageUrl} alt=""/> : <ImageOff size={21}/>}</div><div><span className="eyebrow">CHECKOUT {checkout.name}</span><h2>{product.checkoutTitle}</h2><p>{product.description || 'Oferta complementar sem descrição.'}</p></div><strong>{money.format(product.priceCents / 100)}</strong><button className="secondary" onClick={onOpenCheckouts}>Editar <ArrowRight size={15}/></button></article>) : <section className="card order-bump-empty"><span><Sparkles size={28}/></span><h2>Crie sua primeira oferta complementar</h2><p>Escolha um produto existente ou crie um novo produto com imagem otimizada dentro do editor do checkout.</p><button className="primary" onClick={onOpenCheckouts}><PackagePlus size={17}/> Criar order bump</button></section>}</section></main>;
+}
