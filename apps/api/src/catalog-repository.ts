@@ -30,6 +30,7 @@ export interface CatalogRepository {
   listShippingMethods(context: StoreContext): Promise<readonly object[]>;
   createShippingMethod(context: StoreContext, input: ShippingMethodInput, requestId: string): Promise<object>;
   updateShippingMethod(context: StoreContext, publicId: string, input: ShippingMethodInput, requestId: string): Promise<object | null>;
+  deleteShippingMethod(context: StoreContext, publicId: string, requestId: string): Promise<boolean>;
   listPublicShippingMethods(publicId: string, tokenHash: string, now: Date): Promise<readonly object[] | null>;
   selectPublicShippingMethod(publicId: string, tokenHash: string, methodPublicId: string, now: Date): Promise<object | null>;
   setPublicOrderBump(publicId: string, tokenHash: string, productPublicId: string, enabled: boolean, now: Date): Promise<object | null>;
@@ -90,6 +91,9 @@ export class PrismaCatalogRepository implements CatalogRepository {
       await transaction.auditLog.create({ data: { storeId: context.storeId, actorUserId: context.userId, actorType: 'USER', action: 'shipping_method.updated', targetType: 'shipping_method', targetId: method.publicId, requestId } });
       return method;
     });
+  }
+  async deleteShippingMethod(context: StoreContext, publicId: string, requestId: string): Promise<boolean> {
+    return this.database.$transaction(async transaction => { const method = await transaction.shippingMethod.findFirst({ where: { storeId: context.storeId, publicId }, select: { id: true } }); if (!method) return false; await transaction.shippingMethod.delete({ where: { id: method.id } }); await transaction.auditLog.create({ data: { storeId: context.storeId, actorUserId: context.userId, actorType: 'USER', action: 'shipping_method.deleted', targetType: 'shipping_method', targetId: publicId, requestId } }); return true; });
   }
   listCheckouts(context: StoreContext): Promise<readonly object[]> {
     return this.database.checkout.findMany({ where: { storeId: context.storeId }, orderBy: { createdAt: 'desc' }, take: 100, select: checkoutSelect });

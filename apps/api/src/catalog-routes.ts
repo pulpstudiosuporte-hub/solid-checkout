@@ -127,6 +127,11 @@ export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvi
     if (!method) return reply.code(404).send(errorBody(request, 'SHIPPING_METHOD_NOT_FOUND', 'Método de frete não encontrado.'));
     return reply.send({ method });
   });
+  app.delete<{ Params: { methodId: string } }>('/shipping-methods/:methodId', async (request, reply) => {
+    const context = await authenticate(request, true); if (!context || !canWrite(context)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    const methodId = text(request.params.methodId, 32); if (!methodId || !await catalog.deleteShippingMethod(context, methodId, request.id)) return reply.code(404).send(errorBody(request, 'SHIPPING_METHOD_NOT_FOUND', 'Método de frete não encontrado.'));
+    return reply.code(204).send();
+  });
 
   app.post<{ Body: Record<string, unknown> }>('/checkouts', async (request, reply) => {
     const context = await authenticate(request, true);
