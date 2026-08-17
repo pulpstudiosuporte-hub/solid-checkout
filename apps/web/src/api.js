@@ -77,6 +77,7 @@ export async function selectStore(storeId, csrfToken) {
   const response = await fetch(`${apiBaseUrl}/stores/${encodeURIComponent(storeId)}/select`, { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken } });
   return readJson(response);
 }
+export async function archiveStore(storeId, csrfToken) { const response = await fetch(`${apiBaseUrl}/stores/${encodeURIComponent(storeId)}`, { method: 'DELETE', credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken } }); if (!response.ok) return readJson(response); }
 
 export async function getShopifyStatus() { return readJson(await fetch(`${apiBaseUrl}/integrations/shopify/status`, { credentials: 'include', headers: { Accept: 'application/json' } })); }
 export async function connectShopify(shop, csrfToken) { return readJson(await fetch(`${apiBaseUrl}/integrations/shopify/connect`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify({ shop }) })); }

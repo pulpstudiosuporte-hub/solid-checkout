@@ -6,6 +6,7 @@ export interface StoreRepository {
   listForUser(userId: string, sessionId: string): Promise<readonly StoreSummary[]>;
   createForUser(userId: string, sessionId: string, name: string, slug: string, requestId: string): Promise<StoreSummary | null>;
   selectForUser(userId: string, sessionId: string, storePublicId: string, requestId: string): Promise<StoreSummary | null>;
+  archiveForUser(userId: string, sessionId: string, storePublicId: string, requestId: string): Promise<boolean>;
 }
 
 export class PrismaStoreRepository implements StoreRepository {
@@ -41,5 +42,17 @@ export class PrismaStoreRepository implements StoreRepository {
       return result.count;
     });
     return updated === 1 ? { publicId: membership.store.publicId, name: membership.store.name, slug: membership.store.slug, role: membership.role, active: true } : null;
+  }
+  async archiveForUser(userId: string, sessionId: string, storePublicId: string, requestId: string): Promise<boolean> {
+    return this.database.$transaction(async transaction => {
+      const membership = await transaction.storeMember.findFirst({ where: { userId, store: { publicId: storePublicId, active: true } }, select: { role: true, storeId: true } });
+      if (!membership || membership.role !== 'OWNER') return false;
+      const owned = await transaction.storeMember.count({ where: { userId, role: 'OWNER', store: { active: true } } }); if (owned < 2) return false;
+      await transaction.store.update({ where: { id: membership.storeId }, data: { active: false } });
+      const next = await transaction.storeMember.findFirst({ where: { userId, store: { active: true } }, orderBy: { createdAt: 'asc' }, select: { storeId: true } });
+      await transaction.session.updateMany({ where: { id: sessionId, userId, revokedAt: null }, data: { activeStoreId: next?.storeId ?? null } });
+      await transaction.auditLog.create({ data: { storeId: membership.storeId, actorUserId: userId, actorType: 'USER', action: 'store.archived', targetType: 'store', targetId: storePublicId, requestId } });
+      return true;
+    });
   }
 }

@@ -48,4 +48,10 @@ export function registerStoreRoutes(app: FastifyInstance, environment: AppEnviro
     if (!store) return reply.code(404).send(errorBody(request, 'STORE_NOT_FOUND', 'Loja não encontrada.'));
     return reply.send({ store });
   });
+  app.delete<{ Params: { storeId: string } }>('/stores/:storeId', async (request, reply) => {
+    const session = await authenticate(request, true); if (!session) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    if (!/^[a-zA-Z0-9_-]{1,32}$/.test(request.params.storeId)) return reply.code(404).send(errorBody(request, 'STORE_NOT_FOUND', 'Loja não encontrada.'));
+    if (!await stores.archiveForUser(session.userId, session.sessionId, request.params.storeId, request.id)) return reply.code(409).send(errorBody(request, 'STORE_ARCHIVE_NOT_ALLOWED', 'Não foi possível arquivar esta loja. Mantenha ao menos uma loja ativa.'));
+    return reply.code(204).send();
+  });
 }

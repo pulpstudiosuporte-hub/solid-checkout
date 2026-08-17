@@ -22,6 +22,7 @@ class MemoryStores implements StoreRepository {
   listForUser(): Promise<readonly StoreSummary[]> { return Promise.resolve(this.items); }
   createForUser(_userId: string, _sessionId: string, name: string, slug: string): Promise<StoreSummary> { this.items = this.items.map(item => ({...item, active: false})); const store: StoreSummary = { publicId: 'store-new', name, slug, role: 'OWNER', active: true }; this.items.push(store); return Promise.resolve(store); }
   selectForUser(_userId: string, _sessionId: string, storePublicId: string): Promise<StoreSummary | null> { const selected = this.items.find(item => item.publicId === storePublicId); if (!selected) return Promise.resolve(null); this.items = this.items.map(item => ({...item, active: item.publicId === storePublicId})); return Promise.resolve({...selected, active: true}); }
+  archiveForUser(_userId: string, _sessionId: string, storePublicId: string): Promise<boolean> { if (this.items.length < 2 || !this.items.some(item => item.publicId === storePublicId)) return Promise.resolve(false); this.items = this.items.filter(item => item.publicId !== storePublicId); return Promise.resolve(true); }
 }
 
 const headers = { origin, cookie: `solid_session=${sessionToken}; solid_csrf=${csrfToken}`, 'x-csrf-token': csrfToken };
