@@ -28,10 +28,11 @@ export async function syncPaidShopifyOrder(environment: AppEnvironment, reposito
     const customer = JSON.parse(decryptSecret(context.customerDataEncrypted, environment.APP_ENCRYPTION_KEY)) as Customer;
     const address = JSON.parse(decryptSecret(context.shippingAddressEncrypted, environment.APP_ENCRYPTION_KEY)) as Address;
     const [firstName, ...rest] = (customer.name ?? '').trim().split(/\s+/);
-    const shippingAddress = { firstName, lastName: rest.join(' ') || undefined, address1: [address.street, address.number].filter(Boolean).join(', '), address2: [address.complement, address.neighborhood].filter(Boolean).join(' - ') || undefined, city: address.city, provinceCode: address.state, countryCode: address.country ?? 'BR', zip: address.postalCode, phone: customer.phone };
+    const phone = shopifyPhone(customer.phone);
+    const shippingAddress = { firstName, lastName: rest.join(' ') || undefined, address1: [address.street, address.number].filter(Boolean).join(', '), address2: [address.complement, address.neighborhood].filter(Boolean).join(' - ') || undefined, city: address.city, provinceCode: address.state, countryCode: address.country ?? 'BR', zip: address.postalCode, phone };
     const order = {
       email: customer.email,
-      phone: customer.phone,
+      phone,
       currency: context.currency,
       financialStatus: context.paid ? 'PAID' : 'PENDING',
       lineItems: context.items.map(item => ({ variantId: item.variantExternalId, quantity: item.quantity })),
@@ -53,6 +54,14 @@ export async function syncPaidShopifyOrder(environment: AppEnvironment, reposito
     await repository.markOrderSyncFailed(context.checkoutSessionId, message);
     throw error;
   }
+}
+
+function shopifyPhone(value: string | undefined): string | undefined {
+  const digits = value?.replace(/\D/g, '') ?? '';
+  if (!digits) return undefined;
+  if (/^55\d{10,11}$/.test(digits)) return `+${digits}`;
+  if (/^\d{10,11}$/.test(digits)) return `+55${digits}`;
+  return undefined;
 }
 
 async function markAsPaid(environment: AppEnvironment, repository: ShopifyRepository, storeId: string, orderId: string): Promise<void> {
