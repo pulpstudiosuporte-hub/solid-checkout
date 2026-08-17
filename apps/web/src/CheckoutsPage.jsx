@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, LoaderCircle, Palette, Plus, Rocket } from 'lucide-react';
-import { createCheckout, getCheckouts, getProducts, publishCheckout, updateCheckoutDraft } from './api';
+import { createCheckout, createProduct, getCheckouts, getProducts, publishCheckout, updateCheckoutDraft } from './api';
 import CheckoutEditor from './CheckoutEditor';
 import './checkouts-page.css';
 
@@ -41,8 +41,13 @@ export default function CheckoutsPage({ csrfToken }) {
     const result = await updateCheckoutDraft(principal.publicId, config, csrfToken);
     setData(current => ({ ...current, checkouts: current.checkouts.map(item => item.publicId === principal.publicId ? result.checkout : item) }));
   }
+  async function createOrderBump(input) {
+    const result = await createProduct({ title: input.title, description: input.description || undefined, imageUrl: input.imageUrl || undefined, priceCents: input.priceCents, trackInventory: false, maxPerOrder: 1, active: true }, csrfToken);
+    setData(current => ({ ...current, products: [result.product, ...current.products] }));
+    return result.product;
+  }
 
-  if (editing && principal) return <CheckoutEditor checkout={principal} products={data.products} onBack={() => setEditing(false)} onPreview={() => {}} onSaveDraft={saveDraft} onPublish={publish} />;
+  if (editing && principal) return <CheckoutEditor checkout={principal} products={data.products} onCreateOrderBump={createOrderBump} onBack={() => setEditing(false)} onPreview={() => {}} onSaveDraft={saveDraft} onPublish={publish} />;
   if (data.loading) return <main className="page"><section className="card products-state"><LoaderCircle className="spin" /><span>Carregando checkouts...</span></section></main>;
 
   return <main className="page">
