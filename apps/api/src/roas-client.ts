@@ -15,7 +15,8 @@ const headers = (credentials: RoasCredentials) => ({ Accept: 'application/json',
 async function responseJson<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => null) as Record<string, unknown> | null;
   if (!response.ok) {
-    const details = [body?.message, body?.error, body?.detail].filter((value): value is string => typeof value === 'string').map(value => value.slice(0, 300));
+    const rawErrors = Array.isArray(body?.errors) ? body.errors : Array.isArray(body?.details) ? body.details : [];
+    const details = [body?.message, body?.error, body?.detail, ...rawErrors.flatMap(value => typeof value === 'string' ? [value] : typeof value === 'object' && value !== null ? [String((value as Record<string, unknown>).message ?? (value as Record<string, unknown>).detail ?? '')] : [])].filter((value): value is string => typeof value === 'string' && value.length > 0).map(value => value.slice(0, 300));
     throw new RoasRequestError(response.status, details);
   }
   return body as T;
@@ -33,7 +34,7 @@ const valueOf = (source: Record<string, unknown> | null, ...keys: string[]): unk
 
 function normalizePix(raw: unknown): RoasPix | null {
   const body = record(raw); const wrapped = valueOf(body, 'data', 'Data'); const first = Array.isArray(wrapped) ? wrapped[0] : wrapped; const item = record(first) ?? body;
-  const pix = record(valueOf(item, 'pix', 'Pix', 'pix_data', 'pixData'));
+  const pixValue = valueOf(item, 'pix', 'Pix', 'pix_data', 'pixData'); const pix = record(Array.isArray(pixValue) ? pixValue[0] : pixValue);
   const id = valueOf(item, 'id', 'Id', 'transaction_id', 'transactionId'); const status = valueOf(item, 'status', 'Status'); const amount = valueOf(item, 'amount', 'Amount');
   if ((typeof id !== 'string' && typeof id !== 'number') || typeof status !== 'string' || typeof amount !== 'number') return null;
   const pixCode = valueOf(pix, 'qrcode', 'qr_code', 'copy_paste', 'copyPaste', 'emv') ?? valueOf(item, 'qrcode', 'qr_code', 'copy_paste');
