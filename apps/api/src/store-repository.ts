@@ -114,5 +114,9 @@ export class PrismaStoreRepository implements StoreRepository {
     });
   }
 
-  async isCheckoutDomainAllowed(hostname: string): Promise<boolean> { return (await this.database.storeDomain.count({ where: { hostname, status: 'VERIFIED_DNS' } })) > 0; }
+  async isCheckoutDomainAllowed(hostname: string): Promise<boolean> {
+    return (await this.database.storeDomain.count({
+      where: { hostname, status: { in: ['VERIFIED_DNS', 'ACTIVE'] } },
+    })) > 0;
+  }
 }
