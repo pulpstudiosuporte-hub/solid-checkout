@@ -13,10 +13,11 @@ export class RoasRequestError extends Error {
 const headers = (credentials: RoasCredentials) => ({ Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Basic ${Buffer.from(`${credentials.publicKey}:${credentials.secretKey}`).toString('base64')}`, 'User-Agent': userAgent });
 
 async function responseJson<T>(response: Response): Promise<T> {
-  const body = await response.json().catch(() => null) as Record<string, unknown> | null;
+  const raw = await response.text();
+  const body = (() => { try { return JSON.parse(raw) as Record<string, unknown>; } catch { return null; } })();
   if (!response.ok) {
     const rawErrors = Array.isArray(body?.errors) ? body.errors : Array.isArray(body?.details) ? body.details : [];
-    const details = [body?.message, body?.error, body?.detail, ...rawErrors.flatMap(value => typeof value === 'string' ? [value] : typeof value === 'object' && value !== null ? [String((value as Record<string, unknown>).message ?? (value as Record<string, unknown>).detail ?? '')] : [])].filter((value): value is string => typeof value === 'string' && value.length > 0).map(value => value.slice(0, 300));
+    const details = [body?.message, body?.error, body?.detail, ...rawErrors.flatMap(value => typeof value === 'string' ? [value] : typeof value === 'object' && value !== null ? [String((value as Record<string, unknown>).message ?? (value as Record<string, unknown>).detail ?? '')] : []), ...(raw && !body ? [raw] : [])].filter((value): value is string => typeof value === 'string' && value.length > 0).map(value => value.slice(0, 300));
     throw new RoasRequestError(response.status, details);
   }
   return body as T;
