@@ -8,6 +8,7 @@ import { PrismaShopifyRepository } from './shopify-repository.js';
 import { PrismaGatewayRepository } from './gateway-repository.js';
 import { PrismaOrderRepository } from './order-repository.js';
 import { startWestPayReconciliation } from './westpay-reconciliation.js';
+import { startRoasReconciliation } from './roas-reconciliation.js';
 
 const environment = parseEnvironment(process.env);
 if (!environment.DATABASE_URL) throw new Error('DATABASE_URL é obrigatória para iniciar a API');
@@ -16,10 +17,12 @@ const gatewayRepository = new PrismaGatewayRepository(database);
 const shopifyRepository = new PrismaShopifyRepository(database);
 const app = buildApp(environment, { authRepository: new PrismaAuthRepository(database), catalogRepository: new PrismaCatalogRepository(database), storeRepository: new PrismaStoreRepository(database), shopifyRepository, gatewayRepository, orderRepository: new PrismaOrderRepository(database), database });
 const stopWestPayReconciliation = startWestPayReconciliation(environment, gatewayRepository, shopifyRepository, app.log);
+const stopRoasReconciliation = startRoasReconciliation(environment, gatewayRepository, shopifyRepository, app.log);
 
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, 'shutdown_started');
   stopWestPayReconciliation();
+  stopRoasReconciliation();
   await app.close();
   await database.$disconnect();
   process.exit(0);

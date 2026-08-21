@@ -7,6 +7,7 @@ import type { PrismaGatewayRepository } from './gateway-repository.js';
 import type { ShopifyRepository } from './shopify-repository.js';
 import { syncPaidShopifyOrder } from './shopify-order-sync.js';
 import { createWestPayPix, findWestPayPix, getWestPayPix, WestPayRequestError } from './westpay-client.js';
+import { createRoasPix, getRoasPix } from './roas-client.js';
 import { lookupBrazilianPostalCode, PostalCodeLookupError } from './postal-code.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
@@ -27,6 +28,7 @@ const westPayPaymentStatus = (value: string | undefined) => {
   return null;
 };
 const westPayAmountMatches = (providerAmount: number | undefined, expectedCents: number): boolean => Number(providerAmount) === expectedCents || Number(providerAmount) * 100 === expectedCents;
+const roasAmountMatches = (providerAmount: number | undefined, expectedCents: number): boolean => Number(providerAmount) === expectedCents || Number(providerAmount) * 100 === expectedCents;
 const validProxySignature = (query: Record<string, string | string[] | undefined>, secret: string): boolean => {
   const signature = query.signature; if (typeof signature !== 'string' || !/^[a-f0-9]{64}$/.test(signature)) return false;
   const message = Object.entries(query).filter(([key]) => key !== 'signature').map(([key, value]) => `${key}=${Array.isArray(value) ? value.join(',') : value ?? ''}`).sort().join('');
@@ -120,14 +122,23 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     if (!gateways || !environment.APP_ENCRYPTION_KEY || !environment.API_PUBLIC_URL) return reply.code(503).send(errorBody(request, 'PAYMENT_NOT_CONFIGURED', 'Pagamento ainda não configurado no servidor.'));
     const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization); if (!credentials) return reply.code(401).send(errorBody(request, 'INVALID_SESSION', 'Sessão inválida.'));
     const context = await gateways.paymentContext(credentials.sessionId, credentials.tokenHash, new Date()); if (!context) return reply.code(409).send(errorBody(request, 'CHECKOUT_INCOMPLETE', 'Confirme identificação, endereço e frete antes do pagamento.'));
-    const encryptedCredentials = await gateways.credentials(context.checkout.storeId); if (!encryptedCredentials) return reply.code(409).send(errorBody(request, 'GATEWAY_UNAVAILABLE', 'A loja ainda não configurou a WestPay.'));
+    const provider = await gateways.primaryProvider(context.checkout.storeId); if (!provider) return reply.code(409).send(errorBody(request, 'GATEWAY_UNAVAILABLE', 'A loja ainda não configurou um gateway Pix.'));
+    const encryptedCredentials = await gateways.credentials(context.checkout.storeId, provider); if (!encryptedCredentials) return reply.code(409).send(errorBody(request, 'GATEWAY_UNAVAILABLE', 'O gateway selecionado não está disponível.'));
     const westpayCredentials = { apiKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) };
-    const amountCents = context.totalCents + context.shippingPriceCents; let attempt = await gateways.latestAttempt(context.id);
+    const roasCredentials = { secretKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) };
+    const amountCents = context.totalCents + context.shippingPriceCents; let attempt = await gateways.latestAttempt(context.id, provider);
     if (attempt?.pixCodeEncrypted && attempt.status === 'PENDING') return reply.header('cache-control', 'no-store').send({ payment: { publicId: attempt.publicId, status: 'pending', amountCents: attempt.amountCents, pixCode: decryptSecret(attempt.pixCodeEncrypted, environment.APP_ENCRYPTION_KEY), expiresAt: attempt.expiresAt } });
-    if (!attempt || attempt.status !== 'PENDING') attempt = await gateways.createAttempt(context.id, amountCents, `westpay:${context.id}:${Date.now()}`);
+    if (!attempt || attempt.status !== 'PENDING') attempt = await gateways.createAttempt(context.id, provider, amountCents, `${provider.toLowerCase()}:${context.id}:${Date.now()}`);
     const externalRef = `solid-${attempt.publicId}`;
     try {
       const customer = JSON.parse(decryptSecret(context.customerDataEncrypted!, environment.APP_ENCRYPTION_KEY)) as Record<string, string>; const address = JSON.parse(decryptSecret(context.shippingAddressEncrypted!, environment.APP_ENCRYPTION_KEY)) as Record<string, string>;
+      if (provider === 'ROAS') {
+        const transaction = await createRoasPix(roasCredentials, { amount: amountCents, payment_method: 'pix', customer: { name: customer.name, email: customer.email, phone: digits(customer.phone), document: { number: digits(customer.document), type: digits(customer.document).length === 14 ? 'cnpj' : 'cpf' } }, items: context.items.map(item => ({ title: item.titleSnapshot, unit_price: item.unitPriceCents, quantity: item.quantity, tangible: true, external_ref: item.productId })), shipping: { fee: context.shippingPriceCents, address: { street: address.street, street_number: address.number, complement: address.complement || undefined, zip_code: digits(address.postalCode), neighborhood: address.neighborhood, city: address.city, state: address.state, country: 'BR' } }, pix: { expires_in_days: 1 }, external_ref: externalRef, postback_url: `${environment.API_PUBLIC_URL.replace(/\/$/, '')}/webhooks/roas`, metadata: JSON.stringify({ checkoutSession: context.publicId, platform: 'solid' }), ...(request.ip && /^\d{1,3}(?:\.\d{1,3}){3}$/.test(request.ip) ? { ip: request.ip } : {}) });
+        if (!transaction.id || !transaction.pixCode) throw new Error('Roas returned an incomplete PIX response');
+        const expiresAt = transaction.expiresAt ? new Date(transaction.expiresAt) : null; const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pixCode, environment.APP_ENCRYPTION_KEY), expiresAt);
+        if (shopify) { try { await syncPaidShopifyOrder(environment, shopify, context.id); } catch (error) { request.log.error({ err: error, checkoutSessionId: context.id }, 'shopify_pending_order_sync_failed'); } }
+        return reply.header('cache-control', 'no-store').code(201).send({ payment: { ...saved, status: 'pending', pixCode: transaction.pixCode } });
+      }
       let transaction = await findWestPayPix(westpayCredentials, externalRef);
       if (!transaction) transaction = await createWestPayPix(westpayCredentials, {
         amount: amountCents,
@@ -149,7 +160,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       }
       return reply.header('cache-control', 'no-store').code(201).send({ payment: { ...saved, status: 'pending', pixCode: transaction.pix.qrcode } });
     } catch (error) {
-      request.log.warn({ err: error, checkoutSession: context.publicId }, 'westpay_pix_creation_failed');
+      request.log.warn({ err: error, provider, checkoutSession: context.publicId }, 'pix_creation_failed');
       if (error instanceof WestPayRequestError && error.status === 422) {
         const detail = error.details.find(value => /m[ií]nim|minimum|amount|valor/i.test(value)) ?? '';
         const amount = detail.match(/R\$\s*\d+(?:[.,]\d{1,2})?/i)?.[0];
@@ -166,19 +177,20 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     if (!credentials) return reply.code(401).send(errorBody(request, 'INVALID_SESSION', 'Sessão inválida.'));
     const verification = environment.APP_ENCRYPTION_KEY ? await gateways.publicPaymentVerification(credentials.sessionId, credentials.tokenHash) : null;
     if (verification && verification.status === 'PENDING') {
-      const encryptedCredentials = await gateways.credentials(verification.storeId);
+      const provider = verification.provider === 'ROAS' ? 'ROAS' : 'WESTPAY';
+      const encryptedCredentials = await gateways.credentials(verification.storeId, provider);
       if (encryptedCredentials) {
         try {
-          const official = await getWestPayPix({ apiKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY!), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY!) }, verification.providerTransactionId);
+          const official = provider === 'ROAS' ? await getRoasPix({ secretKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY!), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY!) }, verification.providerTransactionId) : await getWestPayPix({ apiKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY!), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY!) }, verification.providerTransactionId);
           const mapped = westPayPaymentStatus(official?.status);
-          if (mapped && official && westPayAmountMatches(official.amount, verification.amountCents)) {
+          if (mapped && official && (provider === 'ROAS' ? roasAmountMatches(official.amount, verification.amountCents) : westPayAmountMatches(official.amount, verification.amountCents))) {
             await gateways.confirmPayment(verification.id, verification.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined);
             if (mapped === 'PAID' && shopify) {
               try { await syncPaidShopifyOrder(environment, shopify, verification.checkoutSessionId); }
               catch (error) { request.log.error({ err: error, checkoutSessionId: verification.checkoutSessionId }, 'shopify_order_sync_failed'); }
             }
           }
-        } catch (error) { request.log.warn({ err: error, paymentAttemptId: verification.id }, 'westpay_payment_status_check_failed'); }
+        } catch (error) { request.log.warn({ err: error, provider, paymentAttemptId: verification.id }, 'payment_status_check_failed'); }
       }
     }
     const payment = await gateways.publicPaymentStatus(credentials.sessionId, credentials.tokenHash);
@@ -214,6 +226,24 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       }
       return reply.code(200).send({ received: true });
     } catch (error) { request.log.warn({ err: error, providerTransactionId: objectId }, 'westpay_webhook_verification_failed'); return reply.code(503).send(); }
+  });
+
+  // A notificação da Roas é somente um gatilho: o status real sempre é conferido
+  // diretamente na API do provedor antes de alterar um pedido.
+  app.post<{ Body: Record<string, unknown> }>('/webhooks/roas', { config: { rateLimit: { max: 180, timeWindow: '1 minute' } } }, async (request, reply) => {
+    if (!gateways || !environment.APP_ENCRYPTION_KEY) return reply.code(503).send();
+    const objectIdValue = request.body?.Id ?? request.body?.id ?? request.body?.transaction_id ?? request.body?.transactionId;
+    const objectId = (typeof objectIdValue === 'string' || typeof objectIdValue === 'number') ? String(objectIdValue) : null;
+    if (!objectId || objectId.length > 128) return reply.code(400).send();
+    const context = await gateways.webhookContext(objectId); if (!context) return reply.code(200).send({ received: true });
+    const encryptedCredentials = await gateways.credentials(context.session.checkout.storeId, 'ROAS'); if (!encryptedCredentials) return reply.code(200).send({ received: true });
+    try {
+      const official = await getRoasPix({ secretKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) }, objectId);
+      if (!official || official.id !== objectId || !roasAmountMatches(official.amount, context.amountCents)) return reply.code(200).send({ received: true });
+      const mapped = westPayPaymentStatus(official.status);
+      if (mapped) { await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined); if (mapped === 'PAID' && shopify) { try { await syncPaidShopifyOrder(environment, shopify, context.checkoutSessionId); } catch (error) { request.log.error({ err: error, checkoutSessionId: context.checkoutSessionId }, 'shopify_order_sync_failed'); } } }
+      return reply.code(200).send({ received: true });
+    } catch (error) { request.log.warn({ err: error, providerTransactionId: objectId }, 'roas_webhook_verification_failed'); return reply.code(503).send(); }
   });
 
   app.post<{ Querystring: Record<string, string | string[] | undefined>; Body: Record<string, unknown> }>('/integrations/shopify/proxy/checkout-session', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
