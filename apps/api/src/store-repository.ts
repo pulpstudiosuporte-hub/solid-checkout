@@ -101,7 +101,7 @@ export class PrismaStoreRepository implements StoreRepository {
     return this.database.$transaction(async transaction => {
       const domain = await transaction.storeDomain.updateMany({ where: { publicId: domainPublicId, storeId: membership.storeId, status: 'VERIFIED_DNS' }, data: { status: 'ACTIVE', dokployDomainId, activatedAt: new Date() } }); if (!domain.count) return null;
       const result = await transaction.storeDomain.findFirst({ where: { publicId: domainPublicId, storeId: membership.storeId }, select: { publicId: true, hostname: true, status: true, verifiedAt: true, activatedAt: true, lastCheckedAt: true, dokployDomainId: true } });
-      await transaction.auditLog.create({ data: { storeId: membership.storeId, actorUserId: userId, actorType: 'SYSTEM', action: 'store_domain.activated', targetType: 'store_domain', targetId: domainPublicId, requestId } }); return result;
+      await transaction.auditLog.create({ data: { storeId: membership.storeId, actorUserId: userId, actorType: 'USER', action: 'store_domain.activated', targetType: 'store_domain', targetId: domainPublicId, requestId } }); return result;
     });
   }
 
