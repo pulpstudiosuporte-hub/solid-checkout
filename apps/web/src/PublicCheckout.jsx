@@ -17,6 +17,7 @@ import {
 import {
   createPublicCheckoutSession,
   createWestPayPix,
+  getPaidDigitalDelivery,
   getPublicCheckout,
   getPublicCheckoutSession,
   getLatestPublicPayment,
@@ -269,14 +270,16 @@ function SessionContent({ session: initialSession, token }) {
     city: "",
     state: "",
   });
+  const requiresShipping = session.checkout?.product?.fulfillmentType !== 'DIGITAL';
   const [step, setStep] = useState(
-    session.shippingCaptured ? 3 : session.customerCaptured ? 2 : 1,
+    requiresShipping ? (session.shippingCaptured ? 3 : session.customerCaptured ? 2 : 1) : session.customerCaptured ? 4 : 1,
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [shippingOptions, setShippingOptions] = useState([]);
   const [selectedShipping, setSelectedShipping] = useState(null);
   const [payment, setPayment] = useState(null);
+  const [delivery, setDelivery] = useState(null);
   const [copied, setCopied] = useState(false);
   const [postalStatus, setPostalStatus] = useState({
     type: "idle",
@@ -371,7 +374,7 @@ function SessionContent({ session: initialSession, token }) {
     setError("");
     try {
       await savePublicCheckoutCustomer(session.publicId, token, form);
-      setStep(2);
+      setStep(requiresShipping ? 2 : 4);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -393,10 +396,10 @@ function SessionContent({ session: initialSession, token }) {
     }
   };
   useEffect(() => {
-    if (step !== 3) return;
+    if (!requiresShipping || step !== 3) return;
     setBusy(true); setError("");
     getPublicShippingMethods(session.publicId, token).then(({ items: methods }) => setShippingOptions(methods)).catch(requestError => setError(requestError.message)).finally(() => setBusy(false));
-  }, [step, session.publicId, token]);
+  }, [requiresShipping, step, session.publicId, token]);
   useEffect(() => {
     if (!payment || String(payment.status).toUpperCase() !== 'PENDING') return;
     const controller = new AbortController();
@@ -407,6 +410,12 @@ function SessionContent({ session: initialSession, token }) {
     checkStatus();
     return () => { controller.abort(); window.clearInterval(interval); };
   }, [payment?.publicId, payment?.status, session.publicId, token]);
+  useEffect(() => {
+    if (String(payment?.status).toUpperCase() !== 'PAID' || !session.checkout?.product || session.checkout.product.fulfillmentType !== 'DIGITAL') return;
+    const controller = new AbortController();
+    getPaidDigitalDelivery(session.publicId, token, controller.signal).then(result => setDelivery(result.delivery)).catch(() => {});
+    return () => controller.abort();
+  }, [payment?.status, session.checkout?.product?.fulfillmentType, session.publicId, token]);
   const chooseShipping = async (method) => {
     setBusy(true); setError("");
     try { const result = await selectPublicShippingMethod(session.publicId, token, method.publicId); setSelectedShipping(result); setStep(4); }
@@ -421,7 +430,7 @@ function SessionContent({ session: initialSession, token }) {
   };
   const copyPix = async () => { await navigator.clipboard.writeText(payment.pixCode); setCopied(true); window.setTimeout(() => setCopied(false), 1800); };
   if (String(payment?.status).toUpperCase() === "PAID") {
-    return <ThankYouPage session={session} items={items} itemCount={itemCount} selectedShipping={selectedShipping} config={config} />;
+    return <ThankYouPage session={session} items={items} itemCount={itemCount} selectedShipping={selectedShipping} config={config} delivery={delivery} />;
   }
   return (
     <main
@@ -458,13 +467,13 @@ function SessionContent({ session: initialSession, token }) {
           Identificação
         </span>
         <b />
-        <span className={step >= 2 ? "active" : ""}>
+        {requiresShipping && <><span className={step >= 2 ? "active" : ""}>
           <i>
             <MapPin size={15} />
           </i>
           Entrega
         </span>
-        <b />
+        <b /></>}
           <span className={step >= 4 ? "active" : ""}>
             <i>
               <CreditCard size={15} />
@@ -750,8 +759,8 @@ function SessionContent({ session: initialSession, token }) {
               <h1>{String(payment?.status).toUpperCase() === 'PAID' ? 'Pagamento confirmado' : payment ? 'Pague com Pix' : 'Tudo pronto para pagar'}</h1>
               {String(payment?.status).toUpperCase() === 'PAID' ? <div className="payment-confirmed" role="status"><CheckCircle2 size={38}/><p>Recebemos seu pagamento. O pedido já está confirmado e a loja foi avisada.</p>{config.successUrl && config.successUrl !== '#' && <a className="customer-continue" href={config.successUrl}>Continuar <ArrowRight size={19}/></a>}</div> : payment ? <><p>Copie o código abaixo e pague no aplicativo do seu banco. A confirmação acontece automaticamente.</p><strong className="real-pix-total">{money.format(payment.amountCents / 100)}</strong><textarea className="pix-copy-code" readOnly value={payment.pixCode}/><button type="button" className="customer-continue" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? 'Código copiado' : 'Copiar código Pix'}</button>{payment.expiresAt && <small className="pix-expiration">Válido até {new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' }).format(new Date(payment.expiresAt))}</small>}</> : <><p>O total foi conferido no servidor. Gere o Pix seguro pelo gateway da loja.</p><button type="button" className="customer-continue" onClick={generatePix} disabled={busy}>{busy ? <LoaderCircle className="spin" size={18}/> : 'Gerar Pix agora'} <ArrowRight size={19}/></button></>}
               {error && <p className="public-error" role="alert">{error}</p>}
-              {String(payment?.status).toUpperCase() !== 'PAID' && <button type="button" onClick={() => setStep(3)}>
-                Voltar e escolher outro frete
+              {String(payment?.status).toUpperCase() !== 'PAID' && <button type="button" onClick={() => setStep(requiresShipping ? 3 : 1)}>
+                {requiresShipping ? 'Voltar e escolher outro frete' : 'Voltar e editar dados'}
               </button>}
             </div>
           )}
@@ -799,7 +808,7 @@ function SessionContent({ session: initialSession, token }) {
               </div>
               <div>
                 <span>Frete</span>
-                <small>{selectedShipping ? (selectedShipping.shippingPriceCents === 0 ? "Grátis" : money.format(selectedShipping.shippingPriceCents / 100)) : "Escolha na etapa de entrega"}</small>
+                <small>{requiresShipping ? (selectedShipping ? (selectedShipping.shippingPriceCents === 0 ? "Grátis" : money.format(selectedShipping.shippingPriceCents / 100)) : "Escolha na etapa de entrega") : "Não aplicável"}</small>
               </div>
               <div className="session-grand-total">
                 <span>Total</span>
@@ -824,7 +833,7 @@ function SessionContent({ session: initialSession, token }) {
   );
 }
 
-function ThankYouPage({ session, items, itemCount, selectedShipping, config }) {
+function ThankYouPage({ session, items, itemCount, selectedShipping, config, delivery }) {
   const total = selectedShipping?.grandTotalCents ?? session.totalCents;
   return (
     <main className="public-checkout thank-you-page" style={configStyle(config)}>
@@ -836,13 +845,14 @@ function ThankYouPage({ session, items, itemCount, selectedShipping, config }) {
         <div className="thank-you-icon" aria-hidden="true"><CheckCircle2 size={42} /></div>
         <p className="eyebrow">PAGAMENTO CONFIRMADO</p>
         <h1 id="thank-you-title">Obrigado pela sua compra!</h1>
-        <p className="thank-you-lead">Recebemos seu Pix e o seu pedido já está confirmado. Enviaremos as próximas atualizações para o e-mail informado.</p>
+        <p className="thank-you-lead">Recebemos seu Pix e o seu pedido já está confirmado.{delivery ? ' Seu acesso ao conteúdo já foi liberado abaixo.' : ' Enviaremos as próximas atualizações para o e-mail informado.'}</p>
         <div className="thank-you-order" aria-label="Resumo do pedido">
           <div><span>Pedido SOLID</span><strong>#{session.publicId.slice(-8).toUpperCase()}</strong></div>
           <div><span>Total pago</span><strong>{money.format(total / 100)}</strong></div>
           <div><span>Itens</span><strong>{itemCount} {itemCount === 1 ? "item" : "itens"}</strong></div>
         </div>
         <div className="thank-you-items">{items.map((item) => <div key={`${item.titleSnapshot}-${item.variantSnapshot || "default"}`}><span>{item.quantity}× {item.titleSnapshot}</span><strong>{money.format(item.totalCents / 100)}</strong></div>)}</div>
+        {delivery && <a className="customer-continue thank-you-cta" href={delivery.url} target="_blank" rel="noopener noreferrer">Acessar conteúdo <ArrowRight size={19} aria-hidden="true" /></a>}
         {config.successUrl && config.successUrl !== "#" && <a className="customer-continue thank-you-cta" href={config.successUrl}>Continuar para a loja <ArrowRight size={19} aria-hidden="true" /></a>}
         <p className="thank-you-help">Dúvidas sobre seu pedido? Entre em contato diretamente com a loja.</p>
       </section>

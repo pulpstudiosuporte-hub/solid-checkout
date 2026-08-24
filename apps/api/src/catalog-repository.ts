@@ -1,7 +1,7 @@
 import type { Prisma, PrismaClient } from '@solid/database';
 
 export type StoreContext = Readonly<{ storeId: string; userId: string; sessionId: string; role: 'OWNER' | 'ADMIN' | 'ANALYST' }>;
-export type ProductInput = Readonly<{ title: string; description?: string; imageUrl?: string; priceCents: number; compareAtCents?: number; stockQuantity?: number; trackInventory: boolean; maxPerOrder: number; active: boolean }>;
+export type ProductInput = Readonly<{ title: string; description?: string; imageUrl?: string; priceCents: number; compareAtCents?: number; stockQuantity?: number; trackInventory: boolean; maxPerOrder: number; active: boolean; fulfillmentType: 'PHYSICAL' | 'DIGITAL'; externalDeliveryUrl?: string }>;
 export type CheckoutInput = Readonly<{ name: string; slug: string; productPublicId: string; draftConfig: Record<string, unknown> }>;
 export type CheckoutConfigInput = Readonly<Record<string, unknown>>;
 export type CheckoutSessionInput = Readonly<{ storeSlug: string; checkoutSlug: string; variantPublicId?: string; quantity: number; tokenHash: string; source: 'DIRECT' | 'SHOPIFY'; sourceCartId?: string; expiresAt: Date }>;
@@ -25,6 +25,7 @@ export interface CatalogRepository {
   getPublicCheckout(storeSlug: string, checkoutSlug: string): Promise<object | null>;
   createPublicCheckoutSession(input: CheckoutSessionInput): Promise<object | null>;
   getPublicCheckoutSession(publicId: string, tokenHash: string, now: Date): Promise<object | null>;
+  getPaidDigitalDelivery(publicId: string, tokenHash: string): Promise<object | null>;
   createShopifyCartSession(input: ShopifyCartSessionInput): Promise<object | null>;
   updatePublicCheckoutCustomer(publicId: string, tokenHash: string, now: Date, input: CheckoutCustomerInput): Promise<object | null>;
   updatePublicCheckoutShipping(publicId: string, tokenHash: string, now: Date, input: CheckoutShippingInput): Promise<object | null>;
@@ -37,8 +38,8 @@ export interface CatalogRepository {
   setPublicOrderBump(publicId: string, tokenHash: string, productPublicId: string, enabled: boolean, now: Date): Promise<object | null>;
 }
 
-const productSelect = { publicId: true, sourceTitle: true, checkoutTitle: true, checkoutDescription: true, handle: true, vendor: true, productType: true, tags: true, imageUrl: true, priceCents: true, compareAtCents: true, stockQuantity: true, trackInventory: true, maxPerOrder: true, active: true, source: true, syncedAt: true, createdAt: true, updatedAt: true, _count: { select: { variants: true, images: true, collections: true } } } as const;
-const checkoutSelect = { publicId: true, name: true, slug: true, status: true, draftConfig: true, publishedConfig: true, publishedAt: true, createdAt: true, updatedAt: true, product: { select: { publicId: true, checkoutTitle: true, priceCents: true, active: true } } } as const;
+const productSelect = { publicId: true, sourceTitle: true, checkoutTitle: true, checkoutDescription: true, handle: true, vendor: true, productType: true, tags: true, fulfillmentType: true, externalDeliveryUrl: true, imageUrl: true, priceCents: true, compareAtCents: true, stockQuantity: true, trackInventory: true, maxPerOrder: true, active: true, source: true, syncedAt: true, createdAt: true, updatedAt: true, _count: { select: { variants: true, images: true, collections: true } } } as const;
+const checkoutSelect = { publicId: true, name: true, slug: true, status: true, draftConfig: true, publishedConfig: true, publishedAt: true, createdAt: true, updatedAt: true, product: { select: { publicId: true, checkoutTitle: true, priceCents: true, active: true, fulfillmentType: true } } } as const;
 type OrderBumpConfig = Readonly<{ productId: string; title: string; message: string }>;
 const configuredOrderBumps = (config: Record<string, unknown>): readonly OrderBumpConfig[] => {
   const configured = Array.isArray(config.orderBumps) ? config.orderBumps.flatMap((value): OrderBumpConfig[] => {
@@ -69,7 +70,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
   }
   async createProduct(context: StoreContext, input: ProductInput, requestId: string): Promise<object> {
     return this.database.$transaction(async transaction => {
-      const product = await transaction.product.create({ data: { storeId: context.storeId, sourceTitle: input.title, checkoutTitle: input.title, priceCents: input.priceCents, trackInventory: input.trackInventory, maxPerOrder: input.maxPerOrder, active: input.active, ...(input.description !== undefined ? { checkoutDescription: input.description } : {}), ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}), ...(input.compareAtCents !== undefined ? { compareAtCents: input.compareAtCents } : {}), ...(input.stockQuantity !== undefined ? { stockQuantity: input.stockQuantity } : {}), variants: { create: { sourceExternalId: 'manual-default', title: 'Padrão', priceCents: input.priceCents, ...(input.compareAtCents !== undefined ? { compareAtCents: input.compareAtCents } : {}), ...(input.stockQuantity !== undefined ? { inventoryQuantity: input.stockQuantity } : {}), ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}) } } }, select: productSelect });
+      const product = await transaction.product.create({ data: { storeId: context.storeId, sourceTitle: input.title, checkoutTitle: input.title, priceCents: input.priceCents, trackInventory: input.trackInventory, maxPerOrder: input.maxPerOrder, active: input.active, fulfillmentType: input.fulfillmentType, ...(input.externalDeliveryUrl !== undefined ? { externalDeliveryUrl: input.externalDeliveryUrl } : {}), ...(input.description !== undefined ? { checkoutDescription: input.description } : {}), ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}), ...(input.compareAtCents !== undefined ? { compareAtCents: input.compareAtCents } : {}), ...(input.stockQuantity !== undefined ? { stockQuantity: input.stockQuantity } : {}), variants: { create: { sourceExternalId: 'manual-default', title: 'Padrão', priceCents: input.priceCents, ...(input.compareAtCents !== undefined ? { compareAtCents: input.compareAtCents } : {}), ...(input.stockQuantity !== undefined ? { inventoryQuantity: input.stockQuantity } : {}), ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}) } } }, select: productSelect });
       await transaction.auditLog.create({ data: { storeId: context.storeId, actorUserId: context.userId, actorType: 'USER', action: 'product.created', targetType: 'product', targetId: product.publicId, requestId } });
       return product;
     });
@@ -152,13 +153,13 @@ export class PrismaCatalogRepository implements CatalogRepository {
   getPublicCheckout(storeSlug: string, checkoutSlug: string): Promise<object | null> {
     return this.database.checkout.findFirst({
       where: { slug: checkoutSlug, status: 'PUBLISHED', store: { slug: storeSlug, active: true }, product: { active: true } },
-      select: { publicId: true, slug: true, name: true, publishedConfig: true, store: { select: { publicId: true, name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, imageUrl: true, priceCents: true, compareAtCents: true, maxPerOrder: true, stockQuantity: true, trackInventory: true, variants: { where: { availableForSale: true }, orderBy: { createdAt: 'asc' }, select: { publicId: true, title: true, priceCents: true, compareAtCents: true, inventoryQuantity: true, availableForSale: true, imageUrl: true, selectedOptions: true } } } } }
+      select: { publicId: true, slug: true, name: true, publishedConfig: true, store: { select: { publicId: true, name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, fulfillmentType: true, imageUrl: true, priceCents: true, compareAtCents: true, maxPerOrder: true, stockQuantity: true, trackInventory: true, variants: { where: { availableForSale: true }, orderBy: { createdAt: 'asc' }, select: { publicId: true, title: true, priceCents: true, compareAtCents: true, inventoryQuantity: true, availableForSale: true, imageUrl: true, selectedOptions: true } } } } }
     });
   }
 
   async createPublicCheckoutSession(input: CheckoutSessionInput): Promise<object | null> {
     return this.database.$transaction(async transaction => {
-      const checkout = await transaction.checkout.findFirst({ where: { slug: input.checkoutSlug, status: 'PUBLISHED', store: { slug: input.storeSlug, active: true }, product: { active: true } }, select: { id: true, productId: true, product: { select: { publicId: true, checkoutTitle: true, imageUrl: true, priceCents: true, maxPerOrder: true, stockQuantity: true, trackInventory: true } } } });
+      const checkout = await transaction.checkout.findFirst({ where: { slug: input.checkoutSlug, status: 'PUBLISHED', store: { slug: input.storeSlug, active: true }, product: { active: true } }, select: { id: true, productId: true, product: { select: { publicId: true, checkoutTitle: true, fulfillmentType: true, imageUrl: true, priceCents: true, maxPerOrder: true, stockQuantity: true, trackInventory: true } } } });
       if (!checkout || input.quantity > checkout.product.maxPerOrder || (checkout.product.trackInventory && (checkout.product.stockQuantity ?? 0) < input.quantity)) return null;
       const variant = input.variantPublicId ? await transaction.productVariant.findFirst({ where: { publicId: input.variantPublicId, productId: checkout.productId, availableForSale: true }, select: { id: true, publicId: true, title: true, priceCents: true, inventoryQuantity: true, imageUrl: true } }) : null;
       if (input.variantPublicId && !variant) return null;
@@ -170,7 +171,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
   }
 
   async getPublicCheckoutSession(publicId: string, tokenHash: string, now: Date): Promise<object | null> {
-    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { publicId: true, quantity: true, unitPriceCents: true, totalCents: true, currency: true, status: true, expiresAt: true, customerCapturedAt: true, shippingCapturedAt: true, checkout: { select: { storeId: true, slug: true, name: true, publishedConfig: true, store: { select: { name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, imageUrl: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true, isOrderBump: true, product: { select: { publicId: true } } } } } });
+    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { publicId: true, quantity: true, unitPriceCents: true, totalCents: true, currency: true, status: true, expiresAt: true, customerCapturedAt: true, shippingCapturedAt: true, checkout: { select: { storeId: true, slug: true, name: true, publishedConfig: true, store: { select: { name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, fulfillmentType: true, imageUrl: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true, isOrderBump: true, product: { select: { publicId: true } } } } } });
     if (!session) return null;
     const config = session.checkout.publishedConfig as Record<string, unknown>;
     const configured = configuredOrderBumps(config);
@@ -179,6 +180,12 @@ export class PrismaCatalogRepository implements CatalogRepository {
     const orderBumps = configured.flatMap(bump => { const product = byId.get(bump.productId); return product ? [{ ...product, offerTitle: bump.title, offerMessage: bump.message }] : []; });
     const { storeId: _storeId, ...checkout } = session.checkout;
     return { ...session, checkout, orderBump: orderBumps[0] ?? null, orderBumps, customerCaptured: Boolean(session.customerCapturedAt), shippingCaptured: Boolean(session.shippingCapturedAt), customerCapturedAt: undefined, shippingCapturedAt: undefined };
+  }
+
+  async getPaidDigitalDelivery(publicId: string, tokenHash: string): Promise<object | null> {
+    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'COMPLETED' }, select: { checkout: { select: { product: { select: { checkoutTitle: true, fulfillmentType: true, externalDeliveryUrl: true } } } } } });
+    const product = session?.checkout.product;
+    return product?.fulfillmentType === 'DIGITAL' && product.externalDeliveryUrl ? { title: product.checkoutTitle, url: product.externalDeliveryUrl } : null;
   }
 
   async setPublicOrderBump(publicId: string, tokenHash: string, productPublicId: string, enabled: boolean, now: Date): Promise<object | null> {

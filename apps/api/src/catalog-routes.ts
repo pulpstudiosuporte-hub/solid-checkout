@@ -88,12 +88,14 @@ export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvi
     const context = await authenticate(request, true);
     if (!context) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
     if (!canWrite(context)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
-    const title = text(request.body?.title, 240); const description = optionalText(request.body?.description, 10_000); const imageUrl = optionalText(request.body?.imageUrl, 2048);
+    const title = text(request.body?.title, 240); const description = optionalText(request.body?.description, 10_000); const imageUrl = optionalText(request.body?.imageUrl, 2048); const fulfillmentType = request.body?.fulfillmentType === 'DIGITAL' ? 'DIGITAL' : request.body?.fulfillmentType === undefined || request.body?.fulfillmentType === 'PHYSICAL' ? 'PHYSICAL' : null; const externalDeliveryUrl = optionalText(request.body?.externalDeliveryUrl, 2048);
     const priceCents = integer(request.body?.priceCents, 0, 2_000_000_000); const compareAtCents = request.body?.compareAtCents == null ? undefined : integer(request.body.compareAtCents, 1, 2_000_000_000);
     const stockQuantity = request.body?.stockQuantity == null ? undefined : integer(request.body.stockQuantity, 0, 2_000_000_000); const maxPerOrder = request.body?.maxPerOrder === undefined ? 10 : integer(request.body.maxPerOrder, 1, 1000);
     const allowedImage = !imageUrl || imageUrl.startsWith('https://') || (environment.API_PUBLIC_URL && imageUrl.startsWith(`${environment.API_PUBLIC_URL.replace(/\/$/, '')}/media/`));
     if (!title || description === null || imageUrl === null || priceCents === null || compareAtCents === null || stockQuantity === null || maxPerOrder === null || (compareAtCents !== undefined && compareAtCents <= priceCents) || !allowedImage) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Dados do produto inválidos.'));
-    const input: ProductInput = { title, priceCents, trackInventory: request.body?.trackInventory === true, maxPerOrder, active: request.body?.active !== false, ...(description ? { description } : {}), ...(imageUrl ? { imageUrl } : {}), ...(compareAtCents !== undefined ? { compareAtCents } : {}), ...(stockQuantity !== undefined ? { stockQuantity } : {}) };
+    const validDeliveryUrl = !externalDeliveryUrl || externalDeliveryUrl.startsWith('https://');
+    if (!fulfillmentType || externalDeliveryUrl === null || !validDeliveryUrl || fulfillmentType === 'DIGITAL' && !externalDeliveryUrl || fulfillmentType === 'PHYSICAL' && externalDeliveryUrl) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Dados do produto invÃ¡lidos.'));
+    const input: ProductInput = { title, priceCents, fulfillmentType, trackInventory: fulfillmentType === 'DIGITAL' ? false : request.body?.trackInventory === true, maxPerOrder, active: request.body?.active !== false, ...(description ? { description } : {}), ...(imageUrl ? { imageUrl } : {}), ...(externalDeliveryUrl ? { externalDeliveryUrl } : {}), ...(compareAtCents !== undefined ? { compareAtCents } : {}), ...(stockQuantity !== undefined && fulfillmentType === 'PHYSICAL' ? { stockQuantity } : {}) };
     return reply.code(201).send({ product: await catalog.createProduct(context, input, request.id) });
   });
 

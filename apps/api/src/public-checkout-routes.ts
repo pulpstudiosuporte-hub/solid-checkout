@@ -80,6 +80,14 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     return reply.header('cache-control', 'no-store').send({ session });
   });
 
+  app.get<{ Params: { sessionId: string }; Headers: { authorization?: string } }>('/public/checkout-sessions/:sessionId/delivery', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization);
+    if (!credentials) return reply.code(401).send(errorBody(request, 'INVALID_SESSION', 'Sessão inválida.'));
+    const delivery = await catalog.getPaidDigitalDelivery(credentials.sessionId, credentials.tokenHash);
+    if (!delivery) return reply.code(404).send(errorBody(request, 'DELIVERY_NOT_AVAILABLE', 'O acesso ainda não está disponível.'));
+    return reply.header('cache-control', 'no-store').send({ delivery });
+  });
+
   app.put<{ Params: { sessionId: string }; Headers: { authorization?: string }; Body: Record<string, unknown> }>('/public/checkout-sessions/:sessionId/customer', { config: { rateLimit: { max: 12, timeWindow: '1 minute' } } }, async (request, reply) => {
     if (!environment.APP_ENCRYPTION_KEY) return reply.code(503).send(errorBody(request, 'SERVICE_UNAVAILABLE', 'Proteção de dados indisponível.'));
     const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization); const name = typeof request.body?.name === 'string' ? request.body.name.trim().replace(/\s+/g, ' ') : ''; const email = typeof request.body?.email === 'string' ? request.body.email.trim().toLowerCase() : ''; const phone = digits(request.body?.phone); const document = digits(request.body?.document);
@@ -122,7 +130,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
   app.post<{ Params: { sessionId: string }; Headers: { authorization?: string } }>('/public/checkout-sessions/:sessionId/payments/westpay/pix', { config: { rateLimit: { max: 5, timeWindow: '5 minutes' } } }, async (request, reply) => {
     if (!gateways || !environment.APP_ENCRYPTION_KEY || !environment.API_PUBLIC_URL) return reply.code(503).send(errorBody(request, 'PAYMENT_NOT_CONFIGURED', 'Pagamento ainda não configurado no servidor.'));
     const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization); if (!credentials) return reply.code(401).send(errorBody(request, 'INVALID_SESSION', 'Sessão inválida.'));
-    const context = await gateways.paymentContext(credentials.sessionId, credentials.tokenHash, new Date()); if (!context) return reply.code(409).send(errorBody(request, 'CHECKOUT_INCOMPLETE', 'Confirme identificação, endereço e frete antes do pagamento.'));
+    const context = await gateways.paymentContext(credentials.sessionId, credentials.tokenHash, new Date()); if (!context) return reply.code(409).send(errorBody(request, 'CHECKOUT_INCOMPLETE', 'Confirme os dados necessários antes do pagamento.'));
     const provider = await gateways.primaryProvider(context.checkout.storeId); if (!provider) return reply.code(409).send(errorBody(request, 'GATEWAY_UNAVAILABLE', 'A loja ainda não configurou um gateway Pix.'));
     const encryptedCredentials = await gateways.credentials(context.checkout.storeId, provider); if (!encryptedCredentials) return reply.code(409).send(errorBody(request, 'GATEWAY_UNAVAILABLE', 'O gateway selecionado não está disponível.'));
     const westpayCredentials = { apiKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) };
@@ -132,7 +140,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     if (!attempt || attempt.status !== 'PENDING') attempt = await gateways.createAttempt(context.id, provider, amountCents, `${provider.toLowerCase()}:${context.id}:${Date.now()}`);
     const externalRef = `solid-${attempt.publicId}`;
     try {
-      const customer = JSON.parse(decryptSecret(context.customerDataEncrypted!, environment.APP_ENCRYPTION_KEY)) as Record<string, string>; const address = JSON.parse(decryptSecret(context.shippingAddressEncrypted!, environment.APP_ENCRYPTION_KEY)) as Record<string, string>;
+      const customer = JSON.parse(decryptSecret(context.customerDataEncrypted!, environment.APP_ENCRYPTION_KEY)) as Record<string, string>; const address = context.shippingAddressEncrypted ? JSON.parse(decryptSecret(context.shippingAddressEncrypted, environment.APP_ENCRYPTION_KEY)) as Record<string, string> : null;
       if (provider === 'ROAS') {
         const transaction = await createRoasPix(roasCredentials, { payment_method: 'pix', customer: { document: { type: digits(customer.document).length === 14 ? 'cnpj' : 'cpf', number: digits(customer.document) }, name: customer.name, email: customer.email, phone: digits(customer.phone).startsWith('55') ? digits(customer.phone) : `55${digits(customer.phone)}` }, items: context.items.map(item => ({ title: item.titleSnapshot, unit_price: item.unitPriceCents, quantity: item.quantity })), amount: amountCents, postback_url: `${environment.API_PUBLIC_URL.replace(/\/$/, '')}/webhooks/roas`, metadata: { provider_name: 'SOLID Checkout', checkout_session: context.publicId } });
         if (!transaction.id || !transaction.pixCode) throw new Error('Roas returned an incomplete PIX response');
@@ -145,8 +153,8 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
         amount: amountCents,
         paymentMethod: 'pix',
         customer: { name: customer.name, email: customer.email, phone: digits(customer.phone), document: { number: digits(customer.document), type: digits(customer.document).length === 14 ? 'cnpj' : 'cpf' }, externalRef: context.publicId },
-        items: context.items.map(item => ({ title: item.titleSnapshot, unitPrice: item.unitPriceCents, quantity: item.quantity, tangible: true, externalRef: item.productId })),
-        shipping: { fee: context.shippingPriceCents, address: { street: address.street, streetNumber: address.number, complement: address.complement || undefined, zipCode: digits(address.postalCode), neighborhood: address.neighborhood, city: address.city, state: address.state, country: 'br' } },
+        items: context.items.map(item => ({ title: item.titleSnapshot, unitPrice: item.unitPriceCents, quantity: item.quantity, tangible: context.checkout.product.fulfillmentType !== 'DIGITAL', externalRef: item.productId })),
+        ...(address ? { shipping: { fee: context.shippingPriceCents, address: { street: address.street, streetNumber: address.number, complement: address.complement || undefined, zipCode: digits(address.postalCode), neighborhood: address.neighborhood, city: address.city, state: address.state, country: 'br' } } } : {}),
         pix: { expiresInSeconds: Math.max(30, Math.min(1800, Math.floor((context.expiresAt.getTime() - Date.now()) / 1000))) },
         externalRef,
         postbackUrl: `${environment.API_PUBLIC_URL.replace(/\/$/, '')}/webhooks/westpay`,

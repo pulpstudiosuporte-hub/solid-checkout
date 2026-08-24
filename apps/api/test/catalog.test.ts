@@ -43,6 +43,7 @@ class MemoryCatalog implements CatalogRepository {
   getPublicCheckout(storeSlug: string, checkoutSlug: string): Promise<object | null> { return Promise.resolve(storeSlug === 'store-a' && checkoutSlug === 'checkout-a' ? { slug: checkoutSlug, product: this.products[0] } : null); }
   createPublicCheckoutSession(input: CheckoutSessionInput): Promise<object | null> { return Promise.resolve(input.storeSlug === 'store-a' && input.checkoutSlug === 'checkout-a' ? { publicId: 'session-a', totalCents: 9900 * input.quantity } : null); }
   getPublicCheckoutSession(publicId: string, tokenHash: string): Promise<object | null> { return Promise.resolve(publicId === 'session-a' && tokenHash ? { publicId, totalCents: 9900 } : null); }
+  getPaidDigitalDelivery(): Promise<object | null> { return Promise.resolve(null); }
   createShopifyCartSession(input: ShopifyCartSessionInput): Promise<object | null> { return Promise.resolve(input.shopDomain === 'store-a.myshopify.com' ? { publicId: 'shopify-session', totalCents: 9900 } : null); }
   updatePublicCheckoutCustomer(publicId: string, tokenHash: string): Promise<object | null> { return Promise.resolve(publicId === 'session-a' && tokenHash ? { customerCaptured: true, shippingCaptured: false } : null); }
   updatePublicCheckoutShipping(publicId: string, tokenHash: string): Promise<object | null> { return Promise.resolve(publicId === 'session-a' && tokenHash ? { customerCaptured: true, shippingCaptured: true } : null); }
@@ -67,6 +68,16 @@ describe('catálogo isolado por loja', () => {
     expect((await app.inject({ method: 'POST', url: '/products', headers: { cookie: `solid_session=${sessionToken}` }, payload })).statusCode).toBe(403);
     const response = await app.inject({ method: 'POST', url: '/products', headers: authenticatedHeaders, payload });
     expect(response.statusCode).toBe(201); expect(response.json<{ product: { storeId: string; priceCents: number } }>().product).toMatchObject({ storeId: 'store-a', priceCents: 14990 });
+    await app.close();
+  });
+
+  it('aceita infoproduto apenas com link externo HTTPS', async () => {
+    const catalog = new MemoryCatalog(); const app = buildApp(env, { authRepository: new MemoryAuth(), catalogRepository: catalog });
+    const missingLink = await app.inject({ method: 'POST', url: '/products', headers: authenticatedHeaders, payload: { title: 'Curso SOLID', priceCents: 9900, fulfillmentType: 'DIGITAL' } });
+    expect(missingLink.statusCode).toBe(400);
+    const response = await app.inject({ method: 'POST', url: '/products', headers: authenticatedHeaders, payload: { title: 'Curso SOLID', priceCents: 9900, fulfillmentType: 'DIGITAL', externalDeliveryUrl: 'https://conteudo.exemplo.com/aula-1' } });
+    expect(response.statusCode).toBe(201);
+    expect(response.json<{ product: { fulfillmentType: string; externalDeliveryUrl?: string; trackInventory: boolean } }>().product).toMatchObject({ fulfillmentType: 'DIGITAL', externalDeliveryUrl: 'https://conteudo.exemplo.com/aula-1', trackInventory: false });
     await app.close();
   });
 

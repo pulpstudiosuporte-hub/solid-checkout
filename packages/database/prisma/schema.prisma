@@ -121,6 +121,8 @@ model Product {
   sourceStatus        String?       @map("source_status") @db.VarChar(32)
   sourceUpdatedAt     DateTime?     @map("source_updated_at") @db.Timestamptz(3)
   syncedAt            DateTime?     @map("synced_at") @db.Timestamptz(3)
+  fulfillmentType     String        @default("PHYSICAL") @map("fulfillment_type") @db.VarChar(16)
+  externalDeliveryUrl String?       @map("external_delivery_url") @db.VarChar(2048)
   imageUrl            String?       @map("image_url") @db.VarChar(2048)
   priceCents          Int           @map("price_cents")
   compareAtCents      Int?          @map("compare_at_cents")
