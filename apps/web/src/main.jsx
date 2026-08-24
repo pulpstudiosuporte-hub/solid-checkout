@@ -18,7 +18,7 @@ import ProductsPage from './ProductsPage';
 import CheckoutsPage from './CheckoutsPage';
 import LogisticsPage from './LogisticsPage';
 import GatewaysPage from './GatewaysPage';
-import PublicCheckout, { PublicSessionCheckout } from './PublicCheckout';
+import PublicCheckout, { PublicCheckoutErrorBoundary, PublicSessionCheckout } from './PublicCheckout';
 import PageErrorBoundary from './PageErrorBoundary';
 import OrdersPage, { RecentOrders } from './OrdersPage';
 import OrderBumpsPage from './OrderBumpsPage';
@@ -141,8 +141,8 @@ function App(){
   async function handleSelectStore(storeId){setStoreBusy(true);try{await selectStore(storeId,auth.csrfToken);setStores(current=>current.map(store=>({...store,active:store.publicId===storeId})));setPage('Visão geral');}finally{setStoreBusy(false)}}
   async function handleCreateStore(name){setStoreBusy(true);try{const result=await createStore(name,auth.csrfToken);setStores(current=>[...current.map(store=>({...store,active:false})),result.store]);setPage('Visão geral');}finally{setStoreBusy(false)}}
   async function handleArchiveStore(storeId){setStoreBusy(true);try{await archiveStore(storeId,auth.csrfToken);const result=await getStores();setStores(result.items);setPage('Visão geral');}finally{setStoreBusy(false)}}
-  if(publicSessionMatch && publicSessionToken) return <PublicSessionCheckout sessionId={publicSessionMatch[1]} token={publicSessionToken}/>;
-  if(publicMatch) return <PublicCheckout storeSlug={publicMatch[1]} checkoutSlug={publicMatch[2]}/>;
+  if(publicSessionMatch && publicSessionToken) return <PublicCheckoutErrorBoundary><PublicSessionCheckout sessionId={publicSessionMatch[1]} token={publicSessionToken}/></PublicCheckoutErrorBoundary>;
+  if(publicMatch) return <PublicCheckoutErrorBoundary><PublicCheckout storeSlug={publicMatch[1]} checkoutSlug={publicMatch[2]}/></PublicCheckoutErrorBoundary>;
   if(auth.status==='checking') return <SessionLoading/>;
   if(auth.status==='anonymous'){if(window.location.hash!=='#/login')window.history.replaceState({},'', '/#/login');return <Login onSubmit={handleLogin}/>;}
   if(window.location.hash==='#/login')window.history.replaceState({},'', '/');

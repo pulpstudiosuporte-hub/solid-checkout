@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Component, useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowRight,
@@ -89,6 +89,35 @@ function ProductImage({ src, title }) {
   );
 }
 
+export class PublicCheckoutErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("[SOLID public checkout error]", error, info);
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="public-checkout-state error" role="alert">
+        <ShoppingBag />
+        <b>Não foi possível abrir esta etapa</b>
+        <span>Atualize a página para continuar sua compra com segurança.</span>
+        <button type="button" onClick={() => window.location.reload()}>
+          Tentar novamente
+        </button>
+      </div>
+    );
+  }
+}
+
 export default function PublicCheckout({ storeSlug, checkoutSlug }) {
   const [state, setState] = useState({
     loading: true,
@@ -133,13 +162,17 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
         `solid-checkout-session:${result.session.publicId}`,
         result.token,
       );
+      const { session: completeSession } = await getPublicCheckoutSession(
+        result.session.publicId,
+        result.token,
+      );
       window.history.replaceState(
         {},
         "",
         `/#/session/${result.session.publicId}?token=${encodeURIComponent(result.token)}`,
       );
       setSessionToken(result.token);
-      setSession(result.session);
+      setSession(completeSession);
     } catch (error) {
       setState((current) => ({ ...current, error: error.message }));
     } finally {
