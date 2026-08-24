@@ -71,6 +71,14 @@ const configStyle = (config) => ({
 const safeQuantity = (value, maximum) =>
   Math.max(1, Math.min(maximum, Number(value) || 1));
 
+// Shopify descriptions are stored as HTML. The public checkout renders them
+// as plain text, so extract their readable content instead of exposing tags.
+const descriptionText = (value) => {
+  if (!value) return "";
+  if (typeof DOMParser === "undefined") return String(value).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return new DOMParser().parseFromString(value, "text/html").body.textContent?.replace(/\s+/g, " ").trim() || "";
+};
+
 function ProductImage({ src, title }) {
   return src ? (
     <img src={src} alt={`Imagem de ${title}`} loading="lazy" />
@@ -222,7 +230,7 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
         <aside>
           <ProductImage src={product.imageUrl} title={product.checkoutTitle} />
           <h2>{product.checkoutTitle}</h2>
-          {product.checkoutDescription && <p>{product.checkoutDescription}</p>}
+          {descriptionText(product.checkoutDescription) && <p>{descriptionText(product.checkoutDescription)}</p>}
           <div>
             <span>
               {quantity} × {money.format(unitPrice / 100)}
@@ -548,7 +556,7 @@ function SessionContent({ session: initialSession, token }) {
                 <input type="checkbox" checked={Boolean(session.items?.some(item => item.isOrderBump && item.product?.publicId === bump.publicId))} disabled={busy} onChange={(event) => toggleOrderBump(bump.publicId, event.target.checked)} />
                 <span className="public-order-bump-check"><Check size={14} /></span>
                 {bump.imageUrl ? <img src={bump.imageUrl} alt="" /> : <span className="public-order-bump-image"><ShoppingBag size={18}/></span>}
-                <span><b>{bump.offerTitle || config.orderBumpTitle || 'Oferta especial'}</b><strong>{bump.checkoutTitle}</strong>{(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription) && <small>{bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription}</small>}</span>
+                <span><b>{bump.offerTitle || config.orderBumpTitle || 'Oferta especial'}</b><strong>{bump.checkoutTitle}</strong>{descriptionText(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription) && <small>{descriptionText(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription)}</small>}</span>
                 <em>+ {money.format(bump.priceCents / 100)}</em>
               </label>)}
               {error && (
