@@ -1,61 +1,30 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, LoaderCircle, Palette, Plus, Rocket } from 'lucide-react';
-import { createCheckout, createProduct, getCheckouts, getProducts, publishCheckout, updateCheckoutDraft, uploadProductImage } from './api';
+import { CheckCircle2, Clipboard, ExternalLink, LoaderCircle, Palette, Plus, Rocket, X } from 'lucide-react';
+import { createCheckout, createProduct, getCheckouts, getProducts, getStores, publishCheckout, updateCheckoutDraft, uploadProductImage } from './api';
 import CheckoutEditor from './CheckoutEditor';
 import './checkouts-page.css';
 
-export default function CheckoutsPage({ csrfToken }) {
-  const [data, setData] = useState({ loading: true, checkouts: [], products: [], error: '' });
-  const [productId, setProductId] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [editing, setEditing] = useState(false);
+const toSlug = value => value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
 
-  async function load() {
-    try {
-      const [checkouts, products] = await Promise.all([getCheckouts(), getProducts({ status: 'active' })]);
-      setData({ loading: false, checkouts: checkouts.items, products: products.items, error: '' });
-      setProductId(current => current || products.items[0]?.publicId || '');
-    } catch (error) {
-      setData(current => ({ ...current, loading: false, error: error.message }));
-    }
-  }
+function CreateCheckoutDialog({ products, busy, onClose, onCreate }) {
+  const [form, setForm] = useState({ name: '', slug: '', productId: products[0]?.publicId || '' });
+  const [error, setError] = useState('');
+  const updateName = name => setForm(current => ({ ...current, name, slug: current.slug ? current.slug : toSlug(name) }));
+  const submit = async event => { event.preventDefault(); const name = form.name.trim(); const slug = toSlug(form.slug); if (!name || !slug || !form.productId) { setError('Informe nome, endereço e produto para o checkout.'); return; } try { await onCreate({ name, slug, productId: form.productId }); } catch (caught) { setError(caught.message); } };
+  return <div className="modal-overlay" role="presentation" onMouseDown={event => event.target === event.currentTarget && onClose()}><section className="store-modal checkout-create-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-create-title"><button className="modal-close" type="button" onClick={onClose} aria-label="Fechar"><X size={19}/></button><header className="store-modal-head"><span><Rocket size={21}/></span><div><h2 id="checkout-create-title">Criar checkout</h2><p>Escolha o produto e o endereço público de venda.</p></div></header><form onSubmit={submit}><label>Nome interno<input autoFocus value={form.name} maxLength="120" onChange={event => updateName(event.target.value)} placeholder="Ex.: Checkout do Curso SOLID" disabled={busy}/></label><label>Endereço do checkout<input value={form.slug} maxLength="80" onChange={event => setForm(current => ({ ...current, slug: toSlug(event.target.value) }))} placeholder="curso-solid" disabled={busy}/><small>Use letras, números e hífens. Ex.: <b>curso-solid</b></small></label><label>Produto<select value={form.productId} onChange={event => setForm(current => ({ ...current, productId: event.target.value }))} disabled={busy}><option value="">Selecione um produto</option>{products.map(product => <option key={product.publicId} value={product.publicId}>{product.checkoutTitle}{product.fulfillmentType === 'DIGITAL' ? ' · Infoproduto' : ''}</option>)}</select></label>{error && <p className="store-form-error" role="alert">{error}</p>}<div className="store-modal-actions"><button className="secondary" type="button" onClick={onClose} disabled={busy}>Cancelar</button><button className="primary" disabled={busy || !products.length}>{busy ? <LoaderCircle className="spin" size={17}/> : <Plus size={17}/>} Criar checkout</button></div></form></section></div>;
+}
 
+export default function CheckoutsPage({ csrfToken, storeSlug }) {
+  const [data, setData] = useState({ loading: true, checkouts: [], products: [], error: '' }); const [busy, setBusy] = useState(false); const [editing, setEditing] = useState(null); const [creating, setCreating] = useState(false); const [copied, setCopied] = useState('');
+  async function load() { try { const [checkouts, products, stores] = await Promise.all([getCheckouts(), getProducts({ status: 'active', pageSize: 100 }), getStores()]); setData({ loading: false, checkouts: checkouts.items, products: products.items, storeSlug: stores.items.find(store => store.active)?.slug || '', error: '' }); } catch (error) { setData(current => ({ ...current, loading: false, error: error.message })); } }
   useEffect(() => { void load(); }, []);
-  const principal = data.checkouts.find(item => item.slug === 'principal');
-
-  async function create() {
-    setBusy(true);
-    try { await createCheckout({ name: 'Checkout principal', slug: 'principal', productId }, csrfToken); await load(); }
-    catch (error) { setData(current => ({ ...current, error: error.message })); }
-    finally { setBusy(false); }
-  }
-
-  async function publish() {
-    setBusy(true);
-    try { await publishCheckout(principal.publicId, csrfToken); await load(); }
-    catch (error) { setData(current => ({ ...current, error: error.message })); throw error; }
-    finally { setBusy(false); }
-  }
-
-  async function saveDraft(config) {
-    const result = await updateCheckoutDraft(principal.publicId, config, csrfToken);
-    setData(current => ({ ...current, checkouts: current.checkouts.map(item => item.publicId === principal.publicId ? result.checkout : item) }));
-  }
-  async function createOrderBump(input) {
-    const result = await createProduct({ title: input.title, description: input.description || undefined, imageUrl: input.imageUrl || undefined, priceCents: input.priceCents, trackInventory: false, maxPerOrder: 1, active: true }, csrfToken);
-    setData(current => ({ ...current, products: [result.product, ...current.products] }));
-    return result.product;
-  }
-
-  if (editing && principal) return <CheckoutEditor checkout={principal} products={data.products} onCreateOrderBump={createOrderBump} onUploadOrderBumpImage={(file) => uploadProductImage(file, csrfToken)} onBack={() => setEditing(false)} onPreview={() => {}} onSaveDraft={saveDraft} onPublish={publish} />;
-  if (data.loading) return <main className="page"><section className="card products-state"><LoaderCircle className="spin" /><span>Carregando checkouts...</span></section></main>;
-
-  return <main className="page">
-    <section className="page-title"><div><p className="eyebrow">CHECKOUT</p><h1>Checkouts</h1><p>Publique a experiência usada pela sua loja Shopify.</p></div></section>
-    <section className="card principal-checkout-card">
-      <div><h2>Checkout principal</h2><p>Identificador da extensão: <code>principal</code></p></div>
-      {data.error && <p className="public-error" role="alert">{data.error}</p>}
-      {!principal ? <div className="principal-create"><label>Produto de referência<select value={productId} onChange={event => setProductId(event.target.value)}>{data.products.map(product => <option key={product.publicId} value={product.publicId}>{product.checkoutTitle}</option>)}</select></label><button className="primary" disabled={busy || !productId} onClick={create}>{busy ? <LoaderCircle className="spin" size={17} /> : <Plus size={17} />} Criar checkout principal</button>{!data.products.length && <small>Sincronize um produto Shopify primeiro.</small>}</div> : <div className="principal-status"><span className={principal.status === 'PUBLISHED' ? 'published' : ''}>{principal.status === 'PUBLISHED' ? <CheckCircle2 size={16} /> : <Rocket size={16} />} {principal.status === 'PUBLISHED' ? 'Publicado' : 'Rascunho'}</span><button className="secondary" disabled={busy} onClick={() => setEditing(true)}><Palette size={17} /> Personalizar</button>{principal.status !== 'PUBLISHED' && <button className="primary" disabled={busy} onClick={publish}><Rocket size={17} /> Publicar agora</button>}</div>}
-    </section>
-  </main>;
+  async function create(input) { setBusy(true); try { await createCheckout(input, csrfToken); setCreating(false); await load(); } finally { setBusy(false); } }
+  async function publish(checkout) { setBusy(true); try { await publishCheckout(checkout.publicId, csrfToken); await load(); } catch (error) { setData(current => ({ ...current, error: error.message })); } finally { setBusy(false); } }
+  async function saveDraft(config) { const result = await updateCheckoutDraft(editing.publicId, config, csrfToken); setData(current => ({ ...current, checkouts: current.checkouts.map(item => item.publicId === editing.publicId ? result.checkout : item) })); setEditing(result.checkout); }
+  async function createOrderBump(input) { const result = await createProduct({ title: input.title, description: input.description || undefined, imageUrl: input.imageUrl || undefined, priceCents: input.priceCents, trackInventory: false, maxPerOrder: 1, active: true }, csrfToken); setData(current => ({ ...current, products: [result.product, ...current.products] })); return result.product; }
+  const checkoutUrl = checkout => `https://pay.solidcheckout.xyz/c/${storeSlug || data.storeSlug || 'sua-loja'}/${checkout.slug}`;
+  const copy = async checkout => { try { await navigator.clipboard.writeText(checkoutUrl(checkout)); setCopied(checkout.publicId); window.setTimeout(() => setCopied(''), 1800); } catch { setData(current => ({ ...current, error: 'Não foi possível copiar o link. Copie-o manualmente.' })); } };
+  if (editing) return <CheckoutEditor checkout={editing} products={data.products} onCreateOrderBump={createOrderBump} onUploadOrderBumpImage={file => uploadProductImage(file, csrfToken)} onBack={() => { setEditing(null); void load(); }} onPreview={() => {}} onSaveDraft={saveDraft} onPublish={() => publish(editing)} />;
+  if (data.loading) return <main className="page"><section className="card products-state"><LoaderCircle className="spin"/><span>Carregando checkouts...</span></section></main>;
+  return <main className="page checkouts-page"><section className="page-title"><div><p className="eyebrow">CHECKOUT</p><h1>Checkouts</h1><p>Crie um checkout para cada produto, campanha ou oferta.</p></div><button className="primary" onClick={() => setCreating(true)} disabled={!data.products.length}><Plus size={17}/> Criar checkout</button></section>{data.error && <p className="public-error" role="alert">{data.error}</p>}{!data.products.length ? <section className="card checkout-empty"><Rocket size={30}/><h2>Crie um produto primeiro</h2><p>Você precisa de ao menos um produto ativo para criar o link de checkout.</p></section> : data.checkouts.length === 0 ? <section className="card checkout-empty"><Rocket size={30}/><h2>Nenhum checkout criado</h2><p>Crie seu primeiro checkout e publique um link para vender.</p><button className="primary" onClick={() => setCreating(true)}><Plus size={17}/> Criar checkout</button></section> : <section className="checkout-grid">{data.checkouts.map(checkout => <article className="card checkout-card" key={checkout.publicId}><header><div><span className={checkout.status === 'PUBLISHED' ? 'published' : 'draft'}>{checkout.status === 'PUBLISHED' ? <CheckCircle2 size={15}/> : <Rocket size={15}/>}{checkout.status === 'PUBLISHED' ? 'Publicado' : 'Rascunho'}</span><h2>{checkout.name}</h2><p>{checkout.product?.checkoutTitle || 'Produto indisponível'}</p></div></header><div className="checkout-link"><code>{checkoutUrl(checkout)}</code><button className="icon-btn" type="button" onClick={() => void copy(checkout)} title="Copiar link" aria-label="Copiar link do checkout"><Clipboard size={16}/></button></div>{copied === checkout.publicId && <small className="checkout-copied">Link copiado.</small>}<footer><button className="secondary" type="button" onClick={() => setEditing(checkout)} disabled={busy}><Palette size={16}/> Personalizar</button>{checkout.status !== 'PUBLISHED' ? <button className="primary" type="button" onClick={() => void publish(checkout)} disabled={busy}>{busy ? <LoaderCircle className="spin" size={16}/> : <Rocket size={16}/>} Publicar</button> : <a className="secondary" href={checkoutUrl(checkout)} target="_blank" rel="noreferrer"><ExternalLink size={16}/> Abrir</a>}</footer></article>)}</section>}{creating && <CreateCheckoutDialog products={data.products} busy={busy} onClose={() => setCreating(false)} onCreate={create}/>}</main>;
 }

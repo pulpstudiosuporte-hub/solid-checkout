@@ -98,8 +98,8 @@ function Dashboard({ setPage, storeKey }) {
   </main>;
 }
 
-function SimplePage({ page, onCheckout, onEdit, csrfToken, storeKey }) {
-  if (page === 'Checkouts') return <CheckoutsPage csrfToken={csrfToken}/>;
+function SimplePage({ page, onCheckout, onEdit, csrfToken, storeKey, storeSlug }) {
+  if (page === 'Checkouts') return <CheckoutsPage csrfToken={csrfToken} storeSlug={storeSlug}/>;
   if (page === 'Logística') return <LogisticsPage csrfToken={csrfToken} storeKey={storeKey}/>;
   const configs = {
     'Pedidos': ['Pedidos', 'Gerencie vendas, pagamentos e carrinhos abandonados.', ShoppingBag],
