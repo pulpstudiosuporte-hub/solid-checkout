@@ -128,6 +128,19 @@ function Checkout({ onBack, customConfig }) {
   </div><footer className="checkout-footer"><Logo/><span>© 2026 Solid Commerce. Todos os direitos reservados.</span><div><a href="#">Privacidade</a><a href="#">Termos</a></div></footer></div>;
 }
 
+function PublicSessionRoute({ sessionId, urlToken }) {
+  const [token] = useState(() => {
+    const storageKey = `solid-checkout-session:${sessionId}`;
+    if (urlToken) sessionStorage.setItem(storageKey, urlToken);
+    return urlToken || sessionStorage.getItem(storageKey) || '';
+  });
+  useEffect(() => {
+    if (urlToken) window.history.replaceState({}, '', `/#/session/${sessionId}`);
+  }, [sessionId, urlToken]);
+  if (!token) return <div className="public-checkout-state error" role="alert"><ShoppingBag/><b>Sessão indisponível</b><span>Abra novamente o link original do checkout para continuar.</span></div>;
+  return <PublicSessionCheckout sessionId={sessionId} token={token}/>;
+}
+
 function App(){
   const [sidebar,setSidebar]=useState(false); const [page,setPage]=useState(()=>window.location.hash.startsWith('#/integrations')?'Integrações':'Visão geral'); const [checkout,setCheckout]=useState(false); const [editor,setEditor]=useState(false); const [previewConfig,setPreviewConfig]=useState(null); const [apiStatus,setApiStatus]=useState('checking');
   const [auth,setAuth]=useState({status:'checking',user:null,csrfToken:null});
@@ -141,7 +154,7 @@ function App(){
   async function handleSelectStore(storeId){setStoreBusy(true);try{await selectStore(storeId,auth.csrfToken);setStores(current=>current.map(store=>({...store,active:store.publicId===storeId})));setPage('Visão geral');}finally{setStoreBusy(false)}}
   async function handleCreateStore(name){setStoreBusy(true);try{const result=await createStore(name,auth.csrfToken);setStores(current=>[...current.map(store=>({...store,active:false})),result.store]);setPage('Visão geral');}finally{setStoreBusy(false)}}
   async function handleArchiveStore(storeId){setStoreBusy(true);try{await archiveStore(storeId,auth.csrfToken);const result=await getStores();setStores(result.items);setPage('Visão geral');}finally{setStoreBusy(false)}}
-  if(publicSessionMatch && publicSessionToken) return <PublicCheckoutErrorBoundary><PublicSessionCheckout sessionId={publicSessionMatch[1]} token={publicSessionToken}/></PublicCheckoutErrorBoundary>;
+  if(publicSessionMatch) return <PublicCheckoutErrorBoundary><PublicSessionRoute sessionId={publicSessionMatch[1]} urlToken={publicSessionToken}/></PublicCheckoutErrorBoundary>;
   if(publicMatch) return <PublicCheckoutErrorBoundary><PublicCheckout storeSlug={publicMatch[1]} checkoutSlug={publicMatch[2]}/></PublicCheckoutErrorBoundary>;
   if(auth.status==='checking') return <SessionLoading/>;
   if(auth.status==='anonymous'){if(window.location.hash!=='#/login')window.history.replaceState({},'', '/#/login');return <Login onSubmit={handleLogin}/>;}

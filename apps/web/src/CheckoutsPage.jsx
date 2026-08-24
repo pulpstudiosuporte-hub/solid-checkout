@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Clipboard, ExternalLink, LoaderCircle, Palette, Plus, Rocket, X } from 'lucide-react';
-import { createCheckout, createProduct, getCheckouts, getProducts, getStores, publishCheckout, updateCheckoutDraft, uploadProductImage } from './api';
+import { createCheckout, createProduct, getCheckouts, getProducts, getStoreDomain, getStores, publishCheckout, updateCheckoutDraft, uploadProductImage } from './api';
 import CheckoutEditor from './CheckoutEditor';
 import './checkouts-page.css';
 
@@ -16,13 +16,13 @@ function CreateCheckoutDialog({ products, busy, onClose, onCreate }) {
 
 export default function CheckoutsPage({ csrfToken, storeSlug }) {
   const [data, setData] = useState({ loading: true, checkouts: [], products: [], error: '' }); const [busy, setBusy] = useState(false); const [editing, setEditing] = useState(null); const [creating, setCreating] = useState(false); const [copied, setCopied] = useState('');
-  async function load() { try { const [checkouts, products, stores] = await Promise.all([getCheckouts(), getProducts({ status: 'active', pageSize: 100 }), getStores()]); setData({ loading: false, checkouts: checkouts.items, products: products.items, storeSlug: stores.items.find(store => store.active)?.slug || '', error: '' }); } catch (error) { setData(current => ({ ...current, loading: false, error: error.message })); } }
+  async function load() { try { const [checkouts, products, stores, domain] = await Promise.all([getCheckouts(), getProducts({ status: 'active', pageSize: 100 }), getStores(), getStoreDomain()]); setData({ loading: false, checkouts: checkouts.items, products: products.items, storeSlug: stores.items.find(store => store.active)?.slug || '', checkoutHost: domain.domain?.status === 'ACTIVE' ? domain.domain.hostname : 'pay.solidcheckout.xyz', error: '' }); } catch (error) { setData(current => ({ ...current, loading: false, error: error.message })); } }
   useEffect(() => { void load(); }, []);
   async function create(input) { setBusy(true); try { await createCheckout(input, csrfToken); setCreating(false); await load(); } finally { setBusy(false); } }
   async function publish(checkout) { setBusy(true); try { await publishCheckout(checkout.publicId, csrfToken); await load(); } catch (error) { setData(current => ({ ...current, error: error.message })); } finally { setBusy(false); } }
   async function saveDraft(config) { const result = await updateCheckoutDraft(editing.publicId, config, csrfToken); setData(current => ({ ...current, checkouts: current.checkouts.map(item => item.publicId === editing.publicId ? result.checkout : item) })); setEditing(result.checkout); }
   async function createOrderBump(input) { const result = await createProduct({ title: input.title, description: input.description || undefined, imageUrl: input.imageUrl || undefined, priceCents: input.priceCents, trackInventory: false, maxPerOrder: 1, active: true }, csrfToken); setData(current => ({ ...current, products: [result.product, ...current.products] })); return result.product; }
-  const checkoutUrl = checkout => `https://pay.solidcheckout.xyz/#/c/${storeSlug || data.storeSlug || 'sua-loja'}/${checkout.slug}`;
+  const checkoutUrl = checkout => `https://${data.checkoutHost || 'pay.solidcheckout.xyz'}/#/c/${storeSlug || data.storeSlug || 'sua-loja'}/${checkout.slug}`;
   const copy = async checkout => { try { await navigator.clipboard.writeText(checkoutUrl(checkout)); setCopied(checkout.publicId); window.setTimeout(() => setCopied(''), 1800); } catch { setData(current => ({ ...current, error: 'Não foi possível copiar o link. Copie-o manualmente.' })); } };
   if (editing) return <CheckoutEditor checkout={editing} products={data.products} onCreateOrderBump={createOrderBump} onUploadOrderBumpImage={file => uploadProductImage(file, csrfToken)} onBack={() => { setEditing(null); void load(); }} onPreview={() => {}} onSaveDraft={saveDraft} onPublish={() => publish(editing)} />;
   if (data.loading) return <main className="page"><section className="card products-state"><LoaderCircle className="spin"/><span>Carregando checkouts...</span></section></main>;

@@ -169,7 +169,7 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
       window.history.replaceState(
         {},
         "",
-        `/#/session/${result.session.publicId}?token=${encodeURIComponent(result.token)}`,
+        `/#/session/${result.session.publicId}`,
       );
       setSessionToken(result.token);
       setSession(completeSession);
