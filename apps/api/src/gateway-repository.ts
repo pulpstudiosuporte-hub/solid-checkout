@@ -79,6 +79,10 @@ export class PrismaGatewayRepository {
     return this.database.paymentAttempt.findUnique({ where: { providerTransactionId }, select: { id: true, publicId: true, checkoutSessionId: true, amountCents: true, status: true, session: { select: { checkout: { select: { storeId: true } } } } } });
   }
 
+  async recordWebhookEvent(context: WebhookContext, provider: PaymentProvider, providerStatus: string | null, requestId: string): Promise<void> {
+    await this.database.auditLog.create({ data: { storeId: context.session.checkout.storeId, actorType: 'SYSTEM', action: 'payment.webhook_verified', targetType: 'payment_attempt', targetId: context.publicId, requestId, metadata: { provider, providerStatus, paymentStatus: context.status } } });
+  }
+
   async confirmPayment(attemptId: string, checkoutSessionId: string, status: 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED', paidAt?: Date) {
     await this.database.$transaction(async transaction => {
       const current = await transaction.paymentAttempt.findUnique({ where: { id: attemptId }, select: { status: true } });

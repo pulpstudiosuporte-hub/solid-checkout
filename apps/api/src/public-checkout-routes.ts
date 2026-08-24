@@ -219,6 +219,8 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       if (!official || official.id !== objectId || !westPayAmountMatches(official.amount, context.amountCents) || official.externalRef && official.externalRef !== `solid-${context.publicId}`) return reply.code(200).send({ received: true });
       const mapped = westPayPaymentStatus(official.status);
       if (mapped) {
+        try { await gateways.recordWebhookEvent(context, 'WESTPAY', official.status, request.id); }
+        catch (auditError) { request.log.warn({ err: auditError, providerTransactionId: objectId }, 'westpay_webhook_audit_failed'); }
         await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined);
         if (mapped === 'PAID' && shopify) {
           try { await syncPaidShopifyOrder(environment, shopify, context.checkoutSessionId); }
@@ -242,7 +244,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       const official = await getRoasPix({ secretKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) }, objectId);
       if (!official || official.id !== objectId || !roasAmountMatches(official.amount, context.amountCents)) return reply.code(200).send({ received: true });
       const mapped = westPayPaymentStatus(official.status);
-      if (mapped) { await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined); if (mapped === 'PAID' && shopify) { try { await syncPaidShopifyOrder(environment, shopify, context.checkoutSessionId); } catch (error) { request.log.error({ err: error, checkoutSessionId: context.checkoutSessionId }, 'shopify_order_sync_failed'); } } }
+      if (mapped) { try { await gateways.recordWebhookEvent(context, 'ROAS', official.status, request.id); } catch (auditError) { request.log.warn({ err: auditError, providerTransactionId: objectId }, 'roas_webhook_audit_failed'); } await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined); if (mapped === 'PAID' && shopify) { try { await syncPaidShopifyOrder(environment, shopify, context.checkoutSessionId); } catch (error) { request.log.error({ err: error, checkoutSessionId: context.checkoutSessionId }, 'shopify_order_sync_failed'); } } }
       return reply.code(200).send({ received: true });
     } catch (error) { request.log.warn({ err: error, providerTransactionId: objectId }, 'roas_webhook_verification_failed'); return reply.code(503).send(); }
   });

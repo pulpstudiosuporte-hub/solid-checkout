@@ -26,8 +26,10 @@ export interface ShopifyRepository {
   syncCatalog(storeId: string, userId: string, requestId: string, catalog: ShopifyCatalog): Promise<ShopifySyncResult>;
   claimPaidOrderSync(checkoutSessionId: string, now: Date): Promise<ShopifyOrderSyncContext | null>;
   markOrderSynced(checkoutSessionId: string, order: { id: string; name?: string | null }, now: Date): Promise<void>;
+  markOrderPaymentSynced(checkoutSessionId: string, now: Date): Promise<void>;
   markOrderSyncFailed(checkoutSessionId: string, message: string): Promise<void>;
   shopifyOrderId(checkoutSessionId: string): Promise<{ storeId: string; orderId: string } | null>;
+  paidOrdersAwaitingSync(now: Date): Promise<readonly string[]>;
 }
 
 export class PrismaShopifyRepository implements ShopifyRepository {
@@ -117,12 +119,20 @@ export class PrismaShopifyRepository implements ShopifyRepository {
   async markOrderSynced(checkoutSessionId: string, order: { id: string; name?: string | null }, now: Date): Promise<void> {
     await this.database.checkoutSession.updateMany({ where: { id: checkoutSessionId, shopifyOrderId: null }, data: { shopifyOrderId: order.id, shopifyOrderName: order.name ?? null, shopifySyncStatus: 'SYNCED', shopifySyncedAt: now, shopifySyncError: null } });
   }
+  async markOrderPaymentSynced(checkoutSessionId: string, now: Date): Promise<void> {
+    await this.database.checkoutSession.updateMany({ where: { id: checkoutSessionId, shopifyOrderId: { not: null } }, data: { shopifySyncStatus: 'SYNCED', shopifySyncedAt: now, shopifySyncError: null } });
+  }
   async markOrderSyncFailed(checkoutSessionId: string, message: string): Promise<void> {
-    await this.database.checkoutSession.updateMany({ where: { id: checkoutSessionId, shopifyOrderId: null }, data: { shopifySyncStatus: 'FAILED', shopifySyncError: message.slice(0, 500) } });
+    await this.database.checkoutSession.updateMany({ where: { id: checkoutSessionId }, data: { shopifySyncStatus: 'FAILED', shopifySyncError: message.slice(0, 500) } });
   }
   async shopifyOrderId(checkoutSessionId: string): Promise<{ storeId: string; orderId: string } | null> {
     const session = await this.database.checkoutSession.findUnique({ where: { id: checkoutSessionId }, select: { shopifyOrderId: true, checkout: { select: { storeId: true } } } });
     return session?.shopifyOrderId ? { storeId: session.checkout.storeId, orderId: session.shopifyOrderId } : null;
+  }
+  async paidOrdersAwaitingSync(now: Date): Promise<readonly string[]> {
+    const staleBefore = new Date(now.getTime() - 2 * 60_000);
+    const sessions = await this.database.checkoutSession.findMany({ where: { source: 'SHOPIFY', status: 'COMPLETED', OR: [{ shopifySyncStatus: null }, { shopifySyncStatus: 'FAILED', updatedAt: { lte: staleBefore } }, { shopifySyncStatus: 'SYNCING', shopifySyncStartedAt: { lte: new Date(now.getTime() - 10 * 60_000) } }] }, orderBy: { updatedAt: 'asc' }, take: 50, select: { id: true } });
+    return sessions.map(session => session.id);
   }
 }
 

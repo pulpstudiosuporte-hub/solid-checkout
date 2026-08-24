@@ -18,11 +18,15 @@ const MARK_ORDER_PAID = `mutation SolidOrderMarkAsPaid($input: OrderMarkAsPaidIn
 
 export async function syncPaidShopifyOrder(environment: AppEnvironment, repository: ShopifyRepository, checkoutSessionId: string): Promise<void> {
   if (!environment.APP_ENCRYPTION_KEY) return;
-  const existing = await repository.shopifyOrderId(checkoutSessionId);
-  if (existing) return markAsPaid(environment, repository, existing.storeId, existing.orderId);
-  const context = await repository.claimPaidOrderSync(checkoutSessionId, new Date());
-  if (!context) return;
   try {
+    const existing = await repository.shopifyOrderId(checkoutSessionId);
+    if (existing) {
+      await markAsPaid(environment, repository, existing.storeId, existing.orderId);
+      await repository.markOrderPaymentSynced(checkoutSessionId, new Date());
+      return;
+    }
+    const context = await repository.claimPaidOrderSync(checkoutSessionId, new Date());
+    if (!context) return;
     const credentials = await repository.credentials(context.storeId);
     if (!credentials) throw new Error('A loja não possui uma conexão Shopify ativa.');
     const customer = JSON.parse(decryptSecret(context.customerDataEncrypted, environment.APP_ENCRYPTION_KEY)) as Customer;
@@ -51,7 +55,7 @@ export async function syncPaidShopifyOrder(environment: AppEnvironment, reposito
     if (context.paid) await markAsPaid(environment, repository, context.storeId, data.orderCreate.order.id);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha desconhecida ao criar pedido Shopify.';
-    await repository.markOrderSyncFailed(context.checkoutSessionId, message);
+    await repository.markOrderSyncFailed(checkoutSessionId, message);
     throw error;
   }
 }
