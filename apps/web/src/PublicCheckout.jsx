@@ -98,6 +98,7 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
   const [variantId, setVariantId] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [session, setSession] = useState(null);
+  const [sessionToken, setSessionToken] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
@@ -132,6 +133,12 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
         `solid-checkout-session:${result.session.publicId}`,
         result.token,
       );
+      window.history.replaceState(
+        {},
+        "",
+        `/#/session/${result.session.publicId}?token=${encodeURIComponent(result.token)}`,
+      );
+      setSessionToken(result.token);
       setSession(result.session);
     } catch (error) {
       setState((current) => ({ ...current, error: error.message }));
@@ -154,6 +161,8 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
         <span>{state.error || "Confira o endereço e tente novamente."}</span>
       </div>
     );
+  if (session && sessionToken)
+    return <SessionContent session={session} token={sessionToken} />;
   return (
     <main className="public-checkout" style={configStyle(config)}>
       <header>
@@ -167,21 +176,8 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
       <div className="public-checkout-grid">
         <section>
           <p className="eyebrow">FINALIZE SEU PEDIDO</p>
-          <h1>
-            {session ? "Pedido iniciado com segurança." : "Revise sua compra"}
-          </h1>
-          {session ? (
-            <div className="public-session-created">
-              <Check size={28} />
-              <h2>Sessão criada</h2>
-              <p>
-                Os valores foram validados pelo servidor e reservados por 30
-                minutos.
-              </p>
-              <strong>{money.format(session.totalCents / 100)}</strong>
-            </div>
-          ) : (
-            <div className="public-form-card">
+          <h1>Revise sua compra</h1>
+          <div className="public-form-card">
               {product.variants?.length > 0 && (
                 <label>
                   Variação
@@ -224,8 +220,7 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
                 )}{" "}
                 Continuar para pagamento
               </button>
-            </div>
-          )}
+          </div>
         </section>
         <aside>
           <ProductImage src={product.imageUrl} title={product.checkoutTitle} />
