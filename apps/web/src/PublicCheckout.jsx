@@ -1,4 +1,4 @@
-import { Component, useEffect, useMemo, useRef, useState } from "react";
+import { Component, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowRight,
@@ -68,9 +68,6 @@ const configStyle = (config) => ({
   "--public-radius": `${config.radius}px`,
   fontFamily: config.font,
 });
-const safeQuantity = (value, maximum) =>
-  Math.max(1, Math.min(maximum, Number(value) || 1));
-
 // Shopify descriptions are stored as HTML. The public checkout renders them
 // as plain text, so extract their readable content instead of exposing tags.
 const descriptionText = (value) => {
@@ -129,7 +126,9 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
   const [session, setSession] = useState(null);
   const [sessionToken, setSessionToken] = useState("");
   const [busy, setBusy] = useState(false);
+  const autoStarted = useRef(false);
   useEffect(() => {
+    autoStarted.current = false;
     const controller = new AbortController();
     getPublicCheckout(storeSlug, checkoutSlug, controller.signal)
       .then(({ checkout }) => {
@@ -143,12 +142,6 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
     return () => controller.abort();
   }, [storeSlug, checkoutSlug]);
   const product = state.checkout?.product;
-  const config = publicConfig(state.checkout?.publishedConfig);
-  const variant = product?.variants?.find(
-    (item) => item.publicId === variantId,
-  );
-  const unitPrice = variant?.priceCents ?? product?.priceCents ?? 0;
-  const total = useMemo(() => unitPrice * quantity, [unitPrice, quantity]);
   async function begin() {
     setBusy(true);
     setState((current) => ({ ...current, error: "" }));
@@ -179,6 +172,12 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
       setBusy(false);
     }
   }
+  useEffect(() => {
+    if (!product || session || autoStarted.current) return;
+    if (product.variants?.length > 0 && !variantId) return;
+    autoStarted.current = true;
+    void begin();
+  }, [product, variantId, session]);
   if (state.loading)
     return (
       <div className="public-checkout-state">
@@ -197,77 +196,12 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
   if (session && sessionToken)
     return <SessionContent session={session} token={sessionToken} />;
   return (
-    <main className="public-checkout" style={configStyle(config)}>
-      <header>
-        <img className="public-brand" src="/brand/solid-wordmark-dark.png" alt={config.logoText || 'SOLID'} />
-        {config.secureHeader && (
-          <span>
-            <ShieldCheck size={18} /> Pagamento seguro
-          </span>
-        )}
-      </header>
-      <div className="public-checkout-grid">
-        <section>
-          <p className="eyebrow">FINALIZE SEU PEDIDO</p>
-          <h1>Revise sua compra</h1>
-          <div className="public-form-card">
-              {product.variants?.length > 0 && (
-                <label>
-                  Variação
-                  <select
-                    value={variantId}
-                    onChange={(event) => setVariantId(event.target.value)}
-                  >
-                    {product.variants.map((item) => (
-                      <option key={item.publicId} value={item.publicId}>
-                        {item.title} — {money.format(item.priceCents / 100)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              <label>
-                Quantidade
-                <input
-                  type="number"
-                  min="1"
-                  max={product.maxPerOrder}
-                  value={quantity}
-                  onChange={(event) =>
-                    setQuantity(
-                      safeQuantity(event.target.value, product.maxPerOrder),
-                    )
-                  }
-                />
-              </label>
-              {state.error && (
-                <p className="public-error" role="alert">
-                  {state.error}
-                </p>
-              )}
-              <button onClick={begin} disabled={busy}>
-                {busy ? (
-                  <LoaderCircle className="spin" size={18} />
-                ) : (
-                  <ShieldCheck size={18} />
-                )}{" "}
-                Continuar para pagamento
-              </button>
-          </div>
-        </section>
-        <aside>
-          <ProductImage src={product.imageUrl} title={product.checkoutTitle} />
-          <h2>{product.checkoutTitle}</h2>
-          {descriptionText(product.checkoutDescription) && <p>{descriptionText(product.checkoutDescription)}</p>}
-          <div>
-            <span>
-              {quantity} × {money.format(unitPrice / 100)}
-            </span>
-            <strong>{money.format(total / 100)}</strong>
-          </div>
-        </aside>
-      </div>
-    </main>
+    <div className={`public-checkout-state ${state.error ? "error" : ""}`} role={state.error ? "alert" : "status"}>
+      {state.error ? <ShoppingBag /> : <LoaderCircle className="spin" />}
+      <b>{state.error ? "Não foi possível iniciar o checkout" : "Preparando checkout seguro..."}</b>
+      {state.error && <span>{state.error}</span>}
+      {state.error && <button type="button" disabled={busy} onClick={() => { autoStarted.current = true; void begin(); }}>Tentar novamente</button>}
+    </div>
   );
 }
 
