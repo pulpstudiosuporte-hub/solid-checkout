@@ -7,7 +7,7 @@ import type { PrismaGatewayRepository } from './gateway-repository.js';
 import type { ShopifyRepository } from './shopify-repository.js';
 import { syncPaidShopifyOrder } from './shopify-order-sync.js';
 import { createWestPayPix, findWestPayPix, getWestPayPix, WestPayRequestError } from './westpay-client.js';
-import { createRoasPix, getRoasPix } from './roas-client.js';
+import { createRoasPix, getRoasPix, RoasRequestError } from './roas-client.js';
 import { lookupBrazilianPostalCode, PostalCodeLookupError } from './postal-code.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
@@ -186,14 +186,17 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization);
     if (!credentials) return reply.code(401).send(errorBody(request, 'INVALID_SESSION', 'Sessão inválida.'));
     const verification = environment.APP_ENCRYPTION_KEY ? await gateways.publicPaymentVerification(credentials.sessionId, credentials.tokenHash) : null;
-    if (verification && verification.status === 'PENDING') {
-      const provider = verification.provider === 'ROAS' ? 'ROAS' : 'WESTPAY';
+    // ROAS is webhook-first. Polling this public endpoint every few seconds must
+    // only read our database, otherwise one open checkout can exhaust the
+    // provider rate limit and also prevent webhook verification.
+    if (verification && verification.status === 'PENDING' && verification.provider !== 'ROAS') {
+      const provider = 'WESTPAY';
       const encryptedCredentials = await gateways.credentials(verification.storeId, provider);
       if (encryptedCredentials) {
         try {
-          const official = provider === 'ROAS' ? await getRoasPix({ secretKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY!), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY!) }, verification.providerTransactionId) : await getWestPayPix({ apiKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY!), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY!) }, verification.providerTransactionId);
+          const official = await getWestPayPix({ apiKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY!), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY!) }, verification.providerTransactionId);
           const mapped = westPayPaymentStatus(official?.status);
-          if (mapped && official && (provider === 'ROAS' ? roasAmountMatches(official.amount, verification.amountCents) : westPayAmountMatches(official.amount, verification.amountCents))) {
+          if (mapped && official && westPayAmountMatches(official.amount, verification.amountCents)) {
             await gateways.confirmPayment(verification.id, verification.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined);
             if (mapped === 'PAID' && shopify) {
               try { await syncPaidShopifyOrder(environment, shopify, verification.checkoutSessionId); }
@@ -255,7 +258,17 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       const mapped = westPayPaymentStatus(official.status);
       if (mapped) { try { await gateways.recordWebhookEvent(context, 'ROAS', official.status, request.id); } catch (auditError) { request.log.warn({ err: auditError, providerTransactionId: objectId }, 'roas_webhook_audit_failed'); } await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined); if (mapped === 'PAID' && shopify) { try { await syncPaidShopifyOrder(environment, shopify, context.checkoutSessionId); } catch (error) { request.log.error({ err: error, checkoutSessionId: context.checkoutSessionId }, 'shopify_order_sync_failed'); } } }
       return reply.code(200).send({ received: true });
-    } catch (error) { request.log.warn({ err: error, providerTransactionId: objectId }, 'roas_webhook_verification_failed'); return reply.code(503).send(); }
+    } catch (error) {
+      // A 429 is transient. Acknowledge the notification so ROAS does not add
+      // more retries to the burst; the reconciliation worker will verify the
+      // transaction again with backoff. Other failures remain retryable.
+      if (error instanceof RoasRequestError && error.status === 429) {
+        request.log.warn({ err: error, providerTransactionId: objectId }, 'roas_webhook_verification_deferred');
+        return reply.code(202).send({ received: true, verification: 'deferred' });
+      }
+      request.log.warn({ err: error, providerTransactionId: objectId }, 'roas_webhook_verification_failed');
+      return reply.code(503).send();
+    }
   });
 
   app.post<{ Querystring: Record<string, string | string[] | undefined>; Body: Record<string, unknown> }>('/integrations/shopify/proxy/checkout-session', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {

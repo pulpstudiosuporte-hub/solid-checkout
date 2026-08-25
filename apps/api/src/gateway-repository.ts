@@ -7,7 +7,7 @@ type GatewayCredentials = Readonly<{ apiKeyEncrypted: string; publicKeyEncrypted
 type PaymentAttemptSummary = Readonly<{ id: string; publicId: string; provider: string; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; amountCents: number; pixCodeEncrypted: string | null; expiresAt: Date | null }>;
 type CompletedAttempt = Readonly<{ publicId: string; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; amountCents: number; expiresAt: Date | null }>;
 type WebhookContext = Readonly<{ id: string; publicId: string; checkoutSessionId: string; amountCents: number; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; session: { checkout: { storeId: string } } }>;
-export type PendingPaymentVerification = Readonly<{ id: string; checkoutSessionId: string; providerTransactionId: string; amountCents: number; session: { checkout: { storeId: string } } }>;
+export type PendingPaymentVerification = Readonly<{ id: string; checkoutSessionId: string; providerTransactionId: string; amountCents: number; createdAt: Date; session: { checkout: { storeId: string } } }>;
 
 export class PrismaGatewayRepository {
   constructor(private readonly database: PrismaClient) {}
@@ -63,7 +63,7 @@ export class PrismaGatewayRepository {
   }
 
   async pendingPaymentVerifications(since: Date, provider: PaymentProvider = 'WESTPAY'): Promise<readonly PendingPaymentVerification[]> {
-    const attempts = await this.database.paymentAttempt.findMany({ where: { provider, status: 'PENDING', providerTransactionId: { not: null }, createdAt: { gte: since } }, orderBy: { createdAt: 'asc' }, take: 50, select: { id: true, checkoutSessionId: true, providerTransactionId: true, amountCents: true, session: { select: { checkout: { select: { storeId: true } } } } } });
+    const attempts = await this.database.paymentAttempt.findMany({ where: { provider, status: 'PENDING', providerTransactionId: { not: null }, createdAt: { gte: since } }, orderBy: { createdAt: 'asc' }, take: 50, select: { id: true, checkoutSessionId: true, providerTransactionId: true, amountCents: true, createdAt: true, session: { select: { checkout: { select: { storeId: true } } } } } });
     return attempts.flatMap(attempt => attempt.providerTransactionId ? [{ ...attempt, providerTransactionId: attempt.providerTransactionId }] : []);
   }
 
