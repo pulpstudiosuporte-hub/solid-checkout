@@ -18,6 +18,8 @@ const environmentSchema = z.object({
   DOKPLOY_URL: z.string().url().optional(),
   DOKPLOY_API_KEY: z.string().min(16).optional(),
   DOKPLOY_CHECKOUT_APPLICATION_ID: z.string().min(1).optional(),
+  RESEND_API_KEY: z.string().startsWith('re_').optional(),
+  EMAIL_FROM: z.string().min(3).max(320).optional(),
   APP_ENCRYPTION_KEY: z.string().optional().refine(value => !value || Buffer.from(value, 'base64').length === 32, 'deve conter exatamente 32 bytes em base64')
 }).strict();
 
@@ -32,7 +34,7 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): AppEnvironment {
     SHOPIFY_CLIENT_ID: input.SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET: input.SHOPIFY_CLIENT_SECRET,
     SHOPIFY_REDIRECT_URI: input.SHOPIFY_REDIRECT_URI, SHOPIFY_SCOPES: input.SHOPIFY_SCOPES,
     DOKPLOY_URL: input.DOKPLOY_URL, DOKPLOY_API_KEY: input.DOKPLOY_API_KEY, DOKPLOY_CHECKOUT_APPLICATION_ID: input.DOKPLOY_CHECKOUT_APPLICATION_ID,
-    APP_ENCRYPTION_KEY: input.APP_ENCRYPTION_KEY
+    APP_ENCRYPTION_KEY: input.APP_ENCRYPTION_KEY, RESEND_API_KEY: input.RESEND_API_KEY, EMAIL_FROM: input.EMAIL_FROM
   };
   const result = environmentSchema.safeParse(known);
   if (!result.success) {
@@ -47,5 +49,6 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): AppEnvironment {
   if (shopifyValues.some(Boolean) && !shopifyValues.every(Boolean)) throw new Error('A configuração Shopify está incompleta');
   const dokployValues = [result.data.DOKPLOY_URL, result.data.DOKPLOY_API_KEY, result.data.DOKPLOY_CHECKOUT_APPLICATION_ID];
   if (dokployValues.some(Boolean) && !dokployValues.every(Boolean)) throw new Error('A configuração Dokploy está incompleta');
+  if (Boolean(result.data.RESEND_API_KEY) !== Boolean(result.data.EMAIL_FROM)) throw new Error('A configuração de e-mail está incompleta');
   return { ...result.data, TRUST_PROXY: result.data.TRUST_PROXY === 'true' };
 }
