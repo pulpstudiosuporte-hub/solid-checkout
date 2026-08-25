@@ -63,6 +63,12 @@ const publicConfig = (value) => ({
   layout: "split",
   showSummary: true,
   showBump: true,
+  showTrust: true,
+  trustBenefit1: "Pagamento protegido",
+  trustBenefit2: "Confirmação automática",
+  trustBenefit3: "Seus dados estão seguros",
+  testimonialName: "Cliente verificado",
+  testimonialText: "Compra simples, rápida e segura.",
   footerText: "© 2026 Solid Commerce. Todos os direitos reservados.",
   privacyUrl: "#",
   termsUrl: "#",
@@ -559,6 +565,10 @@ function SessionContent({ session: initialSession, token }) {
                 <ShieldCheck size={14} /> Seus dados são criptografados antes de
                 serem armazenados.
               </p>
+              {config.showTrust && <section className="public-trust" aria-label="Confiança da loja">
+                <div className="public-trust-benefits"><span><ShieldCheck size={15}/>{config.trustBenefit1}</span><span><Check size={15}/>{config.trustBenefit2}</span><span><ShieldCheck size={15}/>{config.trustBenefit3}</span></div>
+                <blockquote>“{config.testimonialText}”<footer>{config.testimonialName}</footer></blockquote>
+              </section>}
             </form>
           ) : step === 2 ? (
             <form onSubmit={saveShipping} noValidate>
