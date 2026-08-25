@@ -158,6 +158,7 @@ function App(){
   const [stores,setStores]=useState([]); const [storeBusy,setStoreBusy]=useState(false);
   useEffect(()=>{let active=true; getApiHealth().then(()=>active&&setApiStatus('online')).catch(()=>active&&setApiStatus('offline')); getSession().then(result=>active&&setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken})).catch(()=>active&&setAuth({status:'anonymous',user:null,csrfToken:null})); return()=>{active=false}},[]);
   useEffect(()=>{if(auth.status!=='authenticated')return;let active=true;getStores().then(result=>active&&setStores(result.items)).catch(()=>active&&setApiStatus('offline'));return()=>{active=false}},[auth.status]);
+  useEffect(()=>{const navigate=event=>typeof event.detail==='string'&&setPage(event.detail);window.addEventListener('solid:navigate',navigate);return()=>window.removeEventListener('solid:navigate',navigate)},[]);
   const publicMatch = window.location.pathname.match(/^\/c\/([a-z0-9-]+)\/([a-z0-9-]+)\/?$/) || window.location.hash.match(/^#\/c\/([a-z0-9-]+)\/([a-z0-9-]+)\/?$/);
   const publicSessionMatch = window.location.hash.match(/^#\/session\/([A-Za-z0-9_-]{8,32})/); const publicSessionToken = new URLSearchParams(window.location.hash.split('?')[1] || '').get('token');
   async function handleLogin(email,password){const result=await login(email,password); setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken}); window.history.replaceState({},'', '/');}
