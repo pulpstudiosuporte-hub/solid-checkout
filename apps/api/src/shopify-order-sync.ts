@@ -1,6 +1,7 @@
 import type { AppEnvironment } from '@solid/config';
 import { decryptSecret } from './shopify-crypto.js';
 import type { ShopifyRepository } from './shopify-repository.js';
+import { isShopifyAuthorizationFailure, ShopifyAuthorizationError } from './shopify-auth-error.js';
 
 type Customer = { name?: string; email?: string; phone?: string };
 type Address = { postalCode?: string; street?: string; number?: string; complement?: string; neighborhood?: string; city?: string; state?: string; country?: string };
@@ -18,15 +19,18 @@ const MARK_ORDER_PAID = `mutation SolidOrderMarkAsPaid($input: OrderMarkAsPaidIn
 
 export async function syncPaidShopifyOrder(environment: AppEnvironment, repository: ShopifyRepository, checkoutSessionId: string): Promise<void> {
   if (!environment.APP_ENCRYPTION_KEY) return;
+  let affectedStoreId: string | undefined;
   try {
     const existing = await repository.shopifyOrderId(checkoutSessionId);
     if (existing) {
+      affectedStoreId = existing.storeId;
       await markAsPaid(environment, repository, existing.storeId, existing.orderId);
       await repository.markOrderPaymentSynced(checkoutSessionId, new Date());
       return;
     }
     const context = await repository.claimPaidOrderSync(checkoutSessionId, new Date());
     if (!context) return;
+    affectedStoreId = context.storeId;
     const credentials = await repository.credentials(context.storeId);
     if (!credentials) throw new Error('A loja não possui uma conexão Shopify ativa.');
     const customer = JSON.parse(decryptSecret(context.customerDataEncrypted, environment.APP_ENCRYPTION_KEY)) as Customer;
@@ -56,6 +60,7 @@ export async function syncPaidShopifyOrder(environment: AppEnvironment, reposito
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Falha desconhecida ao criar pedido Shopify.';
     await repository.markOrderSyncFailed(checkoutSessionId, message);
+    if (error instanceof ShopifyAuthorizationError && affectedStoreId) await repository.markReconnectRequired(affectedStoreId, message);
     throw error;
   }
 }
@@ -82,6 +87,7 @@ async function shopifyGraphql<T>(shop: string, token: string, query: string, var
   const raw = await response.text();
   const body = (() => { try { return JSON.parse(raw) as { data?: T; errors?: unknown }; } catch { return { errors: raw }; } })();
   const errors = shopifyErrorMessages(body.errors);
+  if (isShopifyAuthorizationFailure(response.status, errors)) throw new ShopifyAuthorizationError(errors.join('; ') || `Shopify respondeu HTTP ${response.status}.`);
   if (!response.ok || !body.data || errors.length) throw new Error(errors.join('; ') || `Shopify respondeu HTTP ${response.status}.`);
   return body.data;
 }

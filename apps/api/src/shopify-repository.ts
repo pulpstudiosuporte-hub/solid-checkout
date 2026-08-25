@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@solid/database';
 
 export type ShopifyContext = Readonly<{ storeId: string; storePublicId: string; role: 'OWNER' | 'ADMIN' | 'ANALYST' }>;
-export type ShopifyStatus = Readonly<{ connected: boolean; shopDomain?: string; scopes?: string; connectedAt?: Date; lastSyncedAt?: Date }>;
+export type ShopifyStatus = Readonly<{ connected: boolean; reconnectRequired: boolean; shopDomain?: string; scopes?: string; connectedAt?: Date; lastSyncedAt?: Date; reconnectRequiredAt?: Date }>;
 export type OAuthStateRecord = Readonly<{ id: string; storeId: string; userId: string; sessionId: string; shopDomain: string }>;
 export type ShopifyCredentials = Readonly<{ shopDomain: string; accessTokenEncrypted: string; refreshTokenEncrypted?: string; accessTokenExpiresAt?: Date; refreshTokenExpiresAt?: Date }>;
 export type ShopifyCatalog = Readonly<{
@@ -23,6 +23,7 @@ export interface ShopifyRepository {
   consumeState(stateHash: string, userId: string, sessionId: string, now: Date): Promise<OAuthStateRecord | null>;
   connect(input: { storeId: string; userId: string; shopDomain: string; accessTokenEncrypted: string; refreshTokenEncrypted?: string; scopes: string; accessTokenExpiresAt?: Date; refreshTokenExpiresAt?: Date; requestId: string }): Promise<void>;
   disconnect(storeId: string, userId: string, requestId: string): Promise<void>;
+  markReconnectRequired(storeId: string, reason: string): Promise<void>;
   syncCatalog(storeId: string, userId: string, requestId: string, catalog: ShopifyCatalog): Promise<ShopifySyncResult>;
   claimPaidOrderSync(checkoutSessionId: string, now: Date): Promise<ShopifyOrderSyncContext | null>;
   markOrderSynced(checkoutSessionId: string, order: { id: string; name?: string | null }, now: Date): Promise<void>;
@@ -41,11 +42,12 @@ export class PrismaShopifyRepository implements ShopifyRepository {
     return membership?.store.active ? { storeId: membership.store.id, storePublicId: membership.store.publicId, role: membership.role } : null;
   }
   async status(storeId: string): Promise<ShopifyStatus> {
-    const connection = await this.database.shopifyConnection.findFirst({ where: { storeId, revokedAt: null }, select: { shopDomain: true, scopes: true, connectedAt: true, lastSyncedAt: true } });
-    return connection ? { connected: true, shopDomain: connection.shopDomain, scopes: connection.scopes, connectedAt: connection.connectedAt, ...(connection.lastSyncedAt ? { lastSyncedAt: connection.lastSyncedAt } : {}) } : { connected: false };
+    const connection = await this.database.shopifyConnection.findFirst({ where: { storeId, revokedAt: null }, select: { shopDomain: true, scopes: true, connectedAt: true, lastSyncedAt: true, reconnectRequiredAt: true } });
+    if (!connection) return { connected: false, reconnectRequired: false };
+    return { connected: !connection.reconnectRequiredAt, reconnectRequired: Boolean(connection.reconnectRequiredAt), shopDomain: connection.shopDomain, scopes: connection.scopes, connectedAt: connection.connectedAt, ...(connection.lastSyncedAt ? { lastSyncedAt: connection.lastSyncedAt } : {}), ...(connection.reconnectRequiredAt ? { reconnectRequiredAt: connection.reconnectRequiredAt } : {}) };
   }
   async credentials(storeId: string): Promise<ShopifyCredentials | null> {
-    const value = await this.database.shopifyConnection.findFirst({ where: { storeId, revokedAt: null }, select: { shopDomain: true, accessTokenEncrypted: true, refreshTokenEncrypted: true, accessTokenExpiresAt: true, refreshTokenExpiresAt: true } });
+    const value = await this.database.shopifyConnection.findFirst({ where: { storeId, revokedAt: null, reconnectRequiredAt: null }, select: { shopDomain: true, accessTokenEncrypted: true, refreshTokenEncrypted: true, accessTokenExpiresAt: true, refreshTokenExpiresAt: true } });
     return value ? { shopDomain: value.shopDomain, accessTokenEncrypted: value.accessTokenEncrypted, ...(value.refreshTokenEncrypted ? { refreshTokenEncrypted: value.refreshTokenEncrypted } : {}), ...(value.accessTokenExpiresAt ? { accessTokenExpiresAt: value.accessTokenExpiresAt } : {}), ...(value.refreshTokenExpiresAt ? { refreshTokenExpiresAt: value.refreshTokenExpiresAt } : {}) } : null;
   }
   async createState(input: { stateHash: string; storeId: string; userId: string; sessionId: string; shopDomain: string; expiresAt: Date }): Promise<void> {
@@ -66,15 +68,21 @@ export class PrismaShopifyRepository implements ShopifyRepository {
       if (domainConnection && domainConnection.storeId !== input.storeId) {
         if (!domainConnection.revokedAt) throw new ShopifyDomainInUseError();
         await tx.shopifyConnection.deleteMany({ where: { storeId: input.storeId, id: { not: domainConnection.id } } });
-        await tx.shopifyConnection.update({ where: { id: domainConnection.id }, data: { storeId: input.storeId, ...tokenData, revokedAt: null, connectedAt: new Date(), lastSyncedAt: null } });
+        await tx.shopifyConnection.update({ where: { id: domainConnection.id }, data: { storeId: input.storeId, ...tokenData, revokedAt: null, reconnectRequiredAt: null, reconnectReason: null, connectedAt: new Date(), lastSyncedAt: null } });
       } else {
-        await tx.shopifyConnection.upsert({ where: { storeId: input.storeId }, create: { storeId: input.storeId, shopDomain: input.shopDomain, ...tokenData }, update: { shopDomain: input.shopDomain, ...tokenData, revokedAt: null, connectedAt: new Date() } });
+        await tx.shopifyConnection.upsert({ where: { storeId: input.storeId }, create: { storeId: input.storeId, shopDomain: input.shopDomain, ...tokenData }, update: { shopDomain: input.shopDomain, ...tokenData, revokedAt: null, reconnectRequiredAt: null, reconnectReason: null, connectedAt: new Date() } });
       }
       await tx.auditLog.create({ data: { storeId: input.storeId, actorUserId: input.userId, actorType: 'USER', action: 'integration.shopify_connected', targetType: 'shopify_connection', targetId: input.shopDomain, requestId: input.requestId } });
     });
   }
   async disconnect(storeId: string, userId: string, requestId: string): Promise<void> {
     await this.database.$transaction([this.database.shopifyConnection.updateMany({ where: { storeId, revokedAt: null }, data: { revokedAt: new Date() } }), this.database.auditLog.create({ data: { storeId, actorUserId: userId, actorType: 'USER', action: 'integration.shopify_disconnected', targetType: 'shopify_connection', requestId } })]);
+  }
+  async markReconnectRequired(storeId: string, reason: string): Promise<void> {
+    await this.database.$transaction(async tx => {
+      const updated = await tx.shopifyConnection.updateMany({ where: { storeId, revokedAt: null, reconnectRequiredAt: null }, data: { reconnectRequiredAt: new Date(), reconnectReason: reason.slice(0, 500) } });
+      if (updated.count) await tx.auditLog.create({ data: { storeId, actorType: 'SYSTEM', action: 'integration.shopify_reconnect_required', targetType: 'shopify_connection', metadata: { reason: reason.slice(0, 500) } } });
+    });
   }
   async syncCatalog(storeId: string, userId: string, requestId: string, catalog: ShopifyCatalog): Promise<ShopifySyncResult> {
     const syncedAt = new Date(); let variantCount = 0; let imageCount = 0;
@@ -131,7 +139,7 @@ export class PrismaShopifyRepository implements ShopifyRepository {
   }
   async paidOrdersAwaitingSync(now: Date): Promise<readonly string[]> {
     const staleBefore = new Date(now.getTime() - 2 * 60_000);
-    const sessions = await this.database.checkoutSession.findMany({ where: { source: 'SHOPIFY', status: 'COMPLETED', OR: [{ shopifySyncStatus: null }, { shopifySyncStatus: 'FAILED', updatedAt: { lte: staleBefore } }, { shopifySyncStatus: 'SYNCING', shopifySyncStartedAt: { lte: new Date(now.getTime() - 10 * 60_000) } }] }, orderBy: { updatedAt: 'asc' }, take: 50, select: { id: true } });
+    const sessions = await this.database.checkoutSession.findMany({ where: { source: 'SHOPIFY', status: 'COMPLETED', checkout: { store: { shopifyConnection: { is: { revokedAt: null, reconnectRequiredAt: null } } } }, OR: [{ shopifySyncStatus: null }, { shopifySyncStatus: 'FAILED', updatedAt: { lte: staleBefore } }, { shopifySyncStatus: 'SYNCING', shopifySyncStartedAt: { lte: new Date(now.getTime() - 10 * 60_000) } }] }, orderBy: { updatedAt: 'asc' }, take: 50, select: { id: true } });
     return sessions.map(session => session.id);
   }
 }

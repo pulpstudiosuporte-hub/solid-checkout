@@ -4,6 +4,7 @@ import type { AppEnvironment } from '@solid/config';
 import type { AuthRepository, SessionUser } from './auth-repository.js';
 import { decryptSecret, encryptSecret } from './shopify-crypto.js';
 import { ShopifyDomainInUseError, type ShopifyCatalog, type ShopifyRepository } from './shopify-repository.js';
+import { isShopifyAuthorizationFailure, ShopifyAuthorizationError } from './shopify-auth-error.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const equal = (left: string, right: string): boolean => { const a = Buffer.from(left); const b = Buffer.from(right); return a.length === b.length && timingSafeEqual(a, b); };
@@ -76,12 +77,19 @@ export function registerShopifyRoutes(app: FastifyInstance, environment: AppEnvi
     const current = await session(request); if (!current || !csrfValid(request, current)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
     const context = await repository.context(current.userId, current.sessionId); if (!context || context.role === 'ANALYST') return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Somente proprietários e administradores podem sincronizar o catálogo.'));
     const credentials = await repository.credentials(context.storeId); if (!credentials) return reply.code(409).send(errorBody(request, 'SHOPIFY_NOT_CONNECTED', 'Conecte a Shopify antes de sincronizar.'));
-    if (credentials.accessTokenExpiresAt && credentials.accessTokenExpiresAt <= new Date()) return reply.code(409).send(errorBody(request, 'SHOPIFY_TOKEN_EXPIRED', 'A autorização da Shopify expirou. Reconecte a loja.'));
+    if (credentials.accessTokenExpiresAt && credentials.accessTokenExpiresAt <= new Date()) {
+      await repository.markReconnectRequired(context.storeId, 'O token de acesso da Shopify expirou.');
+      return reply.code(409).send(errorBody(request, 'SHOPIFY_TOKEN_EXPIRED', 'A autorização da Shopify expirou. Reconecte a loja.'));
+    }
     try {
       const token = decryptSecret(credentials.accessTokenEncrypted, environment.APP_ENCRYPTION_KEY!);
       const catalog = await fetchShopifyCatalog(credentials.shopDomain, token);
       return reply.send(await repository.syncCatalog(context.storeId, current.userId, request.id, catalog));
     } catch (error) {
+      if (error instanceof ShopifyAuthorizationError) {
+        await repository.markReconnectRequired(context.storeId, error.message);
+        return reply.code(409).send(errorBody(request, 'SHOPIFY_RECONNECT_REQUIRED', 'A autorização da Shopify expirou ou foi revogada. Reconecte a loja.'));
+      }
       request.log.warn({ err: error, shopDomain: credentials.shopDomain }, 'shopify_catalog_sync_failed');
       return reply.code(502).send(errorBody(request, 'SHOPIFY_SYNC_FAILED', 'Não foi possível importar o catálogo da Shopify agora.'));
     }
@@ -97,7 +105,10 @@ type RawCollection = { id: string; title: string; handle: string; descriptionHtm
 
 async function shopifyGraphql<T>(shop: string, token: string, query: string, variables: Record<string, unknown>): Promise<T> {
   const response = await fetch(`https://${shop}/admin/api/2026-07/graphql.json`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Shopify-Access-Token': token }, body: JSON.stringify({ query, variables }), signal: AbortSignal.timeout(25_000) });
-  const body = await response.json() as { data?: T; errors?: readonly { message: string }[] };
+  const raw = await response.text();
+  const body = (() => { try { return JSON.parse(raw) as { data?: T; errors?: readonly { message: string }[] }; } catch { return { errors: [{ message: raw }] }; } })();
+  const messages = body.errors?.map(error => error.message).filter(Boolean) ?? [];
+  if (isShopifyAuthorizationFailure(response.status, messages)) throw new ShopifyAuthorizationError(messages.join('; ') || `Shopify respondeu HTTP ${response.status}.`);
   if (!response.ok || !body.data || body.errors?.length) throw new Error(`Shopify GraphQL request failed (${response.status})`);
   return body.data;
 }

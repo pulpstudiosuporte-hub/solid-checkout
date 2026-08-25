@@ -455,6 +455,8 @@ model ShopifyConnection {
   connectedAt           DateTime  @default(now()) @map("connected_at") @db.Timestamptz(3)
   updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   revokedAt             DateTime? @map("revoked_at") @db.Timestamptz(3)
+  reconnectRequiredAt   DateTime? @map("reconnect_required_at") @db.Timestamptz(3)
+  reconnectReason       String?   @map("reconnect_reason") @db.VarChar(500)
   lastSyncedAt          DateTime? @map("last_synced_at") @db.Timestamptz(3)
   store                 Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
