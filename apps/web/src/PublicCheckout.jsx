@@ -448,7 +448,7 @@ function SessionContent({ session: initialSession, token }) {
   };
   const copyPix = async () => { await navigator.clipboard.writeText(payment.pixCode); setCopied(true); window.setTimeout(() => setCopied(false), 1800); };
   if (String(payment?.status).toUpperCase() === "PAID") {
-    return <ThankYouPage session={session} items={items} itemCount={itemCount} selectedShipping={selectedShipping} config={config} delivery={delivery} />;
+    return <ThankYouPage session={session} items={items} itemCount={itemCount} selectedShipping={selectedShipping} payment={payment} config={config} delivery={delivery} />;
   }
   return (
     <main
@@ -858,8 +858,11 @@ function SessionContent({ session: initialSession, token }) {
   );
 }
 
-function ThankYouPage({ session, items, itemCount, selectedShipping, config, delivery }) {
-  const total = selectedShipping?.grandTotalCents ?? session.totalCents - (session.discountCents || 0);
+function ThankYouPage({ session, items, itemCount, selectedShipping, payment, config, delivery }) {
+  const subtotal = session.totalCents;
+  const discount = session.discountCents || 0;
+  const shipping = selectedShipping?.shippingPriceCents ?? session.shippingPriceCents ?? 0;
+  const total = payment?.amountCents ?? selectedShipping?.grandTotalCents ?? subtotal - discount + shipping;
   return (
     <main className="public-checkout thank-you-page" style={configStyle(config)}>
       <header>
@@ -877,6 +880,12 @@ function ThankYouPage({ session, items, itemCount, selectedShipping, config, del
           <div><span>Itens</span><strong>{itemCount} {itemCount === 1 ? "item" : "itens"}</strong></div>
         </div>
         <div className="thank-you-items">{items.map((item) => <div key={`${item.titleSnapshot}-${item.variantSnapshot || "default"}`}><span>{item.quantity}× {item.titleSnapshot}</span><strong>{money.format(item.totalCents / 100)}</strong></div>)}</div>
+        <div className="thank-you-totals" aria-label="Totais do pagamento">
+          <div><span>Subtotal</span><strong>{money.format(subtotal / 100)}</strong></div>
+          {discount > 0 && <div className="discount"><span>Desconto{session.couponCode ? ` (${session.couponCode})` : ''}</span><strong>- {money.format(discount / 100)}</strong></div>}
+          {shipping > 0 && <div><span>Frete</span><strong>{money.format(shipping / 100)}</strong></div>}
+          <div className="paid"><span>Total pago</span><strong>{money.format(total / 100)}</strong></div>
+        </div>
         {delivery && <a className="customer-continue thank-you-cta" href={delivery.url} target="_blank" rel="noopener noreferrer">Acessar conteúdo <ArrowRight size={19} aria-hidden="true" /></a>}
         {config.successUrl && config.successUrl !== "#" && <a className="customer-continue thank-you-cta" href={config.successUrl}>Continuar para a loja <ArrowRight size={19} aria-hidden="true" /></a>}
         <p className="thank-you-help">Dúvidas sobre seu pedido? Entre em contato diretamente com a loja.</p>

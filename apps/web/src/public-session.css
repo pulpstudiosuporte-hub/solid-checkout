@@ -170,6 +170,11 @@
 .thank-you-items { margin-top: 14px; border-top: 1px solid #eceaf0; text-align: left; }
 .thank-you-items div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 2px; border-bottom: 1px solid #eceaf0; color: #555561; font-size: 14px; }
 .thank-you-items strong { flex: none; color: var(--public-text); }
+.thank-you-totals { margin-top: 14px; padding-top: 8px; text-align: left; }
+.thank-you-totals div { display: flex; justify-content: space-between; gap: 16px; padding: 7px 2px; color: #666370; font-size: 14px; }
+.thank-you-totals strong { color: var(--public-text); }
+.thank-you-totals .discount,.thank-you-totals .discount strong { color: #138b50; }
+.thank-you-totals .paid { margin-top: 5px; padding-top: 13px; border-top: 1px solid #e2dfe8; color: var(--public-text); font-size: 16px; font-weight: 700; }
 .thank-you-cta { display: inline-flex !important; width: auto !important; margin-top: 28px !important; color: #fff; text-decoration: none; }
 .thank-you-help { margin: 22px 0 0; color: #70707a; font-size: 13px; line-height: 1.5; }
 .thank-you-page .public-checkout-footer { margin-top: auto; }
