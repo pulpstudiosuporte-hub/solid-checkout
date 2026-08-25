@@ -47,6 +47,7 @@ const publicConfig = (value) => ({
   logoText: "SOLID",
   logoUrl: "",
   heroImageUrl: "",
+  heroMobileImageUrl: "",
   heroEnabled: false,
   heroHeight: 220,
   secureHeader: true,
@@ -66,6 +67,7 @@ const publicConfig = (value) => ({
   privacyUrl: "#",
   termsUrl: "#",
   buttonEffect: "lift",
+  blockOrder: ["hero", "timer", "progress", "content"],
   ...(value || {}),
 });
 const configStyle = (config) => ({
@@ -322,6 +324,7 @@ function SessionContent({ session: initialSession, token }) {
       ];
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const config = publicConfig(session.checkout?.publishedConfig);
+  const blockOrder = (id) => Math.max(1, (Array.isArray(config.blockOrder) ? config.blockOrder : ["hero", "timer", "progress", "content"]).indexOf(id) + 1);
   const update = (field, value) =>
     setForm((current) => ({ ...current, [field]: value }));
   const toggleOrderBump = async (productId, enabled) => {
@@ -427,9 +430,9 @@ function SessionContent({ session: initialSession, token }) {
           </span>
         )}
       </header>
-      {config.heroEnabled && <div className={`public-checkout-hero ${config.heroImageUrl ? 'has-image' : ''}`} style={config.heroImageUrl ? { backgroundImage: `url(${config.heroImageUrl})` } : undefined}>{!config.heroImageUrl && <><ShoppingBag size={28}/><span>Banner da loja</span></>}</div>}
+      {config.heroEnabled && <div className={`public-checkout-hero ${config.heroImageUrl ? 'has-image' : ''}`} style={{ order:blockOrder('hero'), ...(config.heroImageUrl ? { backgroundImage: `url(${config.heroImageUrl})`, '--public-mobile-hero': `url(${config.heroMobileImageUrl || config.heroImageUrl})` } : {}) }}>{!config.heroImageUrl && <><ShoppingBag size={28}/><span>Banner da loja</span></>}</div>}
       {config.timer && (
-        <div className="session-expiry" role="status">
+        <div className="session-expiry" role="status" style={{order:blockOrder('timer')}}>
           <Clock3 size={17} />
           <span>
             {expiry.remaining ? (
@@ -442,7 +445,7 @@ function SessionContent({ session: initialSession, token }) {
           </span>
         </div>
       )}
-      {config.showProgress && <nav className="checkout-progress" aria-label="Etapas do checkout">
+      {config.showProgress && <nav className="checkout-progress" aria-label="Etapas do checkout" style={{order:blockOrder('progress')}}>
         <span className="active">
           <i>
             <UserRound size={15} />
@@ -466,6 +469,7 @@ function SessionContent({ session: initialSession, token }) {
       </nav>}
       <div
         className={`public-checkout-grid ${config.showSummary ? "" : "without-summary"}`}
+        style={{order:blockOrder('content')}}
       >
         <section className="customer-step">
           {step === 1 ? (

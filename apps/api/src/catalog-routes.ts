@@ -29,7 +29,11 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   for (const [key, fallback] of [['heroEnabled', false], ['showProgress', true]] as const) { const value = input[key] ?? fallback; if (typeof value !== 'boolean') return null; result[key] = value; }
   const headerBg = input.headerBg ?? '#ffffff'; if (typeof headerBg !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(headerBg)) return null; result.headerBg = headerBg.toLowerCase();
   const heroHeight = input.heroHeight === undefined ? 220 : integer(input.heroHeight, 120, 420); if (heroHeight === null) return null; result.heroHeight = heroHeight;
-  for (const key of ['logoUrl', 'heroImageUrl']) { const url = input[key] ?? ''; if (typeof url !== 'string' || url.length > 2048 || url && !url.startsWith('https://')) return null; result[key] = url; }
+  for (const key of ['logoUrl', 'heroImageUrl', 'heroMobileImageUrl']) { const url = input[key] ?? ''; if (typeof url !== 'string' || url.length > 2048 || url && !url.startsWith('https://')) return null; result[key] = url; }
+  const blockOrder = input.blockOrder ?? ['hero', 'timer', 'progress', 'content'];
+  const allowedBlocks = ['hero', 'timer', 'progress', 'content'];
+  if (!Array.isArray(blockOrder) || blockOrder.length !== allowedBlocks.length || new Set(blockOrder).size !== allowedBlocks.length || blockOrder.some(value => typeof value !== 'string' || !allowedBlocks.includes(value))) return null;
+  result.blockOrder = blockOrder;
   const bumpProductId = input.orderBumpProductId;
   if (bumpProductId !== undefined && (typeof bumpProductId !== 'string' || bumpProductId.length > 32 || bumpProductId && !/^[A-Za-z0-9_-]+$/.test(bumpProductId))) return null;
   result.orderBumpProductId = typeof bumpProductId === 'string' ? bumpProductId : '';
