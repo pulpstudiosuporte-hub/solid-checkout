@@ -6,6 +6,7 @@ import type { PrismaGatewayRepository } from './gateway-repository.js';
 import { encryptSecret } from './shopify-crypto.js';
 import { testWestPay } from './westpay-client.js';
 import { testRoas } from './roas-client.js';
+import { testUtmifyToken } from './utmify-client.js';
 
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
 const equal = (a: string, b: string) => { const left = Buffer.from(a); const right = Buffer.from(b); return left.length === right.length && timingSafeEqual(left, right); };
@@ -28,6 +29,12 @@ export function registerGatewayRoutes(app: FastifyInstance, environment: AppEnvi
     const status = await repository.status(context.storeId, 'ROAS'); return reply.send({ connected: Boolean(status?.active && status.verifiedAt), ...status });
   });
 
+  app.get('/integrations/utmify/status', async (request, reply) => {
+    const current = await session(request); if (!current) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
+    const context = await repository.context(current.userId, current.sessionId); if (!context) return reply.code(409).send(errorBody(request, 'STORE_REQUIRED', 'Selecione uma loja.'));
+    const status = await repository.status(context.storeId, 'UTMIFY'); return reply.send({ connected: Boolean(status?.active && status.verifiedAt), ...status });
+  });
+
   app.put<{ Body: { apiKey?: unknown; publicKey?: unknown } }>('/integrations/westpay', { config: { rateLimit: { max: 5, timeWindow: '5 minutes' } } }, async (request, reply) => {
     const current = await session(request); if (!current || !csrfValid(request, current)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
     const context = await repository.context(current.userId, current.sessionId); if (!context || context.role === 'ANALYST') return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Somente proprietários e administradores podem conectar gateways.'));
@@ -48,5 +55,22 @@ export function registerGatewayRoutes(app: FastifyInstance, environment: AppEnvi
     try { await testRoas({ secretKey, publicKey }); } catch (error) { request.log.warn({ err: error }, 'roas_credentials_rejected'); return reply.code(422).send(errorBody(request, 'ROAS_CREDENTIALS_REJECTED', 'A Roas recusou essas credenciais. Confira as chaves.')); }
     const value = await repository.save(context.storeId, 'ROAS', encryptSecret(secretKey, environment.APP_ENCRYPTION_KEY), encryptSecret(publicKey, environment.APP_ENCRYPTION_KEY));
     return reply.send({ connected: true, primary: true, ...value });
+  });
+
+  app.put<{ Body: { token?: unknown } }>('/integrations/utmify', { config: { rateLimit: { max: 5, timeWindow: '5 minutes' } } }, async (request, reply) => {
+    const current = await session(request); if (!current || !csrfValid(request, current)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    const context = await repository.context(current.userId, current.sessionId); if (!context || context.role === 'ANALYST') return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Somente proprietários e administradores podem conectar rastreadores.'));
+    if (!environment.APP_ENCRYPTION_KEY) return reply.code(503).send(errorBody(request, 'SERVICE_UNAVAILABLE', 'Criptografia indisponível.'));
+    const token = typeof request.body?.token === 'string' ? request.body.token.trim() : '';
+    if (token.length < 10 || token.length > 512 || /\s/.test(token)) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Informe uma credencial de API válida da UTMify.'));
+    try { await testUtmifyToken(token); } catch (error) { request.log.warn({ err: error }, 'utmify_credentials_rejected'); return reply.code(422).send(errorBody(request, 'UTMIFY_CREDENTIALS_REJECTED', 'A UTMify recusou essa credencial. Confira o token de API.')); }
+    const value = await repository.save(context.storeId, 'UTMIFY', encryptSecret(token, environment.APP_ENCRYPTION_KEY), encryptSecret('utmify', environment.APP_ENCRYPTION_KEY));
+    return reply.send({ connected: true, ...value });
+  });
+
+  app.delete('/integrations/utmify', async (request, reply) => {
+    const current = await session(request); if (!current || !csrfValid(request, current)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    const context = await repository.context(current.userId, current.sessionId); if (!context || context.role === 'ANALYST') return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    await repository.disconnect(context.storeId, 'UTMIFY'); return reply.code(204).send();
   });
 }

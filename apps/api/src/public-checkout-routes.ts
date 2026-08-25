@@ -9,12 +9,15 @@ import { syncPaidShopifyOrder } from './shopify-order-sync.js';
 import { createWestPayPix, findWestPayPix, getWestPayPix, WestPayRequestError } from './westpay-client.js';
 import { createRoasPix, getRoasPix, RoasRequestError } from './roas-client.js';
 import { lookupBrazilianPostalCode, PostalCodeLookupError } from './postal-code.js';
+import { syncUtmifyOrder } from './utmify-sync.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const slug = (value: unknown): string | null => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) && value.length <= 80 ? value : null;
 const publicId = (value: unknown): string | null => typeof value === 'string' && /^[A-Za-z0-9_-]{8,32}$/.test(value) ? value : null;
 const errorBody = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
 const digits = (value: unknown): string => typeof value === 'string' ? value.replace(/\D/g, '') : '';
+const trackingKeys = ['src', 'sck', 'utm_source', 'utm_campaign', 'utm_medium', 'utm_content', 'utm_term'] as const;
+const trackingParameters = (value: unknown): Record<string, string | null> => { const input = typeof value === 'object' && value !== null ? value as Record<string, unknown> : {}; return Object.fromEntries(trackingKeys.map(key => [key, typeof input[key] === 'string' && input[key].trim() ? input[key].trim().slice(0, 500) : null])); };
 const brazilianPhone = (value: unknown): string => { const number = digits(value); return number.startsWith('55') ? `+${number}` : `+55${number}`; };
 const validCpf = (value: string): boolean => { if (!/^\d{11}$/.test(value) || /^(\d)\1{10}$/.test(value)) return false; const check = (length: number) => { let sum = 0; for (let index = 0; index < length; index += 1) sum += Number(value[index]) * (length + 1 - index); const mod = sum % 11; return mod < 2 ? 0 : 11 - mod; }; return check(9) === Number(value[9]) && check(10) === Number(value[10]); };
 const validCnpj = (value: string): boolean => { if (!/^\d{14}$/.test(value) || /^(\d)\1{13}$/.test(value)) return false; const calculate = (length: number) => { const weights = length === 12 ? [5,4,3,2,9,8,7,6,5,4,3,2] : [6,5,4,3,2,9,8,7,6,5,4,3,2]; const sum = weights.reduce((total, weight, index) => total + Number(value[index]) * weight, 0); const mod = sum % 11; return mod < 2 ? 0 : 11 - mod; }; return calculate(12) === Number(value[12]) && calculate(13) === Number(value[13]); };
@@ -65,7 +68,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     const variantPublicId = request.body?.variantId === undefined ? undefined : publicId(request.body.variantId);
     if (!storeSlug || !checkoutSlug || typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1 || quantity > 1000 || request.body?.variantId !== undefined && !variantPublicId) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Itens do checkout inválidos.'));
     const token = randomBytes(32).toString('base64url');
-    const session = await catalog.createPublicCheckoutSession({ storeSlug, checkoutSlug, quantity, tokenHash: sha256(token), source: 'DIRECT', expiresAt: new Date(Date.now() + 30 * 60_000), ...(variantPublicId ? { variantPublicId } : {}) });
+    const session = await catalog.createPublicCheckoutSession({ storeSlug, checkoutSlug, quantity, tokenHash: sha256(token), source: 'DIRECT', trackingParameters: trackingParameters(request.body?.trackingParameters), expiresAt: new Date(Date.now() + 30 * 60_000), ...(variantPublicId ? { variantPublicId } : {}) });
     if (!session) return reply.code(409).send(errorBody(request, 'CHECKOUT_UNAVAILABLE', 'Produto, variante ou estoque indisponível.'));
     return reply.header('cache-control', 'no-store').code(201).send({ session, token });
   });
@@ -146,6 +149,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
         const transaction = await createRoasPix(roasCredentials, { payment_method: 'pix', customer: { document: { type: digits(customer.document).length === 14 ? 'cnpj' : 'cpf', number: digits(customer.document) }, name: customer.name, email: customer.email, phone: digits(customer.phone).startsWith('55') ? digits(customer.phone) : `55${digits(customer.phone)}` }, items: paymentItems.map(item => ({ title: item.titleSnapshot, unit_price: item.unitPriceCents, quantity: item.quantity })), amount: amountCents, postback_url: `${environment.API_PUBLIC_URL.replace(/\/$/, '')}/webhooks/roas`, metadata: { provider_name: 'SOLID Checkout', checkout_session: context.publicId } });
         if (!transaction.id || !transaction.pixCode) throw new Error('Roas returned an incomplete PIX response');
         const expiresAt = transaction.expiresAt ? new Date(transaction.expiresAt) : null; const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pixCode, environment.APP_ENCRYPTION_KEY), expiresAt);
+        await syncUtmifyOrder(environment, gateways, context.id, 'waiting_payment', request.log);
         if (shopify) { try { await syncPaidShopifyOrder(environment, shopify, context.id); } catch (error) { request.log.error({ err: error, checkoutSessionId: context.id }, 'shopify_pending_order_sync_failed'); } }
         return reply.header('cache-control', 'no-store').code(201).send({ payment: { ...saved, status: 'pending', pixCode: transaction.pixCode } });
       }
@@ -164,6 +168,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       });
       if (!transaction.id || !transaction.pix?.qrcode) throw new Error('WestPay returned an incomplete PIX response');
       const expiresAt = transaction.pix.expiresAt ? new Date(transaction.pix.expiresAt) : null; const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pix.qrcode, environment.APP_ENCRYPTION_KEY), expiresAt);
+      await syncUtmifyOrder(environment, gateways, context.id, 'waiting_payment', request.log);
       if (shopify) {
         try { await syncPaidShopifyOrder(environment, shopify, context.id); }
         catch (error) { request.log.error({ err: error, checkoutSessionId: context.id }, 'shopify_pending_order_sync_failed'); }
@@ -198,6 +203,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
           const mapped = westPayPaymentStatus(official?.status);
           if (mapped && official && westPayAmountMatches(official.amount, verification.amountCents)) {
             await gateways.confirmPayment(verification.id, verification.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined);
+            await syncUtmifyOrder(environment, gateways, verification.checkoutSessionId, mapped === 'PAID' ? 'paid' : mapped === 'REFUNDED' ? 'refunded' : 'refused', request.log);
             if (mapped === 'PAID' && shopify) {
               try { await syncPaidShopifyOrder(environment, shopify, verification.checkoutSessionId); }
               catch (error) { request.log.error({ err: error, checkoutSessionId: verification.checkoutSessionId }, 'shopify_order_sync_failed'); }
@@ -234,6 +240,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
         try { await gateways.recordWebhookEvent(context, 'WESTPAY', official.status, request.id); }
         catch (auditError) { request.log.warn({ err: auditError, providerTransactionId: objectId }, 'westpay_webhook_audit_failed'); }
         await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined);
+        await syncUtmifyOrder(environment, gateways, context.checkoutSessionId, mapped === 'PAID' ? 'paid' : mapped === 'REFUNDED' ? 'refunded' : 'refused', request.log);
         if (mapped === 'PAID' && shopify) {
           try { await syncPaidShopifyOrder(environment, shopify, context.checkoutSessionId); }
           catch (error) { request.log.error({ err: error, checkoutSessionId: context.checkoutSessionId }, 'shopify_order_sync_failed'); }
@@ -256,7 +263,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       const official = await getRoasPix({ secretKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) }, objectId);
       if (!official || official.id !== objectId || !roasAmountMatches(official.amount, context.amountCents)) return reply.code(200).send({ received: true });
       const mapped = westPayPaymentStatus(official.status);
-      if (mapped) { try { await gateways.recordWebhookEvent(context, 'ROAS', official.status, request.id); } catch (auditError) { request.log.warn({ err: auditError, providerTransactionId: objectId }, 'roas_webhook_audit_failed'); } await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined); if (mapped === 'PAID' && shopify) { try { await syncPaidShopifyOrder(environment, shopify, context.checkoutSessionId); } catch (error) { request.log.error({ err: error, checkoutSessionId: context.checkoutSessionId }, 'shopify_order_sync_failed'); } } }
+      if (mapped) { try { await gateways.recordWebhookEvent(context, 'ROAS', official.status, request.id); } catch (auditError) { request.log.warn({ err: auditError, providerTransactionId: objectId }, 'roas_webhook_audit_failed'); } await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined); await syncUtmifyOrder(environment, gateways, context.checkoutSessionId, mapped === 'PAID' ? 'paid' : mapped === 'REFUNDED' ? 'refunded' : 'refused', request.log); if (mapped === 'PAID' && shopify) { try { await syncPaidShopifyOrder(environment, shopify, context.checkoutSessionId); } catch (error) { request.log.error({ err: error, checkoutSessionId: context.checkoutSessionId }, 'shopify_order_sync_failed'); } } }
       return reply.code(200).send({ received: true });
     } catch (error) {
       // A 429 is transient. Acknowledge the notification so ROAS does not add

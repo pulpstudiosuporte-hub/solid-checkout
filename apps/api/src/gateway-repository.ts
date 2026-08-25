@@ -2,12 +2,14 @@ import type { PrismaClient } from '@solid/database';
 
 export type GatewayContext = Readonly<{ storeId: string; role: 'OWNER' | 'ADMIN' | 'ANALYST' }>;
 export type PaymentProvider = 'ROAS' | 'WESTPAY';
+export type IntegrationProvider = PaymentProvider | 'UTMIFY';
 type GatewayStatus = Readonly<{ active: boolean; verifiedAt: Date | null; updatedAt: Date }>;
 type GatewayCredentials = Readonly<{ apiKeyEncrypted: string; publicKeyEncrypted: string }>;
 type PaymentAttemptSummary = Readonly<{ id: string; publicId: string; provider: string; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; amountCents: number; pixCodeEncrypted: string | null; expiresAt: Date | null }>;
 type CompletedAttempt = Readonly<{ publicId: string; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; amountCents: number; expiresAt: Date | null }>;
 type WebhookContext = Readonly<{ id: string; publicId: string; checkoutSessionId: string; amountCents: number; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; session: { checkout: { storeId: string } } }>;
 export type PendingPaymentVerification = Readonly<{ id: string; checkoutSessionId: string; providerTransactionId: string; amountCents: number; createdAt: Date; session: { checkout: { storeId: string } } }>;
+type UtmifyOrderContext = Readonly<{ id: string; publicId: string; createdAt: Date; completedAt: Date | null; currency: string; customerDataEncrypted: string | null; trackingParameters: unknown; totalCents: number; discountCents: number; shippingPriceCents: number; checkout: { storeId: string; store: { name: string }; product: { publicId: string; checkoutTitle: string } }; items: readonly { productId: string; titleSnapshot: string; unitPriceCents: number; quantity: number; product: { publicId: string } }[] }>;
 
 export class PrismaGatewayRepository {
   constructor(private readonly database: PrismaClient) {}
@@ -19,16 +21,29 @@ export class PrismaGatewayRepository {
     return member ? { storeId: session.activeStoreId, role: member.role } : null;
   }
 
-  status(storeId: string, provider: PaymentProvider = 'WESTPAY'): Promise<GatewayStatus | null> {
+  status(storeId: string, provider: IntegrationProvider = 'WESTPAY'): Promise<GatewayStatus | null> {
     return this.database.gatewayConnection.findUnique({ where: { storeId_provider: { storeId, provider } }, select: { active: true, verifiedAt: true, updatedAt: true } });
   }
 
-  save(storeId: string, provider: PaymentProvider, apiKeyEncrypted: string, publicKeyEncrypted: string): Promise<GatewayStatus> {
+  save(storeId: string, provider: IntegrationProvider, apiKeyEncrypted: string, publicKeyEncrypted: string): Promise<GatewayStatus> {
     return this.database.gatewayConnection.upsert({ where: { storeId_provider: { storeId, provider } }, create: { storeId, provider, apiKeyEncrypted, publicKeyEncrypted, active: true, verifiedAt: new Date() }, update: { apiKeyEncrypted, publicKeyEncrypted, active: true, verifiedAt: new Date() }, select: { active: true, verifiedAt: true, updatedAt: true } });
   }
 
-  credentials(storeId: string, provider: PaymentProvider = 'WESTPAY'): Promise<GatewayCredentials | null> {
+  credentials(storeId: string, provider: IntegrationProvider = 'WESTPAY'): Promise<GatewayCredentials | null> {
     return this.database.gatewayConnection.findFirst({ where: { storeId, provider, active: true }, select: { apiKeyEncrypted: true, publicKeyEncrypted: true } });
+  }
+
+  disconnect(storeId: string, provider: IntegrationProvider): Promise<{ count: number }> {
+    return this.database.gatewayConnection.updateMany({ where: { storeId, provider }, data: { active: false } });
+  }
+
+  utmifyOrderContext(checkoutSessionId: string): Promise<UtmifyOrderContext | null> {
+    return this.database.checkoutSession.findUnique({ where: { id: checkoutSessionId }, select: {
+      id: true, publicId: true, createdAt: true, completedAt: true, currency: true, customerDataEncrypted: true, trackingParameters: true,
+      totalCents: true, discountCents: true, shippingPriceCents: true,
+      checkout: { select: { storeId: true, store: { select: { name: true } }, product: { select: { publicId: true, checkoutTitle: true } } } },
+      items: { select: { productId: true, titleSnapshot: true, unitPriceCents: true, quantity: true, product: { select: { publicId: true } } } },
+    } });
   }
 
   async primaryProvider(storeId: string): Promise<PaymentProvider | null> {

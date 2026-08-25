@@ -4,7 +4,7 @@ export type StoreContext = Readonly<{ storeId: string; userId: string; sessionId
 export type ProductInput = Readonly<{ title: string; description?: string; imageUrl?: string; priceCents: number; compareAtCents?: number; stockQuantity?: number; trackInventory: boolean; maxPerOrder: number; active: boolean; fulfillmentType: 'PHYSICAL' | 'DIGITAL'; externalDeliveryUrl?: string }>;
 export type CheckoutInput = Readonly<{ name: string; slug: string; productPublicId: string; draftConfig: Record<string, unknown> }>;
 export type CheckoutConfigInput = Readonly<Record<string, unknown>>;
-export type CheckoutSessionInput = Readonly<{ storeSlug: string; checkoutSlug: string; variantPublicId?: string; quantity: number; tokenHash: string; source: 'DIRECT' | 'SHOPIFY'; sourceCartId?: string; expiresAt: Date }>;
+export type CheckoutSessionInput = Readonly<{ storeSlug: string; checkoutSlug: string; variantPublicId?: string; quantity: number; tokenHash: string; source: 'DIRECT' | 'SHOPIFY'; sourceCartId?: string; trackingParameters?: Record<string, string | null>; expiresAt: Date }>;
 export type ShopifyCartSessionInput = Readonly<{ shopDomain: string; checkoutSlug: string; lines: readonly Readonly<{ variantId: string; quantity: number }>[]; tokenHash: string; sourceCartId?: string; expiresAt: Date }>;
 export type CheckoutCustomerInput = Readonly<{ encryptedData: string; emailHash: string; documentHash: string }>;
 export type CheckoutShippingInput = Readonly<{ encryptedData: string }>;
@@ -195,7 +195,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
       if (input.variantPublicId && !variant) return null;
       if (variant?.inventoryQuantity !== null && variant?.inventoryQuantity !== undefined && variant.inventoryQuantity < input.quantity) return null;
       const unitPriceCents = variant?.priceCents ?? checkout.product.priceCents;
-      const session = await transaction.checkoutSession.create({ data: { checkoutId: checkout.id, variantId: variant?.id ?? null, quantity: input.quantity, unitPriceCents, totalCents: unitPriceCents * input.quantity, tokenHash: input.tokenHash, source: input.source, expiresAt: checkoutSessionExpiry(checkout.publishedConfig, input.expiresAt), ...(input.sourceCartId ? { sourceCartId: input.sourceCartId } : {}) }, select: { publicId: true, quantity: true, unitPriceCents: true, totalCents: true, currency: true, status: true, expiresAt: true, checkout: { select: { slug: true, name: true, publishedConfig: true, store: { select: { name: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } } } });
+      const session = await transaction.checkoutSession.create({ data: { checkoutId: checkout.id, variantId: variant?.id ?? null, quantity: input.quantity, unitPriceCents, totalCents: unitPriceCents * input.quantity, tokenHash: input.tokenHash, source: input.source, trackingParameters: input.trackingParameters ?? {}, expiresAt: checkoutSessionExpiry(checkout.publishedConfig, input.expiresAt), ...(input.sourceCartId ? { sourceCartId: input.sourceCartId } : {}) }, select: { publicId: true, quantity: true, unitPriceCents: true, totalCents: true, currency: true, status: true, expiresAt: true, checkout: { select: { slug: true, name: true, publishedConfig: true, store: { select: { name: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } } } });
       return { ...session, product: checkout.product };
     });
   }

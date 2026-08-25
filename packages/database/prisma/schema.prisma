@@ -302,6 +302,7 @@ model CheckoutSession {
   status            CheckoutSessionStatus @default(OPEN)
   source             String                @default("DIRECT") @db.VarChar(32)
   sourceCartId       String?               @map("source_cart_id") @db.VarChar(255)
+  trackingParameters Json                  @default("{}") @map("tracking_parameters")
   customerDataEncrypted String?            @map("customer_data_encrypted") @db.Text
   customerEmailHash  String?               @map("customer_email_hash") @db.Char(64)
   customerDocumentHash String?             @map("customer_document_hash") @db.Char(64)

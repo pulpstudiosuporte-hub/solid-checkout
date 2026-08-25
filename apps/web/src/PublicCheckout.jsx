@@ -185,10 +185,11 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
     setBusy(true);
     setState((current) => ({ ...current, error: "" }));
     try {
+      const search = new URLSearchParams(window.location.search); const hashSearch = new URLSearchParams(window.location.hash.split('?')[1] || ''); const trackingParameters = Object.fromEntries(['src','sck','utm_source','utm_campaign','utm_medium','utm_content','utm_term'].map(key => [key, search.get(key) || hashSearch.get(key)]));
       const result = await createPublicCheckoutSession(
         storeSlug,
         checkoutSlug,
-        { quantity, ...(variantId ? { variantId } : {}) },
+        { quantity, trackingParameters, ...(variantId ? { variantId } : {}) },
       );
       sessionStorage.setItem(
         `solid-checkout-session:${result.session.publicId}`,
