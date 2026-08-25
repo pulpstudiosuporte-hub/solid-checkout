@@ -28,6 +28,7 @@ export async function getApiHealth() {
 
   return body;
 }
+export async function getDashboard(period, signal) { return readJson(await fetch(`${apiBaseUrl}/dashboard?period=${encodeURIComponent(period)}`, { credentials: 'include', headers: { Accept: 'application/json' }, signal })); }
 
 async function readJson(response) {
   const body = await response.json().catch(() => null);

@@ -42,6 +42,7 @@ export default function Login({ onSubmit, onRegister, onVerify }) {
       {mode !== 'verify' && <>
       <label htmlFor="login-email">E-mail</label><input id="login-email" type="email" inputMode="email" autoComplete="username" value={email} onChange={event => setEmail(event.target.value)} placeholder="voce@empresa.com" required disabled={loading}/>
       <div className="password-label"><label htmlFor="login-password">Senha</label></div><div className="password-field"><input id="login-password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} placeholder="Digite sua senha" required disabled={loading}/><button type="button" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} aria-pressed={showPassword}>{showPassword ? <EyeOff size={19}/> : <Eye size={19}/>}</button></div>
+      {mode === 'register' && <p className={`password-requirement ${password.length >= 14 ? 'valid' : ''}`} aria-live="polite">{password.length >= 14 ? <CheckCircle2 size={15}/> : <LockKeyhole size={15}/>} {password.length >= 14 ? 'Senha segura para continuar' : `Use pelo menos 14 caracteres (${password.length}/14)`}</p>}
       {mode === 'register' && <label className="signup-terms"><input type="checkbox" checked={terms} onChange={event => setTerms(event.target.checked)}/><span>Li e aceito os Termos de Uso e a Política de Privacidade.</span></label>}
       </>}
       {error && <div className="login-error" role="alert">{error}</div>}

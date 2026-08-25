@@ -11,6 +11,7 @@ import './styles.css';
 import CheckoutEditor, { defaultCheckoutConfig } from './CheckoutEditor';
 import { archiveStore, createStore, getApiHealth, getSession, getStores, login, logout, registerAccount, selectStore, verifyAccount } from './api';
 import Login, { SessionLoading } from './Auth';
+import DashboardPage from './DashboardPage';
 import AccountSettings from './AccountSettings';
 import StoreSwitcher from './StoreSwitcher';
 import ShopifyIntegration from './ShopifyIntegration';
@@ -78,7 +79,11 @@ function Metric({ icon: Icon, label, value, delta, tone }) {
   return <div className="metric card"><div className={`metric-icon ${tone}`}><Icon size={20}/></div><div className="metric-copy"><span>{label}</span><strong>{value}</strong><small><TrendingUp size={13}/> {delta} <i>vs. período anterior</i></small></div></div>;
 }
 
-function Dashboard({ setPage, storeKey }) {
+function Dashboard(props) {
+  return <DashboardPage {...props}/>;
+}
+
+function LegacyDashboard({ setPage, storeKey }) {
   const [period, setPeriod] = useState('Últimos 7 dias');
   return <main className="page dashboard">
     <section className="page-title"><div><p className="eyebrow">VISÃO GERAL</p><h1>Olá, Ragnar <span>👋</span></h1><p>Acompanhe o desempenho da sua operação hoje.</p></div><div className="title-actions"><select value={period} onChange={e=>setPeriod(e.target.value)}><option>Hoje</option><option>Últimos 7 dias</option><option>Este mês</option></select><button className="secondary"><FileText size={17}/> Exportar</button></div></section>
