@@ -24,6 +24,7 @@ import type { PrismaClient } from '@solid/database';
 import { registerRegistrationRoutes } from './registration-routes.js';
 import { registerDashboardRoutes } from './dashboard-routes.js';
 import { registerAdminUserRoutes } from './admin-user-routes.js';
+import { registerCouponRoutes } from './coupon-routes.js';
 
 export function buildApp(environment: AppEnvironment, dependencies: { authRepository?: AuthRepository; catalogRepository?: CatalogRepository; storeRepository?: StoreRepository; shopifyRepository?: ShopifyRepository; gatewayRepository?: PrismaGatewayRepository; orderRepository?: OrderRepository; dokployClient?: DokployDomainClient; database?: PrismaClient } = {}): FastifyInstance {
   const app = Fastify({
@@ -66,6 +67,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
   if (dependencies.authRepository && dependencies.storeRepository) registerStoreRoutes(app, environment, dependencies.authRepository, dependencies.storeRepository, dokployClient);
   if (dependencies.authRepository && dependencies.shopifyRepository) registerShopifyRoutes(app, environment, dependencies.authRepository, dependencies.shopifyRepository);
   if (dependencies.authRepository && dependencies.catalogRepository) registerCatalogRoutes(app, environment, dependencies.authRepository, dependencies.catalogRepository);
+  if (dependencies.authRepository && dependencies.catalogRepository && dependencies.database) registerCouponRoutes(app, environment, dependencies.authRepository, dependencies.catalogRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.catalogRepository && dependencies.database) registerMediaRoutes(app, environment, dependencies.authRepository, dependencies.catalogRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.gatewayRepository) registerGatewayRoutes(app, environment, dependencies.authRepository, dependencies.gatewayRepository);
   if (dependencies.authRepository && dependencies.orderRepository) registerOrderRoutes(app, environment, dependencies.authRepository, dependencies.orderRepository);

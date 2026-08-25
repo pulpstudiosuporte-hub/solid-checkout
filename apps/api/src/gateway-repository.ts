@@ -37,7 +37,7 @@ export class PrismaGatewayRepository {
   }
 
   async paymentContext(publicId: string, tokenHash: string, now: Date) {
-    return this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, customerDataEncrypted: { not: null }, OR: [{ checkout: { product: { fulfillmentType: 'DIGITAL' } } }, { shippingAddressEncrypted: { not: null }, shippingMethodPublicId: { not: null } }] }, select: { id: true, publicId: true, totalCents: true, shippingPriceCents: true, customerDataEncrypted: true, shippingAddressEncrypted: true, expiresAt: true, checkout: { select: { storeId: true, store: { select: { name: true } }, product: { select: { fulfillmentType: true } } } }, items: { select: { productId: true, titleSnapshot: true, unitPriceCents: true, quantity: true } } } });
+    return this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, customerDataEncrypted: { not: null }, OR: [{ checkout: { product: { fulfillmentType: 'DIGITAL' } } }, { shippingAddressEncrypted: { not: null }, shippingMethodPublicId: { not: null } }] }, select: { id: true, publicId: true, totalCents: true, discountCents: true, shippingPriceCents: true, customerDataEncrypted: true, shippingAddressEncrypted: true, expiresAt: true, checkout: { select: { storeId: true, store: { select: { name: true } }, product: { select: { fulfillmentType: true } } } }, items: { select: { productId: true, titleSnapshot: true, unitPriceCents: true, quantity: true } } } });
   }
 
   latestAttempt(checkoutSessionId: string, provider?: PaymentProvider): Promise<PaymentAttemptSummary | null> {
@@ -90,7 +90,10 @@ export class PrismaGatewayRepository {
       const canTransition = status === 'PAID' || current.status === 'PENDING' || current.status === 'PAID' && status === 'REFUNDED';
       if (!canTransition) return;
       await transaction.paymentAttempt.update({ where: { id: attemptId }, data: { status, ...(paidAt ? { paidAt } : {}) } });
-      if (status === 'PAID') await transaction.checkoutSession.updateMany({ where: { id: checkoutSessionId, status: 'OPEN' }, data: { status: 'COMPLETED', completedAt: paidAt ?? new Date() } });
+      if (status === 'PAID') {
+        const completed = await transaction.checkoutSession.updateMany({ where: { id: checkoutSessionId, status: 'OPEN' }, data: { status: 'COMPLETED', completedAt: paidAt ?? new Date() } });
+        if (completed.count) { const session = await transaction.checkoutSession.findUnique({ where: { id: checkoutSessionId }, select: { couponId: true } }); if (session?.couponId) await transaction.coupon.update({ where: { id: session.couponId }, data: { redemptionCount: { increment: 1 } } }); }
+      }
     });
   }
 }

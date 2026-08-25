@@ -51,6 +51,11 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum CouponType {
+  PERCENT
+  FIXED
+}
+
 model User {
   id              String        @id @default(uuid()) @db.Uuid
   publicId        String        @unique @default(cuid()) @map("public_id") @db.VarChar(32)
@@ -107,6 +112,7 @@ model Store {
   shippingMethods ShippingMethod[]
   gatewayConnections GatewayConnection[]
   customDomain StoreDomain?
+  coupons Coupon[]
 
   @@map("stores")
 }
@@ -289,6 +295,9 @@ model CheckoutSession {
   quantity          Int
   unitPriceCents    Int                   @map("unit_price_cents")
   totalCents        Int                   @map("total_cents")
+  couponId          String?               @map("coupon_id") @db.Uuid
+  couponCode        String?               @map("coupon_code") @db.VarChar(40)
+  discountCents     Int                   @default(0) @map("discount_cents")
   currency          String                @default("BRL") @db.Char(3)
   status            CheckoutSessionStatus @default(OPEN)
   source             String                @default("DIRECT") @db.VarChar(32)
@@ -323,6 +332,7 @@ model CheckoutSession {
   variant           ProductVariant?       @relation(fields: [variantId], references: [id], onDelete: Restrict)
   items             CheckoutSessionItem[]
   paymentAttempts   PaymentAttempt[]
+  coupon            Coupon?               @relation(fields: [couponId], references: [id], onDelete: SetNull)
 
   @@index([checkoutId, status, expiresAt])
   @@index([expiresAt])
@@ -330,6 +340,30 @@ model CheckoutSession {
   @@index([shopifySyncStatus, shopifySyncStartedAt])
   @@index([status, confirmationEmailSentAt, confirmationEmailNextAttemptAt])
   @@map("checkout_sessions")
+}
+
+model Coupon {
+  id                   String      @id @default(uuid()) @db.Uuid
+  publicId             String      @unique @default(cuid()) @map("public_id") @db.VarChar(32)
+  storeId              String      @map("store_id") @db.Uuid
+  code                 String      @db.VarChar(40)
+  type                 CouponType
+  value                Int
+  minimumSubtotalCents Int         @default(0) @map("minimum_subtotal_cents")
+  maxDiscountCents     Int?        @map("max_discount_cents")
+  maxRedemptions       Int?        @map("max_redemptions")
+  redemptionCount      Int         @default(0) @map("redemption_count")
+  startsAt             DateTime?   @map("starts_at") @db.Timestamptz(3)
+  expiresAt            DateTime?   @map("expires_at") @db.Timestamptz(3)
+  active               Boolean     @default(true)
+  createdAt            DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  store                Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  sessions             CheckoutSession[]
+
+  @@unique([storeId, code])
+  @@index([storeId, active, createdAt(sort: Desc)])
+  @@map("coupons")
 }
 
 model GatewayConnection {

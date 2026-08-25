@@ -51,6 +51,12 @@ const configuredOrderBumps = (config: Record<string, unknown>): readonly OrderBu
   if (configured.length) return configured;
   return typeof config.orderBumpProductId === 'string' && /^[A-Za-z0-9_-]{1,32}$/.test(config.orderBumpProductId) ? [{ productId: config.orderBumpProductId, title: typeof config.orderBumpTitle === 'string' ? config.orderBumpTitle : '', message: typeof config.orderBumpMessage === 'string' ? config.orderBumpMessage : '' }] : [];
 };
+const sessionDiscount = (subtotal: number, coupon: { type: 'PERCENT' | 'FIXED'; value: number; maxDiscountCents: number | null } | null): number => {
+  if (!coupon) return 0;
+  let discount = coupon.type === 'PERCENT' ? Math.floor(subtotal * coupon.value / 100) : coupon.value;
+  if (coupon.maxDiscountCents) discount = Math.min(discount, coupon.maxDiscountCents);
+  return Math.max(0, Math.min(discount, subtotal - 1));
+};
 
 export class PrismaCatalogRepository implements CatalogRepository {
   constructor(private readonly database: PrismaClient) {}
@@ -189,7 +195,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
   }
 
   async getPublicCheckoutSession(publicId: string, tokenHash: string, now: Date): Promise<object | null> {
-    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { publicId: true, quantity: true, unitPriceCents: true, totalCents: true, currency: true, status: true, expiresAt: true, customerCapturedAt: true, shippingCapturedAt: true, checkout: { select: { storeId: true, slug: true, name: true, publishedConfig: true, store: { select: { name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, fulfillmentType: true, imageUrl: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true, isOrderBump: true, product: { select: { publicId: true } } } } } });
+    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { publicId: true, quantity: true, unitPriceCents: true, totalCents: true, discountCents: true, couponCode: true, currency: true, status: true, expiresAt: true, customerCapturedAt: true, shippingCapturedAt: true, checkout: { select: { storeId: true, slug: true, name: true, publishedConfig: true, store: { select: { name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, fulfillmentType: true, imageUrl: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true, isOrderBump: true, product: { select: { publicId: true } } } } } });
     if (!session) return null;
     const config = session.checkout.publishedConfig as Record<string, unknown>;
     const configured = configuredOrderBumps(config);
@@ -208,7 +214,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
 
   async setPublicOrderBump(publicId: string, tokenHash: string, productPublicId: string, enabled: boolean, now: Date): Promise<object | null> {
     return this.database.$transaction(async transaction => {
-      const session = await transaction.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { id: true, totalCents: true, shippingPriceCents: true, checkout: { select: { storeId: true, publishedConfig: true } } } });
+      const session = await transaction.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { id: true, totalCents: true, shippingPriceCents: true, coupon: { select: { type: true, value: true, maxDiscountCents: true } }, checkout: { select: { storeId: true, publishedConfig: true } } } });
       if (!session) return null;
       const config = session.checkout.publishedConfig as Record<string, unknown>;
       if (!configuredOrderBumps(config).some(bump => bump.productId === productPublicId)) return null;
@@ -218,16 +224,16 @@ export class PrismaCatalogRepository implements CatalogRepository {
       if (enabled && !existing) {
         await transaction.checkoutSessionItem.create({ data: { checkoutSessionId: session.id, productId: product.id, variantId: variant.id, quantity: 1, unitPriceCents: variant.priceCents, totalCents: variant.priceCents, titleSnapshot: product.checkoutTitle, variantSnapshot: variant.title, imageUrlSnapshot: variant.imageUrl ?? product.imageUrl, isOrderBump: true } });
         const totalCents = session.totalCents + variant.priceCents;
-        await transaction.checkoutSession.update({ where: { id: session.id }, data: { totalCents } });
-        return { totalCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: totalCents + session.shippingPriceCents, enabled: true };
+        const discountCents = sessionDiscount(totalCents, session.coupon); await transaction.checkoutSession.update({ where: { id: session.id }, data: { totalCents, discountCents } });
+        return { totalCents, discountCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: totalCents - discountCents + session.shippingPriceCents, enabled: true };
       }
       if (!enabled && existing) {
         await transaction.checkoutSessionItem.delete({ where: { id: existing.id } });
         const totalCents = session.totalCents - existing.totalCents;
-        await transaction.checkoutSession.update({ where: { id: session.id }, data: { totalCents } });
-        return { totalCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: totalCents + session.shippingPriceCents, enabled: false };
+        const discountCents = sessionDiscount(totalCents, session.coupon); await transaction.checkoutSession.update({ where: { id: session.id }, data: { totalCents, discountCents } });
+        return { totalCents, discountCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: totalCents - discountCents + session.shippingPriceCents, enabled: false };
       }
-      return { totalCents: session.totalCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: session.totalCents + session.shippingPriceCents, enabled };
+      const discountCents = sessionDiscount(session.totalCents, session.coupon); return { totalCents: session.totalCents, discountCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: session.totalCents - discountCents + session.shippingPriceCents, enabled };
     });
   }
 
@@ -249,12 +255,12 @@ export class PrismaCatalogRepository implements CatalogRepository {
 
   async selectPublicShippingMethod(publicId: string, tokenHash: string, methodPublicId: string, now: Date): Promise<object | null> {
     return this.database.$transaction(async transaction => {
-      const session = await transaction.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, shippingCapturedAt: { not: null } }, select: { id: true, totalCents: true, checkout: { select: { storeId: true } } } });
+      const session = await transaction.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, shippingCapturedAt: { not: null } }, select: { id: true, totalCents: true, discountCents: true, checkout: { select: { storeId: true } } } });
       if (!session) return null;
       const method = await transaction.shippingMethod.findFirst({ where: { publicId: methodPublicId, storeId: session.checkout.storeId, active: true }, select: { publicId: true, name: true, priceCents: true, minDays: true, maxDays: true } });
       if (!method) return null;
       await transaction.checkoutSession.update({ where: { id: session.id }, data: { shippingMethodPublicId: method.publicId, shippingMethodName: method.name, shippingPriceCents: method.priceCents, shippingMinDays: method.minDays, shippingMaxDays: method.maxDays } });
-      return { shippingMethod: method, subtotalCents: session.totalCents, shippingPriceCents: method.priceCents, grandTotalCents: session.totalCents + method.priceCents };
+      return { shippingMethod: method, subtotalCents: session.totalCents, discountCents: session.discountCents, shippingPriceCents: method.priceCents, grandTotalCents: session.totalCents - session.discountCents + method.priceCents };
     });
   }
 

@@ -27,6 +27,7 @@ import {
   savePublicCheckoutShipping,
   selectPublicShippingMethod,
   setPublicOrderBump,
+  applyPublicCoupon,
 } from "./api";
 import "./public-session.css";
 
@@ -279,6 +280,8 @@ function SessionContent({ session: initialSession, token }) {
   const [payment, setPayment] = useState(null);
   const [delivery, setDelivery] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [couponCode, setCouponCode] = useState(session.couponCode || "");
+  const [couponMessage, setCouponMessage] = useState("");
   const [postalStatus, setPostalStatus] = useState({
     type: "idle",
     message: "",
@@ -346,13 +349,19 @@ function SessionContent({ session: initialSession, token }) {
     setError("");
     try {
       const result = await setPublicOrderBump(session.publicId, token, productId, enabled);
-      setSession(result.session);
+      setSession({ ...result.session, discountCents: result.update.discountCents, couponCode: session.couponCode });
       if (selectedShipping) setSelectedShipping((current) => current ? { ...current, subtotalCents: result.update.totalCents, grandTotalCents: result.update.grandTotalCents } : current);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
       setBusy(false);
     }
+  };
+  const applyCoupon = async (event) => {
+    event.preventDefault(); setBusy(true); setError(""); setCouponMessage("");
+    try { const { coupon } = await applyPublicCoupon(session.publicId, token, couponCode); setSession(current => ({ ...current, couponCode: coupon.code, discountCents: coupon.discountCents })); if (selectedShipping) setSelectedShipping(current => ({ ...current, discountCents: coupon.discountCents, grandTotalCents: coupon.grandTotalCents })); setCouponMessage(coupon.code ? `Cupom ${coupon.code} aplicado.` : "Cupom removido."); }
+    catch (requestError) { setCouponMessage(requestError.message); }
+    finally { setBusy(false); }
   };
   const valid =
     form.name.trim().length >= 3 &&
@@ -806,6 +815,7 @@ function SessionContent({ session: initialSession, token }) {
                 </article>
               ))}
             </div>
+            {config.showCoupon && <form className="public-coupon" onSubmit={applyCoupon}><label htmlFor="coupon-code">Cupom de desconto</label><div><input id="coupon-code" value={couponCode} onChange={event=>setCouponCode(event.target.value.toUpperCase())} maxLength="40" placeholder="Digite o código"/><button disabled={busy || couponCode.trim().length<3}>{session.couponCode?'Atualizar':'Aplicar'}</button></div>{couponMessage&&<small className={session.couponCode?'success':'error'}>{couponMessage}</small>}</form>}
             <div className="session-totals">
               <div>
                 <span>Subtotal</span>
@@ -815,9 +825,10 @@ function SessionContent({ session: initialSession, token }) {
                 <span>Frete</span>
                 <small>{requiresShipping ? (selectedShipping ? (selectedShipping.shippingPriceCents === 0 ? "Grátis" : money.format(selectedShipping.shippingPriceCents / 100)) : "Escolha na etapa de entrega") : "Não aplicável"}</small>
               </div>
+              {session.discountCents > 0 && <div className="coupon-discount"><span>Desconto ({session.couponCode})</span><b>- {money.format(session.discountCents / 100)}</b></div>}
               <div className="session-grand-total">
                 <span>Total</span>
-                <strong>{money.format((selectedShipping?.grandTotalCents ?? session.totalCents) / 100)}</strong>
+                <strong>{money.format((selectedShipping?.grandTotalCents ?? (session.totalCents - (session.discountCents || 0))) / 100)}</strong>
               </div>
             </div>
             <p className="session-security">
@@ -839,7 +850,7 @@ function SessionContent({ session: initialSession, token }) {
 }
 
 function ThankYouPage({ session, items, itemCount, selectedShipping, config, delivery }) {
-  const total = selectedShipping?.grandTotalCents ?? session.totalCents;
+  const total = selectedShipping?.grandTotalCents ?? session.totalCents - (session.discountCents || 0);
   return (
     <main className="public-checkout thank-you-page" style={configStyle(config)}>
       <header>

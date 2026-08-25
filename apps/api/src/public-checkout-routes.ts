@@ -135,7 +135,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     const encryptedCredentials = await gateways.credentials(context.checkout.storeId, provider); if (!encryptedCredentials) return reply.code(409).send(errorBody(request, 'GATEWAY_UNAVAILABLE', 'O gateway selecionado não está disponível.'));
     const westpayCredentials = { apiKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) };
     const roasCredentials = { secretKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) };
-    const amountCents = context.totalCents + context.shippingPriceCents; let attempt = await gateways.latestAttempt(context.id, provider);
+    const amountCents = context.totalCents - context.discountCents + context.shippingPriceCents; let attempt = await gateways.latestAttempt(context.id, provider);
     if (attempt?.pixCodeEncrypted && attempt.status === 'PENDING') return reply.header('cache-control', 'no-store').send({ payment: { publicId: attempt.publicId, status: 'pending', amountCents: attempt.amountCents, pixCode: decryptSecret(attempt.pixCodeEncrypted, environment.APP_ENCRYPTION_KEY), expiresAt: attempt.expiresAt } });
     if (!attempt || attempt.status !== 'PENDING') attempt = await gateways.createAttempt(context.id, provider, amountCents, `${provider.toLowerCase()}:${context.id}:${Date.now()}`);
     const externalRef = `solid-${attempt.publicId}`;
