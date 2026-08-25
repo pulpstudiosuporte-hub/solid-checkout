@@ -20,6 +20,7 @@ class MemoryAuth implements AuthRepository {
 }
 
 class MemoryCatalog implements CatalogRepository {
+  paidDigitalDelivery: { title: string; url: string } | null = null;
   shippingMethods = [{ publicId: 'shipping-a', name: 'Entrega padrão', priceCents: 1290, minDays: 3, maxDays: 5, active: true, position: 0 }];
   listShippingMethods(): Promise<readonly object[]> { return Promise.resolve(this.shippingMethods); }
   createShippingMethod(_context: StoreContext, input: { name: string; priceCents: number; minDays: number; maxDays: number; active: boolean }): Promise<object> { const method = { publicId: 'shipping-new', ...input, position: this.shippingMethods.length }; this.shippingMethods.push(method); return Promise.resolve(method); }
@@ -38,12 +39,13 @@ class MemoryCatalog implements CatalogRepository {
   deleteManualProduct(context: StoreContext, publicId: string): Promise<'deleted' | 'archived' | 'not_found'> { const index = this.products.findIndex(product => product.storeId === context.storeId && product.publicId === publicId); if (index < 0) return Promise.resolve('not_found'); this.products.splice(index, 1); return Promise.resolve('deleted'); }
   listCheckouts(context: StoreContext): Promise<readonly object[]> { return Promise.resolve(this.checkouts.filter(checkout => checkout.storeId === context.storeId)); }
   createCheckout(context: StoreContext, input: CheckoutInput): Promise<object | null> { if (!this.products.some(product => product.publicId === input.productPublicId && product.storeId === context.storeId)) return Promise.resolve(null); const checkout = { publicId: 'new-checkout', storeId: context.storeId, ...input }; this.checkouts.push(checkout); return Promise.resolve(checkout); }
+  deleteCheckout(context: StoreContext, publicId: string): Promise<'deleted' | 'archived' | 'not_found'> { const index = this.checkouts.findIndex(checkout => checkout.storeId === context.storeId && checkout.publicId === publicId); if (index < 0) return Promise.resolve('not_found'); this.checkouts.splice(index, 1); return Promise.resolve('deleted'); }
   updateCheckoutDraft(context: StoreContext, publicId: string, config: Record<string, unknown>): Promise<object | null> { const checkout = this.checkouts.find(item => item.storeId === context.storeId && item.publicId === publicId); if (checkout) checkout.draftConfig = config; return Promise.resolve(checkout ?? null); }
   publishCheckout(context: StoreContext, publicId: string): Promise<object | null> { const checkout = this.checkouts.find(item => item.storeId === context.storeId && item.publicId === publicId); if (checkout) checkout.status = 'PUBLISHED'; return Promise.resolve(checkout ?? null); }
   getPublicCheckout(storeSlug: string, checkoutSlug: string): Promise<object | null> { return Promise.resolve(storeSlug === 'store-a' && checkoutSlug === 'checkout-a' ? { slug: checkoutSlug, product: this.products[0] } : null); }
   createPublicCheckoutSession(input: CheckoutSessionInput): Promise<object | null> { return Promise.resolve(input.storeSlug === 'store-a' && input.checkoutSlug === 'checkout-a' ? { publicId: 'session-a', totalCents: 9900 * input.quantity } : null); }
   getPublicCheckoutSession(publicId: string, tokenHash: string): Promise<object | null> { return Promise.resolve(publicId === 'session-a' && tokenHash ? { publicId, totalCents: 9900 } : null); }
-  getPaidDigitalDelivery(): Promise<object | null> { return Promise.resolve(null); }
+  getPaidDigitalDelivery(publicId: string, tokenHash: string): Promise<object | null> { return Promise.resolve(publicId === 'session-a' && tokenHash && this.paidDigitalDelivery ? this.paidDigitalDelivery : null); }
   createShopifyCartSession(input: ShopifyCartSessionInput): Promise<object | null> { return Promise.resolve(input.shopDomain === 'store-a.myshopify.com' ? { publicId: 'shopify-session', totalCents: 9900 } : null); }
   updatePublicCheckoutCustomer(publicId: string, tokenHash: string): Promise<object | null> { return Promise.resolve(publicId === 'session-a' && tokenHash ? { customerCaptured: true, shippingCaptured: false } : null); }
   updatePublicCheckoutShipping(publicId: string, tokenHash: string): Promise<object | null> { return Promise.resolve(publicId === 'session-a' && tokenHash ? { customerCaptured: true, shippingCaptured: true } : null); }
@@ -91,6 +93,16 @@ describe('catálogo isolado por loja', () => {
     await app.close();
   });
 
+  it('exclui checkout somente na loja autenticada e exige CSRF', async () => {
+    const catalog = new MemoryCatalog(); catalog.checkouts.push({ publicId: 'checkout-a', storeId: 'store-a' });
+    const app = buildApp(env, { authRepository: new MemoryAuth(), catalogRepository: catalog });
+    expect((await app.inject({ method: 'DELETE', url: '/checkouts/checkout-a', headers: { cookie: `solid_session=${sessionToken}` } })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'DELETE', url: '/checkouts/checkout-missing', headers: authenticatedHeaders })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'DELETE', url: '/checkouts/checkout-a', headers: authenticatedHeaders })).statusCode).toBe(204);
+    expect(catalog.checkouts).toHaveLength(0);
+    await app.close();
+  });
+
   it('valida e salva personalização somente na loja autenticada', async () => {
     const catalog = new MemoryCatalog(); catalog.checkouts.push({ publicId: 'checkout-a', storeId: 'store-a', draftConfig: {} });
     const app = buildApp(env, { authRepository: new MemoryAuth(), catalogRepository: catalog });
@@ -109,6 +121,21 @@ describe('catálogo isolado por loja', () => {
     expect(created.statusCode).toBe(201);
     expect(created.json<{ session: { publicId: string; totalCents: number } }>().session).toMatchObject({ publicId: 'session-a', totalCents: 19800 });
     expect(created.json<{ token: string }>().token.length).toBeGreaterThanOrEqual(43);
+    await app.close();
+  });
+
+  it('protege a entrega digital e só libera o link após confirmação', async () => {
+    const catalog = new MemoryCatalog();
+    const app = buildApp(env, { authRepository: new MemoryAuth(), catalogRepository: catalog });
+    const url = '/public/checkout-sessions/session-a/delivery';
+    expect((await app.inject({ method: 'GET', url })).statusCode).toBe(401);
+    const headers = { authorization: `Bearer ${'a'.repeat(43)}`, origin };
+    expect((await app.inject({ method: 'GET', url, headers })).statusCode).toBe(404);
+    catalog.paidDigitalDelivery = { title: 'Curso SOLID', url: 'https://conteudo.exemplo.com/acesso' };
+    const delivered = await app.inject({ method: 'GET', url, headers });
+    expect(delivered.statusCode).toBe(200);
+    expect(delivered.headers['cache-control']).toBe('no-store');
+    expect(delivered.json()).toEqual({ delivery: catalog.paidDigitalDelivery });
     await app.close();
   });
 

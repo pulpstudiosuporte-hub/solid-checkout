@@ -241,6 +241,7 @@ model Checkout {
   draftConfig Json           @default("{}") @map("draft_config")
   publishedConfig Json       @default("{}") @map("published_config")
   publishedAt DateTime?      @map("published_at") @db.Timestamptz(3)
+  archivedAt  DateTime?      @map("archived_at") @db.Timestamptz(3)
   createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
   store       Store          @relation(fields: [storeId], references: [id], onDelete: Restrict)
@@ -250,6 +251,7 @@ model Checkout {
   @@unique([storeId, slug])
   @@index([storeId, status, createdAt(sort: Desc)])
   @@index([storeId, productId])
+  @@index([storeId, archivedAt])
   @@map("checkouts")
 }
 

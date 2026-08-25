@@ -20,6 +20,7 @@ export interface CatalogRepository {
   deleteManualProduct(context: StoreContext, publicId: string, requestId: string): Promise<'deleted' | 'archived' | 'not_found'>;
   listCheckouts(context: StoreContext): Promise<readonly object[]>;
   createCheckout(context: StoreContext, input: CheckoutInput, requestId: string): Promise<object | null>;
+  deleteCheckout(context: StoreContext, publicId: string, requestId: string): Promise<'deleted' | 'archived' | 'not_found'>;
   updateCheckoutDraft(context: StoreContext, publicId: string, config: CheckoutConfigInput, requestId: string): Promise<object | null>;
   publishCheckout(context: StoreContext, publicId: string, requestId: string): Promise<object | null>;
   getPublicCheckout(storeSlug: string, checkoutSlug: string): Promise<object | null>;
@@ -117,7 +118,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
     return this.database.$transaction(async transaction => { const method = await transaction.shippingMethod.findFirst({ where: { storeId: context.storeId, publicId }, select: { id: true } }); if (!method) return false; await transaction.shippingMethod.delete({ where: { id: method.id } }); await transaction.auditLog.create({ data: { storeId: context.storeId, actorUserId: context.userId, actorType: 'USER', action: 'shipping_method.deleted', targetType: 'shipping_method', targetId: publicId, requestId } }); return true; });
   }
   listCheckouts(context: StoreContext): Promise<readonly object[]> {
-    return this.database.checkout.findMany({ where: { storeId: context.storeId }, orderBy: { createdAt: 'desc' }, take: 100, select: checkoutSelect });
+    return this.database.checkout.findMany({ where: { storeId: context.storeId, archivedAt: null }, orderBy: { createdAt: 'desc' }, take: 100, select: checkoutSelect });
   }
   async createCheckout(context: StoreContext, input: CheckoutInput, requestId: string): Promise<object | null> {
     const product = await this.database.product.findFirst({ where: { publicId: input.productPublicId, storeId: context.storeId, active: true }, select: { id: true } });
@@ -129,8 +130,25 @@ export class PrismaCatalogRepository implements CatalogRepository {
     });
   }
 
+  async deleteCheckout(context: StoreContext, publicId: string, requestId: string): Promise<'deleted' | 'archived' | 'not_found'> {
+    const checkout = await this.database.checkout.findFirst({ where: { publicId, storeId: context.storeId, archivedAt: null }, select: { id: true, slug: true } });
+    if (!checkout) return 'not_found';
+    return this.database.$transaction(async transaction => {
+      const sessionCount = await transaction.checkoutSession.count({ where: { checkoutId: checkout.id } });
+      if (sessionCount) {
+        const archivedSlug = `${checkout.slug.slice(0, 60)}-archived-${publicId.slice(-8).toLowerCase()}`;
+        await transaction.checkout.update({ where: { id: checkout.id }, data: { status: 'DRAFT', slug: archivedSlug, archivedAt: new Date() } });
+        await transaction.auditLog.create({ data: { storeId: context.storeId, actorUserId: context.userId, actorType: 'USER', action: 'checkout.archived', targetType: 'checkout', targetId: publicId, requestId } });
+        return 'archived';
+      }
+      await transaction.checkout.delete({ where: { id: checkout.id } });
+      await transaction.auditLog.create({ data: { storeId: context.storeId, actorUserId: context.userId, actorType: 'USER', action: 'checkout.deleted', targetType: 'checkout', targetId: publicId, requestId } });
+      return 'deleted';
+    });
+  }
+
   async updateCheckoutDraft(context: StoreContext, publicId: string, config: CheckoutConfigInput, requestId: string): Promise<object | null> {
-    const checkout = await this.database.checkout.findFirst({ where: { publicId, storeId: context.storeId }, select: { id: true } });
+    const checkout = await this.database.checkout.findFirst({ where: { publicId, storeId: context.storeId, archivedAt: null }, select: { id: true } });
     if (!checkout) return null;
     return this.database.$transaction(async transaction => {
       const updated = await transaction.checkout.update({ where: { id: checkout.id }, data: { draftConfig: config as Prisma.InputJsonValue }, select: checkoutSelect });
@@ -140,7 +158,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
   }
 
   async publishCheckout(context: StoreContext, publicId: string, requestId: string): Promise<object | null> {
-    const checkout = await this.database.checkout.findFirst({ where: { publicId, storeId: context.storeId, product: { active: true } }, select: { id: true } });
+    const checkout = await this.database.checkout.findFirst({ where: { publicId, storeId: context.storeId, archivedAt: null, product: { active: true } }, select: { id: true } });
     if (!checkout) return null;
     return this.database.$transaction(async transaction => {
       const current = await transaction.checkout.findUniqueOrThrow({ where: { id: checkout.id }, select: { draftConfig: true } });
@@ -152,14 +170,14 @@ export class PrismaCatalogRepository implements CatalogRepository {
 
   getPublicCheckout(storeSlug: string, checkoutSlug: string): Promise<object | null> {
     return this.database.checkout.findFirst({
-      where: { slug: checkoutSlug, status: 'PUBLISHED', store: { slug: storeSlug, active: true }, product: { active: true } },
+      where: { slug: checkoutSlug, status: 'PUBLISHED', archivedAt: null, store: { slug: storeSlug, active: true }, product: { active: true } },
       select: { publicId: true, slug: true, name: true, publishedConfig: true, store: { select: { publicId: true, name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, fulfillmentType: true, imageUrl: true, priceCents: true, compareAtCents: true, maxPerOrder: true, stockQuantity: true, trackInventory: true, variants: { where: { availableForSale: true }, orderBy: { createdAt: 'asc' }, select: { publicId: true, title: true, priceCents: true, compareAtCents: true, inventoryQuantity: true, availableForSale: true, imageUrl: true, selectedOptions: true } } } } }
     });
   }
 
   async createPublicCheckoutSession(input: CheckoutSessionInput): Promise<object | null> {
     return this.database.$transaction(async transaction => {
-      const checkout = await transaction.checkout.findFirst({ where: { slug: input.checkoutSlug, status: 'PUBLISHED', store: { slug: input.storeSlug, active: true }, product: { active: true } }, select: { id: true, productId: true, product: { select: { publicId: true, checkoutTitle: true, fulfillmentType: true, imageUrl: true, priceCents: true, maxPerOrder: true, stockQuantity: true, trackInventory: true } } } });
+      const checkout = await transaction.checkout.findFirst({ where: { slug: input.checkoutSlug, status: 'PUBLISHED', archivedAt: null, store: { slug: input.storeSlug, active: true }, product: { active: true } }, select: { id: true, productId: true, product: { select: { publicId: true, checkoutTitle: true, fulfillmentType: true, imageUrl: true, priceCents: true, maxPerOrder: true, stockQuantity: true, trackInventory: true } } } });
       if (!checkout || input.quantity > checkout.product.maxPerOrder || (checkout.product.trackInventory && (checkout.product.stockQuantity ?? 0) < input.quantity)) return null;
       const variant = input.variantPublicId ? await transaction.productVariant.findFirst({ where: { publicId: input.variantPublicId, productId: checkout.productId, availableForSale: true }, select: { id: true, publicId: true, title: true, priceCents: true, inventoryQuantity: true, imageUrl: true } }) : null;
       if (input.variantPublicId && !variant) return null;
@@ -244,7 +262,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
     return this.database.$transaction(async transaction => {
       const connection = await transaction.shopifyConnection.findFirst({ where: { shopDomain: input.shopDomain, revokedAt: null, store: { active: true } }, select: { storeId: true, store: { select: { slug: true } } } });
       if (!connection) return null;
-      const checkout = await transaction.checkout.findFirst({ where: { storeId: connection.storeId, slug: input.checkoutSlug, status: 'PUBLISHED' }, select: { id: true } });
+      const checkout = await transaction.checkout.findFirst({ where: { storeId: connection.storeId, slug: input.checkoutSlug, status: 'PUBLISHED', archivedAt: null }, select: { id: true } });
       if (!checkout) return null;
       const requestedIds = input.lines.map(line => `gid://shopify/ProductVariant/${line.variantId}`);
       const variants = await transaction.productVariant.findMany({ where: { sourceExternalId: { in: requestedIds }, availableForSale: true, product: { storeId: connection.storeId, source: 'SHOPIFY', active: true } }, select: { id: true, sourceExternalId: true, title: true, priceCents: true, inventoryQuantity: true, imageUrl: true, product: { select: { id: true, checkoutTitle: true, imageUrl: true, maxPerOrder: true, trackInventory: true } } } });

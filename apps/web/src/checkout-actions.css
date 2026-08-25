@@ -1,0 +1,15 @@
+.checkout-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.checkout-card .checkout-delete {
+  flex: none;
+  color: #dc3d47;
+}
+
+.checkout-card .checkout-delete:hover {
+  background: #fff0f1;
+}
