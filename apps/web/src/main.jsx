@@ -46,7 +46,10 @@ function Logo({ compact = false }) {
 
 function Badge({ children, tone = 'neutral' }) { return <span className={`badge ${tone}`}>{children}</span>; }
 
+const roleLabels = { OWNER: 'Proprietário', ADMIN: 'Administrador', ANALYST: 'Analista' };
+
 function Sidebar({ open, onClose, page, setPage, user, onLogout, stores, storeBusy, onSelectStore, onCreateStore, onArchiveStore }) {
+  const activeRole = stores.find(store => store.active)?.role;
   return <>
     {open && <button className="backdrop" onClick={onClose} aria-label="Fechar menu" />}
     <aside className={`sidebar ${open ? 'open' : ''}`}>
@@ -60,7 +63,7 @@ function Sidebar({ open, onClose, page, setPage, user, onLogout, stores, storeBu
       </nav>
       <div className="side-bottom">
         <button className={page === 'Configurações' ? 'nav-item active' : 'nav-item'} onClick={() => { setPage('Configurações'); onClose(); }}><Settings size={19}/><span>Configurações</span></button>
-        <div className="profile"><div className="avatar">{user?.name?.split(' ').slice(0,2).map(part=>part[0]).join('').toUpperCase() || 'AD'}</div><span><b>{user?.name || 'Administrador'}</b><small>Administrador</small></span><button className="icon-btn" onClick={onLogout} aria-label="Sair do painel" title="Sair"><LogOut size={17}/></button></div>
+        <div className="profile"><div className="avatar">{user?.name?.split(' ').slice(0,2).map(part=>part[0]).join('').toUpperCase() || 'AD'}</div><span><b>{user?.name || 'Usuário'}</b><small>{roleLabels[activeRole] || 'Membro'}</small></span><button className="icon-btn" onClick={onLogout} aria-label="Sair do painel" title="Sair"><LogOut size={17}/></button></div>
       </div>
     </aside>
   </>;

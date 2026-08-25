@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowRight, Check, CircleDollarSign, Clock3, FileText, LoaderCircle, ShoppingCart, TrendingUp } from 'lucide-react';
 import { getDashboard } from './api';
+import { RecentOrders } from './OrdersPage';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -52,5 +53,6 @@ export default function DashboardPage({ setPage, storeKey }) {
     <section className="page-title"><div><p className="eyebrow">VISÃO GERAL</p><h1>Olá, {data.userName?.split(' ')[0] || 'empreendedor'} <span>👋</span></h1><p>Acompanhe o desempenho real da sua operação.</p></div><div className="title-actions"><select value={period} onChange={event => setPeriod(event.target.value)}><option value="today">Hoje</option><option value="7d">Últimos 7 dias</option><option value="month">Este mês</option></select><button className="secondary" onClick={exportCsv}><FileText size={17}/> Exportar</button></div></section>
     <section className="metrics"><Metric icon={CircleDollarSign} label="Receita confirmada" value={money.format(data.revenueCents / 100)} tone="purple"/><Metric icon={ShoppingCart} label="Pedidos pagos" value={data.paidOrders} tone="blue"/><Metric icon={TrendingUp} label="Conversão" value={`${data.conversionRate.toLocaleString('pt-BR')}%`} tone="green"/><Metric icon={Clock3} label="Aguardando Pix" value={data.pendingPix} tone="orange"/></section>
     <section className="grid-main"><div className="card chart-card"><div className="card-head"><div><h2>Receita e pedidos</h2><p>Valores confirmados no período</p></div></div><div className="chart-wrap"><div className="chart"><svg viewBox="0 0 680 230" preserveAspectRatio="none" aria-label="Gráfico de receita real"><g className="gridlines"><line x1="0" y1="15" x2="680" y2="15"/><line x1="0" y1="115" x2="680" y2="115"/><line x1="0" y1="215" x2="680" y2="215"/></g><polyline className="line" points={points} fill="none"/></svg><div className="x-labels">{data.series.map(item => <span key={item.date}>{item.date.slice(8, 10)}/{item.date.slice(5, 7)}</span>)}</div></div></div></div><div className="card progress-card"><div className="card-head"><div><h2>Comece por aqui</h2><p>Prepare sua loja para vender</p></div><span>{completed} de 5</span></div><div className="progress"><span style={{ width: `${completed * 20}%` }}/></div>{tasks.map(([title, done, page], index) => <button key={title} className={`task ${done ? 'done' : ''}`} onClick={() => !done && setPage(page)}><span>{done ? <Check size={15}/> : index + 1}</span><b>{title}</b>{!done && <ArrowRight size={16}/>}</button>)}</div></section>
+    <RecentOrders storeKey={storeKey} onViewAll={() => setPage('Pedidos')}/>
   </main>;
 }
