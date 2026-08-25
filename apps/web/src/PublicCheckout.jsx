@@ -38,18 +38,28 @@ const publicConfig = (value) => ({
   primary: "#7357e9",
   pageBg: "#f6f7f9",
   cardBg: "#ffffff",
+  headerBg: "#ffffff",
   textColor: "#17171a",
   borderColor: "#e5e5e9",
   inputBg: "#ffffff",
   radius: 14,
   font: "Plus Jakarta Sans",
   logoText: "SOLID",
+  logoUrl: "",
+  heroImageUrl: "",
+  heroEnabled: false,
+  heroHeight: 220,
   secureHeader: true,
+  secureText: "Pagamento 100% seguro",
+  showProgress: true,
   timer: true,
   timerText: "Sessão reservada por",
+  eyebrow: "FINALIZE SEU PEDIDO",
   title: "Você está a um passo.",
   subtitle: "Preencha seus dados para continuar. Leva menos de um minuto.",
   buttonText: "Continuar para entrega",
+  summaryTitle: "Resumo da compra",
+  layout: "split",
   showSummary: true,
   showBump: true,
   footerText: "© 2026 Solid Commerce. Todos os direitos reservados.",
@@ -62,10 +72,12 @@ const configStyle = (config) => ({
   "--public-primary": config.primary,
   "--public-bg": config.pageBg,
   "--public-card": config.cardBg,
+  "--public-header": config.headerBg,
   "--public-text": config.textColor,
   "--public-border": config.borderColor,
   "--public-input": config.inputBg,
   "--public-radius": `${config.radius}px`,
+  "--public-hero-height": `${config.heroHeight}px`,
   fontFamily: config.font,
 });
 // Shopify descriptions are stored as HTML. The public checkout renders them
@@ -404,17 +416,18 @@ function SessionContent({ session: initialSession, token }) {
   }
   return (
     <main
-      className="public-checkout session-checkout"
+      className={`public-checkout session-checkout template-${config.template} layout-${config.layout}`}
       style={configStyle(config)}
     >
       <header>
-        <img className="public-brand" src="/brand/solid-wordmark-dark.png" alt={config.logoText || 'SOLID'} />
+        {config.logoUrl ? <img className="public-brand custom" src={config.logoUrl} alt={config.logoText || 'Logo da loja'} /> : <span className="public-brand-text">{config.logoText || 'SOLID'}</span>}
         {config.secureHeader && (
           <span>
-            <ShieldCheck size={18} /> Pagamento seguro
+            <ShieldCheck size={18} /> {config.secureText}
           </span>
         )}
       </header>
+      {config.heroEnabled && <div className={`public-checkout-hero ${config.heroImageUrl ? 'has-image' : ''}`} style={config.heroImageUrl ? { backgroundImage: `url(${config.heroImageUrl})` } : undefined}>{!config.heroImageUrl && <><ShoppingBag size={28}/><span>Banner da loja</span></>}</div>}
       {config.timer && (
         <div className="session-expiry" role="status">
           <Clock3 size={17} />
@@ -429,7 +442,7 @@ function SessionContent({ session: initialSession, token }) {
           </span>
         </div>
       )}
-      <nav className="checkout-progress" aria-label="Etapas do checkout">
+      {config.showProgress && <nav className="checkout-progress" aria-label="Etapas do checkout">
         <span className="active">
           <i>
             <UserRound size={15} />
@@ -450,14 +463,14 @@ function SessionContent({ session: initialSession, token }) {
           </i>
           Pagamento
         </span>
-      </nav>
+      </nav>}
       <div
         className={`public-checkout-grid ${config.showSummary ? "" : "without-summary"}`}
       >
         <section className="customer-step">
           {step === 1 ? (
             <form onSubmit={advance} noValidate>
-              <p className="eyebrow">FINALIZE SEU PEDIDO</p>
+              <p className="eyebrow">{config.eyebrow}</p>
               <h1>{config.title}</h1>
               <p className="customer-subtitle">{config.subtitle}</p>
               <div className="customer-form-card">
@@ -740,7 +753,7 @@ function SessionContent({ session: initialSession, token }) {
             <div className="session-summary-title">
               <div>
                 <span>Seu pedido</span>
-                <h2>Resumo da compra</h2>
+                <h2>{config.summaryTitle}</h2>
               </div>
               <small>
                 {itemCount} {itemCount === 1 ? "item" : "itens"}

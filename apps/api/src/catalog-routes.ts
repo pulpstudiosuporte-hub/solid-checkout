@@ -13,7 +13,7 @@ const integer = (value: unknown, min: number, max: number): number | null => typ
 const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const input = value as Record<string, unknown>; const result: Record<string, unknown> = {};
-  const enums: Record<string, readonly string[]> = { template: ['minimal', 'conversion', 'compact'], font: ['Plus Jakarta Sans', 'Inter', 'Arial', 'Georgia'], language: ['pt-BR', 'en-US', 'es'], currency: ['BRL', 'USD', 'EUR'], buttonEffect: ['lift', 'pulse', 'none'] };
+  const enums: Record<string, readonly string[]> = { template: ['minimal', 'conversion', 'compact', 'showcase'], font: ['Plus Jakarta Sans', 'Inter', 'Arial', 'Georgia'], language: ['pt-BR', 'en-US', 'es'], currency: ['BRL', 'USD', 'EUR'], buttonEffect: ['lift', 'pulse', 'none'] };
   const limits: Record<string, number> = { logoText: 24, timerText: 80, title: 120, subtitle: 300, buttonText: 60, footerText: 300 };
   const booleans = ['secureHeader', 'timer', 'showCoupon', 'showBump', 'showSummary'];
   const colors = ['primary', 'pageBg', 'cardBg', 'textColor', 'borderColor', 'inputBg'];
@@ -24,6 +24,12 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   const radius = integer(input.radius, 0, 28); const timerMinutes = integer(input.timerMinutes, 1, 60); if (radius === null || timerMinutes === null) return null;
   result.radius = radius; result.timerMinutes = timerMinutes;
   for (const key of ['privacyUrl', 'termsUrl', 'successUrl']) { const url = input[key]; if (typeof url !== 'string' || url.length > 2048 || url && url !== '#' && !url.startsWith('https://')) return null; result[key] = url; }
+  const layout = input.layout ?? 'split'; if (typeof layout !== 'string' || !['split', 'centered'].includes(layout)) return null; result.layout = layout;
+  for (const [key, fallback, max] of [['secureText', 'Pagamento 100% seguro', 60], ['eyebrow', 'FINALIZE SEU PEDIDO', 60], ['summaryTitle', 'Resumo da compra', 80]] as const) { const value = input[key] ?? fallback; if (typeof value !== 'string' || value.trim().length < 1 || value.trim().length > max) return null; result[key] = value.trim(); }
+  for (const [key, fallback] of [['heroEnabled', false], ['showProgress', true]] as const) { const value = input[key] ?? fallback; if (typeof value !== 'boolean') return null; result[key] = value; }
+  const headerBg = input.headerBg ?? '#ffffff'; if (typeof headerBg !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(headerBg)) return null; result.headerBg = headerBg.toLowerCase();
+  const heroHeight = input.heroHeight === undefined ? 220 : integer(input.heroHeight, 120, 420); if (heroHeight === null) return null; result.heroHeight = heroHeight;
+  for (const key of ['logoUrl', 'heroImageUrl']) { const url = input[key] ?? ''; if (typeof url !== 'string' || url.length > 2048 || url && !url.startsWith('https://')) return null; result[key] = url; }
   const bumpProductId = input.orderBumpProductId;
   if (bumpProductId !== undefined && (typeof bumpProductId !== 'string' || bumpProductId.length > 32 || bumpProductId && !/^[A-Za-z0-9_-]+$/.test(bumpProductId))) return null;
   result.orderBumpProductId = typeof bumpProductId === 'string' ? bumpProductId : '';

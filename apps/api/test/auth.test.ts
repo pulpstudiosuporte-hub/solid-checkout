@@ -15,7 +15,7 @@ class MemoryAuthRepository implements AuthRepository {
   user: LoginUser = { id: 'internal-user-id', publicId: 'public-user-id', name: 'Owner', email: 'owner@example.com', passwordHash: null, disabledAt: null, accountStatus: 'APPROVED', platformAdmin: false };
   findUserByEmail(email: string): Promise<LoginUser | null> { return Promise.resolve(email === this.user.email ? { ...this.user, passwordHash: this.storedPasswordHash } : null); }
   createSession(input: { tokenHash: string; csrfTokenHash: string; userId: string; userAgent?: string; expiresAt: Date; absoluteExpiresAt: Date }): Promise<void> {
-    this.sessions.set(input.tokenHash, { sessionId: 'session-id', userId: this.user.id, csrfTokenHash: input.csrfTokenHash, expiresAt: input.expiresAt, absoluteExpiresAt: input.absoluteExpiresAt, user: { publicId: this.user.publicId, name: this.user.name, email: this.user.email, accountStatus: this.user.accountStatus, platformAdmin: this.user.platformAdmin } }); return Promise.resolve();
+    this.sessions.set(input.tokenHash, { sessionId: 'session-id', userId: this.user.id, csrfTokenHash: input.csrfTokenHash, expiresAt: input.expiresAt, absoluteExpiresAt: input.absoluteExpiresAt, user: { publicId: this.user.publicId, name: this.user.name, email: this.user.email, accountStatus: this.user.accountStatus ?? 'APPROVED', platformAdmin: this.user.platformAdmin ?? false } }); return Promise.resolve();
   }
   findActiveSession(tokenHash: string): Promise<SessionUser | null> { return Promise.resolve(this.sessions.get(tokenHash) ?? null); }
   touchSession(): Promise<void> { return Promise.resolve(); }
