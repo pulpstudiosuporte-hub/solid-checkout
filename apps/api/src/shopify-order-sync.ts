@@ -79,7 +79,18 @@ async function markAsPaid(environment: AppEnvironment, repository: ShopifyReposi
 
 async function shopifyGraphql<T>(shop: string, token: string, query: string, variables: Record<string, unknown>): Promise<T> {
   const response = await fetch(`https://${shop}/admin/api/2026-07/graphql.json`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Shopify-Access-Token': token }, body: JSON.stringify({ query, variables }), signal: AbortSignal.timeout(25_000) });
-  const body = await response.json() as { data?: T; errors?: readonly { message: string }[] };
-  if (!response.ok || !body.data || body.errors?.length) throw new Error(body.errors?.map(error => error.message).join('; ') || `Shopify respondeu HTTP ${response.status}.`);
+  const raw = await response.text();
+  const body = (() => { try { return JSON.parse(raw) as { data?: T; errors?: unknown }; } catch { return { errors: raw }; } })();
+  const errors = shopifyErrorMessages(body.errors);
+  if (!response.ok || !body.data || errors.length) throw new Error(errors.join('; ') || `Shopify respondeu HTTP ${response.status}.`);
   return body.data;
+}
+
+function shopifyErrorMessages(value: unknown): string[] {
+  if (typeof value === 'string') return value.trim() ? [value.trim().slice(0, 500)] : [];
+  if (Array.isArray(value)) return value.flatMap(shopifyErrorMessages);
+  if (typeof value !== 'object' || value === null) return [];
+  const item = value as Record<string, unknown>;
+  if (typeof item.message === 'string') return shopifyErrorMessages(item.message);
+  return Object.values(item).flatMap(shopifyErrorMessages);
 }

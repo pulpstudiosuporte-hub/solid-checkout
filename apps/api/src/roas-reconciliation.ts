@@ -16,6 +16,9 @@ const statusOf = (value: string | undefined) => {
   return null;
 };
 
+const isPendingStatus = (value: string | undefined): boolean => ['PENDING', 'PROCESSING', 'WAITING_PAYMENT'].includes(value?.toUpperCase() ?? '');
+const amountMatches = (providerAmount: number | undefined, expectedCents: number): boolean => Number(providerAmount) === expectedCents || Number(providerAmount) * 100 === expectedCents;
+
 export function startRoasReconciliation(environment: AppEnvironment, gateways: PrismaGatewayRepository, shopify: ShopifyRepository, log: FastifyBaseLogger): () => void {
   if (!environment.APP_ENCRYPTION_KEY) return () => undefined;
   let running = false;
@@ -26,8 +29,9 @@ export function startRoasReconciliation(environment: AppEnvironment, gateways: P
       for (const attempt of pending) try {
         const credentials = await gateways.credentials(attempt.session.checkout.storeId, 'ROAS'); if (!credentials) continue;
         const payment = await getRoasPix({ secretKey: decryptSecret(credentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY!), publicKey: decryptSecret(credentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY!) }, attempt.providerTransactionId);
-        const status = statusOf(payment?.status); const amountMatches = payment && (Number(payment.amount) === attempt.amountCents || Number(payment.amount) * 100 === attempt.amountCents);
-        if (!status || !amountMatches) { log.warn({ paymentAttemptId: attempt.id, providerStatus: payment?.status ?? null, providerAmount: payment?.amount ?? null, expectedAmountCents: attempt.amountCents }, 'roas_reconciliation_unrecognized_payment'); continue; }
+        const status = statusOf(payment?.status); const validAmount = payment && amountMatches(payment.amount, attempt.amountCents);
+        if (payment && validAmount && isPendingStatus(payment.status)) continue;
+        if (!status || !validAmount) { log.warn({ paymentAttemptId: attempt.id, providerStatus: payment?.status ?? null, providerAmount: payment?.amount ?? null, expectedAmountCents: attempt.amountCents }, 'roas_reconciliation_unrecognized_payment'); continue; }
         await gateways.confirmPayment(attempt.id, attempt.checkoutSessionId, status, status === 'PAID' ? new Date() : undefined);
         if (status === 'PAID') await syncPaidShopifyOrder(environment, shopify, attempt.checkoutSessionId);
       } catch (error) { log.warn({ err: error, paymentAttemptId: attempt.id }, 'roas_reconciliation_item_failed'); }
