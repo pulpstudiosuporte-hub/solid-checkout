@@ -21,6 +21,7 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   for (const [key, max] of Object.entries(limits)) { if (typeof input[key] !== 'string' || input[key].trim().length < 1 || input[key].trim().length > max) return null; result[key] = input[key].trim(); }
   for (const key of booleans) { if (typeof input[key] !== 'boolean') return null; result[key] = input[key]; }
   for (const key of colors) { if (typeof input[key] !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(input[key])) return null; result[key] = input[key].toLowerCase(); }
+  for (const [key, fallback] of [['pageTextColor', '#17171a'], ['headerTextColor', '#17171a'], ['buttonTextColor', '#ffffff']] as const) { const color = input[key] ?? fallback; if (typeof color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color)) return null; result[key] = color.toLowerCase(); }
   const radius = integer(input.radius, 0, 28); const timerMinutes = integer(input.timerMinutes, 1, 60); if (radius === null || timerMinutes === null) return null;
   result.radius = radius; result.timerMinutes = timerMinutes;
   for (const key of ['privacyUrl', 'termsUrl', 'successUrl']) { const url = input[key]; if (typeof url !== 'string' || url.length > 2048 || url && url !== '#' && !url.startsWith('https://')) return null; result[key] = url; }
