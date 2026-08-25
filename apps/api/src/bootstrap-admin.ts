@@ -18,7 +18,7 @@ try {
   if (existingUsers > 0) throw new Error('Bootstrap recusado: já existe um usuário no banco');
   const passwordHash = await hashPassword(password);
   await database.user.create({ data: {
-    email, name, passwordHash, emailVerifiedAt: new Date(),
+    email, name, passwordHash, emailVerifiedAt: new Date(), accountStatus: 'APPROVED', platformAdmin: true,
     memberships: { create: { role: StoreRole.OWNER, store: { create: { name: storeName, slug: storeSlug } } } }
   } });
   process.stdout.write('Administrador inicial criado. Remova imediatamente as variáveis SOLID_ADMIN_* do ambiente.\n');

@@ -24,6 +24,7 @@ import PageErrorBoundary from './PageErrorBoundary';
 import OrdersPage, { RecentOrders } from './OrdersPage';
 import OrderBumpsPage from './OrderBumpsPage';
 import DomainsPage from './DomainsPage';
+import AdminUsersPage from './AdminUsersPage';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -50,6 +51,7 @@ const roleLabels = { OWNER: 'Proprietário', ADMIN: 'Administrador', ANALYST: 'A
 
 function Sidebar({ open, onClose, page, setPage, user, onLogout, stores, storeBusy, onSelectStore, onCreateStore, onArchiveStore }) {
   const activeRole = stores.find(store => store.active)?.role;
+  const visibleNav = user?.platformAdmin ? [...nav, { label: 'Usuários', icon: Users }] : nav;
   return <>
     {open && <button className="backdrop" onClick={onClose} aria-label="Fechar menu" />}
     <aside className={`sidebar ${open ? 'open' : ''}`}>
@@ -57,7 +59,7 @@ function Sidebar({ open, onClose, page, setPage, user, onLogout, stores, storeBu
       <StoreSwitcher stores={stores} busy={storeBusy} onSelect={onSelectStore} onCreate={onCreateStore} onArchive={onArchiveStore}/>
       <nav aria-label="Menu principal">
         <small className="nav-title">GESTÃO</small>
-        {nav.map(item => <button key={item.label} className={page === item.label ? 'nav-item active' : 'nav-item'} onClick={() => { setPage(item.label); onClose(); }}>
+        {visibleNav.map(item => <button key={item.label} className={page === item.label ? 'nav-item active' : 'nav-item'} onClick={() => { setPage(item.label); onClose(); }}>
           <item.icon size={19}/><span>{item.label}</span>{item.count && <em>{item.count}</em>}
         </button>)}
       </nav>
@@ -107,6 +109,7 @@ function LegacyDashboard({ setPage, storeKey }) {
 }
 
 function SimplePage({ page, onCheckout, onEdit, csrfToken, storeKey, storeSlug }) {
+  if (page === 'Usuários') return <AdminUsersPage csrfToken={csrfToken}/>;
   if (page === 'Checkouts') return <CheckoutsPage csrfToken={csrfToken} storeSlug={storeSlug}/>;
   if (page === 'Logística') return <LogisticsPage csrfToken={csrfToken} storeKey={storeKey}/>;
   const configs = {

@@ -13,7 +13,7 @@ export default function Login({ onSubmit, onRegister, onVerify }) {
   const [notice, setNotice] = useState('');
   const [terms, setTerms] = useState(false);
 
-  React.useEffect(() => { if (mode !== 'verify' || !verificationToken) return; setLoading(true); onVerify(verificationToken).then(() => { setNotice('E-mail confirmado. Sua loja foi criada e você já pode entrar.'); setMode('login'); window.history.replaceState({}, '', '/#/login'); }).catch(requestError => setError(requestError?.message || 'O link é inválido ou expirou.')).finally(() => setLoading(false)); }, []);
+  React.useEffect(() => { if (mode !== 'verify' || !verificationToken) return; setLoading(true); onVerify(verificationToken).then(() => { setNotice('E-mail confirmado. Seu cadastro foi enviado para aprovação.'); setMode('login'); window.history.replaceState({}, '', '/#/login'); }).catch(requestError => setError(requestError?.message || 'O link é inválido ou expirou.')).finally(() => setLoading(false)); }, []);
 
   async function submit(event) {
     event.preventDefault();
@@ -24,6 +24,7 @@ export default function Login({ onSubmit, onRegister, onVerify }) {
       await onSubmit(email.trim(), password);
     } catch (requestError) {
       if (requestError?.status === 429) setError('Muitas tentativas. Aguarde um minuto e tente novamente.');
+      else if (requestError?.code === 'ACCOUNT_PENDING') setError('Sua conta está aguardando aprovação da equipe SOLID.');
       else if (requestError?.status === 401) setError('E-mail ou senha inválidos.');
       else setError('Não foi possível entrar agora. Verifique sua conexão e tente novamente.');
     } finally { setLoading(false); }

@@ -13,6 +13,12 @@ enum StoreRole {
   ANALYST
 }
 
+enum AccountStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum AuditActorType {
   USER
   SYSTEM
@@ -53,6 +59,8 @@ model User {
   name            String        @db.VarChar(120)
   passwordHash    String?       @map("password_hash") @db.VarChar(255)
   disabledAt      DateTime?     @map("disabled_at") @db.Timestamptz(3)
+  accountStatus   AccountStatus @default(PENDING) @map("account_status")
+  platformAdmin   Boolean       @default(false) @map("platform_admin")
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
   memberships     StoreMember[]
@@ -60,6 +68,7 @@ model User {
   auditLogs       AuditLog[]
   shopifyOAuthStates ShopifyOAuthState[]
 
+  @@index([accountStatus, createdAt(sort: Desc)])
   @@map("users")
 }
 

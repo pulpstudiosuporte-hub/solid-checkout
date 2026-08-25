@@ -1,7 +1,8 @@
 import type { PrismaClient } from '@solid/database';
 
-export type LoginUser = Readonly<{ id: string; publicId: string; name: string; email: string; passwordHash: string | null; disabledAt: Date | null }>;
-export type SessionUser = Readonly<{ sessionId: string; userId: string; csrfTokenHash: string; user: { publicId: string; name: string; email: string }; expiresAt: Date; absoluteExpiresAt: Date }>;
+export type AccountStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type LoginUser = Readonly<{ id: string; publicId: string; name: string; email: string; passwordHash: string | null; disabledAt: Date | null; accountStatus?: AccountStatus; platformAdmin?: boolean }>;
+export type SessionUser = Readonly<{ sessionId: string; userId: string; csrfTokenHash: string; user: { publicId: string; name: string; email: string; accountStatus?: AccountStatus; platformAdmin?: boolean }; expiresAt: Date; absoluteExpiresAt: Date }>;
 
 export interface AuthRepository {
   findUserByEmail(email: string): Promise<LoginUser | null>;
@@ -15,15 +16,15 @@ export interface AuthRepository {
 export class PrismaAuthRepository implements AuthRepository {
   constructor(private readonly database: PrismaClient) {}
   findUserByEmail(email: string): Promise<LoginUser | null> {
-    return this.database.user.findUnique({ where: { email }, select: { id: true, publicId: true, name: true, email: true, passwordHash: true, disabledAt: true } });
+    return this.database.user.findUnique({ where: { email }, select: { id: true, publicId: true, name: true, email: true, passwordHash: true, disabledAt: true, accountStatus: true, platformAdmin: true } });
   }
   async createSession(input: { tokenHash: string; csrfTokenHash: string; userId: string; userAgent?: string; expiresAt: Date; absoluteExpiresAt: Date }): Promise<void> {
     await this.database.session.create({ data: input });
   }
   async findActiveSession(tokenHash: string, now: Date): Promise<SessionUser | null> {
     const session = await this.database.session.findFirst({
-      where: { tokenHash, revokedAt: null, expiresAt: { gt: now }, absoluteExpiresAt: { gt: now }, user: { disabledAt: null } },
-      select: { id: true, userId: true, csrfTokenHash: true, expiresAt: true, absoluteExpiresAt: true, user: { select: { publicId: true, name: true, email: true } } }
+      where: { tokenHash, revokedAt: null, expiresAt: { gt: now }, absoluteExpiresAt: { gt: now }, user: { disabledAt: null, accountStatus: 'APPROVED' } },
+      select: { id: true, userId: true, csrfTokenHash: true, expiresAt: true, absoluteExpiresAt: true, user: { select: { publicId: true, name: true, email: true, accountStatus: true, platformAdmin: true } } }
     });
     return session ? { sessionId: session.id, userId: session.userId, csrfTokenHash: session.csrfTokenHash, expiresAt: session.expiresAt, absoluteExpiresAt: session.absoluteExpiresAt, user: session.user } : null;
   }
