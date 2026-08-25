@@ -53,9 +53,15 @@ const configuredOrderBumps = (config: Record<string, unknown>): readonly OrderBu
 };
 const sessionDiscount = (subtotal: number, coupon: { type: 'PERCENT' | 'FIXED'; value: number; maxDiscountCents: number | null } | null): number => {
   if (!coupon) return 0;
-  let discount = coupon.type === 'PERCENT' ? Math.floor(subtotal * coupon.value / 100) : coupon.value;
+  let discount = coupon.type === 'PERCENT' ? Math.floor(subtotal * coupon.value / 10_000) : coupon.value;
   if (coupon.maxDiscountCents) discount = Math.min(discount, coupon.maxDiscountCents);
   return Math.max(0, Math.min(discount, subtotal - 1));
+};
+const checkoutSessionExpiry = (publishedConfig: unknown, fallback: Date): Date => {
+  if (typeof publishedConfig !== 'object' || publishedConfig === null || Array.isArray(publishedConfig)) return fallback;
+  const minutes = (publishedConfig as Record<string, unknown>).timerMinutes;
+  if (typeof minutes !== 'number' || !Number.isInteger(minutes) || minutes < 1 || minutes > 60) return fallback;
+  return new Date(Date.now() + minutes * 60_000);
 };
 
 export class PrismaCatalogRepository implements CatalogRepository {
@@ -183,13 +189,13 @@ export class PrismaCatalogRepository implements CatalogRepository {
 
   async createPublicCheckoutSession(input: CheckoutSessionInput): Promise<object | null> {
     return this.database.$transaction(async transaction => {
-      const checkout = await transaction.checkout.findFirst({ where: { slug: input.checkoutSlug, status: 'PUBLISHED', archivedAt: null, store: { slug: input.storeSlug, active: true }, product: { active: true } }, select: { id: true, productId: true, product: { select: { publicId: true, checkoutTitle: true, fulfillmentType: true, imageUrl: true, priceCents: true, maxPerOrder: true, stockQuantity: true, trackInventory: true } } } });
+      const checkout = await transaction.checkout.findFirst({ where: { slug: input.checkoutSlug, status: 'PUBLISHED', archivedAt: null, store: { slug: input.storeSlug, active: true }, product: { active: true } }, select: { id: true, productId: true, publishedConfig: true, product: { select: { publicId: true, checkoutTitle: true, fulfillmentType: true, imageUrl: true, priceCents: true, maxPerOrder: true, stockQuantity: true, trackInventory: true } } } });
       if (!checkout || input.quantity > checkout.product.maxPerOrder || (checkout.product.trackInventory && (checkout.product.stockQuantity ?? 0) < input.quantity)) return null;
       const variant = input.variantPublicId ? await transaction.productVariant.findFirst({ where: { publicId: input.variantPublicId, productId: checkout.productId, availableForSale: true }, select: { id: true, publicId: true, title: true, priceCents: true, inventoryQuantity: true, imageUrl: true } }) : null;
       if (input.variantPublicId && !variant) return null;
       if (variant?.inventoryQuantity !== null && variant?.inventoryQuantity !== undefined && variant.inventoryQuantity < input.quantity) return null;
       const unitPriceCents = variant?.priceCents ?? checkout.product.priceCents;
-      const session = await transaction.checkoutSession.create({ data: { checkoutId: checkout.id, variantId: variant?.id ?? null, quantity: input.quantity, unitPriceCents, totalCents: unitPriceCents * input.quantity, tokenHash: input.tokenHash, source: input.source, expiresAt: input.expiresAt, ...(input.sourceCartId ? { sourceCartId: input.sourceCartId } : {}) }, select: { publicId: true, quantity: true, unitPriceCents: true, totalCents: true, currency: true, status: true, expiresAt: true, checkout: { select: { slug: true, name: true, publishedConfig: true, store: { select: { name: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } } } });
+      const session = await transaction.checkoutSession.create({ data: { checkoutId: checkout.id, variantId: variant?.id ?? null, quantity: input.quantity, unitPriceCents, totalCents: unitPriceCents * input.quantity, tokenHash: input.tokenHash, source: input.source, expiresAt: checkoutSessionExpiry(checkout.publishedConfig, input.expiresAt), ...(input.sourceCartId ? { sourceCartId: input.sourceCartId } : {}) }, select: { publicId: true, quantity: true, unitPriceCents: true, totalCents: true, currency: true, status: true, expiresAt: true, checkout: { select: { slug: true, name: true, publishedConfig: true, store: { select: { name: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } } } });
       return { ...session, product: checkout.product };
     });
   }
@@ -268,7 +274,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
     return this.database.$transaction(async transaction => {
       const connection = await transaction.shopifyConnection.findFirst({ where: { shopDomain: input.shopDomain, revokedAt: null, store: { active: true } }, select: { storeId: true, store: { select: { slug: true } } } });
       if (!connection) return null;
-      const checkout = await transaction.checkout.findFirst({ where: { storeId: connection.storeId, slug: input.checkoutSlug, status: 'PUBLISHED', archivedAt: null }, select: { id: true } });
+      const checkout = await transaction.checkout.findFirst({ where: { storeId: connection.storeId, slug: input.checkoutSlug, status: 'PUBLISHED', archivedAt: null }, select: { id: true, publishedConfig: true } });
       if (!checkout) return null;
       const requestedIds = input.lines.map(line => `gid://shopify/ProductVariant/${line.variantId}`);
       const variants = await transaction.productVariant.findMany({ where: { sourceExternalId: { in: requestedIds }, availableForSale: true, product: { storeId: connection.storeId, source: 'SHOPIFY', active: true } }, select: { id: true, sourceExternalId: true, title: true, priceCents: true, inventoryQuantity: true, imageUrl: true, product: { select: { id: true, checkoutTitle: true, imageUrl: true, maxPerOrder: true, trackInventory: true } } } });
@@ -277,7 +283,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
       if (items.length !== input.lines.length || items.some(({ line, variant }) => line.quantity > variant.product.maxPerOrder || variant.product.trackInventory && (variant.inventoryQuantity ?? 0) < line.quantity)) return null;
       const totalCents = items.reduce((total, { line, variant }) => total + variant.priceCents * line.quantity, 0);
       const first = items[0]; if (!first) return null;
-      const session = await transaction.checkoutSession.create({ data: { checkoutId: checkout.id, variantId: first.variant.id, quantity: items.reduce((total, item) => total + item.line.quantity, 0), unitPriceCents: first.variant.priceCents, totalCents, tokenHash: input.tokenHash, source: 'SHOPIFY', expiresAt: input.expiresAt, ...(input.sourceCartId ? { sourceCartId: input.sourceCartId } : {}), items: { create: items.map(({ line, variant }) => ({ productId: variant.product.id, variantId: variant.id, quantity: line.quantity, unitPriceCents: variant.priceCents, totalCents: variant.priceCents * line.quantity, titleSnapshot: variant.product.checkoutTitle, variantSnapshot: variant.title, imageUrlSnapshot: variant.imageUrl ?? variant.product.imageUrl })) } }, select: { publicId: true, totalCents: true, currency: true, expiresAt: true, checkout: { select: { slug: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true } } } });
+      const session = await transaction.checkoutSession.create({ data: { checkoutId: checkout.id, variantId: first.variant.id, quantity: items.reduce((total, item) => total + item.line.quantity, 0), unitPriceCents: first.variant.priceCents, totalCents, tokenHash: input.tokenHash, source: 'SHOPIFY', expiresAt: checkoutSessionExpiry(checkout.publishedConfig, input.expiresAt), ...(input.sourceCartId ? { sourceCartId: input.sourceCartId } : {}), items: { create: items.map(({ line, variant }) => ({ productId: variant.product.id, variantId: variant.id, quantity: line.quantity, unitPriceCents: variant.priceCents, totalCents: variant.priceCents * line.quantity, titleSnapshot: variant.product.checkoutTitle, variantSnapshot: variant.title, imageUrlSnapshot: variant.imageUrl ?? variant.product.imageUrl })) } }, select: { publicId: true, totalCents: true, currency: true, expiresAt: true, checkout: { select: { slug: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true } } } });
       return { ...session, storeSlug: connection.store.slug };
     });
   }

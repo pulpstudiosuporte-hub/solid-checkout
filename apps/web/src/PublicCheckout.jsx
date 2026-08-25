@@ -59,6 +59,12 @@ const publicConfig = (value) => ({
   showProgress: true,
   timer: true,
   timerText: "Sessão reservada por",
+  timerMinutes: 10,
+  timerStyle: "bar",
+  timerBgColor: "#151c2c",
+  timerTextColor: "#ffffff",
+  timerNumberColor: "#ff515a",
+  timerRadius: 14,
   eyebrow: "FINALIZE SEU PEDIDO",
   title: "Você está a um passo.",
   subtitle: "Preencha seus dados para continuar. Leva menos de um minuto.",
@@ -95,6 +101,10 @@ const configStyle = (config) => ({
   "--public-input": config.inputBg,
   "--public-radius": `${config.radius}px`,
   "--public-hero-height": `${config.heroHeight}px`,
+  "--public-timer-bg": config.timerBgColor,
+  "--public-timer-text": config.timerTextColor,
+  "--public-timer-number": config.timerNumberColor,
+  "--public-timer-radius": `${config.timerRadius}px`,
   fontFamily: config.font,
 });
 // Shopify descriptions are stored as HTML. The public checkout renders them
@@ -247,7 +257,7 @@ function useExpiry(expiresAt) {
   }, [expiresAt]);
   return {
     remaining,
-    label: `${String(Math.floor(remaining / 60)).padStart(2, "0")}:${String(remaining % 60).padStart(2, "0")}`,
+    label: `${String(Math.floor(remaining / 3600)).padStart(2, "0")} : ${String(Math.floor((remaining % 3600) / 60)).padStart(2, "0")} : ${String(remaining % 60).padStart(2, "0")}`,
   };
 }
 
@@ -455,8 +465,7 @@ function SessionContent({ session: initialSession, token }) {
       </header>
       {config.heroEnabled && <div className={`public-checkout-hero ${config.heroImageUrl ? 'has-image' : ''}`} style={{ order:blockOrder('hero'), ...(config.heroImageUrl ? { backgroundImage: `url(${config.heroImageUrl})`, '--public-mobile-hero': `url(${config.heroMobileImageUrl || config.heroImageUrl})` } : {}) }}>{!config.heroImageUrl && <><ShoppingBag size={28}/><span>Banner da loja</span></>}</div>}
       {config.timer && (
-        <div className="session-expiry" role="status" style={{order:blockOrder('timer')}}>
-          <Clock3 size={17} />
+        <div className={`session-expiry timer-${config.timerStyle}`} role="status" style={{order:blockOrder('timer')}}>
           <span>
             {expiry.remaining ? (
               <>

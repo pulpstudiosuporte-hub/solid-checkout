@@ -22,8 +22,11 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   for (const key of booleans) { if (typeof input[key] !== 'boolean') return null; result[key] = input[key]; }
   for (const key of colors) { if (typeof input[key] !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(input[key])) return null; result[key] = input[key].toLowerCase(); }
   for (const [key, fallback] of [['pageTextColor', '#17171a'], ['headerTextColor', '#17171a'], ['buttonTextColor', '#ffffff']] as const) { const color = input[key] ?? fallback; if (typeof color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color)) return null; result[key] = color.toLowerCase(); }
+  for (const [key, fallback] of [['timerBgColor', '#151c2c'], ['timerTextColor', '#ffffff'], ['timerNumberColor', '#ff515a']] as const) { const color = input[key] ?? fallback; if (typeof color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color)) return null; result[key] = color.toLowerCase(); }
   const radius = integer(input.radius, 0, 28); const timerMinutes = integer(input.timerMinutes, 1, 60); if (radius === null || timerMinutes === null) return null;
   result.radius = radius; result.timerMinutes = timerMinutes;
+  const timerRadius = input.timerRadius === undefined ? 14 : integer(input.timerRadius, 0, 30); if (timerRadius === null) return null; result.timerRadius = timerRadius;
+  const timerStyle = input.timerStyle ?? 'bar'; if (typeof timerStyle !== 'string' || !['bar', 'pill', 'outline'].includes(timerStyle)) return null; result.timerStyle = timerStyle;
   for (const key of ['privacyUrl', 'termsUrl', 'successUrl']) { const url = input[key]; if (typeof url !== 'string' || url.length > 2048 || url && url !== '#' && !url.startsWith('https://')) return null; result[key] = url; }
   const layout = input.layout ?? 'split'; if (typeof layout !== 'string' || !['split', 'centered'].includes(layout)) return null; result.layout = layout;
   for (const [key, fallback, max] of [['secureText', 'Pagamento 100% seguro', 60], ['eyebrow', 'FINALIZE SEU PEDIDO', 60], ['summaryTitle', 'Resumo da compra', 80]] as const) { const value = input[key] ?? fallback; if (typeof value !== 'string' || value.trim().length < 1 || value.trim().length > max) return null; result[key] = value.trim(); }

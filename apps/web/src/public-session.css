@@ -5,20 +5,25 @@
   align-items: start;
 }
 .session-expiry {
-  width: fit-content;
-  margin: 20px auto -20px;
+  width: min(650px, calc(100% - 32px));
+  min-height: 48px;
+  margin: 28px auto 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  border: 1px solid #e7ddff;
-  border-radius: 999px;
-  background: #f5f1ff;
-  padding: 9px 14px;
-  color: #5a3fbd;
-  font-size: 13px;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--public-timer-radius, 14px);
+  background: var(--public-timer-bg, #151c2c);
+  padding: 10px 18px;
+  color: var(--public-timer-text, #fff) !important;
+  font-size: 12px;
 }
 .session-expiry strong {
+  margin-left: 7px;
+  color: var(--public-timer-number, #ff515a);
+  font-size: 18px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .session-order-summary {
   padding: 0 !important;
@@ -186,8 +191,13 @@
 }
 @media (max-width: 780px) {
   .session-expiry {
-    margin: 14px auto -10px;
+    width: calc(100% - 24px);
+    min-height: 46px;
+    margin-top: 18px;
+    padding-inline: 12px;
+    font-size: 11px;
   }
+  .session-expiry strong { font-size: 15px; }
   .session-order-summary {
     order: 0 !important;
   }
@@ -225,12 +235,16 @@
   color: var(--public-header-text, #17171f);
 }
 .public-brand-text { color: var(--public-text); font-size: 21px; font-weight: 850; letter-spacing: .06em; }
-.public-checkout-hero { width: min(1120px, calc(100% - 32px)); height: var(--public-hero-height, 220px); margin: 24px auto -22px; border: 1px dashed var(--public-border); border-radius: var(--public-radius); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 9px; overflow: hidden; background: color-mix(in srgb, var(--public-primary) 7%, var(--public-card)); background-position: center; background-size: cover; color: var(--public-primary); font-size: 12px; font-weight: 750; }
+.public-checkout-hero { width: min(1120px, calc(100% - 32px)); height: var(--public-hero-height, 220px); margin: 24px auto 0; border: 1px dashed var(--public-border); border-radius: var(--public-radius); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 9px; overflow: hidden; background: color-mix(in srgb, var(--public-primary) 7%, var(--public-card)); background-position: center; background-size: cover; color: var(--public-primary); font-size: 12px; font-weight: 750; }
 .public-checkout-hero.has-image { border-style: solid; }
 .layout-centered .public-checkout-grid { grid-template-columns: minmax(0, 760px); justify-content: center; }
 .layout-centered .session-order-summary { order: -1; }
 .template-showcase .public-checkout-hero { box-shadow: 0 20px 48px color-mix(in srgb, var(--public-primary) 17%, transparent); }
-.template-showcase .session-expiry { background: var(--public-primary); border-color: var(--public-primary); color: #fff; }
+.public-checkout > .session-expiry { color: var(--public-timer-text, #fff) !important; }
+.public-checkout > .session-expiry strong { color: var(--public-timer-number, #ff515a); }
+.public-checkout > .session-expiry.timer-pill { width: fit-content; max-width: calc(100% - 32px); border-radius: 999px; }
+.public-checkout > .session-expiry.timer-outline { border: 1px solid var(--public-timer-bg, #151c2c); background: transparent; }
+.template-showcase .session-expiry { background: var(--public-timer-bg, #151c2c); border-color: var(--public-timer-bg, #151c2c); }
 .template-showcase .checkout-progress i { box-shadow: 0 0 0 4px color-mix(in srgb, var(--public-primary) 9%, transparent); }
 .public-brand {
   display: block;
