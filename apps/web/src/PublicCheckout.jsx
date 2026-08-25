@@ -69,6 +69,7 @@ const publicConfig = (value) => ({
   trustBenefit3: "Seus dados estão seguros",
   testimonialName: "Cliente verificado",
   testimonialText: "Compra simples, rápida e segura.",
+  testimonials: null,
   footerText: "© 2026 Solid Commerce. Todos os direitos reservados.",
   privacyUrl: "#",
   termsUrl: "#",
@@ -82,6 +83,7 @@ const configStyle = (config) => ({
   "--public-card": config.cardBg,
   "--public-header": config.headerBg,
   "--public-text": config.textColor,
+  "--public-muted": `color-mix(in srgb, ${config.textColor} 68%, transparent)`,
   "--public-border": config.borderColor,
   "--public-input": config.inputBg,
   "--public-radius": `${config.radius}px`,
@@ -567,7 +569,7 @@ function SessionContent({ session: initialSession, token }) {
               </p>
               {config.showTrust && <section className="public-trust" aria-label="Confiança da loja">
                 <div className="public-trust-benefits"><span><ShieldCheck size={15}/>{config.trustBenefit1}</span><span><Check size={15}/>{config.trustBenefit2}</span><span><ShieldCheck size={15}/>{config.trustBenefit3}</span></div>
-                <blockquote>“{config.testimonialText}”<footer>{config.testimonialName}</footer></blockquote>
+                <div className="public-testimonials">{(Array.isArray(config.testimonials)?config.testimonials:[{id:'legacy',name:config.testimonialName,text:config.testimonialText,imageUrl:'',rating:5}]).map(item=><blockquote key={item.id}>{item.imageUrl&&<img src={item.imageUrl} alt={`Foto de ${item.name}`}/>}<div><span className="public-stars" aria-label={`${item.rating||5} de 5 estrelas`}>{'★'.repeat(item.rating||5)}{'☆'.repeat(5-(item.rating||5))}</span>“{item.text}”<footer>{item.name}</footer></div></blockquote>)}</div>
               </section>}
             </form>
           ) : step === 2 ? (

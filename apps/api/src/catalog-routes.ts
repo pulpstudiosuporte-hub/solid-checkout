@@ -29,6 +29,17 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   for (const [key, fallback] of [['heroEnabled', false], ['showProgress', true]] as const) { const value = input[key] ?? fallback; if (typeof value !== 'boolean') return null; result[key] = value; }
   const showTrust = input.showTrust ?? true; if (typeof showTrust !== 'boolean') return null; result.showTrust = showTrust;
   for (const [key, fallback, max] of [['trustBenefit1', 'Pagamento protegido', 80], ['trustBenefit2', 'Confirmação automática', 80], ['trustBenefit3', 'Seus dados estão seguros', 80], ['testimonialName', 'Cliente verificado', 80], ['testimonialText', 'Compra simples, rápida e segura.', 240]] as const) { const value = input[key] ?? fallback; if (typeof value !== 'string' || value.trim().length < 1 || value.trim().length > max) return null; result[key] = value.trim(); }
+  if (input.testimonials !== undefined) {
+    if (!Array.isArray(input.testimonials) || input.testimonials.length > 50) return null;
+    const testimonials = [] as { id: string; name: string; text: string; imageUrl: string; rating: number }[]; const ids = new Set<string>();
+    for (const value of input.testimonials) {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+      const testimonial = value as Record<string, unknown>; const id = text(testimonial.id, 64); const name = text(testimonial.name, 80); const body = text(testimonial.text, 240); const rating = integer(testimonial.rating, 1, 5); const imageUrl = testimonial.imageUrl ?? '';
+      if (!id || ids.has(id) || !/^[A-Za-z0-9_-]+$/.test(id) || !name || !body || rating === null || typeof imageUrl !== 'string' || imageUrl.length > 2048 || imageUrl && !imageUrl.startsWith('https://')) return null;
+      ids.add(id); testimonials.push({ id, name, text: body, imageUrl, rating });
+    }
+    result.testimonials = testimonials;
+  }
   const headerBg = input.headerBg ?? '#ffffff'; if (typeof headerBg !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(headerBg)) return null; result.headerBg = headerBg.toLowerCase();
   const heroHeight = input.heroHeight === undefined ? 220 : integer(input.heroHeight, 120, 420); if (heroHeight === null) return null; result.heroHeight = heroHeight;
   for (const key of ['logoUrl', 'heroImageUrl', 'heroMobileImageUrl']) { const url = input[key] ?? ''; if (typeof url !== 'string' || url.length > 2048 || url && !url.startsWith('https://')) return null; result[key] = url; }
