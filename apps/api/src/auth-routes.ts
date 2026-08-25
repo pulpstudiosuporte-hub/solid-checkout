@@ -17,6 +17,7 @@ export function registerAuthRoutes(app: FastifyInstance, environment: AppEnviron
   const secure = environment.NODE_ENV === 'production';
   const sessionCookie = secure ? '__Host-solid_session' : 'solid_session';
   const csrfCookie = secure ? '__Host-solid_csrf' : 'solid_csrf';
+  const authCsrfCookie = secure ? '__Host-solid_auth_csrf' : 'solid_auth_csrf';
   const cookieBase = { path: '/', secure, sameSite: 'strict' as const };
   void app.register(cookie);
   const allowedOrigin = (request: FastifyRequest): boolean => typeof request.headers.origin === 'string' && environment.CORS_ORIGINS.includes(request.headers.origin);
@@ -28,11 +29,12 @@ export function registerAuthRoutes(app: FastifyInstance, environment: AppEnviron
 
   app.get('/auth/csrf', async (_request, reply) => {
     const csrfToken = randomToken();
-    return reply.setCookie(csrfCookie, csrfToken, { ...cookieBase, httpOnly: true, maxAge: 600 }).send({ csrfToken });
+    return reply.setCookie(authCsrfCookie, csrfToken, { ...cookieBase, httpOnly: true, maxAge: 600 }).send({ csrfToken });
   });
 
   app.post<{ Body: { email?: unknown; password?: unknown } }>('/auth/login', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => {
-    if (!allowedOrigin(request) || !validCsrf(request)) return reply.code(403).send(errorBody(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
+    const authCookieToken = request.cookies[authCsrfCookie]; const authHeaderToken = request.headers['x-csrf-token'];
+    if (!allowedOrigin(request) || !authCookieToken || typeof authHeaderToken !== 'string' || !safeEqual(authCookieToken, authHeaderToken)) return reply.code(403).send(errorBody(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
     const email = typeof request.body?.email === 'string' ? request.body.email.trim().toLowerCase() : '';
     const password = typeof request.body?.password === 'string' ? request.body.password : '';
     if (email.length > 320 || password.length > 128 || !/^\S+@\S+\.\S+$/.test(email)) return reply.code(401).send(errorBody(request, 'INVALID_CREDENTIALS', 'E-mail ou senha inválidos.'));
@@ -40,11 +42,14 @@ export function registerAuthRoutes(app: FastifyInstance, environment: AppEnviron
     const passwordValid = await verifyPassword(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
     if (!user || !passwordValid || user.disabledAt || user.accountStatus === 'REJECTED') return reply.code(401).send(errorBody(request, 'INVALID_CREDENTIALS', 'E-mail ou senha inválidos.'));
     if (user.accountStatus === 'PENDING') return reply.code(403).send(errorBody(request, 'ACCOUNT_PENDING', 'Sua conta está aguardando aprovação.'));
+    const activeToken = request.cookies[sessionCookie];
+    const activeSession = activeToken ? await repository.findActiveSession(sha256(activeToken), new Date()) : null;
+    if (activeSession && activeSession.user.publicId !== user.publicId) return reply.code(409).send(errorBody(request, 'ACCOUNT_SWITCH_REQUIRES_LOGOUT', 'Já existe outra conta conectada neste navegador. Saia dela ou use uma janela anônima.'));
     const now = new Date(); const token = randomToken(); const csrfToken = randomToken();
     await repository.createSession({ tokenHash: sha256(token), csrfTokenHash: sha256(csrfToken), userId: user.id,
       ...(request.headers['user-agent'] ? { userAgent: request.headers['user-agent'].slice(0, 512) } : {}),
       expiresAt: new Date(now.getTime() + SESSION_SECONDS * 1000), absoluteExpiresAt: new Date(now.getTime() + ABSOLUTE_SESSION_SECONDS * 1000) });
-    return reply.setCookie(sessionCookie, token, { ...cookieBase, httpOnly: true, maxAge: ABSOLUTE_SESSION_SECONDS })
+    return reply.clearCookie(authCsrfCookie, cookieBase).setCookie(sessionCookie, token, { ...cookieBase, httpOnly: true, maxAge: ABSOLUTE_SESSION_SECONDS })
       .setCookie(csrfCookie, csrfToken, { ...cookieBase, httpOnly: true, maxAge: SESSION_SECONDS })
       .send({ user: { id: user.publicId, publicId: user.publicId, name: user.name, email: user.email, accountStatus: user.accountStatus ?? 'APPROVED', platformAdmin: user.platformAdmin ?? false }, csrfToken });
   });

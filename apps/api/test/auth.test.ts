@@ -42,7 +42,7 @@ describe('autenticação administrativa', () => {
   it('cria sessão opaca em cookie HttpOnly e retorna usuário seguro', async () => {
     const app = buildApp(env, { authRepository: new MemoryAuthRepository() });
     const csrf = await app.inject({ method: 'GET', url: '/auth/csrf', headers: { origin } });
-    const csrfToken = csrf.json<{ csrfToken: string }>().csrfToken; const csrfCookie = cookiePair(csrf.headers['set-cookie'], 'solid_csrf');
+    const csrfToken = csrf.json<{ csrfToken: string }>().csrfToken; const csrfCookie = cookiePair(csrf.headers['set-cookie'], 'solid_auth_csrf');
     const login = await app.inject({ method: 'POST', url: '/auth/login', headers: { origin, cookie: csrfCookie, 'x-csrf-token': csrfToken }, payload: { email: 'OWNER@example.com', password: 'correct horse battery staple' } });
     await app.close();
     expect(login.statusCode).toBe(200); expect(login.json<{ user: unknown }>().user).toEqual({ id: 'public-user-id', publicId: 'public-user-id', name: 'Owner', email: 'owner@example.com', accountStatus: 'APPROVED', platformAdmin: false });
@@ -54,7 +54,7 @@ describe('autenticação administrativa', () => {
     const app = buildApp(env, { authRepository: new MemoryAuthRepository() });
     const csrf = await app.inject({ method: 'GET', url: '/auth/csrf', headers: { origin } });
     const csrfToken = csrf.json<{ csrfToken: string }>().csrfToken;
-    const login = await app.inject({ method: 'POST', url: '/auth/login', headers: { origin, cookie: cookiePair(csrf.headers['set-cookie'], 'solid_csrf'), 'x-csrf-token': csrfToken }, payload: { email: 'owner@example.com', password: 'correct horse battery staple' } });
+    const login = await app.inject({ method: 'POST', url: '/auth/login', headers: { origin, cookie: cookiePair(csrf.headers['set-cookie'], 'solid_auth_csrf'), 'x-csrf-token': csrfToken }, payload: { email: 'owner@example.com', password: 'correct horse battery staple' } });
     const cookies = `${cookiePair(login.headers['set-cookie'], 'solid_session')}; ${cookiePair(login.headers['set-cookie'], 'solid_csrf')}`;
     const response = await app.inject({ method: 'GET', url: '/auth/session', headers: { cookie: cookies, 'x-solid-user-context': 'another-user-id' } });
     expect(response.statusCode).toBe(409);
@@ -62,10 +62,23 @@ describe('autenticação administrativa', () => {
     await app.close();
   });
 
+  it('não invalida uma sessão existente ao abrir o formulário de login em outra aba', async () => {
+    const app = buildApp(env, { authRepository: new MemoryAuthRepository() });
+    const authCsrf = await app.inject({ method: 'GET', url: '/auth/csrf', headers: { origin } });
+    const authCsrfToken = authCsrf.json<{ csrfToken: string }>().csrfToken;
+    const login = await app.inject({ method: 'POST', url: '/auth/login', headers: { origin, cookie: cookiePair(authCsrf.headers['set-cookie'], 'solid_auth_csrf'), 'x-csrf-token': authCsrfToken }, payload: { email: 'owner@example.com', password: 'correct horse battery staple' } });
+    const sessionCookies = `${cookiePair(login.headers['set-cookie'], 'solid_session')}; ${cookiePair(login.headers['set-cookie'], 'solid_csrf')}`;
+    const anotherLoginForm = await app.inject({ method: 'GET', url: '/auth/csrf', headers: { origin, cookie: sessionCookies } });
+    expect(cookiePair(anotherLoginForm.headers['set-cookie'], 'solid_csrf')).toBe('');
+    const current = await app.inject({ method: 'GET', url: '/auth/session', headers: { cookie: sessionCookies, 'x-solid-user-context': 'public-user-id' } });
+    expect(current.statusCode).toBe(200);
+    await app.close();
+  });
+
   it('não revela se o e-mail existe', async () => {
     const app = buildApp(env, { authRepository: new MemoryAuthRepository() });
     const csrf = await app.inject({ method: 'GET', url: '/auth/csrf', headers: { origin } });
-    const csrfToken = csrf.json<{ csrfToken: string }>().csrfToken; const csrfCookie = cookiePair(csrf.headers['set-cookie'], 'solid_csrf');
+    const csrfToken = csrf.json<{ csrfToken: string }>().csrfToken; const csrfCookie = cookiePair(csrf.headers['set-cookie'], 'solid_auth_csrf');
     const response = await app.inject({ method: 'POST', url: '/auth/login', headers: { origin, cookie: csrfCookie, 'x-csrf-token': csrfToken }, payload: { email: 'missing@example.com', password: 'wrong password' } });
     await app.close(); expect(response.statusCode).toBe(401); expect(response.json<{ error: { message: string } }>().error.message).toBe('E-mail ou senha inválidos.');
   });
@@ -75,7 +88,7 @@ describe('autenticação administrativa', () => {
     const app = buildApp(env, { authRepository: repository });
     const csrf = await app.inject({ method: 'GET', url: '/auth/csrf', headers: { origin } });
     const csrfToken = csrf.json<{ csrfToken: string }>().csrfToken;
-    const response = await app.inject({ method: 'POST', url: '/auth/login', headers: { origin, cookie: cookiePair(csrf.headers['set-cookie'], 'solid_csrf'), 'x-csrf-token': csrfToken }, payload: { email: 'owner@example.com', password: 'correct horse battery staple' } });
+    const response = await app.inject({ method: 'POST', url: '/auth/login', headers: { origin, cookie: cookiePair(csrf.headers['set-cookie'], 'solid_auth_csrf'), 'x-csrf-token': csrfToken }, payload: { email: 'owner@example.com', password: 'correct horse battery staple' } });
     await app.close(); expect(response.statusCode).toBe(403); expect(response.json<{ error: { code: string } }>().error.code).toBe('ACCOUNT_PENDING');
   });
 
@@ -84,7 +97,7 @@ describe('autenticação administrativa', () => {
     const app = buildApp(env, { authRepository: repository });
     const csrf = await app.inject({ method: 'GET', url: '/auth/csrf', headers: { origin } });
     const initialCsrf = csrf.json<{ csrfToken: string }>().csrfToken;
-    const login = await app.inject({ method: 'POST', url: '/auth/login', headers: { origin, cookie: cookiePair(csrf.headers['set-cookie'], 'solid_csrf'), 'x-csrf-token': initialCsrf }, payload: { email: 'owner@example.com', password: 'correct horse battery staple' } });
+    const login = await app.inject({ method: 'POST', url: '/auth/login', headers: { origin, cookie: cookiePair(csrf.headers['set-cookie'], 'solid_auth_csrf'), 'x-csrf-token': initialCsrf }, payload: { email: 'owner@example.com', password: 'correct horse battery staple' } });
     const loginCsrf = login.json<{ csrfToken: string }>().csrfToken;
     const cookies = `${cookiePair(login.headers['set-cookie'], 'solid_session')}; ${cookiePair(login.headers['set-cookie'], 'solid_csrf')}`;
     const response = await app.inject({ method: 'POST', url: '/auth/change-password', headers: { origin, cookie: cookies, 'x-csrf-token': loginCsrf }, payload: { currentPassword: 'correct horse battery staple', newPassword: 'another secure password value' } });

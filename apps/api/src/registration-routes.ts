@@ -17,7 +17,7 @@ async function sendVerification(environment: AppEnvironment, email: string, name
 }
 
 export function registerRegistrationRoutes(app: FastifyInstance, environment: AppEnvironment, database: PrismaClient): void {
-  const secure = environment.NODE_ENV === 'production'; const csrfCookie = secure ? '__Host-solid_csrf' : 'solid_csrf';
+  const secure = environment.NODE_ENV === 'production'; const csrfCookie = secure ? '__Host-solid_auth_csrf' : 'solid_auth_csrf';
   const authorized = (request: FastifyRequest) => typeof request.headers.origin === 'string' && environment.CORS_ORIGINS.includes(request.headers.origin) && typeof request.headers['x-csrf-token'] === 'string' && request.cookies[csrfCookie] === request.headers['x-csrf-token'];
   app.post<{ Body: { name?: unknown; email?: unknown; password?: unknown; termsAccepted?: unknown } }>('/auth/register', { config: { rateLimit: { max: 3, timeWindow: '15 minutes' } } }, async (request, reply) => {
     if (!authorized(request)) return reply.code(403).send(errorBody(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
