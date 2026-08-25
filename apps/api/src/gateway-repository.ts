@@ -37,7 +37,7 @@ export class PrismaGatewayRepository {
   }
 
   async paymentContext(publicId: string, tokenHash: string, now: Date) {
-    return this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, customerDataEncrypted: { not: null }, OR: [{ checkout: { product: { fulfillmentType: 'DIGITAL' } } }, { shippingAddressEncrypted: { not: null }, shippingMethodPublicId: { not: null } }] }, select: { id: true, publicId: true, totalCents: true, discountCents: true, shippingPriceCents: true, customerDataEncrypted: true, shippingAddressEncrypted: true, expiresAt: true, checkout: { select: { storeId: true, store: { select: { name: true } }, product: { select: { fulfillmentType: true } } } }, items: { select: { productId: true, titleSnapshot: true, unitPriceCents: true, quantity: true } } } });
+    return this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, customerDataEncrypted: { not: null }, OR: [{ checkout: { product: { fulfillmentType: 'DIGITAL' } } }, { shippingAddressEncrypted: { not: null }, shippingMethodPublicId: { not: null } }] }, select: { id: true, publicId: true, quantity: true, unitPriceCents: true, totalCents: true, discountCents: true, shippingPriceCents: true, customerDataEncrypted: true, shippingAddressEncrypted: true, expiresAt: true, checkout: { select: { storeId: true, store: { select: { name: true } }, product: { select: { id: true, checkoutTitle: true, fulfillmentType: true } } } }, items: { select: { productId: true, titleSnapshot: true, unitPriceCents: true, quantity: true } } } });
   }
 
   latestAttempt(checkoutSessionId: string, provider?: PaymentProvider): Promise<PaymentAttemptSummary | null> {
