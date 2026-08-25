@@ -50,6 +50,18 @@ describe('autenticação administrativa', () => {
     expect(String(login.headers['set-cookie'])).toContain('HttpOnly'); expect(String(login.headers['set-cookie'])).toContain('SameSite=Strict');
   });
 
+  it('bloqueia uma aba quando o cookie pertence a outro usuário', async () => {
+    const app = buildApp(env, { authRepository: new MemoryAuthRepository() });
+    const csrf = await app.inject({ method: 'GET', url: '/auth/csrf', headers: { origin } });
+    const csrfToken = csrf.json<{ csrfToken: string }>().csrfToken;
+    const login = await app.inject({ method: 'POST', url: '/auth/login', headers: { origin, cookie: cookiePair(csrf.headers['set-cookie'], 'solid_csrf'), 'x-csrf-token': csrfToken }, payload: { email: 'owner@example.com', password: 'correct horse battery staple' } });
+    const cookies = `${cookiePair(login.headers['set-cookie'], 'solid_session')}; ${cookiePair(login.headers['set-cookie'], 'solid_csrf')}`;
+    const response = await app.inject({ method: 'GET', url: '/auth/session', headers: { cookie: cookies, 'x-solid-user-context': 'another-user-id' } });
+    expect(response.statusCode).toBe(409);
+    expect(response.json<{ error: { code: string } }>().error.code).toBe('SESSION_CONTEXT_CHANGED');
+    await app.close();
+  });
+
   it('não revela se o e-mail existe', async () => {
     const app = buildApp(env, { authRepository: new MemoryAuthRepository() });
     const csrf = await app.inject({ method: 'GET', url: '/auth/csrf', headers: { origin } });

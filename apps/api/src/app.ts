@@ -2,6 +2,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { createHash } from 'node:crypto';
 import type { AppEnvironment } from '@solid/config';
 import type { ErrorResponse, HealthResponse } from '@solid/contracts';
 import type { AuthRepository } from './auth-repository.js';
@@ -39,8 +40,24 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
     let hostname = ''; try { const url = new URL(origin); if (url.protocol !== 'https:') return callback(null, false); hostname = url.hostname.toLowerCase(); } catch { return callback(null, false); }
     if (!dependencies.storeRepository?.isCheckoutDomainAllowed) return callback(null, false);
     void dependencies.storeRepository.isCheckoutDomainAllowed(hostname).then(allowed => callback(null, allowed)).catch(() => callback(null, false));
-  }, credentials: true, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], allowedHeaders: ['authorization', 'content-type', 'x-csrf-token', 'x-request-id'], maxAge: 600 });
+  }, credentials: true, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], allowedHeaders: ['authorization', 'content-type', 'x-csrf-token', 'x-request-id', 'x-solid-user-context'], maxAge: 600 });
   void app.register(rateLimit, { max: 100, timeWindow: '1 minute', ban: 3, errorResponseBuilder: (_request, context) => ({ error: { code: 'RATE_LIMITED', message: `Muitas requisições. Tente novamente em ${context.after}.`, requestId: _request.id } }) });
+  if (dependencies.authRepository) {
+    const repository = dependencies.authRepository;
+    const sessionCookie = environment.NODE_ENV === 'production' ? '__Host-solid_session' : 'solid_session';
+    app.addHook('onRequest', async (request, reply) => {
+      const expectedUser = request.headers['x-solid-user-context'];
+      if (typeof expectedUser !== 'string') return;
+      const rawCookie = request.headers.cookie || '';
+      const encodedToken = rawCookie.split(';').map(part => part.trim()).find(part => part.startsWith(`${sessionCookie}=`))?.slice(sessionCookie.length + 1);
+      if (!encodedToken) return reply.code(409).send({ error: { code: 'SESSION_CONTEXT_CHANGED', message: 'A conta desta aba foi alterada em outra aba.', requestId: request.id } });
+      const tokenHash = createHash('sha256').update(decodeURIComponent(encodedToken)).digest('hex');
+      const session = await repository.findActiveSession(tokenHash, new Date());
+      if (!session || session.user.publicId !== expectedUser) {
+        return reply.code(409).send({ error: { code: 'SESSION_CONTEXT_CHANGED', message: 'A conta desta aba foi alterada em outra aba.', requestId: request.id } });
+      }
+    });
+  }
   if (dependencies.authRepository) registerAuthRoutes(app, environment, dependencies.authRepository);
   if (dependencies.database) registerRegistrationRoutes(app, environment, dependencies.database);
   if (dependencies.authRepository && dependencies.database) registerDashboardRoutes(app, environment, dependencies.authRepository, dependencies.database);

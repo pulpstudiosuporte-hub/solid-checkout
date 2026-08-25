@@ -2,6 +2,33 @@ const fallbackApiUrl = 'http://127.0.0.1:3333';
 
 export const apiBaseUrl = (import.meta.env.VITE_API_URL || fallbackApiUrl).replace(/\/$/, '');
 
+const tabUserKey = 'solid-tab-user-context';
+
+export function bindTabToUser(userId) {
+  if (userId) sessionStorage.setItem(tabUserKey, userId);
+}
+
+export function clearTabUser() {
+  sessionStorage.removeItem(tabUserKey);
+}
+
+async function fetch(input, init = {}) {
+  const headers = new Headers(init.headers || {});
+  const expectedUser = sessionStorage.getItem(tabUserKey);
+  const url = String(input);
+  const establishesSession = /\/auth\/(csrf|login|register|verify-email)$/.test(url);
+  if (init.credentials === 'include' && expectedUser && !establishesSession) headers.set('x-solid-user-context', expectedUser);
+  const response = await globalThis.fetch(input, { ...init, headers });
+  if (response.status === 409) {
+    const clone = response.clone();
+    const body = await clone.json().catch(() => null);
+    if (body?.error?.code === 'SESSION_CONTEXT_CHANGED') {
+      window.dispatchEvent(new CustomEvent('solid:session-conflict'));
+    }
+  }
+  return response;
+}
+
 // Imagens enviadas pelo painel são armazenadas e servidas pela API.  Mantemos
 // esse caminho centralizado para que registros antigos, que eventualmente
 // tenham salvo outro host, continuem funcionando após uma troca de domínio.

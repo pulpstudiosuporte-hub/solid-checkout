@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import './styles.css';
 import CheckoutEditor, { defaultCheckoutConfig } from './CheckoutEditor';
-import { archiveStore, createStore, getApiHealth, getSession, getStores, login, logout, registerAccount, selectStore, verifyAccount } from './api';
+import { archiveStore, bindTabToUser, clearTabUser, createStore, getApiHealth, getSession, getStores, login, logout, registerAccount, selectStore, verifyAccount } from './api';
 import Login, { SessionLoading } from './Auth';
 import DashboardPage from './DashboardPage';
 import AccountSettings from './AccountSettings';
@@ -152,22 +152,38 @@ function PublicSessionRoute({ sessionId, urlToken }) {
   return <PublicSessionCheckout sessionId={sessionId} token={token}/>;
 }
 
+function SessionConflict() {
+  return <main className="session-conflict" role="alert">
+    <div className="session-conflict-card">
+      <div className="session-conflict-icon"><ShieldCheck size={30}/></div>
+      <p className="eyebrow">SESSÃO PROTEGIDA</p>
+      <h1>A conta desta aba mudou</h1>
+      <p>Outra aba deste navegador entrou em uma conta diferente. Esta página foi bloqueada antes de acessar ou alterar dados da outra conta.</p>
+      <button className="primary" onClick={() => { clearTabUser(); window.location.reload(); }}>Usar a conta conectada agora</button>
+      <small>Para manter administrador e cliente abertos ao mesmo tempo, use uma janela anônima ou perfis diferentes do Chrome.</small>
+    </div>
+  </main>;
+}
+
 function App(){
   const [sidebar,setSidebar]=useState(false); const [page,setPage]=useState(()=>window.location.hash.startsWith('#/integrations')?'Integrações':'Visão geral'); const [checkout,setCheckout]=useState(false); const [editor,setEditor]=useState(false); const [previewConfig,setPreviewConfig]=useState(null); const [apiStatus,setApiStatus]=useState('checking');
   const [auth,setAuth]=useState({status:'checking',user:null,csrfToken:null});
+  const [sessionConflict,setSessionConflict]=useState(false);
   const [stores,setStores]=useState([]); const [storeBusy,setStoreBusy]=useState(false);
-  useEffect(()=>{let active=true; getApiHealth().then(()=>active&&setApiStatus('online')).catch(()=>active&&setApiStatus('offline')); getSession().then(result=>active&&setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken})).catch(()=>active&&setAuth({status:'anonymous',user:null,csrfToken:null})); return()=>{active=false}},[]);
+  useEffect(()=>{let active=true; getApiHealth().then(()=>active&&setApiStatus('online')).catch(()=>active&&setApiStatus('offline')); getSession().then(result=>{if(!active)return;bindTabToUser(result.user.publicId || result.user.id);setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken})}).catch(error=>{if(!active)return;if(error?.code==='SESSION_CONTEXT_CHANGED')setSessionConflict(true);else setAuth({status:'anonymous',user:null,csrfToken:null})}); return()=>{active=false}},[]);
+  useEffect(()=>{const conflict=()=>setSessionConflict(true);window.addEventListener('solid:session-conflict',conflict);const channel=typeof BroadcastChannel!=='undefined'?new BroadcastChannel('solid-auth'):null;channel?.addEventListener('message',event=>{const current=auth.user?.publicId||auth.user?.id;if(auth.status==='authenticated'&&event.data?.type==='auth-changed'&&event.data.userId!==current)setSessionConflict(true)});const verify=()=>{if(document.visibilityState==='visible'&&auth.status==='authenticated')getSession().catch(()=>{})};window.addEventListener('focus',verify);document.addEventListener('visibilitychange',verify);return()=>{window.removeEventListener('solid:session-conflict',conflict);window.removeEventListener('focus',verify);document.removeEventListener('visibilitychange',verify);channel?.close()}},[auth.status,auth.user]);
   useEffect(()=>{if(auth.status!=='authenticated')return;let active=true;getStores().then(result=>active&&setStores(result.items)).catch(()=>active&&setApiStatus('offline'));return()=>{active=false}},[auth.status]);
   useEffect(()=>{const navigate=event=>typeof event.detail==='string'&&setPage(event.detail);window.addEventListener('solid:navigate',navigate);return()=>window.removeEventListener('solid:navigate',navigate)},[]);
   const publicMatch = window.location.pathname.match(/^\/c\/([a-z0-9-]+)\/([a-z0-9-]+)\/?$/) || window.location.hash.match(/^#\/c\/([a-z0-9-]+)\/([a-z0-9-]+)\/?$/);
   const publicSessionMatch = window.location.hash.match(/^#\/session\/([A-Za-z0-9_-]{8,32})/); const publicSessionToken = new URLSearchParams(window.location.hash.split('?')[1] || '').get('token');
-  async function handleLogin(email,password){const result=await login(email,password); setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken}); window.history.replaceState({},'', '/');}
-  async function handleLogout(){try{await logout(auth.csrfToken);}finally{setAuth({status:'anonymous',user:null,csrfToken:null});setStores([]);setCheckout(false);setEditor(false);window.history.replaceState({},'', '/#/login');}}
+  async function handleLogin(email,password){const result=await login(email,password);const userId=result.user.publicId||result.user.id;bindTabToUser(userId);const channel=typeof BroadcastChannel!=='undefined'?new BroadcastChannel('solid-auth'):null;channel?.postMessage({type:'auth-changed',userId});channel?.close();setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken}); window.history.replaceState({},'', '/');}
+  async function handleLogout(){try{await logout(auth.csrfToken);}finally{clearTabUser();const channel=typeof BroadcastChannel!=='undefined'?new BroadcastChannel('solid-auth'):null;channel?.postMessage({type:'auth-changed',userId:null});channel?.close();setAuth({status:'anonymous',user:null,csrfToken:null});setStores([]);setCheckout(false);setEditor(false);window.history.replaceState({},'', '/#/login');}}
   async function handleSelectStore(storeId){setStoreBusy(true);try{await selectStore(storeId,auth.csrfToken);setStores(current=>current.map(store=>({...store,active:store.publicId===storeId})));setPage('Visão geral');}finally{setStoreBusy(false)}}
   async function handleCreateStore(name){setStoreBusy(true);try{const result=await createStore(name,auth.csrfToken);setStores(current=>[...current.map(store=>({...store,active:false})),result.store]);setPage('Visão geral');}finally{setStoreBusy(false)}}
   async function handleArchiveStore(storeId){setStoreBusy(true);try{await archiveStore(storeId,auth.csrfToken);const result=await getStores();setStores(result.items);setPage('Visão geral');}finally{setStoreBusy(false)}}
   if(publicSessionMatch) return <PublicCheckoutErrorBoundary><PublicSessionRoute sessionId={publicSessionMatch[1]} urlToken={publicSessionToken}/></PublicCheckoutErrorBoundary>;
   if(publicMatch) return <PublicCheckoutErrorBoundary><PublicCheckout storeSlug={publicMatch[1]} checkoutSlug={publicMatch[2]}/></PublicCheckoutErrorBoundary>;
+  if(sessionConflict) return <SessionConflict/>;
   if(auth.status==='checking') return <SessionLoading/>;
   if(auth.status==='anonymous'){return <Login onSubmit={handleLogin} onRegister={registerAccount} onVerify={verifyAccount}/>;}
   if(window.location.hash==='#/login')window.history.replaceState({},'', '/');
