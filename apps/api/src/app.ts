@@ -20,6 +20,7 @@ import { registerOrderRoutes } from './order-routes.js';
 import { registerMediaRoutes } from './media-routes.js';
 import { HttpDokployDomainClient, type DokployDomainClient } from './dokploy-client.js';
 import type { PrismaClient } from '@solid/database';
+import { registerRegistrationRoutes } from './registration-routes.js';
 
 export function buildApp(environment: AppEnvironment, dependencies: { authRepository?: AuthRepository; catalogRepository?: CatalogRepository; storeRepository?: StoreRepository; shopifyRepository?: ShopifyRepository; gatewayRepository?: PrismaGatewayRepository; orderRepository?: OrderRepository; dokployClient?: DokployDomainClient; database?: PrismaClient } = {}): FastifyInstance {
   const app = Fastify({
@@ -39,6 +40,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
   }, credentials: true, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], allowedHeaders: ['authorization', 'content-type', 'x-csrf-token', 'x-request-id'], maxAge: 600 });
   void app.register(rateLimit, { max: 100, timeWindow: '1 minute', ban: 3, errorResponseBuilder: (_request, context) => ({ error: { code: 'RATE_LIMITED', message: `Muitas requisições. Tente novamente em ${context.after}.`, requestId: _request.id } }) });
   if (dependencies.authRepository) registerAuthRoutes(app, environment, dependencies.authRepository);
+  if (dependencies.database) registerRegistrationRoutes(app, environment, dependencies.database);
   const dokployClient = dependencies.dokployClient ?? (environment.DOKPLOY_URL && environment.DOKPLOY_API_KEY && environment.DOKPLOY_CHECKOUT_APPLICATION_ID ? new HttpDokployDomainClient(environment) : undefined);
   if (dependencies.authRepository && dependencies.storeRepository) registerStoreRoutes(app, environment, dependencies.authRepository, dependencies.storeRepository, dokployClient);
   if (dependencies.authRepository && dependencies.shopifyRepository) registerShopifyRoutes(app, environment, dependencies.authRepository, dependencies.shopifyRepository);
