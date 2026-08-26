@@ -11,6 +11,11 @@ function nextSession(database: PrismaClient) {
   return database.checkoutSession.findFirst({ where: { status: 'COMPLETED', customerDataEncrypted: { not: null }, confirmationEmailSentAt: null, confirmationEmailAttempts: { lt: 8 }, OR: [{ confirmationEmailNextAttemptAt: null }, { confirmationEmailNextAttemptAt: { lte: now } }], AND: [{ OR: [{ confirmationEmailClaimedAt: null }, { confirmationEmailClaimedAt: { lt: new Date(now.getTime() - 5 * 60_000) } }] }] }, orderBy: { completedAt: 'asc' }, select: { id: true, publicId: true, totalCents: true, discountCents: true, couponCode: true, shippingPriceCents: true, customerDataEncrypted: true, confirmationEmailAttempts: true, checkout: { select: { store: { select: { name: true } } } }, paymentAttempts: { where: { status: 'PAID' }, orderBy: { paidAt: 'desc' }, take: 1, select: { amountCents: true } }, items: { select: { titleSnapshot: true, quantity: true, totalCents: true, product: { select: { fulfillmentType: true, externalDeliveryUrl: true } } } } } });
 }
 
+function nextMerchantSession(database: PrismaClient) {
+  const now = new Date();
+  return database.checkoutSession.findFirst({ where: { status: 'COMPLETED', customerDataEncrypted: { not: null }, merchantEmailSentAt: null, merchantEmailAttempts: { lt: 8 }, OR: [{ merchantEmailNextAttemptAt: null }, { merchantEmailNextAttemptAt: { lte: now } }], AND: [{ OR: [{ merchantEmailClaimedAt: null }, { merchantEmailClaimedAt: { lt: new Date(now.getTime() - 5 * 60_000) } }] }] }, orderBy: { completedAt: 'asc' }, select: { id: true, publicId: true, totalCents: true, discountCents: true, shippingPriceCents: true, customerDataEncrypted: true, merchantEmailAttempts: true, checkout: { select: { store: { select: { name: true, members: { where: { role: { in: ['OWNER', 'ADMIN'] }, user: { disabledAt: null, accountStatus: 'APPROVED' } }, select: { user: { select: { email: true, name: true } } } } } } } }, paymentAttempts: { where: { status: 'PAID' }, orderBy: { paidAt: 'desc' }, take: 1, select: { amountCents: true, provider: true } }, items: { select: { titleSnapshot: true, quantity: true, totalCents: true } } } });
+}
+
 type EmailSession = NonNullable<Awaited<ReturnType<typeof nextSession>>>;
 
 async function sendConfirmation(environment: AppEnvironment, session: EmailSession): Promise<void> {
@@ -24,6 +29,19 @@ async function sendConfirmation(environment: AppEnvironment, session: EmailSessi
   const accessHtml = access.length ? `<div style="margin:24px 0;padding:20px;border-radius:14px;background:#f2efff"><h2 style="margin:0 0 12px;font-size:18px">Seu acesso foi liberado</h2>${access.map(item => `<p style="margin:10px 0"><a href="${escapeHtml(item.url)}" style="display:inline-block;padding:12px 18px;border-radius:9px;background:#7047eb;color:#fff;text-decoration:none;font-weight:700">Acessar ${escapeHtml(item.title)}</a></p>`).join('')}</div>` : '';
   const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${environment.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': `solid-payment-${session.publicId}` }, body: JSON.stringify({ from: environment.EMAIL_FROM, to: [customer.email], subject: `Pagamento confirmado — pedido #${session.publicId.slice(-8).toUpperCase()}`, html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#17131f"><p style="color:#7047eb;font-weight:700">SOLID CHECKOUT</p><h1>Pagamento confirmado</h1><p>Olá, ${escapeHtml(customer.name || 'cliente')}. Recebemos seu pagamento de <strong>${money(paidCents)}</strong>.</p><table style="width:100%;border-collapse:collapse">${itemRows}</table>${totalsHtml}${accessHtml}<p style="margin-top:28px;color:#686471;font-size:13px">Este é um e-mail automático de confirmação da ${escapeHtml(session.checkout.store.name)}.</p></div>` }) });
   if (!response.ok) throw new Error(`Resend recusou o envio (${response.status})`);
+}
+
+type MerchantEmailSession = NonNullable<Awaited<ReturnType<typeof nextMerchantSession>>>;
+
+async function sendMerchantNotification(environment: AppEnvironment, session: MerchantEmailSession): Promise<void> {
+  if (!environment.RESEND_API_KEY || !environment.EMAIL_FROM || !environment.APP_ENCRYPTION_KEY) return;
+  const recipients = [...new Set(session.checkout.store.members.map(member => member.user.email).filter(email => /^\S+@\S+\.\S+$/.test(email)))];
+  if (!recipients.length) throw new Error('A loja não possui proprietário ou administrador ativo com e-mail válido');
+  const customer = JSON.parse(decryptSecret(session.customerDataEncrypted!, environment.APP_ENCRYPTION_KEY)) as { name?: string; email?: string; phone?: string };
+  const paidCents = session.paymentAttempts[0]?.amountCents ?? session.totalCents - session.discountCents + session.shippingPriceCents;
+  const itemRows = session.items.map(item => `<tr><td style="padding:8px 0;color:#34313d">${item.quantity}× ${escapeHtml(item.titleSnapshot)}</td><td style="padding:8px 0;text-align:right;font-weight:700">${money(item.totalCents)}</td></tr>`).join('');
+  const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${environment.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': `solid-merchant-sale-${session.publicId}` }, body: JSON.stringify({ from: environment.EMAIL_FROM, to: recipients, subject: `Nova venda de ${money(paidCents)} — ${session.checkout.store.name}`, html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#17131f"><p style="color:#7047eb;font-weight:700">SOLID CHECKOUT</p><h1>Nova venda confirmada</h1><p>O pedido <strong>#${session.publicId.slice(-8).toUpperCase()}</strong> foi pago via ${escapeHtml(session.paymentAttempts[0]?.provider || 'gateway')}.</p><div style="padding:16px;border-radius:12px;background:#f5f3fa"><strong>Cliente:</strong> ${escapeHtml(customer.name || 'Não informado')}<br><strong>E-mail:</strong> ${escapeHtml(customer.email || 'Não informado')}${customer.phone ? `<br><strong>Telefone:</strong> ${escapeHtml(customer.phone)}` : ''}</div><table style="width:100%;border-collapse:collapse;margin-top:16px">${itemRows}<tr><td style="padding:12px 0;border-top:1px solid #e8e6ed;font-weight:700">Total pago</td><td style="padding:12px 0;border-top:1px solid #e8e6ed;text-align:right;font-weight:700">${money(paidCents)}</td></tr></table><p style="margin-top:24px;color:#686471;font-size:13px">Acesse o painel da SOLID para acompanhar os detalhes do pedido.</p></div>` }) });
+  if (!response.ok) throw new Error(`Resend recusou o aviso ao lojista (${response.status})`);
 }
 
 export function startConfirmationEmailDelivery(environment: AppEnvironment, database: PrismaClient, log: FastifyBaseLogger): () => void {
@@ -46,6 +64,22 @@ export function startConfirmationEmailDelivery(environment: AppEnvironment, data
           const message = error instanceof Error ? error.message.slice(0, 500) : 'Falha desconhecida';
           await database.checkoutSession.update({ where: { id: session.id }, data: { confirmationEmailAttempts: { increment: 1 }, confirmationEmailClaimedAt: null, confirmationEmailNextAttemptAt: new Date(Date.now() + delayMinutes * 60_000), confirmationEmailLastError: message } });
           log.warn({ err: error, checkoutSessionId: session.publicId, attempts }, 'confirmation_email_failed');
+        }
+      }
+      for (let count = 0; count < 20; count += 1) {
+        const session = await nextMerchantSession(database); if (!session) break;
+        const claimedAt = new Date();
+        const claim = await database.checkoutSession.updateMany({ where: { id: session.id, merchantEmailSentAt: null, OR: [{ merchantEmailClaimedAt: null }, { merchantEmailClaimedAt: { lt: new Date(claimedAt.getTime() - 5 * 60_000) } }] }, data: { merchantEmailClaimedAt: claimedAt } });
+        if (!claim.count) continue;
+        try {
+          await sendMerchantNotification(environment, session);
+          await database.checkoutSession.update({ where: { id: session.id }, data: { merchantEmailSentAt: new Date(), merchantEmailClaimedAt: null, merchantEmailLastError: null } });
+          log.info({ checkoutSessionId: session.publicId }, 'merchant_sale_email_sent');
+        } catch (error) {
+          const attempts = session.merchantEmailAttempts + 1; const delayMinutes = Math.min(360, 2 ** attempts);
+          const message = error instanceof Error ? error.message.slice(0, 500) : 'Falha desconhecida';
+          await database.checkoutSession.update({ where: { id: session.id }, data: { merchantEmailAttempts: { increment: 1 }, merchantEmailClaimedAt: null, merchantEmailNextAttemptAt: new Date(Date.now() + delayMinutes * 60_000), merchantEmailLastError: message } });
+          log.warn({ err: error, checkoutSessionId: session.publicId, attempts }, 'merchant_sale_email_failed');
         }
       }
     } catch (error) { log.error({ err: error }, 'confirmation_email_delivery_failed'); } finally { running = false; }

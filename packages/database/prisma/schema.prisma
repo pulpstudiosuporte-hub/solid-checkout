@@ -329,6 +329,11 @@ model CheckoutSession {
   confirmationEmailNextAttemptAt DateTime? @map("confirmation_email_next_attempt_at") @db.Timestamptz(3)
   confirmationEmailAttempts Int            @default(0) @map("confirmation_email_attempts")
   confirmationEmailLastError String?       @map("confirmation_email_last_error") @db.VarChar(500)
+  merchantEmailSentAt DateTime?            @map("merchant_email_sent_at") @db.Timestamptz(3)
+  merchantEmailClaimedAt DateTime?         @map("merchant_email_claimed_at") @db.Timestamptz(3)
+  merchantEmailNextAttemptAt DateTime?     @map("merchant_email_next_attempt_at") @db.Timestamptz(3)
+  merchantEmailAttempts Int                @default(0) @map("merchant_email_attempts")
+  merchantEmailLastError String?           @map("merchant_email_last_error") @db.VarChar(500)
   createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
   checkout          Checkout              @relation(fields: [checkoutId], references: [id], onDelete: Restrict)
@@ -342,6 +347,7 @@ model CheckoutSession {
   @@index([customerEmailHash])
   @@index([shopifySyncStatus, shopifySyncStartedAt])
   @@index([status, confirmationEmailSentAt, confirmationEmailNextAttemptAt])
+  @@index([status, merchantEmailSentAt, merchantEmailNextAttemptAt])
   @@map("checkout_sessions")
 }
 
