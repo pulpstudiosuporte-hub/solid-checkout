@@ -14,9 +14,9 @@ function decryptPanelData(encrypted: string | null, encryptionKey: string, reque
   catch (error) { request.log.error({ err: error, orderId }, event); return {}; }
 }
 
-function customerForPanel(encrypted: string | null, encryptionKey: string, request: FastifyRequest, orderId: string): { name?: string; email?: string } {
+function customerForPanel(encrypted: string | null, encryptionKey: string, request: FastifyRequest, orderId: string): { name?: string; email?: string; phone?: string } {
   const value = decryptPanelData(encrypted, encryptionKey, request, orderId, 'order_customer_decryption_failed');
-  return { ...(typeof value.name === 'string' ? { name: value.name } : {}), ...(typeof value.email === 'string' ? { email: value.email } : {}) };
+  return { ...(typeof value.name === 'string' ? { name: value.name } : {}), ...(typeof value.email === 'string' ? { email: value.email } : {}), ...(typeof value.phone === 'string' ? { phone: value.phone } : {}) };
 }
 
 function addressForPanel(encrypted: string | null, encryptionKey: string, request: FastifyRequest, orderId: string): Record<string, string> {
