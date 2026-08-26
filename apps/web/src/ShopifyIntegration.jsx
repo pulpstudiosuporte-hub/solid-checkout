@@ -4,6 +4,7 @@ import { connectShopify, disconnectShopify, getShopifyStatus, syncShopifyCatalog
 import ShopifyOnboarding from './ShopifyOnboarding';
 import UtmifyIntegration from './UtmifyIntegration';
 import MetaIntegration from './MetaIntegration';
+import IntegrationDiagnostics from './IntegrationDiagnostics';
 
 const formatDate = value => value ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : 'Ainda não sincronizado';
 const shopHandle = domain => domain?.replace(/\.myshopify\.com$/i, '') ?? '';
@@ -22,6 +23,7 @@ export default function ShopifyIntegration({ csrfToken, storeKey }) {
   return <main className="page integrations-page"><section className="page-title"><div><p className="eyebrow">INTEGRAÇÕES</p><h1>Shopify</h1><p>Importe o catálogo completo da loja ativa com autorização segura.</p></div><span className={`connection-pill ${status.connected ? 'connected' : ''} ${status.reconnectRequired ? 'reconnect' : ''}`}>{badge}</span></section>
     {status.reconnectRequired && <div className="integration-alert reconnect-alert" role="alert"><AlertTriangle size={18}/><div><strong>Reconecte sua loja Shopify</strong><span>A autorização expirou ou foi revogada. Seus produtos e personalizações continuam salvos, mas novas sincronizações estão pausadas.</span></div></div>}
     {message && <div className="integration-alert" role="status" aria-live="polite">{message}</div>}
+    <IntegrationDiagnostics storeKey={storeKey}/>
     <ShopifyOnboarding key={storeKey} connected={status.connected} synced={Boolean(status.lastSyncedAt)} shopDomain={status.shopDomain} storeKey={storeKey}/>
     <UtmifyIntegration csrfToken={csrfToken} storeKey={storeKey}/>
     <MetaIntegration csrfToken={csrfToken} storeKey={storeKey}/>

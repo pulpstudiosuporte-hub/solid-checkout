@@ -19,5 +19,6 @@ export async function syncUtmifyOrder(environment: AppEnvironment, repository: P
       trackingParameters: context.trackingParameters,
       commission: { totalPriceInCents: total, gatewayFeeInCents: 0, userCommissionInCents: total, currency: context.currency }, isTest: false,
     });
-  } catch (error) { log.warn({ err: error, checkoutSessionId, utmifyStatus: status }, 'utmify_order_sync_failed'); }
+    await repository.recordIntegrationEvent(context.checkout.storeId, 'UTMIFY', status, true, { checkoutSessionId: context.publicId });
+  } catch (error) { log.warn({ err: error, checkoutSessionId, utmifyStatus: status }, 'utmify_order_sync_failed'); try { await repository.recordIntegrationEvent(context.checkout.storeId, 'UTMIFY', status, false, { checkoutSessionId: context.publicId }); } catch {} }
 }

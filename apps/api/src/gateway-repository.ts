@@ -37,6 +37,20 @@ export class PrismaGatewayRepository {
     return this.database.gatewayConnection.updateMany({ where: { storeId, provider }, data: { active: false } });
   }
 
+  async recordIntegrationEvent(storeId: string, provider: IntegrationProvider, event: string, success: boolean, metadata: Record<string, unknown> = {}): Promise<void> {
+    await this.database.auditLog.create({ data: { storeId, actorType: 'SYSTEM', action: success ? 'integration.event_sent' : 'integration.event_failed', targetType: 'integration', targetId: provider, metadata: { provider, event, ...metadata } } });
+  }
+
+  async diagnostics(storeId: string) {
+    const [connections, shopify, events, latestPayment] = await Promise.all([
+      this.database.gatewayConnection.findMany({ where: { storeId, provider: { in: ['ROAS', 'WESTPAY', 'UTMIFY', 'META'] } }, select: { provider: true, active: true, verifiedAt: true, updatedAt: true } }),
+      this.database.shopifyConnection.findUnique({ where: { storeId }, select: { shopDomain: true, revokedAt: true, reconnectRequiredAt: true, reconnectReason: true, lastSyncedAt: true, updatedAt: true } }),
+      this.database.auditLog.findMany({ where: { storeId, OR: [{ action: { startsWith: 'integration.' } }, { action: 'payment.webhook_verified' }] }, orderBy: { createdAt: 'desc' }, take: 60, select: { action: true, targetId: true, metadata: true, createdAt: true } }),
+      this.database.paymentAttempt.findFirst({ where: { session: { checkout: { storeId } } }, orderBy: { updatedAt: 'desc' }, select: { provider: true, status: true, updatedAt: true } }),
+    ]);
+    return { connections, shopify, events, latestPayment };
+  }
+
   utmifyOrderContext(checkoutSessionId: string): Promise<UtmifyOrderContext | null> {
     return this.database.checkoutSession.findUnique({ where: { id: checkoutSessionId }, select: {
       id: true, publicId: true, createdAt: true, completedAt: true, currency: true, customerDataEncrypted: true, trackingParameters: true,

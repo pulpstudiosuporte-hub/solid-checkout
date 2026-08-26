@@ -73,12 +73,12 @@ function Sidebar({ open, onClose, page, setPage, user, onLogout, stores, storeBu
   </>;
 }
 
-function Header({ toggleSidebar, onCheckout, apiStatus }) {
+function Header({ toggleSidebar, apiStatus }) {
   const statusLabel = apiStatus === 'online' ? 'API conectada' : apiStatus === 'offline' ? 'API indisponível' : 'Conectando à API';
   return <header className="topbar">
     <button className="icon-btn menu-btn" onClick={toggleSidebar} aria-label="Abrir menu"><Menu size={21}/></button>
     <div className="search"><Search size={18}/><input aria-label="Buscar" placeholder="Buscar pedidos, clientes ou produtos..."/><kbd>⌘ K</kbd></div>
-    <div className="top-actions"><span className={`sandbox api-status ${apiStatus}`} role="status"><span/> {statusLabel}</span><button className="icon-btn bell" aria-label="Notificações"><Bell size={19}/><i/></button><button className="primary small" onClick={onCheckout}><Eye size={17}/> Ver checkout</button></div>
+    <div className="top-actions"><span className={`sandbox api-status ${apiStatus}`} role="status"><span/> {statusLabel}</span><button className="icon-btn bell" aria-label="Notificações"><Bell size={19}/><i/></button></div>
   </header>;
 }
 
@@ -193,7 +193,7 @@ function App(){
   if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>;
   const activeStore=stores.find(store=>store.active);
   const pageContent=page==='Visão geral'?<Dashboard setPage={setPage} storeKey={activeStore?.publicId}/>:page==='Pedidos'?<OrdersPage storeKey={activeStore?.publicId}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Gateways'?<GatewaysPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Domínios'?<DomainsPage csrfToken={auth.csrfToken}/>:page==='Produtos'?<ProductsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onOpenIntegrations={()=>setPage('Integrações')}/>:page==='Order bumps'?<OrderBumpsPage csrfToken={auth.csrfToken}/>:page==='Cupons'?<CouponsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>;
-  return <div className="app"><Sidebar open={sidebar} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout} stores={stores} storeBusy={storeBusy} onSelectStore={handleSelectStore} onCreateStore={handleCreateStore} onArchiveStore={handleArchiveStore}/><div className="main-shell"><Header toggleSidebar={()=>setSidebar(true)} onCheckout={()=>setCheckout(true)} apiStatus={apiStatus}/><PageErrorBoundary routeKey={`${activeStore?.publicId || 'store'}:${page}`} onHome={()=>setPage('Visão geral')}>{pageContent}</PageErrorBoundary></div></div>
+  return <div className="app"><Sidebar open={sidebar} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout} stores={stores} storeBusy={storeBusy} onSelectStore={handleSelectStore} onCreateStore={handleCreateStore} onArchiveStore={handleArchiveStore}/><div className="main-shell"><Header toggleSidebar={()=>setSidebar(true)} apiStatus={apiStatus}/><PageErrorBoundary routeKey={`${activeStore?.publicId || 'store'}:${page}`} onHome={()=>setPage('Visão geral')}>{pageContent}</PageErrorBoundary></div></div>
 }
 
 createRoot(document.getElementById('root')).render(<App/>);
