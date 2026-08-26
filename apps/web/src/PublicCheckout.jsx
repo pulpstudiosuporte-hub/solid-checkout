@@ -20,6 +20,7 @@ import {
   getPaidDigitalDelivery,
   getPublicCheckout,
   getPublicCheckoutSession,
+  getPublicMetaConfig,
   getLatestPublicPayment,
   getPublicShippingMethods,
   lookupPostalCode,
@@ -35,6 +36,13 @@ const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
 });
+const cookieValue = (name) => document.cookie.split(';').map(value => value.trim()).find(value => value.startsWith(`${name}=`))?.slice(name.length + 1) || '';
+const loadMetaPixel = (pixelId) => {
+  if (!pixelId || typeof window === 'undefined') return;
+  if (!window.fbq) { const fbq = function(){ fbq.callMethod ? fbq.callMethod.apply(fbq, arguments) : fbq.queue.push(arguments); }; fbq.queue = []; fbq.loaded = true; fbq.version = '2.0'; window.fbq = fbq; const script = document.createElement('script'); script.async = true; script.src = 'https://connect.facebook.net/en_US/fbevents.js'; document.head.appendChild(script); }
+  window.fbq('init', pixelId);
+};
+const trackMeta = (eventName, data = {}, eventId) => { if (!window.fbq) return; const key = eventId ? `solid-meta:${eventId}` : ''; if (key && sessionStorage.getItem(key)) return; window.fbq('track', eventName, data, eventId ? { eventID: eventId } : undefined); if (key) sessionStorage.setItem(key, '1'); };
 const publicConfig = (value) => ({
   primary: "#7357e9",
   pageBg: "#f6f7f9",
@@ -185,7 +193,7 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
     setBusy(true);
     setState((current) => ({ ...current, error: "" }));
     try {
-      const search = new URLSearchParams(window.location.search); const hashSearch = new URLSearchParams(window.location.hash.split('?')[1] || ''); const trackingParameters = Object.fromEntries(['src','sck','utm_source','utm_campaign','utm_medium','utm_content','utm_term'].map(key => [key, search.get(key) || hashSearch.get(key)]));
+      const search = new URLSearchParams(window.location.search); const hashSearch = new URLSearchParams(window.location.hash.split('?')[1] || ''); const read = key => search.get(key) || hashSearch.get(key); const fbclid = read('fbclid'); const trackingParameters = { ...Object.fromEntries(['src','sck','utm_source','utm_campaign','utm_medium','utm_content','utm_term'].map(key => [key, read(key)])), fbp: cookieValue('_fbp') || null, fbc: cookieValue('_fbc') || (fbclid ? `fb.1.${Date.now()}.${fbclid}` : null), event_source_url: window.location.href };
       const result = await createPublicCheckoutSession(
         storeSlug,
         checkoutSlug,
@@ -289,6 +297,7 @@ function SessionContent({ session: initialSession, token }) {
   const [shippingOptions, setShippingOptions] = useState([]);
   const [selectedShipping, setSelectedShipping] = useState(null);
   const [payment, setPayment] = useState(null);
+  const [metaPixelId, setMetaPixelId] = useState('');
   const [delivery, setDelivery] = useState(null);
   const [copied, setCopied] = useState(false);
   const [couponCode, setCouponCode] = useState(session.couponCode || "");
@@ -351,6 +360,8 @@ function SessionContent({ session: initialSession, token }) {
         },
       ];
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const metaData = { value: session.totalCents / 100, currency: session.currency || 'BRL', content_type: 'product', content_ids: items.map(item => item.product?.publicId || item.productId).filter(Boolean), contents: items.map(item => ({ id: item.product?.publicId || item.productId || item.titleSnapshot, quantity: item.quantity, item_price: item.unitPriceCents / 100 })), num_items: itemCount };
+  useEffect(() => { const controller = new AbortController(); getPublicMetaConfig(session.publicId, token, controller.signal).then(({ pixelId }) => { if (!pixelId) return; setMetaPixelId(pixelId); loadMetaPixel(pixelId); trackMeta('PageView', {}, `${session.publicId}:PageView`); trackMeta('ViewContent', metaData, `${session.publicId}:ViewContent`); trackMeta('InitiateCheckout', metaData, `${session.publicId}:InitiateCheckout`); }).catch(() => {}); return () => controller.abort(); }, [session.publicId, token]); // eslint-disable-line react-hooks/exhaustive-deps
   const config = publicConfig(session.checkout?.publishedConfig);
   const blockOrder = (id) => Math.max(1, (Array.isArray(config.blockOrder) ? config.blockOrder : ["hero", "timer", "progress", "content"]).indexOf(id) + 1);
   const update = (field, value) =>
@@ -435,6 +446,7 @@ function SessionContent({ session: initialSession, token }) {
     getPaidDigitalDelivery(session.publicId, token, controller.signal).then(result => setDelivery(result.delivery)).catch(() => {});
     return () => controller.abort();
   }, [payment?.status, session.checkout?.product?.fulfillmentType, session.publicId, token]);
+  useEffect(() => { if (metaPixelId && String(payment?.status).toUpperCase() === 'PAID') trackMeta('Purchase', { ...metaData, value: payment.amountCents / 100, order_id: session.publicId }, `${session.publicId}:Purchase`); }, [metaPixelId, payment?.status]); // eslint-disable-line react-hooks/exhaustive-deps
   const chooseShipping = async (method) => {
     setBusy(true); setError("");
     try { const result = await selectPublicShippingMethod(session.publicId, token, method.publicId); setSelectedShipping(result); setStep(4); }
@@ -443,7 +455,7 @@ function SessionContent({ session: initialSession, token }) {
   };
   const generatePix = async () => {
     setBusy(true); setError("");
-    try { const result = await createWestPayPix(session.publicId, token); setPayment(result.payment); }
+    try { const result = await createWestPayPix(session.publicId, token); setPayment(result.payment); if (metaPixelId) trackMeta('AddPaymentInfo', { ...metaData, value: result.payment.amountCents / 100 }, `${session.publicId}:AddPaymentInfo`); }
     catch (requestError) { setError(requestError.message); }
     finally { setBusy(false); }
   };

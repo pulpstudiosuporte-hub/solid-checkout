@@ -2,7 +2,7 @@ import type { PrismaClient } from '@solid/database';
 
 export type GatewayContext = Readonly<{ storeId: string; role: 'OWNER' | 'ADMIN' | 'ANALYST' }>;
 export type PaymentProvider = 'ROAS' | 'WESTPAY';
-export type IntegrationProvider = PaymentProvider | 'UTMIFY';
+export type IntegrationProvider = PaymentProvider | 'UTMIFY' | 'META';
 type GatewayStatus = Readonly<{ active: boolean; verifiedAt: Date | null; updatedAt: Date }>;
 type GatewayCredentials = Readonly<{ apiKeyEncrypted: string; publicKeyEncrypted: string }>;
 type PaymentAttemptSummary = Readonly<{ id: string; publicId: string; provider: string; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; amountCents: number; pixCodeEncrypted: string | null; expiresAt: Date | null }>;
@@ -44,6 +44,16 @@ export class PrismaGatewayRepository {
       checkout: { select: { storeId: true, store: { select: { name: true } }, product: { select: { publicId: true, checkoutTitle: true } } } },
       items: { select: { productId: true, titleSnapshot: true, unitPriceCents: true, quantity: true, product: { select: { publicId: true } } } },
     } });
+  }
+
+  async publicTrackingStore(publicId: string, tokenHash: string): Promise<string | null> {
+    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash }, select: { checkout: { select: { storeId: true } } } });
+    return session?.checkout.storeId ?? null;
+  }
+
+  async publicTrackingSession(publicId: string, tokenHash: string): Promise<{ id: string; storeId: string } | null> {
+    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash }, select: { id: true, checkout: { select: { storeId: true } } } });
+    return session ? { id: session.id, storeId: session.checkout.storeId } : null;
   }
 
   async primaryProvider(storeId: string): Promise<PaymentProvider | null> {

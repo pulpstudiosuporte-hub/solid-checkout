@@ -5,6 +5,7 @@ import type { PrismaGatewayRepository } from './gateway-repository.js';
 import type { ShopifyRepository } from './shopify-repository.js';
 import { syncPaidShopifyOrder } from './shopify-order-sync.js';
 import { getRoasPix, RoasRequestError } from './roas-client.js';
+import { syncMetaEvent } from './meta-sync.js';
 
 const statusOf = (value: string | undefined) => {
   const status = value?.toUpperCase();
@@ -46,6 +47,7 @@ export function startRoasReconciliation(environment: AppEnvironment, gateways: P
         if (!status || !validAmount) { log.warn({ paymentAttemptId: attempt.id, providerStatus: payment?.status ?? null, providerAmount: payment?.amount ?? null, expectedAmountCents: attempt.amountCents }, 'roas_reconciliation_unrecognized_payment'); continue; }
         await gateways.confirmPayment(attempt.id, attempt.checkoutSessionId, status, status === 'PAID' ? new Date() : undefined);
         retries.delete(attempt.id);
+        if (status === 'PAID') await syncMetaEvent(environment, gateways, attempt.checkoutSessionId, 'Purchase', log);
         if (status === 'PAID') await syncPaidShopifyOrder(environment, shopify, attempt.checkoutSessionId);
       } catch (error) {
         const previous = retries.get(attempt.id)?.failures ?? 0;

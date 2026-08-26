@@ -10,13 +10,14 @@ import { createWestPayPix, findWestPayPix, getWestPayPix, WestPayRequestError } 
 import { createRoasPix, getRoasPix, RoasRequestError } from './roas-client.js';
 import { lookupBrazilianPostalCode, PostalCodeLookupError } from './postal-code.js';
 import { syncUtmifyOrder } from './utmify-sync.js';
+import { syncMetaEvent } from './meta-sync.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const slug = (value: unknown): string | null => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) && value.length <= 80 ? value : null;
 const publicId = (value: unknown): string | null => typeof value === 'string' && /^[A-Za-z0-9_-]{8,32}$/.test(value) ? value : null;
 const errorBody = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
 const digits = (value: unknown): string => typeof value === 'string' ? value.replace(/\D/g, '') : '';
-const trackingKeys = ['src', 'sck', 'utm_source', 'utm_campaign', 'utm_medium', 'utm_content', 'utm_term'] as const;
+const trackingKeys = ['src', 'sck', 'utm_source', 'utm_campaign', 'utm_medium', 'utm_content', 'utm_term', 'fbp', 'fbc', 'event_source_url'] as const;
 const trackingParameters = (value: unknown): Record<string, string | null> => { const input = typeof value === 'object' && value !== null ? value as Record<string, unknown> : {}; return Object.fromEntries(trackingKeys.map(key => [key, typeof input[key] === 'string' && input[key].trim() ? input[key].trim().slice(0, 500) : null])); };
 const brazilianPhone = (value: unknown): string => { const number = digits(value); return number.startsWith('55') ? `+${number}` : `+55${number}`; };
 const validCpf = (value: string): boolean => { if (!/^\d{11}$/.test(value) || /^(\d)\1{10}$/.test(value)) return false; const check = (length: number) => { let sum = 0; for (let index = 0; index < length; index += 1) sum += Number(value[index]) * (length + 1 - index); const mod = sum % 11; return mod < 2 ? 0 : 11 - mod; }; return check(9) === Number(value[9]) && check(10) === Number(value[10]); };
@@ -68,7 +69,8 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     const variantPublicId = request.body?.variantId === undefined ? undefined : publicId(request.body.variantId);
     if (!storeSlug || !checkoutSlug || typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1 || quantity > 1000 || request.body?.variantId !== undefined && !variantPublicId) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Itens do checkout inválidos.'));
     const token = randomBytes(32).toString('base64url');
-    const session = await catalog.createPublicCheckoutSession({ storeSlug, checkoutSlug, quantity, tokenHash: sha256(token), source: 'DIRECT', trackingParameters: trackingParameters(request.body?.trackingParameters), expiresAt: new Date(Date.now() + 30 * 60_000), ...(variantPublicId ? { variantPublicId } : {}) });
+    const sessionTracking = { ...trackingParameters(request.body?.trackingParameters), client_ip_address: request.ip, client_user_agent: String(request.headers['user-agent'] || '').slice(0, 500) };
+    const session = await catalog.createPublicCheckoutSession({ storeSlug, checkoutSlug, quantity, tokenHash: sha256(token), source: 'DIRECT', trackingParameters: sessionTracking, expiresAt: new Date(Date.now() + 30 * 60_000), ...(variantPublicId ? { variantPublicId } : {}) });
     if (!session) return reply.code(409).send(errorBody(request, 'CHECKOUT_UNAVAILABLE', 'Produto, variante ou estoque indisponível.'));
     return reply.header('cache-control', 'no-store').code(201).send({ session, token });
   });
@@ -81,6 +83,16 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     const session = await catalog.getPublicCheckoutSession(sessionId, sha256(token), new Date());
     if (!session) return reply.code(404).send(errorBody(request, 'SESSION_NOT_FOUND', 'Sessão expirada ou indisponível.'));
     return reply.header('cache-control', 'no-store').send({ session });
+  });
+
+  app.get<{ Params: { sessionId: string }; Headers: { authorization?: string } }>('/public/checkout-sessions/:sessionId/tracking/meta', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization);
+    if (!credentials || !gateways || !environment.APP_ENCRYPTION_KEY) return reply.code(401).send(errorBody(request, 'INVALID_SESSION', 'Sessão inválida.'));
+    const storeId = await gateways.publicTrackingStore(credentials.sessionId, credentials.tokenHash);
+    if (!storeId) return reply.code(404).send(errorBody(request, 'SESSION_NOT_FOUND', 'Sessão indisponível.'));
+    const meta = await gateways.credentials(storeId, 'META');
+    const pixelId = meta ? decryptSecret(meta.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) : null;
+    return reply.header('cache-control', 'no-store').send({ pixelId });
   });
 
   app.get<{ Params: { sessionId: string }; Headers: { authorization?: string } }>('/public/checkout-sessions/:sessionId/delivery', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
@@ -100,6 +112,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     const encryptedData = encryptSecret(JSON.stringify({ name, email, phone, document }), environment.APP_ENCRYPTION_KEY);
     const result = await catalog.updatePublicCheckoutCustomer(credentials.sessionId, credentials.tokenHash, new Date(), { encryptedData, emailHash: hmac(email), documentHash: hmac(document) });
     if (!result) return reply.code(404).send(errorBody(request, 'SESSION_NOT_FOUND', 'Sessão expirada ou indisponível.'));
+    if (gateways) { const tracking = await gateways.publicTrackingSession(credentials.sessionId, credentials.tokenHash); if (tracking) await syncMetaEvent(environment, gateways, tracking.id, 'InitiateCheckout', request.log); }
     return reply.header('cache-control', 'no-store').send(result);
   });
 
@@ -150,6 +163,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
         if (!transaction.id || !transaction.pixCode) throw new Error('Roas returned an incomplete PIX response');
         const expiresAt = transaction.expiresAt ? new Date(transaction.expiresAt) : null; const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pixCode, environment.APP_ENCRYPTION_KEY), expiresAt);
         await syncUtmifyOrder(environment, gateways, context.id, 'waiting_payment', request.log);
+        await syncMetaEvent(environment, gateways, context.id, 'AddPaymentInfo', request.log);
         if (shopify) { try { await syncPaidShopifyOrder(environment, shopify, context.id); } catch (error) { request.log.error({ err: error, checkoutSessionId: context.id }, 'shopify_pending_order_sync_failed'); } }
         return reply.header('cache-control', 'no-store').code(201).send({ payment: { ...saved, status: 'pending', pixCode: transaction.pixCode } });
       }
@@ -169,6 +183,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       if (!transaction.id || !transaction.pix?.qrcode) throw new Error('WestPay returned an incomplete PIX response');
       const expiresAt = transaction.pix.expiresAt ? new Date(transaction.pix.expiresAt) : null; const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pix.qrcode, environment.APP_ENCRYPTION_KEY), expiresAt);
       await syncUtmifyOrder(environment, gateways, context.id, 'waiting_payment', request.log);
+      await syncMetaEvent(environment, gateways, context.id, 'AddPaymentInfo', request.log);
       if (shopify) {
         try { await syncPaidShopifyOrder(environment, shopify, context.id); }
         catch (error) { request.log.error({ err: error, checkoutSessionId: context.id }, 'shopify_pending_order_sync_failed'); }
@@ -204,6 +219,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
           if (mapped && official && westPayAmountMatches(official.amount, verification.amountCents)) {
             await gateways.confirmPayment(verification.id, verification.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined);
             await syncUtmifyOrder(environment, gateways, verification.checkoutSessionId, mapped === 'PAID' ? 'paid' : mapped === 'REFUNDED' ? 'refunded' : 'refused', request.log);
+            if (mapped === 'PAID') await syncMetaEvent(environment, gateways, verification.checkoutSessionId, 'Purchase', request.log);
             if (mapped === 'PAID' && shopify) {
               try { await syncPaidShopifyOrder(environment, shopify, verification.checkoutSessionId); }
               catch (error) { request.log.error({ err: error, checkoutSessionId: verification.checkoutSessionId }, 'shopify_order_sync_failed'); }
@@ -241,6 +257,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
         catch (auditError) { request.log.warn({ err: auditError, providerTransactionId: objectId }, 'westpay_webhook_audit_failed'); }
         await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined);
         await syncUtmifyOrder(environment, gateways, context.checkoutSessionId, mapped === 'PAID' ? 'paid' : mapped === 'REFUNDED' ? 'refunded' : 'refused', request.log);
+        if (mapped === 'PAID') await syncMetaEvent(environment, gateways, context.checkoutSessionId, 'Purchase', request.log);
         if (mapped === 'PAID' && shopify) {
           try { await syncPaidShopifyOrder(environment, shopify, context.checkoutSessionId); }
           catch (error) { request.log.error({ err: error, checkoutSessionId: context.checkoutSessionId }, 'shopify_order_sync_failed'); }
@@ -263,7 +280,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       const official = await getRoasPix({ secretKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) }, objectId);
       if (!official || official.id !== objectId || !roasAmountMatches(official.amount, context.amountCents)) return reply.code(200).send({ received: true });
       const mapped = westPayPaymentStatus(official.status);
-      if (mapped) { try { await gateways.recordWebhookEvent(context, 'ROAS', official.status, request.id); } catch (auditError) { request.log.warn({ err: auditError, providerTransactionId: objectId }, 'roas_webhook_audit_failed'); } await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined); await syncUtmifyOrder(environment, gateways, context.checkoutSessionId, mapped === 'PAID' ? 'paid' : mapped === 'REFUNDED' ? 'refunded' : 'refused', request.log); if (mapped === 'PAID' && shopify) { try { await syncPaidShopifyOrder(environment, shopify, context.checkoutSessionId); } catch (error) { request.log.error({ err: error, checkoutSessionId: context.checkoutSessionId }, 'shopify_order_sync_failed'); } } }
+      if (mapped) { try { await gateways.recordWebhookEvent(context, 'ROAS', official.status, request.id); } catch (auditError) { request.log.warn({ err: auditError, providerTransactionId: objectId }, 'roas_webhook_audit_failed'); } await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined); await syncUtmifyOrder(environment, gateways, context.checkoutSessionId, mapped === 'PAID' ? 'paid' : mapped === 'REFUNDED' ? 'refunded' : 'refused', request.log); if (mapped === 'PAID') await syncMetaEvent(environment, gateways, context.checkoutSessionId, 'Purchase', request.log); if (mapped === 'PAID' && shopify) { try { await syncPaidShopifyOrder(environment, shopify, context.checkoutSessionId); } catch (error) { request.log.error({ err: error, checkoutSessionId: context.checkoutSessionId }, 'shopify_order_sync_failed'); } } }
       return reply.code(200).send({ received: true });
     } catch (error) {
       // A 429 is transient. Acknowledge the notification so ROAS does not add
