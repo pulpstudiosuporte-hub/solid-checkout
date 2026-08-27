@@ -6,7 +6,7 @@ export type SessionUser = Readonly<{ sessionId: string; userId: string; csrfToke
 
 export interface AuthRepository {
   findUserByEmail(email: string): Promise<LoginUser | null>;
-  createSession(input: { tokenHash: string; csrfTokenHash: string; userId: string; userAgent?: string; expiresAt: Date; absoluteExpiresAt: Date; mfaVerifiedAt?: Date }): Promise<void>;
+  createSession(input: { tokenHash: string; csrfTokenHash: string; userId: string; userAgent?: string; ipHash?: string; expiresAt: Date; absoluteExpiresAt: Date; mfaVerifiedAt?: Date }): Promise<void>;
   findActiveSession(tokenHash: string, now: Date): Promise<SessionUser | null>;
   touchSession(sessionId: string, expiresAt: Date, now: Date): Promise<void>;
   revokeSession(tokenHash: string, now: Date): Promise<void>;
@@ -18,7 +18,7 @@ export class PrismaAuthRepository implements AuthRepository {
   findUserByEmail(email: string): Promise<LoginUser | null> {
     return this.database.user.findUnique({ where: { email }, select: { id: true, publicId: true, name: true, email: true, passwordHash: true, disabledAt: true, accountStatus: true, platformAdmin: true, mfaSecretEncrypted: true, mfaEnabledAt: true } });
   }
-  async createSession(input: { tokenHash: string; csrfTokenHash: string; userId: string; userAgent?: string; expiresAt: Date; absoluteExpiresAt: Date; mfaVerifiedAt?: Date }): Promise<void> {
+  async createSession(input: { tokenHash: string; csrfTokenHash: string; userId: string; userAgent?: string; ipHash?: string; expiresAt: Date; absoluteExpiresAt: Date; mfaVerifiedAt?: Date }): Promise<void> {
     await this.database.session.create({ data: input });
   }
   async findActiveSession(tokenHash: string, now: Date): Promise<SessionUser | null> {

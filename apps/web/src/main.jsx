@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import './styles.css';
 import CheckoutEditor, { defaultCheckoutConfig } from './CheckoutEditor';
-import { archiveStore, bindTabToUser, clearTabUser, completeMfaLogin, createStore, getApiHealth, getSession, getStores, login, logout, registerAccount, selectStore, verifyAccount } from './api';
+import { archiveStore, bindTabToUser, clearTabUser, completeMfaLogin, createStore, forgotPassword, getApiHealth, getSession, getStores, login, logout, registerAccount, resetPassword, selectStore, verifyAccount } from './api';
 import Login, { SessionLoading } from './Auth';
 import DashboardPage from './DashboardPage';
 import AccountSettings from './AccountSettings';
@@ -191,7 +191,7 @@ function App(){
   if(publicMatch) return <PublicCheckoutErrorBoundary><PublicCheckout storeSlug={publicMatch[1]} checkoutSlug={publicMatch[2]}/></PublicCheckoutErrorBoundary>;
   if(sessionConflict) return <SessionConflict/>;
   if(auth.status==='checking') return <SessionLoading/>;
-  if(auth.status==='anonymous'){return <Login onSubmit={handleLogin} onMfaSubmit={handleMfaLogin} onRegister={registerAccount} onVerify={verifyAccount}/>;}
+  if(auth.status==='anonymous'){return <Login onSubmit={handleLogin} onMfaSubmit={handleMfaLogin} onRegister={registerAccount} onVerify={verifyAccount} onForgot={forgotPassword} onReset={resetPassword}/>;}
   if(window.location.hash==='#/login')window.history.replaceState({},'', '/');
   if(editor) return <CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/>;
   if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>;

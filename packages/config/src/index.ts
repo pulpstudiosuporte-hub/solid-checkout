@@ -45,6 +45,7 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): AppEnvironment {
     throw new Error('CORS_ORIGINS não pode usar localhost em produção');
   }
   if (result.data.NODE_ENV === 'production' && !result.data.DATABASE_URL) throw new Error('DATABASE_URL é obrigatória em produção');
+  if (result.data.NODE_ENV === 'production' && !result.data.APP_ENCRYPTION_KEY) throw new Error('APP_ENCRYPTION_KEY é obrigatória em produção');
   const shopifyValues = [result.data.APP_URL, result.data.SHOPIFY_CLIENT_ID, result.data.SHOPIFY_CLIENT_SECRET, result.data.SHOPIFY_REDIRECT_URI, result.data.APP_ENCRYPTION_KEY];
   if (shopifyValues.some(Boolean) && !shopifyValues.every(Boolean)) throw new Error('A configuração Shopify está incompleta');
   const dokployValues = [result.data.DOKPLOY_URL, result.data.DOKPLOY_API_KEY, result.data.DOKPLOY_CHECKOUT_APPLICATION_ID];

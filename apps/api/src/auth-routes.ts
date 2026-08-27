@@ -1,5 +1,5 @@
 import cookie from '@fastify/cookie';
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
 import type { PrismaClient } from '@solid/database';
@@ -15,6 +15,14 @@ const sha256 = (value: string): string => createHash('sha256').update(value).dig
 const randomToken = (): string => randomBytes(32).toString('base64url');
 const safeEqual = (left: string, right: string): boolean => timingSafeEqual(Buffer.from(sha256(left), 'hex'), Buffer.from(sha256(right), 'hex'));
 const errorBody = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
+const escapeHtml = (value: string): string => value.replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]!);
+
+async function sendPasswordReset(environment: AppEnvironment, email: string, name: string, rawToken: string): Promise<void> {
+  if (!environment.RESEND_API_KEY || !environment.EMAIL_FROM || !environment.APP_URL) throw new Error('Serviço de e-mail indisponível');
+  const resetUrl = `${environment.APP_URL.replace(/\/$/, '')}/#/redefinir-senha?token=${encodeURIComponent(rawToken)}`;
+  const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${environment.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': `solid-password-reset-${sha256(rawToken)}` }, body: JSON.stringify({ from: environment.EMAIL_FROM, to: [email], subject: 'Redefina sua senha no SOLID Checkout', html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#17131f"><p style="color:#7047eb;font-weight:700">SOLID CHECKOUT</p><h1>Redefinição de senha</h1><p>Olá, ${escapeHtml(name)}. Use o botão abaixo para criar uma nova senha.</p><p><a href="${resetUrl}" style="display:inline-block;padding:14px 20px;border-radius:10px;background:#7047eb;color:#fff;text-decoration:none;font-weight:700">Criar nova senha</a></p><p style="color:#686471;font-size:13px">O link expira em 20 minutos e só pode ser usado uma vez. Se você não solicitou, ignore este e-mail.</p></div>` }) });
+  if (!response.ok) throw new Error(`Resend recusou o envio (${response.status})`);
+}
 
 export function registerAuthRoutes(app: FastifyInstance, environment: AppEnvironment, repository: AuthRepository, database?: PrismaClient): void {
   const secure = environment.NODE_ENV === 'production';
@@ -40,8 +48,10 @@ export function registerAuthRoutes(app: FastifyInstance, environment: AppEnviron
   };
   const issueSession = async (request: FastifyRequest, reply: FastifyReply, user: LoginUser, mfaVerifiedAt?: Date) => {
     const now = new Date(); const token = randomToken(); const csrfToken = randomToken();
+    const ipHash = environment.APP_ENCRYPTION_KEY ? createHmac('sha256', Buffer.from(environment.APP_ENCRYPTION_KEY, 'base64')).update(request.ip).digest('hex') : undefined;
     await repository.createSession({ tokenHash: sha256(token), csrfTokenHash: sha256(csrfToken), userId: user.id,
       ...(request.headers['user-agent'] ? { userAgent: request.headers['user-agent'].slice(0, 512) } : {}),
+      ...(ipHash ? { ipHash } : {}),
       expiresAt: new Date(now.getTime() + SESSION_SECONDS * 1000), absoluteExpiresAt: new Date(now.getTime() + ABSOLUTE_SESSION_SECONDS * 1000), ...(mfaVerifiedAt ? { mfaVerifiedAt } : {}) });
     return reply.clearCookie(authCsrfCookie, cookieBase).setCookie(sessionCookie, token, { ...cookieBase, httpOnly: true, maxAge: ABSOLUTE_SESSION_SECONDS })
       .setCookie(csrfCookie, csrfToken, { ...cookieBase, httpOnly: true, maxAge: SESSION_SECONDS })
@@ -51,6 +61,37 @@ export function registerAuthRoutes(app: FastifyInstance, environment: AppEnviron
   app.get('/auth/csrf', async (_request, reply) => {
     const csrfToken = randomToken();
     return reply.setCookie(authCsrfCookie, csrfToken, { ...cookieBase, httpOnly: true, maxAge: 600 }).send({ csrfToken });
+  });
+
+  app.post<{ Body: { email?: unknown } }>('/auth/forgot-password', { config: { rateLimit: { max: 3, timeWindow: '15 minutes' } } }, async (request, reply) => {
+    if (!validAuthCsrf(request)) return reply.code(403).send(errorBody(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
+    const email = typeof request.body?.email === 'string' ? request.body.email.trim().toLowerCase() : '';
+    if (email.length > 320 || !/^\S+@\S+\.\S+$/.test(email)) return reply.code(202).send({ accepted: true });
+    const user = await repository.findUserByEmail(email);
+    if (user && !user.disabledAt && user.accountStatus === 'APPROVED' && database) {
+      const rawToken = randomToken(); const now = new Date();
+      await database.$transaction([database.passwordResetToken.updateMany({ where: { userId: user.id, usedAt: null }, data: { usedAt: now } }), database.passwordResetToken.create({ data: { userId: user.id, tokenHash: sha256(rawToken), expiresAt: new Date(now.getTime() + 20 * 60_000) } })]);
+      void sendPasswordReset(environment, user.email, user.name, rawToken).catch(error => request.log.error({ err: error }, 'password_reset_email_failed'));
+    }
+    return reply.code(202).send({ accepted: true });
+  });
+
+  app.post<{ Body: { token?: unknown; newPassword?: unknown } }>('/auth/reset-password', { config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } }, async (request, reply) => {
+    if (!validAuthCsrf(request)) return reply.code(403).send(errorBody(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
+    if (!database) return reply.code(503).send(errorBody(request, 'SERVICE_UNAVAILABLE', 'Serviço temporariamente indisponível.'));
+    const rawToken = typeof request.body?.token === 'string' ? request.body.token : ''; const newPassword = typeof request.body?.newPassword === 'string' ? request.body.newPassword : '';
+    if (rawToken.length < 32 || rawToken.length > 128 || newPassword.length < 14 || newPassword.length > 128) return reply.code(400).send(errorBody(request, 'RESET_INVALID', 'Link inválido ou expirado.'));
+    const now = new Date(); const passwordHash = await hashPassword(newPassword);
+    const reset = await database.$transaction(async transaction => {
+      const record = await transaction.passwordResetToken.findFirst({ where: { tokenHash: sha256(rawToken), usedAt: null, expiresAt: { gt: now } }, select: { id: true, userId: true } }); if (!record) return false;
+      const consumed = await transaction.passwordResetToken.updateMany({ where: { id: record.id, usedAt: null }, data: { usedAt: now } }); if (consumed.count !== 1) return false;
+      await transaction.user.update({ where: { id: record.userId }, data: { passwordHash } });
+      await transaction.session.updateMany({ where: { userId: record.userId, revokedAt: null }, data: { revokedAt: now } });
+      await transaction.mfaChallenge.deleteMany({ where: { userId: record.userId } });
+      await transaction.auditLog.create({ data: { actorType: 'USER', actorUserId: record.userId, action: 'auth.password_reset', targetType: 'user', targetId: record.userId, requestId: request.id } }); return true;
+    });
+    if (!reset) return reply.code(400).send(errorBody(request, 'RESET_INVALID', 'Link inválido ou expirado.'));
+    return reply.clearCookie(sessionCookie, cookieBase).clearCookie(csrfCookie, cookieBase).code(204).send();
   });
 
   app.post<{ Body: { email?: unknown; password?: unknown } }>('/auth/login', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => {
@@ -101,6 +142,24 @@ export function registerAuthRoutes(app: FastifyInstance, environment: AppEnviron
     const csrfToken = request.cookies[csrfCookie]; if (!csrfToken || !safeEqual(sha256(csrfToken), session.csrfTokenHash)) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     await repository.touchSession(session.sessionId, new Date(Math.min(now.getTime() + SESSION_SECONDS * 1000, session.absoluteExpiresAt.getTime())), now);
     return reply.send({ user: session.user, csrfToken });
+  });
+
+  app.get('/auth/sessions', async (request, reply) => {
+    const session = await authenticated(request); if (!session || !database) return reply.code(403).send(errorBody(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
+    const items = await database.session.findMany({ where: { userId: session.userId, revokedAt: null, absoluteExpiresAt: { gt: new Date() } }, orderBy: { lastSeenAt: 'desc' }, select: { id: true, userAgent: true, lastSeenAt: true, createdAt: true, absoluteExpiresAt: true, ipHash: true } });
+    return reply.header('cache-control', 'private, no-store').send({ items: items.map(item => ({ id: item.id, current: item.id === session.sessionId, device: item.userAgent || 'Dispositivo desconhecido', lastSeenAt: item.lastSeenAt, createdAt: item.createdAt, expiresAt: item.absoluteExpiresAt, network: item.ipHash ? item.ipHash.slice(0, 8) : null })) });
+  });
+
+  app.delete<{ Params: { sessionId: string } }>('/auth/sessions/:sessionId', async (request, reply) => {
+    const session = await authenticated(request); if (!session || !database) return reply.code(403).send(errorBody(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
+    if (request.params.sessionId === session.sessionId) return reply.code(409).send(errorBody(request, 'CURRENT_SESSION', 'Use o botão Sair para encerrar esta sessão.'));
+    await database.session.updateMany({ where: { id: request.params.sessionId, userId: session.userId, revokedAt: null }, data: { revokedAt: new Date() } }); return reply.code(204).send();
+  });
+
+  app.post('/auth/sessions/revoke-others', async (request, reply) => {
+    const session = await authenticated(request); if (!session || !database) return reply.code(403).send(errorBody(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
+    const now = new Date(); const result = await database.session.updateMany({ where: { userId: session.userId, id: { not: session.sessionId }, revokedAt: null }, data: { revokedAt: now } });
+    await database.auditLog.create({ data: { actorType: 'USER', actorUserId: session.userId, action: 'auth.sessions_revoked', targetType: 'user', targetId: session.userId, requestId: request.id, metadata: { count: result.count } } }); return reply.send({ revoked: result.count });
   });
 
   app.post('/auth/logout', async (request, reply) => {

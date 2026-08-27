@@ -12,6 +12,7 @@ import { startRoasReconciliation } from './roas-reconciliation.js';
 import { startShopifyOrderReconciliation } from './shopify-order-reconciliation.js';
 import { startConfirmationEmailDelivery } from './confirmation-email.js';
 import { startIntegrationDelivery } from './integration-delivery.js';
+import { startSecurityCleanup } from './security-cleanup.js';
 
 const environment = parseEnvironment(process.env);
 if (!environment.DATABASE_URL) throw new Error('DATABASE_URL é obrigatória para iniciar a API');
@@ -24,6 +25,7 @@ const stopRoasReconciliation = startRoasReconciliation(environment, gatewayRepos
 const stopShopifyOrderReconciliation = startShopifyOrderReconciliation(environment, shopifyRepository, app.log);
 const stopConfirmationEmailDelivery = startConfirmationEmailDelivery(environment, database, app.log);
 const stopIntegrationDelivery = startIntegrationDelivery(environment, gatewayRepository, app.log);
+const stopSecurityCleanup = startSecurityCleanup(database, app.log);
 
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, 'shutdown_started');
@@ -32,6 +34,7 @@ const shutdown = async (signal: string): Promise<void> => {
   stopShopifyOrderReconciliation();
   stopConfirmationEmailDelivery();
   stopIntegrationDelivery();
+  stopSecurityCleanup();
   await app.close();
   await database.$disconnect();
   process.exit(0);

@@ -16,7 +16,7 @@ async function fetch(input, init = {}) {
   const headers = new Headers(init.headers || {});
   const expectedUser = sessionStorage.getItem(tabUserKey);
   const url = String(input);
-  const establishesSession = /\/auth\/(csrf|login|register|verify-email)$/.test(url);
+  const establishesSession = /\/auth\/(csrf|login|register|verify-email|forgot-password|reset-password)$/.test(url);
   if (init.credentials === 'include' && expectedUser && !establishesSession) headers.set('x-solid-user-context', expectedUser);
   const response = await globalThis.fetch(input, { ...init, headers });
   if (response.status === 409) {
@@ -84,6 +84,18 @@ export async function login(email, password) {
   const result = await readJson(response);
   return result?.mfaRequired ? { ...result, authCsrfToken: csrfToken } : result;
 }
+
+async function anonymousAuthPost(path, body) {
+  const csrfResponse = await fetch(`${apiBaseUrl}/auth/csrf`, { credentials: 'include', headers: { Accept: 'application/json' } });
+  const { csrfToken } = await readJson(csrfResponse);
+  return readJson(await fetch(`${apiBaseUrl}${path}`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(body) }));
+}
+
+export async function forgotPassword(email) { return anonymousAuthPost('/auth/forgot-password', { email }); }
+export async function resetPassword(token, newPassword) { return anonymousAuthPost('/auth/reset-password', { token, newPassword }); }
+export async function getSessions(csrfToken) { return readJson(await fetch(`${apiBaseUrl}/auth/sessions`, { credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken } })); }
+export async function revokeSession(sessionId, csrfToken) { const response = await fetch(`${apiBaseUrl}/auth/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE', credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken } }); if (response.status !== 204) return readJson(response); }
+export async function revokeOtherSessions(csrfToken) { return readJson(await fetch(`${apiBaseUrl}/auth/sessions/revoke-others`, { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken } })); }
 
 export async function completeMfaLogin(challengeToken, code, authCsrfToken) {
   const response = await fetch(`${apiBaseUrl}/auth/login/mfa`, {

@@ -13,6 +13,7 @@ export type ProductListQuery = Readonly<{ search?: string; status?: 'active' | '
 export type ProductListResult = Readonly<{ items: readonly object[]; total: number }>;
 
 export interface CatalogRepository {
+  hasActiveDomain?(context: StoreContext): Promise<boolean>;
   resolveStoreContext(userId: string, sessionId: string): Promise<StoreContext | null>;
   listProducts(context: StoreContext, query: ProductListQuery): Promise<ProductListResult>;
   getProduct(context: StoreContext, publicId: string): Promise<object | null>;
@@ -65,6 +66,9 @@ const checkoutSessionExpiry = (publishedConfig: unknown, fallback: Date): Date =
 };
 
 export class PrismaCatalogRepository implements CatalogRepository {
+  async hasActiveDomain(context: StoreContext): Promise<boolean> {
+    return (await this.database.storeDomain.count({ where: { storeId: context.storeId, status: 'ACTIVE' } })) > 0;
+  }
   constructor(private readonly database: PrismaClient) {}
   async resolveStoreContext(userId: string, sessionId: string): Promise<StoreContext | null> {
     const session = await this.database.session.findFirst({ where: { id: sessionId, userId, revokedAt: null }, select: { activeStoreId: true } });
@@ -182,14 +186,14 @@ export class PrismaCatalogRepository implements CatalogRepository {
 
   getPublicCheckout(storeSlug: string, checkoutSlug: string): Promise<object | null> {
     return this.database.checkout.findFirst({
-      where: { slug: checkoutSlug, status: 'PUBLISHED', archivedAt: null, store: { slug: storeSlug, active: true }, product: { active: true } },
+      where: { slug: checkoutSlug, status: 'PUBLISHED', archivedAt: null, store: { slug: storeSlug, active: true, customDomain: { is: { status: 'ACTIVE' } } }, product: { active: true } },
       select: { publicId: true, slug: true, name: true, publishedConfig: true, store: { select: { publicId: true, name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, fulfillmentType: true, imageUrl: true, priceCents: true, compareAtCents: true, maxPerOrder: true, stockQuantity: true, trackInventory: true, variants: { where: { availableForSale: true }, orderBy: { createdAt: 'asc' }, select: { publicId: true, title: true, priceCents: true, compareAtCents: true, inventoryQuantity: true, availableForSale: true, imageUrl: true, selectedOptions: true } } } } }
     });
   }
 
   async createPublicCheckoutSession(input: CheckoutSessionInput): Promise<object | null> {
     return this.database.$transaction(async transaction => {
-      const checkout = await transaction.checkout.findFirst({ where: { slug: input.checkoutSlug, status: 'PUBLISHED', archivedAt: null, store: { slug: input.storeSlug, active: true }, product: { active: true } }, select: { id: true, productId: true, publishedConfig: true, product: { select: { publicId: true, checkoutTitle: true, fulfillmentType: true, imageUrl: true, priceCents: true, maxPerOrder: true, stockQuantity: true, trackInventory: true } } } });
+      const checkout = await transaction.checkout.findFirst({ where: { slug: input.checkoutSlug, status: 'PUBLISHED', archivedAt: null, store: { slug: input.storeSlug, active: true, customDomain: { is: { status: 'ACTIVE' } } }, product: { active: true } }, select: { id: true, productId: true, publishedConfig: true, product: { select: { publicId: true, checkoutTitle: true, fulfillmentType: true, imageUrl: true, priceCents: true, maxPerOrder: true, stockQuantity: true, trackInventory: true } } } });
       if (!checkout || input.quantity > checkout.product.maxPerOrder || (checkout.product.trackInventory && (checkout.product.stockQuantity ?? 0) < input.quantity)) return null;
       const variant = input.variantPublicId ? await transaction.productVariant.findFirst({ where: { publicId: input.variantPublicId, productId: checkout.productId, availableForSale: true }, select: { id: true, publicId: true, title: true, priceCents: true, inventoryQuantity: true, imageUrl: true } }) : null;
       if (input.variantPublicId && !variant) return null;
@@ -272,7 +276,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
 
   async createShopifyCartSession(input: ShopifyCartSessionInput): Promise<object | null> {
     return this.database.$transaction(async transaction => {
-      const connection = await transaction.shopifyConnection.findFirst({ where: { shopDomain: input.shopDomain, revokedAt: null, store: { active: true } }, select: { storeId: true, store: { select: { slug: true } } } });
+      const connection = await transaction.shopifyConnection.findFirst({ where: { shopDomain: input.shopDomain, revokedAt: null, store: { active: true, customDomain: { is: { status: 'ACTIVE' } } } }, select: { storeId: true, store: { select: { slug: true } } } });
       if (!connection) return null;
       const checkout = await transaction.checkout.findFirst({ where: { storeId: connection.storeId, slug: input.checkoutSlug, status: 'PUBLISHED', archivedAt: null }, select: { id: true, publishedConfig: true } });
       if (!checkout) return null;

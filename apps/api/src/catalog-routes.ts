@@ -199,6 +199,7 @@ export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvi
   app.post<{ Params: { checkoutId: string } }>('/checkouts/:checkoutId/publish', async (request, reply) => {
     const context = await authenticate(request, true);
     if (!context || !canWrite(context)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    if (catalog.hasActiveDomain && !(await catalog.hasActiveDomain(context))) return reply.code(409).send(errorBody(request, 'DOMAIN_REQUIRED', 'Ative um domínio seguro para publicar o checkout.'));
     const checkoutId = text(request.params.checkoutId, 32);
     if (!checkoutId) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Checkout inválido.'));
     const checkout = await catalog.publishCheckout(context, checkoutId, request.id);

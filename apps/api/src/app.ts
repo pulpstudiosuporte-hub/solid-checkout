@@ -37,7 +37,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
     genReqId: request => request.headers['x-request-id']?.toString().slice(0, 128) ?? crypto.randomUUID()
   });
 
-  void app.register(helmet, { global: true, contentSecurityPolicy: false, hsts: environment.NODE_ENV === 'production' ? { maxAge: 31_536_000, includeSubDomains: true, preload: true } : false });
+  void app.register(helmet, { global: true, contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], baseUri: ["'none'"], formAction: ["'none'"], frameAncestors: ["'none'"] } }, hsts: environment.NODE_ENV === 'production' ? { maxAge: 31_536_000, includeSubDomains: true, preload: true } : false });
   void app.register(cors, { origin: (origin, callback) => {
     if (!origin || environment.CORS_ORIGINS.includes(origin)) return callback(null, true);
     let hostname = ''; try { const url = new URL(origin); if (url.protocol !== 'https:') return callback(null, false); hostname = url.hostname.toLowerCase(); } catch { return callback(null, false); }
