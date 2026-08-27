@@ -81,6 +81,16 @@ export async function login(email, password) {
     headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken },
     body: JSON.stringify({ email, password }),
   });
+  const result = await readJson(response);
+  return result?.mfaRequired ? { ...result, authCsrfToken: csrfToken } : result;
+}
+
+export async function completeMfaLogin(challengeToken, code, authCsrfToken) {
+  const response = await fetch(`${apiBaseUrl}/auth/login/mfa`, {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': authCsrfToken },
+    body: JSON.stringify({ challengeToken, code }),
+  });
   return readJson(response);
 }
 
@@ -105,6 +115,15 @@ export async function changePassword(currentPassword, newPassword, csrfToken) {
     headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken },
     body: JSON.stringify({ currentPassword, newPassword }),
   });
+  if (response.status !== 204) await readJson(response);
+}
+
+const mfaRequest = async (path, body, csrfToken, method = 'POST') => readJson(await fetch(`${apiBaseUrl}${path}`, { method, credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, ...(body ? { body: JSON.stringify(body) } : {}) }));
+export const getMfaStatus = csrfToken => mfaRequest('/auth/mfa/status', null, csrfToken, 'GET');
+export const beginMfaSetup = (currentPassword, csrfToken) => mfaRequest('/auth/mfa/setup', { currentPassword }, csrfToken);
+export const enableMfa = (code, csrfToken) => mfaRequest('/auth/mfa/enable', { code }, csrfToken);
+export async function disableMfa(currentPassword, code, csrfToken) {
+  const response = await fetch(`${apiBaseUrl}/auth/mfa/disable`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify({ currentPassword, code }) });
   if (response.status !== 204) await readJson(response);
 }
 

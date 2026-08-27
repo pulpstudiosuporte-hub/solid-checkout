@@ -73,6 +73,9 @@ model User {
   disabledAt      DateTime?     @map("disabled_at") @db.Timestamptz(3)
   accountStatus   AccountStatus @default(PENDING) @map("account_status")
   platformAdmin   Boolean       @default(false) @map("platform_admin")
+  mfaSecretEncrypted String?    @map("mfa_secret_encrypted") @db.Text
+  mfaPendingSecretEncrypted String? @map("mfa_pending_secret_encrypted") @db.Text
+  mfaEnabledAt    DateTime?     @map("mfa_enabled_at") @db.Timestamptz(3)
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
   memberships     StoreMember[]
@@ -80,6 +83,8 @@ model User {
   auditLogs       AuditLog[]
   shopifyOAuthStates ShopifyOAuthState[]
   notificationStates NotificationState[]
+  mfaChallenges   MfaChallenge[]
+  mfaRecoveryCodes MfaRecoveryCode[]
 
   @@index([accountStatus, createdAt(sort: Desc)])
   @@map("users")
@@ -553,6 +558,7 @@ model Session {
   expiresAt       DateTime @map("expires_at") @db.Timestamptz(3)
   absoluteExpiresAt DateTime @map("absolute_expires_at") @db.Timestamptz(3)
   revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(3)
+  mfaVerifiedAt   DateTime? @map("mfa_verified_at") @db.Timestamptz(3)
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   activeMembership StoreMember? @relation(fields: [activeStoreId, userId], references: [storeId, userId], onDelete: Restrict)
@@ -560,6 +566,33 @@ model Session {
   @@index([userId, revokedAt])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+model MfaChallenge {
+  id          String    @id @default(uuid()) @db.Uuid
+  tokenHash   String    @unique @map("token_hash") @db.Char(64)
+  userId      String    @map("user_id") @db.Uuid
+  attempts    Int       @default(0)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(3)
+  consumedAt  DateTime? @map("consumed_at") @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("mfa_challenges")
+}
+
+model MfaRecoveryCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  codeHash  String    @map("code_hash") @db.Char(64)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, codeHash])
+  @@index([userId, usedAt])
+  @@map("mfa_recovery_codes")
 }
 
 model AuditLog {

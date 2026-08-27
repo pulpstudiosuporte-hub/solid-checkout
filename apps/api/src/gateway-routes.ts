@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
 import type { AuthRepository, SessionUser } from './auth-repository.js';
 import type { PrismaGatewayRepository } from './gateway-repository.js';
@@ -17,6 +17,11 @@ export function registerGatewayRoutes(app: FastifyInstance, environment: AppEnvi
   const secure = environment.NODE_ENV === 'production'; const sessionCookie = secure ? '__Host-solid_session' : 'solid_session'; const csrfCookie = secure ? '__Host-solid_csrf' : 'solid_csrf';
   const session = async (request: FastifyRequest): Promise<SessionUser | null> => { const token = request.cookies[sessionCookie]; return token ? auth.findActiveSession(sha256(token), new Date()) : null; };
   const csrfValid = (request: FastifyRequest, current: SessionUser) => { const origin = request.headers.origin; const cookie = request.cookies[csrfCookie]; const header = request.headers['x-csrf-token']; return typeof origin === 'string' && environment.CORS_ORIGINS.includes(origin) && Boolean(cookie) && typeof header === 'string' && equal(sha256(cookie!), sha256(header)) && equal(sha256(header), current.csrfTokenHash); };
+  const mfaRequired = (request: FastifyRequest, reply: FastifyReply, current: SessionUser) => {
+    if (current.user.mfaEnabled === false) return reply.code(403).send(errorBody(request, 'MFA_SETUP_REQUIRED', 'Ative o aplicativo autenticador em Configurações para administrar credenciais.'));
+    if (current.user.mfaEnabled === true && !current.mfaVerifiedAt) return reply.code(403).send(errorBody(request, 'MFA_VERIFICATION_REQUIRED', 'Entre novamente e confirme o segundo fator.'));
+    return null;
+  };
 
   app.get('/integrations/westpay/status', async (request, reply) => {
     const current = await session(request); if (!current) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
@@ -54,6 +59,7 @@ export function registerGatewayRoutes(app: FastifyInstance, environment: AppEnvi
 
   app.put<{ Body: { apiKey?: unknown; publicKey?: unknown } }>('/integrations/westpay', { config: { rateLimit: { max: 5, timeWindow: '5 minutes' } } }, async (request, reply) => {
     const current = await session(request); if (!current || !csrfValid(request, current)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    if (mfaRequired(request, reply, current)) return;
     const context = await repository.context(current.userId, current.sessionId); if (!context || context.role === 'ANALYST') return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Somente proprietários e administradores podem conectar gateways.'));
     if (!environment.APP_ENCRYPTION_KEY) return reply.code(503).send(errorBody(request, 'SERVICE_UNAVAILABLE', 'Criptografia indisponível.'));
     const apiKey = typeof request.body?.apiKey === 'string' ? request.body.apiKey.trim() : ''; const publicKey = typeof request.body?.publicKey === 'string' ? request.body.publicKey.trim() : '';
@@ -65,6 +71,7 @@ export function registerGatewayRoutes(app: FastifyInstance, environment: AppEnvi
 
   app.put<{ Body: { secretKey?: unknown; publicKey?: unknown } }>('/integrations/roas', { config: { rateLimit: { max: 5, timeWindow: '5 minutes' } } }, async (request, reply) => {
     const current = await session(request); if (!current || !csrfValid(request, current)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    if (mfaRequired(request, reply, current)) return;
     const context = await repository.context(current.userId, current.sessionId); if (!context || context.role === 'ANALYST') return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Somente proprietários e administradores podem conectar gateways.'));
     if (!environment.APP_ENCRYPTION_KEY) return reply.code(503).send(errorBody(request, 'SERVICE_UNAVAILABLE', 'Criptografia indisponível.'));
     const secretKey = typeof request.body?.secretKey === 'string' ? request.body.secretKey.trim() : ''; const publicKey = typeof request.body?.publicKey === 'string' ? request.body.publicKey.trim() : '';

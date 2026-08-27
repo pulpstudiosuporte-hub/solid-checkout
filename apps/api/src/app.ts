@@ -61,7 +61,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
       }
     });
   }
-  if (dependencies.authRepository) registerAuthRoutes(app, environment, dependencies.authRepository);
+  if (dependencies.authRepository) registerAuthRoutes(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.database) registerRegistrationRoutes(app, environment, dependencies.database);
   if (dependencies.authRepository && dependencies.database) registerDashboardRoutes(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.database) registerAdminUserRoutes(app, environment, dependencies.authRepository, dependencies.database);

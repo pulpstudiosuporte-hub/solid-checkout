@@ -45,7 +45,7 @@ describe('autenticação administrativa', () => {
     const csrfToken = csrf.json<{ csrfToken: string }>().csrfToken; const csrfCookie = cookiePair(csrf.headers['set-cookie'], 'solid_auth_csrf');
     const login = await app.inject({ method: 'POST', url: '/auth/login', headers: { origin, cookie: csrfCookie, 'x-csrf-token': csrfToken }, payload: { email: 'OWNER@example.com', password: 'correct horse battery staple' } });
     await app.close();
-    expect(login.statusCode).toBe(200); expect(login.json<{ user: unknown }>().user).toEqual({ id: 'public-user-id', publicId: 'public-user-id', name: 'Owner', email: 'owner@example.com', accountStatus: 'APPROVED', platformAdmin: false });
+    expect(login.statusCode).toBe(200); expect(login.json<{ user: unknown }>().user).toEqual({ id: 'public-user-id', publicId: 'public-user-id', name: 'Owner', email: 'owner@example.com', accountStatus: 'APPROVED', platformAdmin: false, mfaEnabled: false });
     expect(cookiePair(login.headers['set-cookie'], 'solid_session')).toMatch(/^solid_session=/);
     expect(String(login.headers['set-cookie'])).toContain('HttpOnly'); expect(String(login.headers['set-cookie'])).toContain('SameSite=Strict');
   });

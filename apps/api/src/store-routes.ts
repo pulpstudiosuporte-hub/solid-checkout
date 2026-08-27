@@ -1,6 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { resolveCname } from 'node:dns/promises';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
 import type { AuthRepository, SessionUser } from './auth-repository.js';
 import type { StoreRepository } from './store-repository.js';
@@ -25,6 +25,11 @@ export function registerStoreRoutes(app: FastifyInstance, environment: AppEnviro
       if (typeof origin !== 'string' || !environment.CORS_ORIGINS.includes(origin) || !cookieToken || typeof headerToken !== 'string' || !safeEqual(cookieToken, headerToken) || !safeEqual(sha256(headerToken), session.csrfTokenHash)) return null;
     }
     return session;
+  };
+  const ensureMfa = (request: FastifyRequest, reply: FastifyReply, session: SessionUser) => {
+    if (session.user.mfaEnabled === false) return reply.code(403).send(errorBody(request, 'MFA_SETUP_REQUIRED', 'Ative o aplicativo autenticador em Configurações para administrar domínios.'));
+    if (session.user.mfaEnabled === true && !session.mfaVerifiedAt) return reply.code(403).send(errorBody(request, 'MFA_VERIFICATION_REQUIRED', 'Entre novamente e confirme o segundo fator.'));
+    return null;
   };
 
   app.get('/stores', async (request, reply) => {
@@ -67,6 +72,7 @@ export function registerStoreRoutes(app: FastifyInstance, environment: AppEnviro
 
   app.put<{ Body: { hostname?: unknown } }>('/store-domain', async (request, reply) => {
     const session = await authenticate(request, true); if (!session) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    if (ensureMfa(request, reply, session)) return;
     const hostname = typeof request.body?.hostname === 'string' ? normaliseHostname(request.body.hostname) : '';
     if (!validCheckoutHostname(hostname)) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Use um subdomínio válido, como checkout.sualoja.com.'));
     try {
@@ -83,6 +89,7 @@ export function registerStoreRoutes(app: FastifyInstance, environment: AppEnviro
 
   app.post<{ Params: { domainId: string } }>('/store-domain/:domainId/verify', async (request, reply) => {
     const session = await authenticate(request, true); if (!session) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    if (ensureMfa(request, reply, session)) return;
     const current = await stores.getDomainForUser(session.userId, session.sessionId);
     if (!current || current.publicId !== request.params.domainId) return reply.code(404).send(errorBody(request, 'DOMAIN_NOT_FOUND', 'Domínio não encontrado.'));
     let verified = false;
@@ -102,6 +109,7 @@ export function registerStoreRoutes(app: FastifyInstance, environment: AppEnviro
 
   app.delete<{ Params: { domainId: string } }>('/store-domain/:domainId', async (request, reply) => {
     const session = await authenticate(request, true); if (!session) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    if (ensureMfa(request, reply, session)) return;
     const current = await stores.getDomainForUser(session.userId, session.sessionId);
     if (!current || current.publicId !== request.params.domainId) return reply.code(404).send(errorBody(request, 'DOMAIN_NOT_FOUND', 'Domínio não encontrado.'));
     if (current.dokployDomainId && dokploy) { try { await dokploy.deleteCheckoutDomain(current.dokployDomainId); } catch (error) { request.log.error({ err: error, hostname: current.hostname }, 'dokploy_domain_deletion_failed'); return reply.code(502).send(errorBody(request, 'DOMAIN_DELETION_FAILED', 'Não foi possível remover a rota do checkout. Tente novamente.')); } }

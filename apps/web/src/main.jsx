@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import './styles.css';
 import CheckoutEditor, { defaultCheckoutConfig } from './CheckoutEditor';
-import { archiveStore, bindTabToUser, clearTabUser, createStore, getApiHealth, getSession, getStores, login, logout, registerAccount, selectStore, verifyAccount } from './api';
+import { archiveStore, bindTabToUser, clearTabUser, completeMfaLogin, createStore, getApiHealth, getSession, getStores, login, logout, registerAccount, selectStore, verifyAccount } from './api';
 import Login, { SessionLoading } from './Auth';
 import DashboardPage from './DashboardPage';
 import AccountSettings from './AccountSettings';
@@ -180,7 +180,9 @@ function App(){
   useEffect(()=>{const navigate=event=>typeof event.detail==='string'&&setPage(event.detail);window.addEventListener('solid:navigate',navigate);return()=>window.removeEventListener('solid:navigate',navigate)},[]);
   const publicMatch = window.location.pathname.match(/^\/c\/([a-z0-9-]+)\/([a-z0-9-]+)\/?$/) || window.location.hash.match(/^#\/c\/([a-z0-9-]+)\/([a-z0-9-]+)\/?$/);
   const publicSessionMatch = window.location.hash.match(/^#\/session\/([A-Za-z0-9_-]{8,32})/); const publicSessionToken = new URLSearchParams(window.location.hash.split('?')[1] || '').get('token');
-  async function handleLogin(email,password){const result=await login(email,password);const userId=result.user.publicId||result.user.id;bindTabToUser(userId);const channel=typeof BroadcastChannel!=='undefined'?new BroadcastChannel('solid-auth'):null;channel?.postMessage({type:'auth-changed',userId});channel?.close();setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken}); window.history.replaceState({},'', '/');}
+  function finishLogin(result){const userId=result.user.publicId||result.user.id;bindTabToUser(userId);const channel=typeof BroadcastChannel!=='undefined'?new BroadcastChannel('solid-auth'):null;channel?.postMessage({type:'auth-changed',userId});channel?.close();setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken});window.history.replaceState({},'', '/');}
+  async function handleLogin(email,password){const result=await login(email,password);if(!result.mfaRequired)finishLogin(result);return result;}
+  async function handleMfaLogin(challengeToken,code,authCsrfToken){const result=await completeMfaLogin(challengeToken,code,authCsrfToken);finishLogin(result);return result;}
   async function handleLogout(){try{await logout(auth.csrfToken);}finally{clearTabUser();const channel=typeof BroadcastChannel!=='undefined'?new BroadcastChannel('solid-auth'):null;channel?.postMessage({type:'auth-changed',userId:null});channel?.close();setAuth({status:'anonymous',user:null,csrfToken:null});setStores([]);setCheckout(false);setEditor(false);window.history.replaceState({},'', '/#/login');}}
   async function handleSelectStore(storeId){setStoreBusy(true);try{await selectStore(storeId,auth.csrfToken);setStores(current=>current.map(store=>({...store,active:store.publicId===storeId})));setPage('Visão geral');}finally{setStoreBusy(false)}}
   async function handleCreateStore(name){setStoreBusy(true);try{const result=await createStore(name,auth.csrfToken);setStores(current=>[...current.map(store=>({...store,active:false})),result.store]);setPage('Visão geral');}finally{setStoreBusy(false)}}
@@ -189,7 +191,7 @@ function App(){
   if(publicMatch) return <PublicCheckoutErrorBoundary><PublicCheckout storeSlug={publicMatch[1]} checkoutSlug={publicMatch[2]}/></PublicCheckoutErrorBoundary>;
   if(sessionConflict) return <SessionConflict/>;
   if(auth.status==='checking') return <SessionLoading/>;
-  if(auth.status==='anonymous'){return <Login onSubmit={handleLogin} onRegister={registerAccount} onVerify={verifyAccount}/>;}
+  if(auth.status==='anonymous'){return <Login onSubmit={handleLogin} onMfaSubmit={handleMfaLogin} onRegister={registerAccount} onVerify={verifyAccount}/>;}
   if(window.location.hash==='#/login')window.history.replaceState({},'', '/');
   if(editor) return <CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/>;
   if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>;

@@ -1,49 +1,31 @@
-import React, { useState } from 'react';
-import { CheckCircle2, Eye, EyeOff, KeyRound, LoaderCircle, ShieldCheck } from 'lucide-react';
-import { changePassword } from './api';
+import React, { useEffect, useState } from 'react';
+import { CheckCircle2, Copy, Eye, EyeOff, KeyRound, LoaderCircle, ShieldCheck, Smartphone } from 'lucide-react';
+import { beginMfaSetup, changePassword, disableMfa, enableMfa, getMfaStatus } from './api';
 
 function PasswordInput({ id, label, value, onChange, autoComplete }) {
   const [visible, setVisible] = useState(false);
-  return <label className="settings-field" htmlFor={id}><span>{label}</span><div className="settings-password"><input id={id} type={visible ? 'text' : 'password'} value={value} onChange={event => onChange(event.target.value)} autoComplete={autoComplete} required/><button type="button" onClick={() => setVisible(current => !current)} aria-label={visible ? `Ocultar ${label.toLowerCase()}` : `Mostrar ${label.toLowerCase()}`} aria-pressed={visible}>{visible ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div></label>;
+  return <label className="settings-field" htmlFor={id}><span>{label}</span><div className="settings-password"><input id={id} type={visible ? 'text' : 'password'} value={value} onChange={event => onChange(event.target.value)} autoComplete={autoComplete} required/><button type="button" onClick={() => setVisible(current => !current)} aria-label={visible ? `Ocultar ${label.toLowerCase()}` : `Mostrar ${label.toLowerCase()}`}>{visible ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div></label>;
 }
 
 export default function AccountSettings({ csrfToken }) {
-  const [form, setForm] = useState({ current: '', next: '', confirm: '' });
-  const [status, setStatus] = useState({ type: 'idle', message: '' });
+  const [form, setForm] = useState({ current: '', next: '', confirm: '' }); const [status, setStatus] = useState({ type: 'idle', message: '' });
+  const [mfa, setMfa] = useState({ loading: true, enabled: false, recoveryCodesRemaining: 0 }); const [mfaStep, setMfaStep] = useState('status');
+  const [mfaForm, setMfaForm] = useState({ password: '', code: '' }); const [setup, setSetup] = useState(null); const [recoveryCodes, setRecoveryCodes] = useState([]); const [mfaMessage, setMfaMessage] = useState('');
   const valid = form.current && form.next.length >= 14 && form.next === form.confirm;
 
-  async function submit(event) {
-    event.preventDefault();
-    if (!valid || status.type === 'loading') return;
-    setStatus({ type: 'loading', message: '' });
-    try {
-      await changePassword(form.current, form.next, csrfToken);
-      setForm({ current: '', next: '', confirm: '' });
-      setStatus({ type: 'success', message: 'Senha alterada. As outras sessões foram desconectadas.' });
-    } catch (error) {
-      const messages = {
-        CURRENT_PASSWORD_INVALID: 'A senha atual está incorreta.',
-        PASSWORD_UNCHANGED: 'Escolha uma senha diferente da atual.',
-        PASSWORD_INVALID: 'A nova senha deve ter entre 14 e 128 caracteres.',
-      };
-      setStatus({ type: 'error', message: messages[error?.code] || 'Não foi possível alterar a senha. Tente novamente.' });
-    }
-  }
+  useEffect(() => { let active = true; getMfaStatus(csrfToken).then(result => active && setMfa({ loading: false, ...result })).catch(() => active && setMfa(current => ({ ...current, loading: false }))); return () => { active = false; }; }, [csrfToken]);
+  async function submit(event) { event.preventDefault(); if (!valid || status.type === 'loading') return; setStatus({ type: 'loading', message: '' }); try { await changePassword(form.current, form.next, csrfToken); setForm({ current: '', next: '', confirm: '' }); setStatus({ type: 'success', message: 'Senha alterada. As outras sessões foram desconectadas.' }); } catch (error) { const messages = { CURRENT_PASSWORD_INVALID: 'A senha atual está incorreta.', PASSWORD_UNCHANGED: 'Escolha uma senha diferente da atual.', PASSWORD_INVALID: 'A nova senha deve ter entre 14 e 128 caracteres.' }; setStatus({ type: 'error', message: messages[error?.code] || 'Não foi possível alterar a senha. Tente novamente.' }); } }
+  async function startMfa() { setMfaMessage(''); try { const result = await beginMfaSetup(mfaForm.password, csrfToken); setSetup(result); setMfaForm(current => ({ ...current, password: '', code: '' })); setMfaStep('verify'); } catch (error) { setMfaMessage(error?.code === 'CURRENT_PASSWORD_INVALID' ? 'A senha atual está incorreta.' : 'Não foi possível iniciar a configuração.'); } }
+  async function confirmMfa() { setMfaMessage(''); try { const result = await enableMfa(mfaForm.code, csrfToken); setRecoveryCodes(result.recoveryCodes); setMfa({ loading: false, enabled: true, recoveryCodesRemaining: result.recoveryCodes.length }); setMfaStep('recovery'); setMfaForm({ password: '', code: '' }); } catch { setMfaMessage('Código inválido. Aguarde o próximo código do autenticador e tente novamente.'); } }
+  async function turnOffMfa() { setMfaMessage(''); try { await disableMfa(mfaForm.password, mfaForm.code, csrfToken); setMfa({ loading: false, enabled: false, recoveryCodesRemaining: 0 }); setMfaForm({ password: '', code: '' }); setMfaStep('status'); setMfaMessage('Segundo fator desativado. As outras sessões foram encerradas.'); } catch { setMfaMessage('Não foi possível desativar. Confira a senha e o código atual.'); } }
+  const copySetup = () => navigator.clipboard.writeText(setup?.secret || ''); const copyRecovery = () => navigator.clipboard.writeText(recoveryCodes.join('\n'));
 
-  return <main className="page settings-page">
-    <section className="page-title"><div><p className="eyebrow">MINHA CONTA</p><h1>Configurações</h1><p>Gerencie a segurança do seu acesso ao SOLID.</p></div></section>
-    <section className="settings-grid">
-      <form className="card password-card" onSubmit={submit}>
-        <div className="settings-heading"><span><KeyRound size={22}/></span><div><h2>Alterar senha</h2><p>Use uma senha exclusiva que você não utiliza em outros serviços.</p></div></div>
-        <PasswordInput id="current-password" label="Senha atual" value={form.current} onChange={current => setForm({...form,current})} autoComplete="current-password"/>
-        <PasswordInput id="new-password" label="Nova senha" value={form.next} onChange={next => setForm({...form,next})} autoComplete="new-password"/>
-        <small className={form.next && form.next.length < 14 ? 'password-rule invalid' : 'password-rule'}>Mínimo de 14 caracteres</small>
-        <PasswordInput id="confirm-password" label="Confirmar nova senha" value={form.confirm} onChange={confirm => setForm({...form,confirm})} autoComplete="new-password"/>
-        {form.confirm && form.next !== form.confirm && <p className="settings-alert error" role="alert">As senhas não coincidem.</p>}
-        {status.message && <p className={`settings-alert ${status.type}`} role="status">{status.type === 'success' && <CheckCircle2 size={17}/>} {status.message}</p>}
-        <button className="primary settings-submit" type="submit" disabled={!valid || status.type === 'loading'}>{status.type === 'loading' ? <><LoaderCircle className="spin" size={18}/> Alterando...</> : 'Salvar nova senha'}</button>
-      </form>
-      <aside className="card security-note"><span><ShieldCheck size={25}/></span><h2>Proteção da conta</h2><p>Ao alterar sua senha, todas as outras sessões abertas serão encerradas. Este dispositivo continuará conectado.</p><ul><li>Não reutilize senhas</li><li>Evite dados pessoais</li><li>Prefira um gerenciador de senhas</li></ul></aside>
+  return <main className="page settings-page"><section className="page-title"><div><p className="eyebrow">MINHA CONTA</p><h1>Configurações</h1><p>Gerencie a segurança do seu acesso ao SOLID.</p></div></section><section className="settings-grid">
+    <form className="card password-card" onSubmit={submit}><div className="settings-heading"><span><KeyRound size={22}/></span><div><h2>Alterar senha</h2><p>Use uma senha exclusiva que você não utiliza em outros serviços.</p></div></div><PasswordInput id="current-password" label="Senha atual" value={form.current} onChange={current => setForm({...form,current})} autoComplete="current-password"/><PasswordInput id="new-password" label="Nova senha" value={form.next} onChange={next => setForm({...form,next})} autoComplete="new-password"/><small className={form.next && form.next.length < 14 ? 'password-rule invalid' : 'password-rule'}>Mínimo de 14 caracteres</small><PasswordInput id="confirm-password" label="Confirmar nova senha" value={form.confirm} onChange={confirm => setForm({...form,confirm})} autoComplete="new-password"/>{form.confirm && form.next !== form.confirm && <p className="settings-alert error">As senhas não coincidem.</p>}{status.message && <p className={`settings-alert ${status.type}`}>{status.type === 'success' && <CheckCircle2 size={17}/>} {status.message}</p>}<button className="primary settings-submit" type="submit" disabled={!valid || status.type === 'loading'}>{status.type === 'loading' ? <><LoaderCircle className="spin" size={18}/> Alterando...</> : 'Salvar nova senha'}</button></form>
+    <section className="card password-card mfa-card"><div className="settings-heading"><span><Smartphone size={22}/></span><div><h2>Aplicativo autenticador</h2><p>Proteja gateway, domínios e sua operação mesmo se a senha vazar.</p></div></div>
+      {mfa.loading ? <p><LoaderCircle className="spin" size={18}/> Verificando...</p> : mfaStep === 'recovery' ? <><p className="settings-alert success"><CheckCircle2 size={17}/> MFA ativado. Salve estes códigos agora; eles não serão exibidos novamente.</p><div className="mfa-recovery-list">{recoveryCodes.map(code => <code key={code}>{code}</code>)}</div><button className="secondary" type="button" onClick={copyRecovery}><Copy size={17}/> Copiar códigos</button><button className="primary settings-submit" type="button" onClick={() => { setRecoveryCodes([]); setMfaStep('status'); }}>Já salvei os códigos</button></> : mfa.enabled ? <><p className="settings-alert success"><CheckCircle2 size={17}/> Segundo fator ativo. {mfa.recoveryCodesRemaining} códigos de recuperação disponíveis.</p><PasswordInput id="disable-mfa-password" label="Senha atual" value={mfaForm.password} onChange={password => setMfaForm({...mfaForm,password})} autoComplete="current-password"/><label className="settings-field"><span>Código do autenticador</span><input value={mfaForm.code} onChange={event => setMfaForm({...mfaForm,code:event.target.value})} inputMode="numeric" autoComplete="one-time-code"/></label><button className="secondary" type="button" disabled={!mfaForm.password || mfaForm.code.length < 6} onClick={turnOffMfa}>Desativar segundo fator</button></> : mfaStep === 'verify' && setup ? <><p>Adicione uma conta no Google Authenticator, Microsoft Authenticator ou 1Password usando esta chave:</p><div className="mfa-secret"><code>{setup.secret}</code><button type="button" onClick={copySetup} aria-label="Copiar chave"><Copy size={17}/></button></div><small>Emissor: {setup.issuer} · Conta: {setup.account}</small><label className="settings-field"><span>Código de 6 dígitos</span><input autoFocus value={mfaForm.code} onChange={event => setMfaForm({...mfaForm,code:event.target.value.replace(/\D/g,'').slice(0,6)})} inputMode="numeric" autoComplete="one-time-code" placeholder="000000"/></label><button className="primary settings-submit" type="button" disabled={mfaForm.code.length !== 6} onClick={confirmMfa}>Confirmar e ativar</button></> : <><PasswordInput id="mfa-password" label="Confirme sua senha" value={mfaForm.password} onChange={password => setMfaForm({...mfaForm,password})} autoComplete="current-password"/><button className="primary settings-submit" type="button" disabled={!mfaForm.password} onClick={startMfa}>Configurar autenticador</button></>}
+      {mfaMessage && <p className="settings-alert" role="status">{mfaMessage}</p>}
     </section>
-  </main>;
+    <aside className="card security-note"><span><ShieldCheck size={25}/></span><h2>Proteção da conta</h2><p>O segundo fator é recomendado para todos e obrigatório antes de administrar credenciais e infraestrutura.</p><ul><li>Não reutilize senhas</li><li>Guarde os códigos de recuperação</li><li>Prefira um gerenciador de senhas</li></ul></aside>
+  </section></main>;
 }
