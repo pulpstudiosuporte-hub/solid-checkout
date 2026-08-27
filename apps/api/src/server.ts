@@ -11,6 +11,7 @@ import { startWestPayReconciliation } from './westpay-reconciliation.js';
 import { startRoasReconciliation } from './roas-reconciliation.js';
 import { startShopifyOrderReconciliation } from './shopify-order-reconciliation.js';
 import { startConfirmationEmailDelivery } from './confirmation-email.js';
+import { startIntegrationDelivery } from './integration-delivery.js';
 
 const environment = parseEnvironment(process.env);
 if (!environment.DATABASE_URL) throw new Error('DATABASE_URL é obrigatória para iniciar a API');
@@ -22,6 +23,7 @@ const stopWestPayReconciliation = startWestPayReconciliation(environment, gatewa
 const stopRoasReconciliation = startRoasReconciliation(environment, gatewayRepository, shopifyRepository, app.log);
 const stopShopifyOrderReconciliation = startShopifyOrderReconciliation(environment, shopifyRepository, app.log);
 const stopConfirmationEmailDelivery = startConfirmationEmailDelivery(environment, database, app.log);
+const stopIntegrationDelivery = startIntegrationDelivery(environment, gatewayRepository, app.log);
 
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, 'shutdown_started');
@@ -29,6 +31,7 @@ const shutdown = async (signal: string): Promise<void> => {
   stopRoasReconciliation();
   stopShopifyOrderReconciliation();
   stopConfirmationEmailDelivery();
+  stopIntegrationDelivery();
   await app.close();
   await database.$disconnect();
   process.exit(0);

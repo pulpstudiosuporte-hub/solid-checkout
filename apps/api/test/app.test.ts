@@ -10,6 +10,10 @@ describe('API foundation', () => {
     const app = buildApp(env); const response = await app.inject({ method: 'GET', url: '/health/live' }); await app.close();
     expect(response.statusCode).toBe(200); expect(response.json()).toMatchObject({ status: 'ok', service: 'solid-api' });
   });
+  it('nao declara prontidao quando o banco nao esta disponivel', async () => {
+    const app = buildApp(env); const response = await app.inject({ method: 'GET', url: '/health/ready' }); await app.close();
+    expect(response.statusCode).toBe(503); expect(response.json()).toMatchObject({ status: 'error', database: 'unavailable' });
+  });
   it('aplica headers de proteção', async () => {
     const app = buildApp(env); const response = await app.inject({ method: 'GET', url: '/health/live' }); await app.close();
     expect(response.headers['x-content-type-options']).toBe('nosniff'); expect(response.headers['x-frame-options']).toBe('SAMEORIGIN');

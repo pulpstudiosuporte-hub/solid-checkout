@@ -5,7 +5,7 @@ import {
   CircleDollarSign, Clock3, Copy, CreditCard, Eye, FileText,
   Globe2, Home, LayoutTemplate, Link2, Menu, Package, PanelLeftClose, Plug, Plus,
   Search, Settings, ShieldCheck, ShoppingBag, ShoppingCart, Sparkles, Store,
-  Tag, TrendingUp, Truck, Users, X, Zap, LogOut
+  Tag, TrendingUp, Truck, Users, X, Zap, LogOut, ServerCog
 } from 'lucide-react';
 import './styles.css';
 import CheckoutEditor, { defaultCheckoutConfig } from './CheckoutEditor';
@@ -27,6 +27,7 @@ import DomainsPage from './DomainsPage';
 import AdminUsersPage from './AdminUsersPage';
 import CouponsPage from './CouponsPage';
 import NotificationCenter from './NotificationCenter';
+import AdminOperationsPage from './AdminOperationsPage';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -54,7 +55,7 @@ const roleLabels = { OWNER: 'Proprietário', ADMIN: 'Administrador', ANALYST: 'A
 
 function Sidebar({ open, onClose, page, setPage, user, onLogout, stores, storeBusy, onSelectStore, onCreateStore, onArchiveStore }) {
   const activeRole = stores.find(store => store.active)?.role;
-  const visibleNav = user?.platformAdmin ? [...nav, { label: 'Usuários', icon: Users }] : nav;
+  const visibleNav = user?.platformAdmin ? [...nav, { label: 'Usuários', icon: Users }, { label: 'Operações', icon: ServerCog }] : nav;
   return <>
     {open && <button className="backdrop" onClick={onClose} aria-label="Fechar menu" />}
     <aside className={`sidebar ${open ? 'open' : ''}`}>
@@ -193,7 +194,7 @@ function App(){
   if(editor) return <CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/>;
   if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>;
   const activeStore=stores.find(store=>store.active);
-  const pageContent=page==='Visão geral'?<Dashboard setPage={setPage} storeKey={activeStore?.publicId}/>:page==='Pedidos'?<OrdersPage storeKey={activeStore?.publicId}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Gateways'?<GatewaysPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Domínios'?<DomainsPage csrfToken={auth.csrfToken}/>:page==='Produtos'?<ProductsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onOpenIntegrations={()=>setPage('Integrações')}/>:page==='Order bumps'?<OrderBumpsPage csrfToken={auth.csrfToken}/>:page==='Cupons'?<CouponsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>;
+  const pageContent=page==='Visão geral'?<Dashboard setPage={setPage} storeKey={activeStore?.publicId}/>:page==='Pedidos'?<OrdersPage storeKey={activeStore?.publicId}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Operações'?<AdminOperationsPage csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Gateways'?<GatewaysPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Domínios'?<DomainsPage csrfToken={auth.csrfToken}/>:page==='Produtos'?<ProductsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onOpenIntegrations={()=>setPage('Integrações')}/>:page==='Order bumps'?<OrderBumpsPage csrfToken={auth.csrfToken}/>:page==='Cupons'?<CouponsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>;
   return <div className="app"><Sidebar open={sidebar} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout} stores={stores} storeBusy={storeBusy} onSelectStore={handleSelectStore} onCreateStore={handleCreateStore} onArchiveStore={handleArchiveStore}/><div className="main-shell"><Header toggleSidebar={()=>setSidebar(true)} apiStatus={apiStatus} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onNavigate={setPage}/><PageErrorBoundary routeKey={`${activeStore?.publicId || 'store'}:${page}`} onHome={()=>setPage('Visão geral')}>{pageContent}</PageErrorBoundary></div></div>
 }
 

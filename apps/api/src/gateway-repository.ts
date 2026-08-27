@@ -9,6 +9,7 @@ type PaymentAttemptSummary = Readonly<{ id: string; publicId: string; provider: 
 type CompletedAttempt = Readonly<{ publicId: string; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; amountCents: number; expiresAt: Date | null }>;
 type WebhookContext = Readonly<{ id: string; publicId: string; checkoutSessionId: string; amountCents: number; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; session: { checkout: { storeId: string } } }>;
 export type PendingPaymentVerification = Readonly<{ id: string; checkoutSessionId: string; providerTransactionId: string; amountCents: number; createdAt: Date; session: { checkout: { storeId: string } } }>;
+export type PendingIntegrationDelivery = Readonly<{ id: string; publicId: string; checkoutSessionId: string; provider: string; event: string; attempts: number }>;
 type UtmifyOrderContext = Readonly<{ id: string; publicId: string; createdAt: Date; completedAt: Date | null; currency: string; customerDataEncrypted: string | null; trackingParameters: unknown; totalCents: number; discountCents: number; shippingPriceCents: number; checkout: { storeId: string; store: { name: string }; product: { publicId: string; checkoutTitle: string } }; items: readonly { productId: string; titleSnapshot: string; unitPriceCents: number; quantity: number; product: { publicId: string } }[] }>;
 
 export class PrismaGatewayRepository {
@@ -39,6 +40,51 @@ export class PrismaGatewayRepository {
 
   async recordIntegrationEvent(storeId: string, provider: IntegrationProvider, event: string, success: boolean, metadata: Record<string, unknown> = {}): Promise<void> {
     await this.database.auditLog.create({ data: { storeId, actorType: 'SYSTEM', action: success ? 'integration.event_sent' : 'integration.event_failed', targetType: 'integration', targetId: provider, metadata: { provider, event, ...metadata } } });
+  }
+
+  async markIntegrationDeliverySuccess(storeId: string, checkoutSessionId: string, provider: 'UTMIFY' | 'META', event: string): Promise<void> {
+    const now = new Date();
+    await this.database.integrationDeliveryJob.upsert({
+      where: { checkoutSessionId_provider_event: { checkoutSessionId, provider, event } },
+      create: { storeId, checkoutSessionId, provider, event, status: 'DELIVERED', deliveredAt: now },
+      update: { status: 'DELIVERED', deliveredAt: now, claimedAt: null, nextAttemptAt: null, lastError: null }
+    });
+  }
+
+  async markIntegrationDeliveryFailure(storeId: string, checkoutSessionId: string, provider: 'UTMIFY' | 'META', event: string, error: string): Promise<void> {
+    await this.database.$transaction(async transaction => {
+      const current = await transaction.integrationDeliveryJob.findUnique({ where: { checkoutSessionId_provider_event: { checkoutSessionId, provider, event } }, select: { attempts: true } });
+      const attempts = (current?.attempts ?? 0) + 1;
+      const dead = attempts >= 8;
+      const nextAttemptAt = dead ? null : new Date(Date.now() + Math.min(360, 2 ** attempts) * 60_000);
+      await transaction.integrationDeliveryJob.upsert({
+        where: { checkoutSessionId_provider_event: { checkoutSessionId, provider, event } },
+        create: { storeId, checkoutSessionId, provider, event, status: dead ? 'DEAD' : 'PENDING', attempts, nextAttemptAt, lastError: error.slice(0, 500) },
+        update: { status: dead ? 'DEAD' : 'PENDING', attempts, nextAttemptAt, claimedAt: null, lastError: error.slice(0, 500) }
+      });
+    });
+  }
+
+  async claimPendingIntegrationDeliveries(now: Date): Promise<readonly PendingIntegrationDelivery[]> {
+    const stale = new Date(now.getTime() - 5 * 60_000);
+    const candidates = await this.database.integrationDeliveryJob.findMany({
+      where: { OR: [{ status: 'PENDING', OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }] }, { status: 'PROCESSING', claimedAt: { lte: stale } }] },
+      orderBy: { nextAttemptAt: 'asc' }, take: 20,
+      select: { id: true, publicId: true, checkoutSessionId: true, provider: true, event: true, attempts: true }
+    });
+    const claimed: PendingIntegrationDelivery[] = [];
+    for (const candidate of candidates) {
+      const updated = await this.database.integrationDeliveryJob.updateMany({ where: { id: candidate.id, OR: [{ status: 'PENDING' }, { status: 'PROCESSING', claimedAt: { lte: stale } }] }, data: { status: 'PROCESSING', claimedAt: now } });
+      if (updated.count) claimed.push(candidate);
+    }
+    return claimed;
+  }
+
+  async discardIntegrationDelivery(publicId: string, error: string): Promise<void> {
+    await this.database.integrationDeliveryJob.updateMany({
+      where: { publicId },
+      data: { status: 'DEAD', claimedAt: null, nextAttemptAt: null, lastError: error.slice(0, 500) }
+    });
   }
 
   async diagnostics(storeId: string) {
