@@ -11,6 +11,7 @@ import { createRoasPix, getRoasPix, RoasRequestError } from './roas-client.js';
 import { lookupBrazilianPostalCode, PostalCodeLookupError } from './postal-code.js';
 import { syncUtmifyOrder } from './utmify-sync.js';
 import { syncMetaEvent } from './meta-sync.js';
+import { mapProviderPaymentStatus, providerAmountMatches } from './payment-rules.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const slug = (value: unknown): string | null => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) && value.length <= 80 ? value : null;
@@ -23,17 +24,9 @@ const brazilianPhone = (value: unknown): string => { const number = digits(value
 const validCpf = (value: string): boolean => { if (!/^\d{11}$/.test(value) || /^(\d)\1{10}$/.test(value)) return false; const check = (length: number) => { let sum = 0; for (let index = 0; index < length; index += 1) sum += Number(value[index]) * (length + 1 - index); const mod = sum % 11; return mod < 2 ? 0 : 11 - mod; }; return check(9) === Number(value[9]) && check(10) === Number(value[10]); };
 const validCnpj = (value: string): boolean => { if (!/^\d{14}$/.test(value) || /^(\d)\1{13}$/.test(value)) return false; const calculate = (length: number) => { const weights = length === 12 ? [5,4,3,2,9,8,7,6,5,4,3,2] : [6,5,4,3,2,9,8,7,6,5,4,3,2]; const sum = weights.reduce((total, weight, index) => total + Number(value[index]) * weight, 0); const mod = sum % 11; return mod < 2 ? 0 : 11 - mod; }; return calculate(12) === Number(value[12]) && calculate(13) === Number(value[13]); };
 const sessionCredentials = (sessionIdValue: unknown, authorization: string | undefined): { sessionId: string; tokenHash: string } | null => { const sessionId = publicId(sessionIdValue); const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : ''; return sessionId && token.length >= 32 && token.length <= 128 ? { sessionId, tokenHash: sha256(token) } : null; };
-const westPayPaymentStatus = (value: string | undefined) => {
-  const status = value?.toUpperCase();
-  if (['PAID', 'APPROVED', 'CONFIRMED', 'COMPLETED', 'SUCCESS', 'SUCCEEDED', 'SETTLED'].includes(status ?? '')) return 'PAID' as const;
-  if (status === 'FAILED') return 'FAILED' as const;
-  if (status === 'CANCELLED') return 'CANCELLED' as const;
-  if (status === 'EXPIRED') return 'EXPIRED' as const;
-  if (['REFUNDED', 'PARTIALLY_REFUNDED'].includes(status ?? '')) return 'REFUNDED' as const;
-  return null;
-};
-const westPayAmountMatches = (providerAmount: number | undefined, expectedCents: number): boolean => Number(providerAmount) === expectedCents || Number(providerAmount) * 100 === expectedCents;
-const roasAmountMatches = (providerAmount: number | undefined, expectedCents: number): boolean => Number(providerAmount) === expectedCents || Number(providerAmount) * 100 === expectedCents;
+const westPayPaymentStatus = mapProviderPaymentStatus;
+const westPayAmountMatches = providerAmountMatches;
+const roasAmountMatches = providerAmountMatches;
 const validProxySignature = (query: Record<string, string | string[] | undefined>, secret: string): boolean => {
   const signature = query.signature; if (typeof signature !== 'string' || !/^[a-f0-9]{64}$/.test(signature)) return false;
   const message = Object.entries(query).filter(([key]) => key !== 'signature').map(([key, value]) => `${key}=${Array.isArray(value) ? value.join(',') : value ?? ''}`).sort().join('');

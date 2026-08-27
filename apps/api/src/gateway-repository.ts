@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@solid/database';
+import { canTransitionPayment } from './payment-rules.js';
 
 export type GatewayContext = Readonly<{ storeId: string; role: 'OWNER' | 'ADMIN' | 'ANALYST' }>;
 export type PaymentProvider = 'ROAS' | 'WESTPAY';
@@ -172,7 +173,7 @@ export class PrismaGatewayRepository {
     await this.database.$transaction(async transaction => {
       const current = await transaction.paymentAttempt.findUnique({ where: { id: attemptId }, select: { status: true } });
       if (!current || current.status === 'REFUNDED' || current.status === status) return;
-      const canTransition = status === 'PAID' || current.status === 'PENDING' || current.status === 'PAID' && status === 'REFUNDED';
+      const canTransition = canTransitionPayment(current.status, status);
       if (!canTransition) return;
       await transaction.paymentAttempt.update({ where: { id: attemptId }, data: { status, ...(paidAt ? { paidAt } : {}) } });
       if (status === 'PAID') {
