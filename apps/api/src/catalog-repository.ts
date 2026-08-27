@@ -212,7 +212,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
     const products = configured.length ? await this.database.product.findMany({ where: { publicId: { in: configured.map(bump => bump.productId) }, storeId: session.checkout.storeId, active: true }, select: { publicId: true, checkoutTitle: true, checkoutDescription: true, imageUrl: true, priceCents: true } }) : [];
     const byId = new Map(products.map(product => [product.publicId, product]));
     const orderBumps = configured.flatMap(bump => { const product = byId.get(bump.productId); return product ? [{ ...product, offerTitle: bump.title, offerMessage: bump.message }] : []; });
-    const { storeId: _storeId, ...checkout } = session.checkout;
+    const checkout = { slug: session.checkout.slug, name: session.checkout.name, publishedConfig: session.checkout.publishedConfig, store: session.checkout.store, product: session.checkout.product };
     return { ...session, checkout, orderBump: orderBumps[0] ?? null, orderBumps, customerCaptured: Boolean(session.customerCapturedAt), shippingCaptured: Boolean(session.shippingCapturedAt), customerCapturedAt: undefined, shippingCapturedAt: undefined };
   }
 

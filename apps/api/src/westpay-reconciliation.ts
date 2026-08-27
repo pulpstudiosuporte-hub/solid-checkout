@@ -1,7 +1,7 @@
 import type { AppEnvironment } from '@solid/config';
 import type { FastifyBaseLogger } from 'fastify';
 import { decryptSecret } from './shopify-crypto.js';
-import { PrismaGatewayRepository } from './gateway-repository.js';
+import type { PrismaGatewayRepository } from './gateway-repository.js';
 import type { ShopifyRepository } from './shopify-repository.js';
 import { syncPaidShopifyOrder } from './shopify-order-sync.js';
 import { getWestPayPix } from './westpay-client.js';

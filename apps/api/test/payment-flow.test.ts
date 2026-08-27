@@ -43,7 +43,8 @@ describe('fluxo Pix integrado com Roas simulada', () => {
     const request = { method: 'POST' as const, url: '/public/checkout-sessions/session-public/payments/westpay/pix', headers: { authorization: `Bearer ${token}` } };
     const first = await app.inject(request); const second = await app.inject(request); await app.close();
     expect(first.statusCode).toBe(201); expect(second.statusCode).toBe(200);
-    expect(first.json().payment.pixCode).toBe('pix-copia-e-cola'); expect(second.json().payment.pixCode).toBe('pix-copia-e-cola');
+    const firstBody = first.json<{ payment: { pixCode: string } }>(); const secondBody = second.json<{ payment: { pixCode: string } }>();
+    expect(firstBody.payment.pixCode).toBe('pix-copia-e-cola'); expect(secondBody.payment.pixCode).toBe('pix-copia-e-cola');
     expect(createRoasPix).toHaveBeenCalledTimes(1); expect(test.raw.createAttempt).toHaveBeenCalledTimes(1);
   });
 

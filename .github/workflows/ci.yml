@@ -12,6 +12,9 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # Prisma generation validates the URL format but does not connect during CI checks.
+      DATABASE_URL: postgresql://solid_ci:solid_ci@127.0.0.1:5432/solid_ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

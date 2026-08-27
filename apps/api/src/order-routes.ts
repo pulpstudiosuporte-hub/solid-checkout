@@ -22,7 +22,7 @@ function customerForPanel(encrypted: string | null, encryptionKey: string, reque
 function addressForPanel(encrypted: string | null, encryptionKey: string, request: FastifyRequest, orderId: string): Record<string, string> {
   const value = decryptPanelData(encrypted, encryptionKey, request, orderId, 'order_address_decryption_failed');
   const keys = ['postalCode', 'street', 'number', 'complement', 'neighborhood', 'city', 'state'] as const;
-  return Object.fromEntries(keys.flatMap(key => typeof value[key] === 'string' ? [[key, value[key] as string]] : []));
+  return Object.fromEntries(keys.flatMap(key => { const field = value[key]; return typeof field === 'string' ? [[key, field]] : []; }));
 }
 
 export function registerOrderRoutes(app: FastifyInstance, environment: AppEnvironment, auth: AuthRepository, orders: OrderRepository): void {
