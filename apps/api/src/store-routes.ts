@@ -96,10 +96,9 @@ export function registerStoreRoutes(app: FastifyInstance, environment: AppEnviro
     try { verified = (await resolveCname(current.hostname)).some(value => value.replace(/\.$/, '').toLowerCase() === checkoutTarget); } catch { verified = false; }
     let domain = await stores.updateDomainVerification(session.userId, session.sessionId, current.publicId, verified, request.id);
     if (!domain) return reply.code(404).send(errorBody(request, 'DOMAIN_NOT_FOUND', 'Domínio não encontrado.'));
-    if (verified && dokploy && !domain.dokployDomainId) {
+    if (verified && dokploy) {
       try {
-        const existingDomainId = await dokploy.findCheckoutDomain(current.hostname);
-        const dokployDomainId = existingDomainId ?? await dokploy.createCheckoutDomain(current.hostname);
+        const dokployDomainId = await dokploy.reconcileCheckoutDomain(current.hostname);
         domain = await stores.activateDomainForUser(session.userId, session.sessionId, current.publicId, dokployDomainId, request.id) ?? domain;
       }
       catch (error) { request.log.error({ err: error, hostname: current.hostname }, 'dokploy_domain_activation_failed'); return reply.code(502).send(errorBody(request, 'DOMAIN_ACTIVATION_FAILED', 'DNS validado, mas não foi possível ativar o checkout. Tente novamente em alguns instantes.')); }

@@ -3,7 +3,20 @@ import type { AppEnvironment } from '@solid/config';
 export interface DokployDomainClient {
   createCheckoutDomain(hostname: string): Promise<string>;
   findCheckoutDomain(hostname: string): Promise<string | null>;
+  reconcileCheckoutDomain(hostname: string): Promise<string>;
   deleteCheckoutDomain(domainId: string): Promise<void>;
+}
+
+function collectDomainRecords(value: unknown, output: Record<string, unknown>[] = []): Record<string, unknown>[] {
+  if (Array.isArray(value)) {
+    for (const item of value) collectDomainRecords(item, output);
+    return output;
+  }
+  if (!value || typeof value !== 'object') return output;
+  const record = value as Record<string, unknown>;
+  if (typeof record.host === 'string') output.push(record);
+  for (const nested of Object.values(record)) collectDomainRecords(nested, output);
+  return output;
 }
 
 export class HttpDokployDomainClient implements DokployDomainClient {
@@ -56,16 +69,30 @@ export class HttpDokployDomainClient implements DokployDomainClient {
   }
 
   async findCheckoutDomain(hostname: string): Promise<string | null> {
+    return (await this.findCheckoutDomains(hostname))[0] ?? null;
+  }
+
+  private async findCheckoutDomains(hostname: string): Promise<string[]> {
     const query = new URLSearchParams({ applicationId: this.environment.DOKPLOY_CHECKOUT_APPLICATION_ID! });
     const result = await this.request(`domain.byApplicationId?${query.toString()}`, undefined, 'GET');
-    const values = Array.isArray(result)
-      ? result
-      : result && typeof result === 'object'
-        ? Object.values(result as Record<string, unknown>).flatMap(value => Array.isArray(value) ? value : [value])
-        : [];
-    const match = values.find(value => value && typeof value === 'object' && (value as Record<string, unknown>).host === hostname) as Record<string, unknown> | undefined;
-    const id = match?.domainId ?? match?.id;
-    return typeof id === 'string' && id ? id : null;
+    const normalized = hostname.toLowerCase();
+    return collectDomainRecords(result)
+      .filter(domain => typeof domain.host === 'string' && domain.host.toLowerCase() === normalized)
+      .map(domain => domain.domainId ?? domain.id)
+      .filter((id): id is string => typeof id === 'string' && Boolean(id));
+  }
+
+  async reconcileCheckoutDomain(hostname: string): Promise<string> {
+    let domainIds = await this.findCheckoutDomains(hostname);
+    if (!domainIds.length) {
+      const createdId = await this.createCheckoutDomain(hostname);
+      domainIds = await this.findCheckoutDomains(hostname);
+      if (!domainIds.length) domainIds = [createdId];
+    }
+    const [primaryId, ...duplicateIds] = [...new Set(domainIds)];
+    if (!primaryId) throw new Error('Dokploy não retornou o domínio reconciliado');
+    await Promise.all(duplicateIds.map(domainId => this.deleteCheckoutDomain(domainId)));
+    return primaryId;
   }
 
   async deleteCheckoutDomain(domainId: string): Promise<void> { await this.request('domain.delete', { domainId }); }
