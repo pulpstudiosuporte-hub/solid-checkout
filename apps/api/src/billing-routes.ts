@@ -28,6 +28,14 @@ export function registerBillingRoutes(app: FastifyInstance, environment: AppEnvi
   const csrfCookie = environment.NODE_ENV === 'production' ? '__Host-solid_csrf' : 'solid_csrf';
   const stripe = environment.STRIPE_SECRET_KEY ? new Stripe(environment.STRIPE_SECRET_KEY) : null;
   const stripeReady = Boolean(stripe && environment.STRIPE_WEBHOOK_SECRET && environment.STRIPE_PRICE_START && environment.STRIPE_PRICE_PRIME && environment.STRIPE_PRICE_ELITE && environment.APP_URL);
+  const planFromSubscription = (subscription: Stripe.Subscription): BillingPlan | undefined => {
+    const priceId = subscription.items.data[0]?.price.id;
+    if (priceId === environment.STRIPE_PRICE_START) return 'START';
+    if (priceId === environment.STRIPE_PRICE_PRIME) return 'PRIME';
+    if (priceId === environment.STRIPE_PRICE_ELITE) return 'ELITE';
+    const metadataPlan = subscription.metadata.solid_plan;
+    return metadataPlan && metadataPlan in plans ? metadataPlan as BillingPlan : undefined;
+  };
 
   const activeSession = async (request: FastifyRequest): Promise<SessionUser | null> => {
     const token = request.cookies[cookie];
@@ -106,7 +114,7 @@ export function registerBillingRoutes(app: FastifyInstance, environment: AppEnvi
       if (userId && plan && plan in plans && subscriptionId && customerId) await db.billingSubscription.upsert({ where: { userId }, create: { userId, plan, status: 'ACTIVE', monthlyPriceCents: plans[plan].monthlyPriceCents, feeBasisPoints: plans[plan].feeBasisPoints, stripeCustomerId: customerId, stripeSubscriptionId: subscriptionId }, update: { plan, status: 'ACTIVE', monthlyPriceCents: plans[plan].monthlyPriceCents, feeBasisPoints: plans[plan].feeBasisPoints, stripeCustomerId: customerId, stripeSubscriptionId: subscriptionId, blockedAt: null, graceUntil: null, canceledAt: null } });
     }
     if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
-      const object = event.data.object; const plan = object.metadata.solid_plan as BillingPlan | undefined;
+      const object = event.data.object; const plan = planFromSubscription(object);
       await db.billingSubscription.updateMany({ where: { stripeSubscriptionId: object.id }, data: { status: statusFromStripe(object.status), ...(plan && plan in plans ? { plan, monthlyPriceCents: plans[plan].monthlyPriceCents, feeBasisPoints: plans[plan].feeBasisPoints } : {}), ...(object.status === 'canceled' ? { canceledAt: new Date() } : {}) } });
     }
     if (event.type === 'invoice.created') {
