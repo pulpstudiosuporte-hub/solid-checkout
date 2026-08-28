@@ -36,7 +36,7 @@ export async function requestDeviceNotifications() {
 export async function showDeviceNotification(item, test = false) {
   if (deviceNotificationPermission() !== 'granted') return false;
   const options = {
-    body: test ? 'Os alertas deste aparelho estÃ£o funcionando.' : item.message,
+    body: test ? 'Os alertas deste aparelho est\u00e3o funcionando.' : item.message,
     icon: '/brand/solid-symbol.png',
     badge: '/brand/solid-symbol.png',
     tag: test ? 'solid-notification-test' : `solid-${item.id}`,
@@ -44,9 +44,9 @@ export async function showDeviceNotification(item, test = false) {
   };
   if ('serviceWorker' in navigator) {
     const registration = await navigator.serviceWorker.ready;
-    await registration.showNotification(test ? 'Teste de notificaÃ§Ã£o SOLID' : item.title, options);
+    await registration.showNotification(test ? 'Teste de notifica\u00e7\u00e3o SOLID' : item.title, options);
     return true;
   }
-  new window.Notification(test ? 'Teste de notificaÃ§Ã£o SOLID' : item.title, options);
+  new window.Notification(test ? 'Teste de notifica\u00e7\u00e3o SOLID' : item.title, options);
   return true;
 }
