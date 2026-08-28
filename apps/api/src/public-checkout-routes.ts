@@ -153,7 +153,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       if (provider === 'ROAS') {
         const transaction = await createRoasPix(roasCredentials, { payment_method: 'pix', customer: { document: { type: digits(customer.document).length === 14 ? 'cnpj' : 'cpf', number: digits(customer.document) }, name: customer.name, email: customer.email, phone: digits(customer.phone).startsWith('55') ? digits(customer.phone) : `55${digits(customer.phone)}` }, items: paymentItems.map(item => ({ title: item.titleSnapshot, unit_price: item.unitPriceCents, quantity: item.quantity })), amount: amountCents, postback_url: `${environment.API_PUBLIC_URL.replace(/\/$/, '')}/webhooks/roas`, metadata: { provider_name: 'SOLID Checkout', checkout_session: context.publicId } });
         if (!transaction.id || !transaction.pixCode) throw new Error('Roas returned an incomplete PIX response');
-        const expiresAt = transaction.expiresAt ? new Date(transaction.expiresAt) : null; const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pixCode, environment.APP_ENCRYPTION_KEY), expiresAt);
+        const expiresAt = transaction.expiresAt ? new Date(transaction.expiresAt) : null; const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pixCode, environment.APP_ENCRYPTION_KEY), expiresAt); if (typeof gateways.recordPendingPayment === 'function') await gateways.recordPendingPayment(attempt.id, provider, request.id);
         await syncUtmifyOrder(environment, gateways, context.id, 'waiting_payment', request.log);
         await syncMetaEvent(environment, gateways, context.id, 'AddPaymentInfo', request.log);
         if (shopify) { try { await syncPaidShopifyOrder(environment, shopify, context.id); } catch (error) { request.log.error({ err: error, checkoutSessionId: context.id }, 'shopify_pending_order_sync_failed'); } }
@@ -173,7 +173,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
         ...(request.ip && /^\d{1,3}(?:\.\d{1,3}){3}$/.test(request.ip) ? { ip: request.ip } : {})
       });
       if (!transaction.id || !transaction.pix?.qrcode) throw new Error('WestPay returned an incomplete PIX response');
-      const expiresAt = transaction.pix.expiresAt ? new Date(transaction.pix.expiresAt) : null; const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pix.qrcode, environment.APP_ENCRYPTION_KEY), expiresAt);
+      const expiresAt = transaction.pix.expiresAt ? new Date(transaction.pix.expiresAt) : null; const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pix.qrcode, environment.APP_ENCRYPTION_KEY), expiresAt); if (typeof gateways.recordPendingPayment === 'function') await gateways.recordPendingPayment(attempt.id, provider, request.id);
       await syncUtmifyOrder(environment, gateways, context.id, 'waiting_payment', request.log);
       await syncMetaEvent(environment, gateways, context.id, 'AddPaymentInfo', request.log);
       if (shopify) {

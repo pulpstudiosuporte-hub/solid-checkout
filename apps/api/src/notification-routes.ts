@@ -7,12 +7,13 @@ import type { AuthRepository } from './auth-repository.js';
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
 const same = (left: string, right: string) => { const a = Buffer.from(left); const b = Buffer.from(right); return a.length === b.length && timingSafeEqual(a, b); };
 const failure = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
-const actions = ['payment.webhook_verified', 'integration.event_failed', 'integration.shopify_reconnect_required', 'store_domain.not_verified', 'store_domain.activated', 'integration.shopify_connected'] as const;
+const actions = ['payment.pix_created', 'payment.webhook_verified', 'integration.event_failed', 'integration.shopify_reconnect_required', 'store_domain.not_verified', 'store_domain.activated', 'integration.shopify_connected'] as const;
 
 const metadata = (value: unknown): Record<string, unknown> => typeof value === 'object' && value !== null ? value as Record<string, unknown> : {};
 function content(action: string, raw: unknown) {
   const data = metadata(raw); const provider = typeof data.provider === 'string' ? data.provider : 'integração'; const payment = typeof data.providerStatus === 'string' ? data.providerStatus.toUpperCase() : typeof data.paymentStatus === 'string' ? data.paymentStatus : '';
-  if (action === 'payment.webhook_verified' && payment === 'PAID') return { type: 'success', title: 'Pagamento confirmado', message: `Uma venda foi confirmada via ${provider}.`, destination: 'Pedidos' };
+  if (action === 'payment.pix_created') return { type: 'info', sound: 'pending', title: 'Novo Pix pendente', message: `Um cliente gerou um Pix via ${provider}.`, destination: 'Pedidos' };
+  if (action === 'payment.webhook_verified' && payment === 'PAID') return { type: 'success', sound: 'sale', title: 'Pagamento confirmado', message: `Uma venda foi confirmada via ${provider}.`, destination: 'Pedidos' };
   if (action === 'payment.webhook_verified' && payment === 'REFUNDED') return { type: 'warning', title: 'Pagamento reembolsado', message: `Um pagamento via ${provider} foi reembolsado.`, destination: 'Pedidos' };
   if (action === 'payment.webhook_verified') return { type: 'info', title: 'Pagamento atualizado', message: `O gateway ${provider} atualizou um pagamento para ${payment || 'novo status'}.`, destination: 'Pedidos' };
   if (action === 'integration.event_failed') return { type: 'error', title: `Falha na ${provider}`, message: 'Um evento não foi entregue. Abra as integrações para revisar.', destination: 'Integrações' };

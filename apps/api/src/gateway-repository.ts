@@ -161,6 +161,12 @@ export class PrismaGatewayRepository {
     return this.database.paymentAttempt.update({ where: { id }, data: { providerTransactionId, pixCodeEncrypted, expiresAt }, select: { publicId: true, status: true, amountCents: true, expiresAt: true } });
   }
 
+  async recordPendingPayment(id: string, provider: PaymentProvider, requestId: string): Promise<void> {
+    const attempt = await this.database.paymentAttempt.findUnique({ where: { id }, select: { publicId: true, session: { select: { checkout: { select: { storeId: true } } } } } });
+    if (!attempt) return;
+    await this.database.auditLog.create({ data: { storeId: attempt.session.checkout.storeId, actorType: 'SYSTEM', action: 'payment.pix_created', targetType: 'payment_attempt', targetId: attempt.publicId, requestId, metadata: { provider, paymentStatus: 'PENDING' } } });
+  }
+
   webhookContext(providerTransactionId: string): Promise<WebhookContext | null> {
     return this.database.paymentAttempt.findUnique({ where: { providerTransactionId }, select: { id: true, publicId: true, checkoutSessionId: true, amountCents: true, status: true, session: { select: { checkout: { select: { storeId: true } } } } } });
   }
