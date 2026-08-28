@@ -162,9 +162,15 @@ export function registerAuthRoutes(app: FastifyInstance, environment: AppEnviron
     await database.auditLog.create({ data: { actorType: 'USER', actorUserId: session.userId, action: 'auth.sessions_revoked', targetType: 'user', targetId: session.userId, requestId: request.id, metadata: { count: result.count } } }); return reply.send({ revoked: result.count });
   });
 
-  app.post('/auth/logout', async (request, reply) => {
+  app.post<{ Body: { pushEndpoint?: unknown } }>('/auth/logout', async (request, reply) => {
     const token = request.cookies[sessionCookie]; if (!token || !allowedOrigin(request)) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     const session = await repository.findActiveSession(sha256(token), new Date()); if (!session || !validCsrf(request, session.csrfTokenHash)) return reply.code(403).send(errorBody(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
+    const pushEndpoint = typeof request.body?.pushEndpoint === 'string' ? request.body.pushEndpoint : null;
+    if (database && pushEndpoint && pushEndpoint.length <= 2048) {
+      try {
+        if (new URL(pushEndpoint).protocol === 'https:') await database.pushSubscription.deleteMany({ where: { userId: session.userId, endpointHash: sha256(pushEndpoint) } });
+      } catch { /* An invalid endpoint must not prevent logout. */ }
+    }
     await repository.revokeSession(sha256(token), new Date()); return reply.clearCookie(sessionCookie, cookieBase).clearCookie(csrfCookie, cookieBase).code(204).send();
   });
 

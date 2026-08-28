@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Bell, Check, CheckCircle2, LoaderCircle, RefreshCw, Volume2, VolumeX, XCircle } from 'lucide-react';
-import { getNotifications, markNotificationsRead } from './api';
+import { getNotifications, getPushConfig, markNotificationsRead, savePushSubscription } from './api';
 import {
   deviceNotificationPermission,
   notificationSoundsEnabled,
@@ -11,6 +11,7 @@ import {
   showDeviceNotification,
   unlockNotificationSounds,
 } from './notification-sounds';
+import { ensureWebPushSubscription, setWebPushEnabled, webPushEnabled } from './web-push';
 
 const icons = { success: CheckCircle2, warning: AlertTriangle, error: XCircle, info: Bell };
 const relative = value => {
@@ -25,6 +26,7 @@ export default function NotificationCenter({ csrfToken, storeKey, onNavigate }) 
   const [open, setOpen] = useState(false);
   const [sounds, setSounds] = useState(notificationSoundsEnabled);
   const [devicePermission, setDevicePermission] = useState(deviceNotificationPermission);
+  const [pushActive, setPushActive] = useState(webPushEnabled);
   const [state, setState] = useState({ loading: true, unread: 0, items: [], error: '' });
   const root = useRef(null);
   const knownIds = useRef(new Set());
@@ -50,7 +52,7 @@ export default function NotificationCenter({ csrfToken, storeKey, onNavigate }) 
     if (!important) return;
     if (important.sound === 'sale') void playSaleSound();
     else void playPendingSound();
-    void showDeviceNotification(important);
+    if (!webPushEnabled()) void showDeviceNotification(important);
   };
 
   const load = async (silent = false) => {
@@ -96,13 +98,36 @@ export default function NotificationCenter({ csrfToken, storeKey, onNavigate }) 
     setOpen(next);
     if (next) { void load(true); window.setTimeout(() => void readAll(), 800); }
   };
+  const syncWebPush = async () => {
+    const config = await getPushConfig();
+    if (!config.enabled || !config.publicKey) throw new Error('Web Push ainda n\u00e3o foi configurado no servidor.');
+    const subscription = await ensureWebPushSubscription(config.publicKey);
+    await savePushSubscription(subscription, csrfToken);
+    setWebPushEnabled(true);
+    setPushActive(true);
+    return true;
+  };
+  useEffect(() => {
+    if (!sounds || deviceNotificationPermission() !== 'granted') return;
+    void syncWebPush().catch(error => {
+      setWebPushEnabled(false);
+      setPushActive(false);
+      setState(current => ({ ...current, error: error.message }));
+    });
+  }, [storeKey, csrfToken]); // eslint-disable-line react-hooks/exhaustive-deps
   const toggleSounds = async () => {
     const next = !sounds;
     if (next && !await unlockNotificationSounds()) {
       setState(current => ({ ...current, error: 'Este navegador não permite reproduzir notificações sonoras.' }));
       return;
     }
-    if (next) setDevicePermission(await requestDeviceNotifications());
+    if (next) {
+      const permission = await requestDeviceNotifications();
+      setDevicePermission(permission);
+      if (permission === 'granted') {
+        try { await syncWebPush(); } catch (error) { setState(current => ({ ...current, error: error.message })); }
+      }
+    }
     setNotificationSoundsEnabled(next);
     setSounds(next);
   };
@@ -112,6 +137,9 @@ export default function NotificationCenter({ csrfToken, storeKey, onNavigate }) 
     setSounds(true);
     const permission = await requestDeviceNotifications();
     setDevicePermission(permission);
+    if (permission === 'granted') {
+      try { await syncWebPush(); } catch (error) { setState(current => ({ ...current, error: error.message })); }
+    }
     await playSaleSound();
     if (permission === 'granted') await showDeviceNotification({ id: 'test', title: 'Teste de venda SOLID', message: '', destination: 'orders' }, true);
   };
@@ -122,9 +150,9 @@ export default function NotificationCenter({ csrfToken, storeKey, onNavigate }) 
     {open && <section className="notification-popover" aria-label="Central de notificações">
       <header><div><h2>Notificações</h2><p>Acompanhe sua operação em tempo real.</p></div><button className="icon-btn" aria-label="Atualizar notificações" onClick={() => void load()}>{state.loading ? <LoaderCircle className="spin" size={17}/> : <RefreshCw size={17}/>}</button></header>
       <div className="alert-controls">
-        <button className={`sound-control ${sounds ? 'active' : ''}`} type="button" onClick={() => void toggleSounds()}>{sounds ? <Volume2 size={17}/> : <VolumeX size={17}/>}<span><strong>Alertas de vendas</strong><small>{sounds ? (devicePermission === 'granted' ? 'Som e notificação ativados neste aparelho' : 'Som ativo; permita notificações no iPhone') : 'Toque para ativar neste aparelho'}</small></span><i aria-hidden="true"/></button>
+        <button className={`sound-control ${sounds ? 'active' : ''}`} type="button" onClick={() => void toggleSounds()}>{sounds ? <Volume2 size={17}/> : <VolumeX size={17}/>}<span><strong>Alertas de vendas</strong><small>{sounds ? (pushActive ? 'Segundo plano ativado neste aparelho' : devicePermission === 'granted' ? 'Som ativo; concluindo Web Push' : 'Som ativo; permita notificações no iPhone') : 'Toque para ativar neste aparelho'}</small></span><i aria-hidden="true"/></button>
         <button className="test-alerts" type="button" onClick={() => void testAlerts()}>Testar</button>
-        <p>Para ouvir no iPhone, instale o app e permita notificações. Mantenha-o aberto para alertas em tempo real.</p>
+        <p>{pushActive ? 'Você receberá alertas mesmo com o aplicativo fechado.' : 'No iPhone, instale o app na tela inicial e permita notificações.'}</p>
       </div>
       {state.error && <div className="notification-error">{state.error}</div>}
       <div className="notification-list">{state.loading && !state.items.length ? <div className="notification-empty"><LoaderCircle className="spin"/> Carregando...</div> : !state.items.length ? <div className="notification-empty"><Check size={25}/><strong>Tudo certo por aqui</strong><span>Novos pagamentos e alertas aparecerão aqui.</span></div> : state.items.map(item => { const Icon = icons[item.type] || Bell; return <button key={item.id} className={`notification-item ${item.type} ${item.read ? '' : 'unread'}`} onClick={() => navigate(item)}><span className="notification-item-icon"><Icon size={17}/></span><span><strong>{item.title}</strong><small>{item.message}</small><time>{relative(item.createdAt)}</time></span></button>; })}</div>

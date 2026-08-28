@@ -13,6 +13,7 @@ import { startShopifyOrderReconciliation } from './shopify-order-reconciliation.
 import { startConfirmationEmailDelivery } from './confirmation-email.js';
 import { startIntegrationDelivery } from './integration-delivery.js';
 import { startSecurityCleanup } from './security-cleanup.js';
+import { createStorePushDispatcher } from './web-push-service.js';
 
 const environment = parseEnvironment(process.env);
 if (!environment.DATABASE_URL) throw new Error('DATABASE_URL é obrigatória para iniciar a API');
@@ -20,6 +21,7 @@ const database = createDatabaseClient(environment.DATABASE_URL);
 const gatewayRepository = new PrismaGatewayRepository(database);
 const shopifyRepository = new PrismaShopifyRepository(database);
 const app = buildApp(environment, { authRepository: new PrismaAuthRepository(database), catalogRepository: new PrismaCatalogRepository(database), storeRepository: new PrismaStoreRepository(database), shopifyRepository, gatewayRepository, orderRepository: new PrismaOrderRepository(database), database });
+gatewayRepository.setPushDispatcher(createStorePushDispatcher(environment, database, app.log));
 const stopWestPayReconciliation = startWestPayReconciliation(environment, gatewayRepository, shopifyRepository, app.log);
 const stopRoasReconciliation = startRoasReconciliation(environment, gatewayRepository, shopifyRepository, app.log);
 const stopShopifyOrderReconciliation = startShopifyOrderReconciliation(environment, shopifyRepository, app.log);

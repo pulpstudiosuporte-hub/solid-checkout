@@ -83,6 +83,7 @@ model User {
   auditLogs       AuditLog[]
   shopifyOAuthStates ShopifyOAuthState[]
   notificationStates NotificationState[]
+  pushSubscriptions PushSubscription[]
   mfaChallenges   MfaChallenge[]
   mfaRecoveryCodes MfaRecoveryCode[]
   passwordResetTokens PasswordResetToken[]
@@ -642,4 +643,21 @@ model NotificationState {
   @@unique([userId, storeId])
   @@index([storeId, lastReadAt])
   @@map("notification_states")
+}
+
+model PushSubscription {
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
+  endpointHash      String   @unique @map("endpoint_hash") @db.Char(64)
+  endpointEncrypted String   @map("endpoint_encrypted") @db.Text
+  p256dhEncrypted   String   @map("p256dh_encrypted") @db.Text
+  authEncrypted     String   @map("auth_encrypted") @db.Text
+  userAgent         String?  @map("user_agent") @db.VarChar(500)
+  lastUsedAt        DateTime @default(now()) @map("last_used_at") @db.Timestamptz(3)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("push_subscriptions")
 }

@@ -114,9 +114,9 @@ async function authPost(path, body) {
 export function registerAccount(name, email, password) { return authPost('/auth/register', { name, email, password, termsAccepted: true }); }
 export function verifyAccount(token) { return authPost('/auth/verify-email', { token }); }
 
-export async function logout(csrfToken) {
+export async function logout(csrfToken, pushEndpoint) {
   const response = await fetch(`${apiBaseUrl}/auth/logout`, {
-    method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken },
+    method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify({ pushEndpoint: pushEndpoint || undefined }),
   });
   if (!response.ok && response.status !== 401) await readJson(response);
 }
@@ -172,6 +172,8 @@ export async function disconnectMeta(csrfToken) { const response = await fetch(`
 export async function getIntegrationDiagnostics(signal) { return readJson(await fetch(`${apiBaseUrl}/integrations/diagnostics`, { credentials: 'include', headers: { Accept: 'application/json' }, signal })); }
 export async function getNotifications() { return readJson(await fetch(`${apiBaseUrl}/notifications`, { credentials: 'include', headers: { Accept: 'application/json' } })); }
 export async function markNotificationsRead(csrfToken) { return readJson(await fetch(`${apiBaseUrl}/notifications/read`, { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken } })); }
+export async function getPushConfig() { return readJson(await fetch(`${apiBaseUrl}/notifications/push/config`, { credentials: 'include', headers: { Accept: 'application/json' } })); }
+export async function savePushSubscription(subscription, csrfToken) { return readJson(await fetch(`${apiBaseUrl}/notifications/push/subscriptions`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(subscription) })); }
 export async function getProducts(filters = {}, signal) { const query = new URLSearchParams({ page: String(filters.page || 1), pageSize: '20' }); if (filters.search) query.set('search', filters.search); if (filters.status) query.set('status', filters.status); if (filters.source) query.set('source', filters.source); return readJson(await fetch(`${apiBaseUrl}/products?${query}`, { credentials: 'include', headers: { Accept: 'application/json' }, signal })); }
 export async function getProduct(productId, signal) { return readJson(await fetch(`${apiBaseUrl}/products/${encodeURIComponent(productId)}`, { credentials: 'include', headers: { Accept: 'application/json' }, signal })); }
 export async function createProduct(input, csrfToken) { return readJson(await fetch(`${apiBaseUrl}/products`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(input) })); }

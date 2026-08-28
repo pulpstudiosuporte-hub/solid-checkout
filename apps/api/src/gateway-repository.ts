@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@solid/database';
 import { canTransitionPayment } from './payment-rules.js';
+import type { StorePushDispatcher } from './web-push-service.js';
 
 export type GatewayContext = Readonly<{ storeId: string; role: 'OWNER' | 'ADMIN' | 'ANALYST' }>;
 export type PaymentProvider = 'ROAS' | 'WESTPAY';
@@ -14,7 +15,9 @@ export type PendingIntegrationDelivery = Readonly<{ id: string; publicId: string
 type UtmifyOrderContext = Readonly<{ id: string; publicId: string; createdAt: Date; completedAt: Date | null; currency: string; customerDataEncrypted: string | null; trackingParameters: unknown; totalCents: number; discountCents: number; shippingPriceCents: number; checkout: { storeId: string; store: { name: string }; product: { publicId: string; checkoutTitle: string } }; items: readonly { productId: string; titleSnapshot: string; unitPriceCents: number; quantity: number; product: { publicId: string } }[] }>;
 
 export class PrismaGatewayRepository {
+  private push: StorePushDispatcher | undefined;
   constructor(private readonly database: PrismaClient) {}
+  setPushDispatcher(push: StorePushDispatcher | undefined): void { this.push = push; }
 
   async context(userId: string, sessionId: string): Promise<GatewayContext | null> {
     const session = await this.database.session.findFirst({ where: { id: sessionId, userId, revokedAt: null }, select: { activeStoreId: true } });
@@ -164,7 +167,9 @@ export class PrismaGatewayRepository {
   async recordPendingPayment(id: string, provider: PaymentProvider, requestId: string): Promise<void> {
     const attempt = await this.database.paymentAttempt.findUnique({ where: { id }, select: { publicId: true, session: { select: { checkout: { select: { storeId: true } } } } } });
     if (!attempt) return;
-    await this.database.auditLog.create({ data: { storeId: attempt.session.checkout.storeId, actorType: 'SYSTEM', action: 'payment.pix_created', targetType: 'payment_attempt', targetId: attempt.publicId, requestId, metadata: { provider, paymentStatus: 'PENDING' } } });
+    const metadata = { provider, paymentStatus: 'PENDING' };
+    await this.database.auditLog.create({ data: { storeId: attempt.session.checkout.storeId, actorType: 'SYSTEM', action: 'payment.pix_created', targetType: 'payment_attempt', targetId: attempt.publicId, requestId, metadata } });
+    await this.push?.(attempt.session.checkout.storeId, 'payment.pix_created', metadata, attempt.publicId);
   }
 
   webhookContext(providerTransactionId: string): Promise<WebhookContext | null> {
@@ -172,7 +177,9 @@ export class PrismaGatewayRepository {
   }
 
   async recordWebhookEvent(context: WebhookContext, provider: PaymentProvider, providerStatus: string | null, requestId: string): Promise<void> {
-    await this.database.auditLog.create({ data: { storeId: context.session.checkout.storeId, actorType: 'SYSTEM', action: 'payment.webhook_verified', targetType: 'payment_attempt', targetId: context.publicId, requestId, metadata: { provider, providerStatus, paymentStatus: context.status } } });
+    const metadata = { provider, providerStatus, paymentStatus: context.status };
+    await this.database.auditLog.create({ data: { storeId: context.session.checkout.storeId, actorType: 'SYSTEM', action: 'payment.webhook_verified', targetType: 'payment_attempt', targetId: context.publicId, requestId, metadata } });
+    await this.push?.(context.session.checkout.storeId, 'payment.webhook_verified', metadata, context.publicId);
   }
 
   async confirmPayment(attemptId: string, checkoutSessionId: string, status: 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED', paidAt?: Date) {

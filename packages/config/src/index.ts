@@ -20,6 +20,9 @@ const environmentSchema = z.object({
   DOKPLOY_CHECKOUT_APPLICATION_ID: z.string().min(1).optional(),
   RESEND_API_KEY: z.string().startsWith('re_').optional(),
   EMAIL_FROM: z.string().min(3).max(320).optional(),
+  VAPID_PUBLIC_KEY: z.string().min(40).optional(),
+  VAPID_PRIVATE_KEY: z.string().min(20).optional(),
+  VAPID_SUBJECT: z.string().refine(value => value.startsWith('mailto:') || /^https?:\/\//.test(value), 'deve usar mailto: ou uma URL').optional(),
   APP_ENCRYPTION_KEY: z.string().optional().refine(value => !value || Buffer.from(value, 'base64').length === 32, 'deve conter exatamente 32 bytes em base64')
 }).strict();
 
@@ -34,7 +37,8 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): AppEnvironment {
     SHOPIFY_CLIENT_ID: input.SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET: input.SHOPIFY_CLIENT_SECRET,
     SHOPIFY_REDIRECT_URI: input.SHOPIFY_REDIRECT_URI, SHOPIFY_SCOPES: input.SHOPIFY_SCOPES,
     DOKPLOY_URL: input.DOKPLOY_URL, DOKPLOY_API_KEY: input.DOKPLOY_API_KEY, DOKPLOY_CHECKOUT_APPLICATION_ID: input.DOKPLOY_CHECKOUT_APPLICATION_ID,
-    APP_ENCRYPTION_KEY: input.APP_ENCRYPTION_KEY, RESEND_API_KEY: input.RESEND_API_KEY, EMAIL_FROM: input.EMAIL_FROM
+    APP_ENCRYPTION_KEY: input.APP_ENCRYPTION_KEY, RESEND_API_KEY: input.RESEND_API_KEY, EMAIL_FROM: input.EMAIL_FROM,
+    VAPID_PUBLIC_KEY: input.VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY: input.VAPID_PRIVATE_KEY, VAPID_SUBJECT: input.VAPID_SUBJECT
   };
   const result = environmentSchema.safeParse(known);
   if (!result.success) {
@@ -51,5 +55,7 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): AppEnvironment {
   const dokployValues = [result.data.DOKPLOY_URL, result.data.DOKPLOY_API_KEY, result.data.DOKPLOY_CHECKOUT_APPLICATION_ID];
   if (dokployValues.some(Boolean) && !dokployValues.every(Boolean)) throw new Error('A configuração Dokploy está incompleta');
   if (Boolean(result.data.RESEND_API_KEY) !== Boolean(result.data.EMAIL_FROM)) throw new Error('A configuração de e-mail está incompleta');
+  const vapidValues = [result.data.VAPID_PUBLIC_KEY, result.data.VAPID_PRIVATE_KEY, result.data.VAPID_SUBJECT];
+  if (vapidValues.some(Boolean) && !vapidValues.every(Boolean)) throw new Error('A configura\u00e7\u00e3o Web Push est\u00e1 incompleta');
   return { ...result.data, TRUST_PROXY: result.data.TRUST_PROXY === 'true' };
 }
