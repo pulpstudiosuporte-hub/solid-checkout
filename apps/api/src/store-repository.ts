@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@solid/database';
+import { planLimits } from './plan-entitlements.js';
 
 export type StoreSummary = Readonly<{ publicId: string; name: string; slug: string; role: 'OWNER' | 'ADMIN' | 'ANALYST'; active: boolean }>;
 export type StoreDomainSummary = Readonly<{ publicId: string; hostname: string; status: string; verifiedAt: Date | null; activatedAt: Date | null; lastCheckedAt: Date | null; dokployDomainId: string | null }>;
@@ -30,16 +31,19 @@ export class PrismaStoreRepository implements StoreRepository {
   }
 
   async createForUser(userId: string, sessionId: string, name: string, slug: string, requestId: string): Promise<StoreSummary | null> {
-    const membershipCount = await this.database.storeMember.count({ where: { userId } });
-    if (membershipCount >= 20) return null;
     return this.database.$transaction(async transaction => {
+      const [subscription, ownedStoreCount] = await Promise.all([
+        transaction.billingSubscription.findUnique({ where: { userId }, select: { plan: true } }),
+        transaction.storeMember.count({ where: { userId, role: 'OWNER', store: { active: true } } }),
+      ]);
+      if (ownedStoreCount >= planLimits(subscription?.plan).stores) return null;
       const store = await transaction.store.create({ data: { name, slug }, select: { id: true, publicId: true, name: true, slug: true } });
       await transaction.storeMember.create({ data: { userId, storeId: store.id, role: 'OWNER' } });
       const updated = await transaction.session.updateMany({ where: { id: sessionId, userId, revokedAt: null }, data: { activeStoreId: store.id } });
       if (updated.count !== 1) throw new Error('Sessão ativa não encontrada');
       await transaction.auditLog.create({ data: { storeId: store.id, actorUserId: userId, actorType: 'USER', action: 'store.created', targetType: 'store', targetId: store.publicId, requestId } });
       return { publicId: store.publicId, name: store.name, slug: store.slug, role: 'OWNER', active: true };
-    });
+    }, { isolationLevel: 'Serializable' });
   }
 
   async selectForUser(userId: string, sessionId: string, storePublicId: string, requestId: string): Promise<StoreSummary | null> {

@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from '@solid/database';
+import { planLimits } from './plan-entitlements.js';
 
 export type StoreContext = Readonly<{ storeId: string; userId: string; sessionId: string; role: 'OWNER' | 'ADMIN' | 'ANALYST' }>;
 export type ProductInput = Readonly<{ title: string; description?: string; imageUrl?: string; priceCents: number; compareAtCents?: number; stockQuantity?: number; trackInventory: boolean; maxPerOrder: number; active: boolean; fulfillmentType: 'PHYSICAL' | 'DIGITAL'; externalDeliveryUrl?: string }>;
@@ -20,7 +21,7 @@ export interface CatalogRepository {
   createProduct(context: StoreContext, input: ProductInput, requestId: string): Promise<object>;
   deleteManualProduct(context: StoreContext, publicId: string, requestId: string): Promise<'deleted' | 'archived' | 'not_found'>;
   listCheckouts(context: StoreContext): Promise<readonly object[]>;
-  createCheckout(context: StoreContext, input: CheckoutInput, requestId: string): Promise<object | null>;
+  createCheckout(context: StoreContext, input: CheckoutInput, requestId: string): Promise<object | 'limit_reached' | null>;
   deleteCheckout(context: StoreContext, publicId: string, requestId: string): Promise<'deleted' | 'archived' | 'not_found'>;
   updateCheckoutDraft(context: StoreContext, publicId: string, config: CheckoutConfigInput, requestId: string): Promise<object | null>;
   publishCheckout(context: StoreContext, publicId: string, requestId: string): Promise<object | null>;
@@ -136,14 +137,17 @@ export class PrismaCatalogRepository implements CatalogRepository {
   listCheckouts(context: StoreContext): Promise<readonly object[]> {
     return this.database.checkout.findMany({ where: { storeId: context.storeId, archivedAt: null }, orderBy: { createdAt: 'desc' }, take: 100, select: checkoutSelect });
   }
-  async createCheckout(context: StoreContext, input: CheckoutInput, requestId: string): Promise<object | null> {
+  async createCheckout(context: StoreContext, input: CheckoutInput, requestId: string): Promise<object | 'limit_reached' | null> {
     const product = await this.database.product.findFirst({ where: { publicId: input.productPublicId, storeId: context.storeId, active: true }, select: { id: true } });
     if (!product) return null;
     return this.database.$transaction(async transaction => {
+      const owner = await transaction.storeMember.findFirst({ where: { storeId: context.storeId, role: 'OWNER' }, orderBy: { createdAt: 'asc' }, select: { user: { select: { billingSubscription: { select: { plan: true } } } } } });
+      const checkoutCount = await transaction.checkout.count({ where: { storeId: context.storeId, archivedAt: null } });
+      if (checkoutCount >= planLimits(owner?.user.billingSubscription?.plan).checkoutsPerStore) return 'limit_reached';
       const checkout = await transaction.checkout.create({ data: { storeId: context.storeId, productId: product.id, name: input.name, slug: input.slug, draftConfig: input.draftConfig as Prisma.InputJsonValue }, select: checkoutSelect });
       await transaction.auditLog.create({ data: { storeId: context.storeId, actorUserId: context.userId, actorType: 'USER', action: 'checkout.created', targetType: 'checkout', targetId: checkout.publicId, requestId } });
       return checkout;
-    });
+    }, { isolationLevel: 'Serializable' });
   }
 
   async deleteCheckout(context: StoreContext, publicId: string, requestId: string): Promise<'deleted' | 'archived' | 'not_found'> {

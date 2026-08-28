@@ -181,6 +181,7 @@ export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvi
     if (!name || !slug || !productPublicId || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || typeof draftConfig !== 'object' || draftConfig === null || Array.isArray(draftConfig) || JSON.stringify(draftConfig).length > 100_000) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Dados do checkout inválidos.'));
     const input: CheckoutInput = { name, slug, productPublicId, draftConfig: draftConfig as Record<string, unknown> };
     const checkout = await catalog.createCheckout(context, input, request.id);
+    if (checkout === 'limit_reached') return reply.code(409).send(errorBody(request, 'CHECKOUT_LIMIT_REACHED', 'Seu plano atingiu o limite de checkouts desta loja. Faça upgrade para criar outro.'));
     if (!checkout) return reply.code(404).send(errorBody(request, 'PRODUCT_NOT_FOUND', 'Produto não encontrado.'));
     return reply.code(201).send({ checkout });
   });

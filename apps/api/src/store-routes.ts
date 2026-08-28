@@ -1,10 +1,10 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { resolveCname } from 'node:dns/promises';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
 import type { AuthRepository, SessionUser } from './auth-repository.js';
 import type { StoreRepository } from './store-repository.js';
 import type { DokployDomainClient } from './dokploy-client.js';
+import { verifyCname } from './dns-verification.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const safeEqual = (left: string, right: string): boolean => timingSafeEqual(Buffer.from(sha256(left), 'hex'), Buffer.from(sha256(right), 'hex'));
@@ -92,8 +92,7 @@ export function registerStoreRoutes(app: FastifyInstance, environment: AppEnviro
     if (ensureMfa(request, reply, session)) return;
     const current = await stores.getDomainForUser(session.userId, session.sessionId);
     if (!current || current.publicId !== request.params.domainId) return reply.code(404).send(errorBody(request, 'DOMAIN_NOT_FOUND', 'Domínio não encontrado.'));
-    let verified = false;
-    try { verified = (await resolveCname(current.hostname)).some(value => value.replace(/\.$/, '').toLowerCase() === checkoutTarget); } catch { verified = false; }
+    const verified = await verifyCname(current.hostname, checkoutTarget);
     let domain = await stores.updateDomainVerification(session.userId, session.sessionId, current.publicId, verified, request.id);
     if (!domain) return reply.code(404).send(errorBody(request, 'DOMAIN_NOT_FOUND', 'Domínio não encontrado.'));
     if (verified && dokploy) {
