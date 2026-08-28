@@ -29,15 +29,23 @@ export default function NotificationCenter({ csrfToken, storeKey, onNavigate }) 
   const root = useRef(null);
   const knownIds = useRef(new Set());
   const initialized = useRef(false);
+  const cursorKey = `solid:notification-cursor:${storeKey || 'default'}`;
 
   const announceNew = items => {
+    let fresh = [];
     if (!initialized.current) {
+      const cursor = window.localStorage.getItem(cursorKey);
+      if (cursor && items[0]?.id !== cursor) {
+        const cursorIndex = items.findIndex(item => item.id === cursor);
+        fresh = cursorIndex >= 0 ? items.slice(0, cursorIndex) : items.slice(0, 1);
+      }
       knownIds.current = new Set(items.map(item => item.id));
       initialized.current = true;
-      return;
+    } else {
+      fresh = items.filter(item => !knownIds.current.has(item.id));
+      items.forEach(item => knownIds.current.add(item.id));
     }
-    const fresh = items.filter(item => !knownIds.current.has(item.id));
-    items.forEach(item => knownIds.current.add(item.id));
+    if (items[0]?.id) window.localStorage.setItem(cursorKey, items[0].id);
     const important = fresh.find(item => item.sound === 'sale') || fresh.find(item => item.sound === 'pending');
     if (!important) return;
     if (important.sound === 'sale') void playSaleSound();
