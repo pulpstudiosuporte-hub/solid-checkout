@@ -596,7 +596,7 @@ function SessionContent({ session: initialSession, token }) {
                 {busy ? (
                   <LoaderCircle className="spin" size={18} />
                 ) : (
-                  config.buttonText
+                  requiresShipping ? config.buttonText : "Continuar para pagamento"
                 )}
                 <ArrowRight size={19} />
               </button>
