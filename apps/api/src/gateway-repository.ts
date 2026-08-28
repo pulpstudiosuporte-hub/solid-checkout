@@ -165,9 +165,9 @@ export class PrismaGatewayRepository {
   }
 
   async recordPendingPayment(id: string, provider: PaymentProvider, requestId: string): Promise<void> {
-    const attempt = await this.database.paymentAttempt.findUnique({ where: { id }, select: { publicId: true, session: { select: { checkout: { select: { storeId: true } } } } } });
+    const attempt = await this.database.paymentAttempt.findUnique({ where: { id }, select: { publicId: true, amountCents: true, session: { select: { checkout: { select: { storeId: true } } } } } });
     if (!attempt) return;
-    const metadata = { provider, paymentStatus: 'PENDING' };
+    const metadata = { provider, paymentStatus: 'PENDING', amountCents: attempt.amountCents };
     await this.database.auditLog.create({ data: { storeId: attempt.session.checkout.storeId, actorType: 'SYSTEM', action: 'payment.pix_created', targetType: 'payment_attempt', targetId: attempt.publicId, requestId, metadata } });
     await this.push?.(attempt.session.checkout.storeId, 'payment.pix_created', metadata, attempt.publicId);
   }
@@ -177,7 +177,7 @@ export class PrismaGatewayRepository {
   }
 
   async recordWebhookEvent(context: WebhookContext, provider: PaymentProvider, providerStatus: string | null, requestId: string): Promise<void> {
-    const metadata = { provider, providerStatus, paymentStatus: context.status };
+    const metadata = { provider, providerStatus, paymentStatus: context.status, amountCents: context.amountCents };
     await this.database.auditLog.create({ data: { storeId: context.session.checkout.storeId, actorType: 'SYSTEM', action: 'payment.webhook_verified', targetType: 'payment_attempt', targetId: context.publicId, requestId, metadata } });
     await this.push?.(context.session.checkout.storeId, 'payment.webhook_verified', metadata, context.publicId);
   }

@@ -7,13 +7,17 @@ export type NotificationPayload = Readonly<{
 }>;
 
 const metadata = (value: unknown): Record<string, unknown> => typeof value === 'object' && value !== null ? value as Record<string, unknown> : {};
+const amount = (value: unknown): string | null => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+  ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value / 100)
+  : null;
 
 export function notificationContent(action: string, raw: unknown): NotificationPayload {
   const data = metadata(raw);
   const provider = typeof data.provider === 'string' ? data.provider : 'integra\u00e7\u00e3o';
   const payment = typeof data.providerStatus === 'string' ? data.providerStatus.toUpperCase() : typeof data.paymentStatus === 'string' ? data.paymentStatus : '';
-  if (action === 'payment.pix_created') return { type: 'info', sound: 'pending', title: 'Novo Pix pendente', message: `Um cliente gerou um Pix via ${provider}.`, destination: 'Pedidos' };
-  if (action === 'payment.webhook_verified' && payment === 'PAID') return { type: 'success', sound: 'sale', title: 'Pagamento confirmado', message: `Uma venda foi confirmada via ${provider}.`, destination: 'Pedidos' };
+  const formattedAmount = amount(data.amountCents);
+  if (action === 'payment.pix_created') return { type: 'info', sound: 'pending', title: formattedAmount ? `Novo Pix pendente \u00b7 ${formattedAmount}` : 'Novo Pix pendente', message: `Um cliente gerou um Pix${formattedAmount ? ` de ${formattedAmount}` : ''} via ${provider}.`, destination: 'Pedidos' };
+  if (action === 'payment.webhook_verified' && payment === 'PAID') return { type: 'success', sound: 'sale', title: formattedAmount ? `Venda paga \u00b7 ${formattedAmount}` : 'Pagamento confirmado', message: `Uma venda${formattedAmount ? ` de ${formattedAmount}` : ''} foi confirmada via ${provider}.`, destination: 'Pedidos' };
   if (action === 'payment.webhook_verified' && payment === 'REFUNDED') return { type: 'warning', title: 'Pagamento reembolsado', message: `Um pagamento via ${provider} foi reembolsado.`, destination: 'Pedidos' };
   if (action === 'payment.webhook_verified') return { type: 'info', title: 'Pagamento atualizado', message: `O gateway ${provider} atualizou um pagamento para ${payment || 'novo status'}.`, destination: 'Pedidos' };
   if (action === 'integration.event_failed') return { type: 'error', title: `Falha na ${provider}`, message: 'Um evento n\u00e3o foi entregue. Abra as integra\u00e7\u00f5es para revisar.', destination: 'Integra\u00e7\u00f5es' };
