@@ -16,7 +16,7 @@ export function createStorePushDispatcher(environment: AppEnvironment, database:
       const payload = notificationContent(action, metadata);
       const [store, subscriptions] = await Promise.all([
         database.store.findUnique({ where: { id: storeId }, select: { name: true } }),
-        database.pushSubscription.findMany({ where: { user: { memberships: { some: { storeId } } } }, select: { id: true, endpointEncrypted: true, p256dhEncrypted: true, authEncrypted: true } }),
+        database.pushSubscription.findMany({ where: { user: { disabledAt: null, accountStatus: 'APPROVED', memberships: { some: { storeId } } }, session: { revokedAt: null, expiresAt: { gt: new Date() }, absoluteExpiresAt: { gt: new Date() } } }, select: { id: true, endpointEncrypted: true, p256dhEncrypted: true, authEncrypted: true } }),
       ]);
       await Promise.all(subscriptions.map(async subscription => {
         try {

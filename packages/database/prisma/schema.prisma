@@ -564,6 +564,7 @@ model Session {
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   activeMembership StoreMember? @relation(fields: [activeStoreId, userId], references: [storeId, userId], onDelete: Restrict)
+  pushSubscriptions PushSubscription[]
 
   @@index([userId, revokedAt])
   @@index([expiresAt])
@@ -648,6 +649,7 @@ model NotificationState {
 model PushSubscription {
   id                String   @id @default(uuid()) @db.Uuid
   userId            String   @map("user_id") @db.Uuid
+  sessionId         String?  @map("session_id") @db.Uuid
   endpointHash      String   @unique @map("endpoint_hash") @db.Char(64)
   endpointEncrypted String   @map("endpoint_encrypted") @db.Text
   p256dhEncrypted   String   @map("p256dh_encrypted") @db.Text
@@ -657,7 +659,9 @@ model PushSubscription {
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session           Session? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt(sort: Desc)])
+  @@index([sessionId])
   @@map("push_subscriptions")
 }

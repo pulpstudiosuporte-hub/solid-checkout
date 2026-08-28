@@ -87,6 +87,7 @@ export function registerAuthRoutes(app: FastifyInstance, environment: AppEnviron
       const consumed = await transaction.passwordResetToken.updateMany({ where: { id: record.id, usedAt: null }, data: { usedAt: now } }); if (consumed.count !== 1) return false;
       await transaction.user.update({ where: { id: record.userId }, data: { passwordHash } });
       await transaction.session.updateMany({ where: { userId: record.userId, revokedAt: null }, data: { revokedAt: now } });
+      await transaction.pushSubscription.deleteMany({ where: { userId: record.userId } });
       await transaction.mfaChallenge.deleteMany({ where: { userId: record.userId } });
       await transaction.auditLog.create({ data: { actorType: 'USER', actorUserId: record.userId, action: 'auth.password_reset', targetType: 'user', targetId: record.userId, requestId: request.id } }); return true;
     });
@@ -146,19 +147,23 @@ export function registerAuthRoutes(app: FastifyInstance, environment: AppEnviron
 
   app.get('/auth/sessions', async (request, reply) => {
     const session = await authenticated(request); if (!session || !database) return reply.code(403).send(errorBody(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
-    const items = await database.session.findMany({ where: { userId: session.userId, revokedAt: null, absoluteExpiresAt: { gt: new Date() } }, orderBy: { lastSeenAt: 'desc' }, select: { id: true, userAgent: true, lastSeenAt: true, createdAt: true, absoluteExpiresAt: true, ipHash: true } });
-    return reply.header('cache-control', 'private, no-store').send({ items: items.map(item => ({ id: item.id, current: item.id === session.sessionId, device: item.userAgent || 'Dispositivo desconhecido', lastSeenAt: item.lastSeenAt, createdAt: item.createdAt, expiresAt: item.absoluteExpiresAt, network: item.ipHash ? item.ipHash.slice(0, 8) : null })) });
+    const items = await database.session.findMany({ where: { userId: session.userId, revokedAt: null, absoluteExpiresAt: { gt: new Date() } }, orderBy: { lastSeenAt: 'desc' }, select: { id: true, userAgent: true, lastSeenAt: true, createdAt: true, absoluteExpiresAt: true, ipHash: true, _count: { select: { pushSubscriptions: true } } } });
+    return reply.header('cache-control', 'private, no-store').send({ items: items.map(item => ({ id: item.id, current: item.id === session.sessionId, device: item.userAgent || 'Dispositivo desconhecido', lastSeenAt: item.lastSeenAt, createdAt: item.createdAt, expiresAt: item.absoluteExpiresAt, network: item.ipHash ? item.ipHash.slice(0, 8) : null, notificationsActive: item._count.pushSubscriptions > 0 })) });
   });
 
   app.delete<{ Params: { sessionId: string } }>('/auth/sessions/:sessionId', async (request, reply) => {
     const session = await authenticated(request); if (!session || !database) return reply.code(403).send(errorBody(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
     if (request.params.sessionId === session.sessionId) return reply.code(409).send(errorBody(request, 'CURRENT_SESSION', 'Use o botão Sair para encerrar esta sessão.'));
-    await database.session.updateMany({ where: { id: request.params.sessionId, userId: session.userId, revokedAt: null }, data: { revokedAt: new Date() } }); return reply.code(204).send();
+    await database.$transaction([
+      database.session.updateMany({ where: { id: request.params.sessionId, userId: session.userId, revokedAt: null }, data: { revokedAt: new Date() } }),
+      database.pushSubscription.deleteMany({ where: { sessionId: request.params.sessionId, userId: session.userId } }),
+    ]); return reply.code(204).send();
   });
 
   app.post('/auth/sessions/revoke-others', async (request, reply) => {
     const session = await authenticated(request); if (!session || !database) return reply.code(403).send(errorBody(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
     const now = new Date(); const result = await database.session.updateMany({ where: { userId: session.userId, id: { not: session.sessionId }, revokedAt: null }, data: { revokedAt: now } });
+    await database.pushSubscription.deleteMany({ where: { userId: session.userId, OR: [{ sessionId: { not: session.sessionId } }, { sessionId: null }] } });
     await database.auditLog.create({ data: { actorType: 'USER', actorUserId: session.userId, action: 'auth.sessions_revoked', targetType: 'user', targetId: session.userId, requestId: request.id, metadata: { count: result.count } } }); return reply.send({ revoked: result.count });
   });
 
@@ -166,6 +171,7 @@ export function registerAuthRoutes(app: FastifyInstance, environment: AppEnviron
     const token = request.cookies[sessionCookie]; if (!token || !allowedOrigin(request)) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     const session = await repository.findActiveSession(sha256(token), new Date()); if (!session || !validCsrf(request, session.csrfTokenHash)) return reply.code(403).send(errorBody(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
     const pushEndpoint = typeof request.body?.pushEndpoint === 'string' ? request.body.pushEndpoint : null;
+    if (database) await database.pushSubscription.deleteMany({ where: { userId: session.userId, sessionId: session.sessionId } });
     if (database && pushEndpoint && pushEndpoint.length <= 2048) {
       try {
         if (new URL(pushEndpoint).protocol === 'https:') await database.pushSubscription.deleteMany({ where: { userId: session.userId, endpointHash: sha256(pushEndpoint) } });
@@ -181,7 +187,9 @@ export function registerAuthRoutes(app: FastifyInstance, environment: AppEnviron
     const user = await repository.findUserByEmail(session.user.email); const currentValid = user?.passwordHash ? await verifyPassword(currentPassword, user.passwordHash) : false;
     if (!user || !currentValid) return reply.code(401).send(errorBody(request, 'CURRENT_PASSWORD_INVALID', 'A senha atual está incorreta.'));
     if (await verifyPassword(newPassword, user.passwordHash!)) return reply.code(400).send(errorBody(request, 'PASSWORD_UNCHANGED', 'A nova senha deve ser diferente da senha atual.'));
-    await repository.updatePasswordAndRevokeOtherSessions(user.id, await hashPassword(newPassword), session.sessionId, new Date()); return reply.code(204).send();
+    await repository.updatePasswordAndRevokeOtherSessions(user.id, await hashPassword(newPassword), session.sessionId, new Date());
+    if (database) await database.pushSubscription.deleteMany({ where: { userId: user.id, OR: [{ sessionId: { not: session.sessionId } }, { sessionId: null }] } });
+    return reply.code(204).send();
   });
 
   app.get('/auth/mfa/status', async (request, reply) => {
@@ -226,6 +234,7 @@ export function registerAuthRoutes(app: FastifyInstance, environment: AppEnviron
       database.user.update({ where: { id: session.userId }, data: { mfaSecretEncrypted: null, mfaPendingSecretEncrypted: null, mfaEnabledAt: null } }),
       database.mfaRecoveryCode.deleteMany({ where: { userId: session.userId } }),
       database.session.updateMany({ where: { userId: session.userId, id: { not: session.sessionId }, revokedAt: null }, data: { revokedAt: now } }),
+      database.pushSubscription.deleteMany({ where: { userId: session.userId, OR: [{ sessionId: { not: session.sessionId } }, { sessionId: null }] } }),
       database.session.update({ where: { id: session.sessionId }, data: { mfaVerifiedAt: null } }),
       database.auditLog.create({ data: { actorType: 'USER', actorUserId: session.userId, action: 'auth.mfa_disabled', targetType: 'user', targetId: session.userId } }),
     ]); return reply.code(204).send();

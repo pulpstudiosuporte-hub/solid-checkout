@@ -60,11 +60,16 @@ export function registerNotificationRoutes(app: FastifyInstance, environment: Ap
     if (!csrfValid(request, current.session.csrfTokenHash)) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso negado.'));
     if (!environment.VAPID_PUBLIC_KEY || !environment.APP_ENCRYPTION_KEY) return reply.code(503).send(failure(request, 'PUSH_UNAVAILABLE', 'Notifica\u00e7\u00f5es em segundo plano ainda n\u00e3o foram configuradas.'));
     if (!validPushBody(request.body)) return reply.code(400).send(failure(request, 'INVALID_PUSH_SUBSCRIPTION', 'Inscri\u00e7\u00e3o de notifica\u00e7\u00e3o inv\u00e1lida.'));
-    const endpointHash = sha256(request.body.endpoint);
-    await db.pushSubscription.upsert({
-      where: { endpointHash },
-      create: { userId: current.session.userId, endpointHash, endpointEncrypted: encryptSecret(request.body.endpoint, environment.APP_ENCRYPTION_KEY), p256dhEncrypted: encryptSecret(request.body.keys.p256dh, environment.APP_ENCRYPTION_KEY), authEncrypted: encryptSecret(request.body.keys.auth, environment.APP_ENCRYPTION_KEY), userAgent: request.headers['user-agent']?.slice(0, 500) ?? null },
-      update: { userId: current.session.userId, endpointEncrypted: encryptSecret(request.body.endpoint, environment.APP_ENCRYPTION_KEY), p256dhEncrypted: encryptSecret(request.body.keys.p256dh, environment.APP_ENCRYPTION_KEY), authEncrypted: encryptSecret(request.body.keys.auth, environment.APP_ENCRYPTION_KEY), userAgent: request.headers['user-agent']?.slice(0, 500) ?? null, lastUsedAt: new Date() },
+    const body = request.body;
+    const endpointHash = sha256(body.endpoint);
+    await db.$transaction(async transaction => {
+      await transaction.pushSubscription.upsert({
+        where: { endpointHash },
+        create: { userId: current.session.userId, sessionId: current.session.sessionId, endpointHash, endpointEncrypted: encryptSecret(body.endpoint, environment.APP_ENCRYPTION_KEY!), p256dhEncrypted: encryptSecret(body.keys.p256dh, environment.APP_ENCRYPTION_KEY!), authEncrypted: encryptSecret(body.keys.auth, environment.APP_ENCRYPTION_KEY!), userAgent: request.headers['user-agent']?.slice(0, 500) ?? null },
+        update: { userId: current.session.userId, sessionId: current.session.sessionId, endpointEncrypted: encryptSecret(body.endpoint, environment.APP_ENCRYPTION_KEY!), p256dhEncrypted: encryptSecret(body.keys.p256dh, environment.APP_ENCRYPTION_KEY!), authEncrypted: encryptSecret(body.keys.auth, environment.APP_ENCRYPTION_KEY!), userAgent: request.headers['user-agent']?.slice(0, 500) ?? null, lastUsedAt: new Date() },
+      });
+      const excess = await transaction.pushSubscription.findMany({ where: { userId: current.session.userId }, orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }], skip: 10, select: { id: true } });
+      if (excess.length) await transaction.pushSubscription.deleteMany({ where: { id: { in: excess.map(item => item.id) } } });
     });
     return reply.code(201).send({ active: true });
   });

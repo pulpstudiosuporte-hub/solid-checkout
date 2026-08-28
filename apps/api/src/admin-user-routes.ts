@@ -68,6 +68,7 @@ export function registerAdminUserRoutes(app: FastifyInstance, environment: AppEn
     await db.$transaction([
       db.user.update({ where: { id: target.id }, data: { accountStatus: 'REJECTED', disabledAt: now } }),
       db.session.updateMany({ where: { userId: target.id, revokedAt: null }, data: { revokedAt: now } }),
+      db.pushSubscription.deleteMany({ where: { userId: target.id } }),
       db.auditLog.create({ data: { actorType: 'USER', actorUserId: session.userId, action: 'admin.user_blocked', targetType: 'user', targetId: target.publicId, requestId: request.id, metadata: { sessionsRevoked: true } } })
     ]);
     return reply.send({ status: 'REJECTED' });
