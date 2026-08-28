@@ -30,6 +30,7 @@ import CouponsPage from './CouponsPage';
 import NotificationCenter from './NotificationCenter';
 import AdminOperationsPage from './AdminOperationsPage';
 import InstallAppPrompt from './InstallAppPrompt';
+import BillingPage from './BillingPage';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -70,6 +71,7 @@ function Sidebar({ open, onClose, page, setPage, user, onLogout, stores, storeBu
         </button>)}
       </nav>
       <div className="side-bottom">
+        <button className={page === 'Meu plano' ? 'nav-item active' : 'nav-item'} onClick={() => { setPage('Meu plano'); onClose(); }}><CreditCard size={19}/><span>Meu plano</span></button>
         <button className={page === 'Configurações' ? 'nav-item active' : 'nav-item'} onClick={() => { setPage('Configurações'); onClose(); }}><Settings size={19}/><span>Configurações</span></button>
         <div className="profile"><div className="avatar">{user?.name?.split(' ').slice(0,2).map(part=>part[0]).join('').toUpperCase() || 'AD'}</div><span><b>{user?.name || 'Usuário'}</b><small>{roleLabels[activeRole] || 'Membro'}</small></span><button className="icon-btn" onClick={onLogout} aria-label="Sair do painel" title="Sair"><LogOut size={17}/></button></div>
       </div>
@@ -198,7 +200,7 @@ function App(){
   if(editor) return <CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/>;
   if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>;
   const activeStore=stores.find(store=>store.active);
-  const pageContent=page==='Visão geral'?<Dashboard setPage={setPage} storeKey={activeStore?.publicId}/>:page==='Pedidos'?<OrdersPage storeKey={activeStore?.publicId}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Operações'?<AdminOperationsPage csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Gateways'?<GatewaysPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Domínios'?<DomainsPage csrfToken={auth.csrfToken}/>:page==='Produtos'?<ProductsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onOpenIntegrations={()=>setPage('Integrações')}/>:page==='Order bumps'?<OrderBumpsPage csrfToken={auth.csrfToken}/>:page==='Cupons'?<CouponsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>;
+  const pageContent=page==='Visão geral'?<Dashboard setPage={setPage} storeKey={activeStore?.publicId}/>:page==='Pedidos'?<OrdersPage storeKey={activeStore?.publicId}/>:page==='Meu plano'?<BillingPage csrfToken={auth.csrfToken}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Operações'?<AdminOperationsPage csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Gateways'?<GatewaysPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Domínios'?<DomainsPage csrfToken={auth.csrfToken}/>:page==='Produtos'?<ProductsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onOpenIntegrations={()=>setPage('Integrações')}/>:page==='Order bumps'?<OrderBumpsPage csrfToken={auth.csrfToken}/>:page==='Cupons'?<CouponsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>;
   return <div className="app"><InstallAppPrompt/><Sidebar open={sidebar} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout} stores={stores} storeBusy={storeBusy} onSelectStore={handleSelectStore} onCreateStore={handleCreateStore} onArchiveStore={handleArchiveStore}/><div className="main-shell"><Header toggleSidebar={()=>setSidebar(true)} apiStatus={apiStatus} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onNavigate={setPage}/><PageErrorBoundary routeKey={`${activeStore?.publicId || 'store'}:${page}`} onHome={()=>setPage('Visão geral')}>{pageContent}</PageErrorBoundary></div></div>
 }
 

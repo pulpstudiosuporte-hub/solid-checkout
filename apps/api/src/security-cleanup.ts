@@ -10,7 +10,7 @@ export async function runSecurityCleanup(database: PrismaClient, logger: Fastify
   const monthAgo = new Date(now.getTime() - 30 * DAY);
   const pushLimit = new Date(now.getTime() - 90 * DAY);
   const auditLimit = new Date(now.getTime() - 400 * DAY);
-  const [signups, resetTokens, challenges, pushSubscriptions, sessions, expiredCheckouts, anonymizedCheckouts, audits] = await database.$transaction([
+  const [signups, resetTokens, challenges, pushSubscriptions, sessions, expiredCheckouts, anonymizedCheckouts, billingBlocked, audits] = await database.$transaction([
     database.pendingSignup.deleteMany({ where: { expiresAt: { lt: dayAgo } } }),
     database.passwordResetToken.deleteMany({ where: { OR: [{ expiresAt: { lt: dayAgo } }, { usedAt: { lt: dayAgo } }] } }),
     database.mfaChallenge.deleteMany({ where: { OR: [{ expiresAt: { lt: dayAgo } }, { consumedAt: { lt: dayAgo } }] } }),
@@ -18,9 +18,10 @@ export async function runSecurityCleanup(database: PrismaClient, logger: Fastify
     database.session.deleteMany({ where: { OR: [{ revokedAt: { lt: monthAgo } }, { absoluteExpiresAt: { lt: monthAgo } }] } }),
     database.checkoutSession.updateMany({ where: { status: 'OPEN', expiresAt: { lte: now } }, data: { status: 'EXPIRED' } }),
     database.checkoutSession.updateMany({ where: { status: { in: ['EXPIRED', 'CANCELLED'] }, expiresAt: { lt: monthAgo } }, data: { customerDataEncrypted: null, customerEmailHash: null, customerDocumentHash: null, shippingAddressEncrypted: null } }),
+    database.billingSubscription.updateMany({ where: { status: 'PAST_DUE', graceUntil: { lte: now }, blockedAt: null }, data: { status: 'UNPAID', blockedAt: now } }),
     database.auditLog.deleteMany({ where: { createdAt: { lt: auditLimit } } })
   ]);
-  logger.info({ deleted: { signups: signups.count, resetTokens: resetTokens.count, challenges: challenges.count, pushSubscriptions: pushSubscriptions.count, sessions: sessions.count, audits: audits.count }, updated: { expiredCheckouts: expiredCheckouts.count, anonymizedCheckouts: anonymizedCheckouts.count } }, 'security_cleanup_completed');
+  logger.info({ deleted: { signups: signups.count, resetTokens: resetTokens.count, challenges: challenges.count, pushSubscriptions: pushSubscriptions.count, sessions: sessions.count, audits: audits.count }, updated: { expiredCheckouts: expiredCheckouts.count, anonymizedCheckouts: anonymizedCheckouts.count, billingBlocked: billingBlocked.count } }, 'security_cleanup_completed');
 }
 
 export function startSecurityCleanup(database: PrismaClient, logger: FastifyBaseLogger): () => void {

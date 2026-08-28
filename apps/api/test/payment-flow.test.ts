@@ -24,6 +24,7 @@ function fixture() {
   const context = { id: 'internal-session', publicId: 'session-public', totalCents: 500, discountCents: 0, shippingPriceCents: 0, customerDataEncrypted: customer, shippingAddressEncrypted: null, expiresAt: new Date(Date.now() + 600_000), quantity: 1, unitPriceCents: 500, checkout: { storeId: 'store-a', store: { name: 'Loja' }, product: { id: 'product-internal', checkoutTitle: 'Produto teste', fulfillmentType: 'DIGITAL' } }, items: [{ productId: 'product-internal', titleSnapshot: 'Produto teste', unitPriceCents: 500, quantity: 1 }] };
   const gateway = {
     paymentContext: vi.fn().mockResolvedValue(context), primaryProvider: vi.fn().mockResolvedValue('ROAS'),
+    billingAccessAllowed: vi.fn().mockResolvedValue(true),
     credentials: vi.fn((_storeId: string, provider = 'WESTPAY') => Promise.resolve(provider === 'ROAS' ? credentials : null)),
     latestAttempt: vi.fn(() => Promise.resolve(completedAttempt)),
     createAttempt: vi.fn().mockResolvedValue({ id: 'attempt-internal', publicId: 'attempt-public', provider: 'ROAS', status: 'PENDING', amountCents: 500, pixCodeEncrypted: null, expiresAt: null }),

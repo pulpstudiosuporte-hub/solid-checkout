@@ -184,7 +184,7 @@ export class PrismaGatewayRepository {
 
   async confirmPayment(attemptId: string, checkoutSessionId: string, status: 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED', paidAt?: Date) {
     await this.database.$transaction(async transaction => {
-      const current = await transaction.paymentAttempt.findUnique({ where: { id: attemptId }, select: { status: true } });
+      const current = await transaction.paymentAttempt.findUnique({ where: { id: attemptId }, select: { status: true, amountCents: true, session: { select: { checkout: { select: { store: { select: { members: { where: { role: 'OWNER' }, orderBy: { createdAt: 'asc' }, take: 1, select: { userId: true } } } } } } } } } });
       if (!current || current.status === 'REFUNDED' || current.status === status) return;
       const canTransition = canTransitionPayment(current.status, status);
       if (!canTransition) return;
@@ -193,6 +193,26 @@ export class PrismaGatewayRepository {
         const completed = await transaction.checkoutSession.updateMany({ where: { id: checkoutSessionId, status: 'OPEN' }, data: { status: 'COMPLETED', completedAt: paidAt ?? new Date() } });
         if (completed.count) { const session = await transaction.checkoutSession.findUnique({ where: { id: checkoutSessionId }, select: { couponId: true } }); if (session?.couponId) await transaction.coupon.update({ where: { id: session.couponId }, data: { redemptionCount: { increment: 1 } } }); }
       }
+      const ownerId = current.session.checkout.store.members[0]?.userId;
+      if (ownerId && (status === 'PAID' || status === 'REFUNDED')) {
+        const billing = await transaction.billingSubscription.upsert({ where: { userId: ownerId }, create: { userId: ownerId }, update: {} });
+        const originalFee = status === 'REFUNDED'
+          ? await transaction.billingLedgerEntry.findUnique({ where: { paymentAttemptId_type: { paymentAttemptId: attemptId, type: 'TRANSACTION_FEE' } } })
+          : null;
+        const feeBasisPoints = originalFee?.feeBasisPoints ?? billing.feeBasisPoints;
+        const feeCents = originalFee?.amountCents ?? Math.round(current.amountCents * feeBasisPoints / 10_000);
+        await transaction.billingLedgerEntry.upsert({
+          where: { paymentAttemptId_type: { paymentAttemptId: attemptId, type: status === 'PAID' ? 'TRANSACTION_FEE' : 'REFUND_CREDIT' } },
+          create: { userId: ownerId, paymentAttemptId: attemptId, type: status === 'PAID' ? 'TRANSACTION_FEE' : 'REFUND_CREDIT', grossAmountCents: current.amountCents, feeBasisPoints, amountCents: status === 'PAID' ? feeCents : -feeCents, occurredAt: paidAt ?? new Date() },
+          update: {},
+        });
+      }
     });
+  }
+
+  async billingAccessAllowed(storeId: string): Promise<boolean> {
+    const owner = await this.database.storeMember.findFirst({ where: { storeId, role: 'OWNER' }, orderBy: { createdAt: 'asc' }, select: { user: { select: { billingSubscription: { select: { blockedAt: true, status: true } } } } } });
+    const billing = owner?.user.billingSubscription;
+    return !billing || (!billing.blockedAt && !['UNPAID', 'CANCELED'].includes(billing.status));
   }
 }

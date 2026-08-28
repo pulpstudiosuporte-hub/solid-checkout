@@ -63,6 +63,26 @@ enum DeliveryJobStatus {
   DEAD
 }
 
+enum BillingPlan {
+  START
+  PRIME
+  ELITE
+}
+
+enum BillingSubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  UNPAID
+  CANCELED
+  INCOMPLETE
+}
+
+enum BillingEntryType {
+  TRANSACTION_FEE
+  REFUND_CREDIT
+}
+
 model User {
   id              String        @id @default(uuid()) @db.Uuid
   publicId        String        @unique @default(cuid()) @map("public_id") @db.VarChar(32)
@@ -87,6 +107,8 @@ model User {
   mfaChallenges   MfaChallenge[]
   mfaRecoveryCodes MfaRecoveryCode[]
   passwordResetTokens PasswordResetToken[]
+  billingSubscription BillingSubscription?
+  billingEntries BillingLedgerEntry[]
 
   @@index([accountStatus, createdAt(sort: Desc)])
   @@map("users")
@@ -446,10 +468,53 @@ model PaymentAttempt {
   createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
   session               CheckoutSession @relation(fields: [checkoutSessionId], references: [id], onDelete: Restrict)
+  billingEntries        BillingLedgerEntry[]
 
   @@index([checkoutSessionId, createdAt(sort: Desc)])
   @@index([status, expiresAt])
   @@map("payment_attempts")
+}
+
+model BillingSubscription {
+  id                   String                    @id @default(uuid()) @db.Uuid
+  userId               String                    @unique @map("user_id") @db.Uuid
+  plan                 BillingPlan               @default(START)
+  status               BillingSubscriptionStatus @default(INCOMPLETE)
+  monthlyPriceCents    Int                       @default(0) @map("monthly_price_cents")
+  feeBasisPoints       Int                       @default(200) @map("fee_basis_points")
+  stripeCustomerId     String?                   @unique @map("stripe_customer_id") @db.VarChar(128)
+  stripeSubscriptionId String?                   @unique @map("stripe_subscription_id") @db.VarChar(128)
+  currentPeriodStart   DateTime?                 @map("current_period_start") @db.Timestamptz(3)
+  currentPeriodEnd     DateTime?                 @map("current_period_end") @db.Timestamptz(3)
+  graceUntil           DateTime?                 @map("grace_until") @db.Timestamptz(3)
+  blockedAt            DateTime?                 @map("blocked_at") @db.Timestamptz(3)
+  canceledAt           DateTime?                 @map("canceled_at") @db.Timestamptz(3)
+  createdAt            DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user                 User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, graceUntil])
+  @@map("billing_subscriptions")
+}
+
+model BillingLedgerEntry {
+  id               String           @id @default(uuid()) @db.Uuid
+  userId           String           @map("user_id") @db.Uuid
+  paymentAttemptId String           @map("payment_attempt_id") @db.Uuid
+  type             BillingEntryType
+  grossAmountCents Int              @map("gross_amount_cents")
+  feeBasisPoints   Int              @map("fee_basis_points")
+  amountCents      Int              @map("amount_cents")
+  occurredAt       DateTime         @map("occurred_at") @db.Timestamptz(3)
+  stripeInvoiceId  String?          @map("stripe_invoice_id") @db.VarChar(128)
+  billedAt         DateTime?        @map("billed_at") @db.Timestamptz(3)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  user             User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  paymentAttempt   PaymentAttempt   @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict)
+
+  @@unique([paymentAttemptId, type])
+  @@index([userId, billedAt, occurredAt])
+  @@map("billing_ledger_entries")
 }
 
 model ShippingMethod {

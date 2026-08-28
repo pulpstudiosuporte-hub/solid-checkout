@@ -1,6 +1,7 @@
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import rawBody from 'fastify-raw-body';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { createHash } from 'node:crypto';
 import type { AppEnvironment } from '@solid/config';
@@ -27,6 +28,7 @@ import { registerAdminUserRoutes } from './admin-user-routes.js';
 import { registerCouponRoutes } from './coupon-routes.js';
 import { registerNotificationRoutes } from './notification-routes.js';
 import { registerAdminOperationRoutes } from './admin-operation-routes.js';
+import { registerBillingRoutes } from './billing-routes.js';
 
 export function buildApp(environment: AppEnvironment, dependencies: { authRepository?: AuthRepository; catalogRepository?: CatalogRepository; storeRepository?: StoreRepository; shopifyRepository?: ShopifyRepository; gatewayRepository?: PrismaGatewayRepository; orderRepository?: OrderRepository; dokployClient?: DokployDomainClient; database?: PrismaClient } = {}): FastifyInstance {
   const app = Fastify({
@@ -45,6 +47,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
     void dependencies.storeRepository.isCheckoutDomainAllowed(hostname).then(allowed => callback(null, allowed)).catch(() => callback(null, false));
   }, credentials: true, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], allowedHeaders: ['authorization', 'content-type', 'x-csrf-token', 'x-request-id', 'x-solid-user-context'], maxAge: 600 });
   void app.register(rateLimit, { max: 100, timeWindow: '1 minute', ban: 3, errorResponseBuilder: (_request, context) => ({ error: { code: 'RATE_LIMITED', message: `Muitas requisições. Tente novamente em ${context.after}.`, requestId: _request.id } }) });
+  void app.register(rawBody, { field: 'rawBody', global: false, encoding: false, runFirst: true });
   if (dependencies.authRepository) {
     const repository = dependencies.authRepository;
     const sessionCookie = environment.NODE_ENV === 'production' ? '__Host-solid_session' : 'solid_session';
@@ -67,6 +70,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
   if (dependencies.authRepository && dependencies.database) registerAdminUserRoutes(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.database) registerAdminOperationRoutes(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.database) registerNotificationRoutes(app, environment, dependencies.authRepository, dependencies.database);
+  if (dependencies.authRepository && dependencies.database) registerBillingRoutes(app, environment, dependencies.authRepository, dependencies.database);
   const dokployClient = dependencies.dokployClient ?? (environment.DOKPLOY_URL && environment.DOKPLOY_API_KEY && environment.DOKPLOY_CHECKOUT_APPLICATION_ID ? new HttpDokployDomainClient(environment) : undefined);
   if (dependencies.authRepository && dependencies.storeRepository) registerStoreRoutes(app, environment, dependencies.authRepository, dependencies.storeRepository, dokployClient);
   if (dependencies.authRepository && dependencies.shopifyRepository) registerShopifyRoutes(app, environment, dependencies.authRepository, dependencies.shopifyRepository);
