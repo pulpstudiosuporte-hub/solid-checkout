@@ -3,6 +3,7 @@ import type { AppEnvironment } from '@solid/config';
 import type { PrismaClient } from '@solid/database';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { hashPassword } from './password.js';
+import { verifyTurnstile } from './turnstile.js';
 
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
 const token = () => randomBytes(32).toString('base64url');
@@ -19,8 +20,9 @@ async function sendVerification(environment: AppEnvironment, email: string, name
 export function registerRegistrationRoutes(app: FastifyInstance, environment: AppEnvironment, database: PrismaClient): void {
   const secure = environment.NODE_ENV === 'production'; const csrfCookie = secure ? '__Host-solid_auth_csrf' : 'solid_auth_csrf';
   const authorized = (request: FastifyRequest) => typeof request.headers.origin === 'string' && environment.CORS_ORIGINS.includes(request.headers.origin) && typeof request.headers['x-csrf-token'] === 'string' && request.cookies[csrfCookie] === request.headers['x-csrf-token'];
-  app.post<{ Body: { name?: unknown; email?: unknown; password?: unknown; termsAccepted?: unknown } }>('/auth/register', { config: { rateLimit: { max: 3, timeWindow: '15 minutes' } } }, async (request, reply) => {
+  app.post<{ Body: { name?: unknown; email?: unknown; password?: unknown; termsAccepted?: unknown; turnstileToken?: unknown } }>('/auth/register', { config: { rateLimit: { max: 3, timeWindow: '15 minutes' } } }, async (request, reply) => {
     if (!authorized(request)) return reply.code(403).send(errorBody(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
+    if (!await verifyTurnstile(environment, request.body?.turnstileToken, request.ip, 'register')) return reply.code(403).send(errorBody(request, 'BOT_CHALLENGE_FAILED', 'Não foi possível validar que você é uma pessoa. Atualize o desafio e tente novamente.'));
     const name = typeof request.body?.name === 'string' ? request.body.name.trim().replace(/\s+/g, ' ') : ''; const email = typeof request.body?.email === 'string' ? request.body.email.trim().toLowerCase() : ''; const password = typeof request.body?.password === 'string' ? request.body.password : '';
     if (name.length < 3 || name.length > 120 || !/^\S+@\S+\.\S+$/.test(email) || email.length > 320 || password.length < 14 || password.length > 128 || request.body?.termsAccepted !== true) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Revise os dados e aceite os termos para continuar.'));
     if (await database.user.findUnique({ where: { email }, select: { id: true } })) return reply.code(202).send({ pending: true });

@@ -116,7 +116,7 @@ async function authPost(path, body) {
   const { csrfToken } = await readJson(csrfResponse);
   return readJson(await fetch(`${apiBaseUrl}${path}`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(body) }));
 }
-export function registerAccount(name, email, password) { return authPost('/auth/register', { name, email, password, termsAccepted: true }); }
+export function registerAccount(name, email, password, turnstileToken) { return authPost('/auth/register', { name, email, password, termsAccepted: true, turnstileToken }); }
 export function verifyAccount(token) { return authPost('/auth/verify-email', { token }); }
 
 export async function logout(csrfToken, pushEndpoint) {

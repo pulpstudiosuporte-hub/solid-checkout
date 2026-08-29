@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowRight, CheckCircle2, Eye, EyeOff, LoaderCircle, LockKeyhole, ShieldCheck } from 'lucide-react';
+import Turnstile, { turnstileEnabled } from './Turnstile';
 
 export default function Login({ onSubmit, onMfaSubmit, onRegister, onVerify, onForgot, onReset }) {
   const urlToken = new URLSearchParams(window.location.hash.split('?')[1] || '').get('token');
@@ -9,13 +10,14 @@ export default function Login({ onSubmit, onMfaSubmit, onRegister, onVerify, onF
   const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false); const [loading, setLoading] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [terms, setTerms] = useState(false);
   const [mfaCode, setMfaCode] = useState(''); const [mfaChallenge, setMfaChallenge] = useState(null); const [confirmPassword, setConfirmPassword] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState(''); const [turnstileReset, setTurnstileReset] = useState(0);
 
   React.useEffect(() => { if (mode !== 'verify' || !verificationToken) return; setLoading(true); onVerify(verificationToken).then(() => { setNotice('E-mail confirmado. Seu cadastro foi enviado para aprovação.'); setMode('login'); window.history.replaceState({}, '', '/#/login'); }).catch(requestError => setError(requestError?.message || 'O link é inválido ou expirou.')).finally(() => setLoading(false)); }, []);
 
   async function submit(event) {
     event.preventDefault(); if (loading) return; setError(''); setLoading(true);
     try {
-      if (mode === 'register') { await onRegister(name.trim(), email.trim(), password); setNotice('Enviamos um link de confirmação para o seu e-mail. Ele é válido por 30 minutos.'); return; }
+      if (mode === 'register') { await onRegister(name.trim(), email.trim(), password, turnstileToken); setNotice('Enviamos um link de confirmação para o seu e-mail. Ele é válido por 30 minutos.'); return; }
       if (mode === 'forgot') { await onForgot(email.trim()); setNotice('Se o e-mail estiver cadastrado, enviaremos um link válido por 20 minutos.'); return; }
       if (mode === 'reset') { if (password !== confirmPassword) throw new Error('As senhas não coincidem.'); await onReset(urlToken, password); setNotice('Senha redefinida. Entre com sua nova senha.'); setPassword(''); setConfirmPassword(''); setMode('login'); window.history.replaceState({}, '', '/#/login'); return; }
       if (mode === 'mfa') { await onMfaSubmit(mfaChallenge.challengeToken, mfaCode, mfaChallenge.authCsrfToken); return; }
@@ -27,7 +29,9 @@ export default function Login({ onSubmit, onMfaSubmit, onRegister, onVerify, onF
       else if (requestError?.code === 'MFA_CODE_INVALID') setError('Código inválido. Confira o autenticador ou use um código de recuperação.');
       else if (requestError?.code === 'MFA_CHALLENGE_INVALID') { setError('O acesso expirou. Digite sua senha novamente.'); setMode('login'); setMfaChallenge(null); }
       else if (requestError?.status === 401) setError(mode === 'mfa' ? 'Código inválido.' : 'E-mail ou senha inválidos.');
+      else if (requestError?.code === 'BOT_CHALLENGE_FAILED') setError(requestError.message);
       else setError('Não foi possível entrar agora. Verifique sua conexão e tente novamente.');
+      if (mode === 'register') { setTurnstileToken(''); setTurnstileReset(value => value + 1); }
     } finally { setLoading(false); }
   }
 
@@ -49,11 +53,12 @@ export default function Login({ onSubmit, onMfaSubmit, onRegister, onVerify, onF
         {mode !== 'forgot' && <><div className="password-label"><label htmlFor="login-password">Senha</label>{mode === 'login' && <button className="login-help" type="button" onClick={() => changeMode('forgot')}>Esqueci minha senha</button>}</div><div className="password-field"><input id="login-password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} placeholder="Digite sua senha" required disabled={loading}/><button type="button" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOff size={19}/> : <Eye size={19}/>}</button></div></>}
         {mode === 'register' && <p className={`password-requirement ${password.length >= 14 ? 'valid' : ''}`}>{password.length >= 14 ? <CheckCircle2 size={15}/> : <LockKeyhole size={15}/>} {password.length >= 14 ? 'Senha segura para continuar' : `Use pelo menos 14 caracteres (${password.length}/14)`}</p>}
         {mode === 'register' && <label className="signup-terms"><input type="checkbox" checked={terms} onChange={event => setTerms(event.target.checked)}/><span>Li e aceito os Termos de Uso e a Política de Privacidade.</span></label>}
+        {mode === 'register' && <Turnstile action="register" onToken={setTurnstileToken} resetKey={turnstileReset}/>}
       </>}
       {mode === 'reset' && <><label htmlFor="reset-password">Nova senha</label><div className="password-field"><input id="reset-password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} required minLength={14}/><button type="button" onClick={() => setShowPassword(value => !value)} aria-label="Mostrar ou ocultar senha">{showPassword ? <EyeOff size={19}/> : <Eye size={19}/>}</button></div><label htmlFor="reset-confirm">Confirmar nova senha</label><input id="reset-confirm" type="password" autoComplete="new-password" value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} required minLength={14}/></>}
       {mode === 'mfa' && <><label htmlFor="mfa-code">Código de segurança</label><input id="mfa-code" autoFocus autoComplete="one-time-code" value={mfaCode} onChange={event => setMfaCode(event.target.value.toUpperCase())} placeholder="000000 ou código de recuperação" required disabled={loading}/><button className="login-help" type="button" onClick={() => changeMode('login')}>Voltar para o login</button></>}
       {error && <div className="login-error" role="alert">{error}</div>}{notice && <div className="login-notice" role="status"><CheckCircle2 size={18}/>{notice}</div>}
-      {mode !== 'verify' && <button className="login-submit" type="submit" disabled={loading || (mode === 'mfa' ? mfaCode.trim().length < 6 : mode === 'reset' ? password.length < 14 || password !== confirmPassword : !email || (mode !== 'forgot' && password.length < (mode === 'register' ? 14 : 1)) || mode === 'register' && (!name || !terms))}>{loading ? <><LoaderCircle className="spin" size={19}/> Aguarde...</> : <>{mode === 'register' ? 'Criar minha conta' : mode === 'mfa' ? 'Validar e entrar' : mode === 'forgot' ? 'Enviar link seguro' : mode === 'reset' ? 'Salvar nova senha' : 'Entrar no painel'} <ArrowRight size={19}/></>}</button>}
+      {mode !== 'verify' && <button className="login-submit" type="submit" disabled={loading || (mode === 'mfa' ? mfaCode.trim().length < 6 : mode === 'reset' ? password.length < 14 || password !== confirmPassword : !email || (mode !== 'forgot' && password.length < (mode === 'register' ? 14 : 1)) || mode === 'register' && (!name || !terms || turnstileEnabled && !turnstileToken))}>{loading ? <><LoaderCircle className="spin" size={19}/> Aguarde...</> : <>{mode === 'register' ? 'Criar minha conta' : mode === 'mfa' ? 'Validar e entrar' : mode === 'forgot' ? 'Enviar link seguro' : mode === 'reset' ? 'Salvar nova senha' : 'Entrar no painel'} <ArrowRight size={19}/></>}</button>}
       {mode === 'verify' && loading && <div className="login-help"><LoaderCircle className="spin" size={20}/> Validando...</div>}
       {mode !== 'mfa' && mode !== 'verify' && <p className="login-help">{mode === 'register' ? <>Já possui uma conta? <button type="button" onClick={() => changeMode('login')}>Entrar</button></> : mode === 'forgot' || mode === 'reset' ? <button type="button" onClick={() => changeMode('login')}>Voltar para o login</button> : <>Ainda não possui conta? <button type="button" onClick={() => changeMode('register')}>Criar conta</button></>}</p>}
     </form></section>
