@@ -206,6 +206,22 @@
 .dashboard-chart svg { height: 238px; }
 .dashboard-chart .line { stroke-width: 3.5; }
 .chart-point { fill: #fff; stroke: #7357e9; stroke-width: 3; vector-effect: non-scaling-stroke; }
+.dashboard-chart { position: relative; touch-action: pan-y; }
+.dashboard-gridlines line { stroke: #eeeaf7; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.dashboard-smooth-line { stroke: #6d16e8; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.chart-hit-point { fill: transparent; stroke: transparent; cursor: crosshair; outline: none; }
+.chart-hit-point:focus { fill: #fff; stroke: #6d16e8; stroke-width: 3; vector-effect: non-scaling-stroke; }
+.chart-active-marker line { stroke: #8f55ee; stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.chart-active-marker circle { fill: #fff; stroke: #6d16e8; stroke-width: 4; vector-effect: non-scaling-stroke; }
+.dashboard-chart-tooltip { position: absolute; z-index: 5; display: grid; gap: 3px; min-width: 158px; padding: 12px 14px; border-radius: 10px; background: #6812dd; color: #fff; box-shadow: 0 14px 30px rgba(73,20,143,.25); pointer-events: none; transform: translate(-50%,calc(-100% - 16px)); font-size: 11px; line-height: 1.45; }
+.dashboard-chart-tooltip::after { content: ""; position: absolute; left: 50%; bottom: -6px; width: 12px; height: 12px; background: #6812dd; transform: translateX(-50%) rotate(45deg); }
+.dashboard-chart-tooltip b { font-size: 11px; }
+.dashboard-chart-tooltip span { font-weight: 700; }
+.dashboard-chart-tooltip small { color: #e9dcff; font-size: 9px; }
+.dashboard-chart-tooltip.edge-left { transform: translate(0,calc(-100% - 16px)); }
+.dashboard-chart-tooltip.edge-left::after { left: 8px; transform: rotate(45deg); }
+.dashboard-chart-tooltip.edge-right { transform: translate(-100%,calc(-100% - 16px)); }
+.dashboard-chart-tooltip.edge-right::after { left: auto; right: 8px; transform: rotate(45deg); }
 .progress-count { flex: none; border-radius: 999px; background: #eeeafd; padding: 7px 9px; color: #6546d8; font-size: 10px; }
 .dashboard-progress .progress { height: 7px; margin: 22px 0 13px; }
 .dashboard-progress .progress span { background: linear-gradient(90deg,#7357e9,#9d80ff); }
