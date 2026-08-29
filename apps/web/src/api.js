@@ -58,6 +58,8 @@ export async function getApiHealth() {
 export async function getDashboard(period, signal) { return readJson(await fetch(`${apiBaseUrl}/dashboard?period=${encodeURIComponent(period)}`, { credentials: 'include', headers: { Accept: 'application/json' }, signal })); }
 export async function getBilling() { return readJson(await fetch(`${apiBaseUrl}/billing`, { credentials: 'include', headers: { Accept: 'application/json' } })); }
 export async function startBillingCheckout(plan, csrfToken) { return readJson(await fetch(`${apiBaseUrl}/billing/checkout`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify({ plan }) })); }
+export async function startBillingPix(plan, customer, csrfToken) { return readJson(await fetch(`${apiBaseUrl}/billing/pix`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify({ plan, ...customer }) })); }
+export async function getBillingPix(invoiceId) { return readJson(await fetch(`${apiBaseUrl}/billing/pix/${encodeURIComponent(invoiceId)}`, { credentials: 'include', headers: { Accept: 'application/json' } })); }
 export async function openBillingPortal(csrfToken) { return readJson(await fetch(`${apiBaseUrl}/billing/portal`, { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken } })); }
 
 async function readJson(response) {

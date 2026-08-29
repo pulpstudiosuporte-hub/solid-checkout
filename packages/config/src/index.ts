@@ -28,6 +28,8 @@ const environmentSchema = z.object({
   STRIPE_PRICE_START: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRIME: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_ELITE: z.string().startsWith('price_').optional(),
+  BILLING_ROAS_PUBLIC_KEY: z.string().min(8).optional(),
+  BILLING_ROAS_SECRET_KEY: z.string().min(8).optional(),
   APP_ENCRYPTION_KEY: z.string().optional().refine(value => !value || Buffer.from(value, 'base64').length === 32, 'deve conter exatamente 32 bytes em base64')
 }).strict();
 
@@ -45,7 +47,8 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): AppEnvironment {
     APP_ENCRYPTION_KEY: input.APP_ENCRYPTION_KEY, RESEND_API_KEY: input.RESEND_API_KEY, EMAIL_FROM: input.EMAIL_FROM,
     VAPID_PUBLIC_KEY: input.VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY: input.VAPID_PRIVATE_KEY, VAPID_SUBJECT: input.VAPID_SUBJECT,
     STRIPE_SECRET_KEY: input.STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET: input.STRIPE_WEBHOOK_SECRET,
-    STRIPE_PRICE_START: input.STRIPE_PRICE_START, STRIPE_PRICE_PRIME: input.STRIPE_PRICE_PRIME, STRIPE_PRICE_ELITE: input.STRIPE_PRICE_ELITE
+    STRIPE_PRICE_START: input.STRIPE_PRICE_START, STRIPE_PRICE_PRIME: input.STRIPE_PRICE_PRIME, STRIPE_PRICE_ELITE: input.STRIPE_PRICE_ELITE,
+    BILLING_ROAS_PUBLIC_KEY: input.BILLING_ROAS_PUBLIC_KEY, BILLING_ROAS_SECRET_KEY: input.BILLING_ROAS_SECRET_KEY
   };
   const result = environmentSchema.safeParse(known);
   if (!result.success) {
@@ -66,5 +69,6 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): AppEnvironment {
   if (vapidValues.some(Boolean) && !vapidValues.every(Boolean)) throw new Error('A configura\u00e7\u00e3o Web Push est\u00e1 incompleta');
   const stripeValues = [result.data.STRIPE_SECRET_KEY, result.data.STRIPE_WEBHOOK_SECRET, result.data.STRIPE_PRICE_START, result.data.STRIPE_PRICE_PRIME, result.data.STRIPE_PRICE_ELITE];
   if (stripeValues.some(Boolean) && !stripeValues.every(Boolean)) throw new Error('A configura\u00e7\u00e3o Stripe est\u00e1 incompleta');
+  if (Boolean(result.data.BILLING_ROAS_PUBLIC_KEY) !== Boolean(result.data.BILLING_ROAS_SECRET_KEY)) throw new Error('A configura\u00e7\u00e3o Roas do faturamento est\u00e1 incompleta');
   return { ...result.data, TRUST_PROXY: result.data.TRUST_PROXY === 'true' };
 }

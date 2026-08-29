@@ -83,6 +83,18 @@ enum BillingEntryType {
   REFUND_CREDIT
 }
 
+enum BillingPaymentProvider {
+  STRIPE
+  ROAS
+}
+
+enum BillingPixStatus {
+  PENDING
+  PAID
+  EXPIRED
+  FAILED
+}
+
 model User {
   id              String        @id @default(uuid()) @db.Uuid
   publicId        String        @unique @default(cuid()) @map("public_id") @db.VarChar(32)
@@ -109,6 +121,7 @@ model User {
   passwordResetTokens PasswordResetToken[]
   billingSubscription BillingSubscription?
   billingEntries BillingLedgerEntry[]
+  billingPixInvoices BillingPixInvoice[]
 
   @@index([accountStatus, createdAt(sort: Desc)])
   @@map("users")
@@ -484,6 +497,7 @@ model BillingSubscription {
   feeBasisPoints       Int                       @default(200) @map("fee_basis_points")
   stripeCustomerId     String?                   @unique @map("stripe_customer_id") @db.VarChar(128)
   stripeSubscriptionId String?                   @unique @map("stripe_subscription_id") @db.VarChar(128)
+  paymentProvider      BillingPaymentProvider?   @map("payment_provider")
   currentPeriodStart   DateTime?                 @map("current_period_start") @db.Timestamptz(3)
   currentPeriodEnd     DateTime?                 @map("current_period_end") @db.Timestamptz(3)
   graceUntil           DateTime?                 @map("grace_until") @db.Timestamptz(3)
@@ -495,6 +509,28 @@ model BillingSubscription {
 
   @@index([status, graceUntil])
   @@map("billing_subscriptions")
+}
+
+model BillingPixInvoice {
+  id                    String           @id @default(uuid()) @db.Uuid
+  publicId              String           @unique @default(cuid()) @map("public_id") @db.VarChar(32)
+  userId                String           @map("user_id") @db.Uuid
+  plan                  BillingPlan
+  status                BillingPixStatus @default(PENDING)
+  providerTransactionId String           @unique @map("provider_transaction_id") @db.VarChar(128)
+  monthlyAmountCents    Int              @map("monthly_amount_cents")
+  usageAmountCents      Int              @map("usage_amount_cents")
+  totalAmountCents      Int              @map("total_amount_cents")
+  pixCodeEncrypted      String           @map("pix_code_encrypted") @db.Text
+  expiresAt             DateTime?        @map("expires_at") @db.Timestamptz(3)
+  paidAt                DateTime?        @map("paid_at") @db.Timestamptz(3)
+  createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user                  User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, status, createdAt(sort: Desc)])
+  @@index([status, expiresAt])
+  @@map("billing_pix_invoices")
 }
 
 model BillingLedgerEntry {
