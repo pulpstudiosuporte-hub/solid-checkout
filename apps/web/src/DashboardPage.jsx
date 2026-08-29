@@ -93,6 +93,10 @@ export default function DashboardPage({ setPage, storeKey }) {
   };
 
   return <main className="page dashboard dashboard-v2">
+    <section className="solid-command-bar" aria-label="Atalho de configuração">
+      <div><span className="solid-command-icon"><Sparkles size={18}/></span><div><b>Deixe sua operação pronta para vender</b><p>{completed === 5 ? 'Configuração essencial concluída. Acompanhe os resultados em tempo real.' : `Faltam ${5 - completed} ${5 - completed === 1 ? 'etapa' : 'etapas'} para concluir a configuração essencial.`}</p></div></div>
+      <button onClick={() => setPage(tasks.find(task => !task[1])?.[2] || 'Checkouts')}>{completed === 5 ? 'Ver checkouts' : 'Continuar configuração'}<ArrowRight size={16}/></button>
+    </section>
     <section className="dashboard-hero">
       <div><p className="eyebrow">VISÃO GERAL</p><h1>Olá, {firstName}</h1><p>Seu negócio em um só lugar, com os números que importam.</p></div>
       <div className="title-actions"><label className="period-select"><span className="sr-only">Período dos indicadores</span><select value={period} onChange={event => setPeriod(event.target.value)}><option value="today">Hoje</option><option value="7d">Últimos 7 dias</option><option value="month">Este mês</option></select></label><button className="secondary" onClick={exportCsv}><FileText size={17}/> Exportar</button></div>
