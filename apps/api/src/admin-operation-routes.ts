@@ -21,6 +21,56 @@ export function registerAdminOperationRoutes(app: FastifyInstance, environment: 
     return typeof origin === 'string' && environment.CORS_ORIGINS.includes(origin) && typeof header === 'string' && Boolean(cookie) && safeEqual(cookie!, header) && safeEqual(sha256(header), session.csrfTokenHash);
   };
 
+  app.get('/admin/advanced/overview', async (request, reply) => {
+    if (!await adminSession(request)) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso administrativo necessário.'));
+    const now = new Date();
+    const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const since30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const [
+      users, pendingUsers, approvedUsers, blockedUsers, unverifiedUsers, mfaUsers,
+      stores, checkouts, publishedCheckouts, paymentAttempts, pendingPayments, paidPayments, paidRevenue,
+      shopifyConnected, shopifyAttention, gatewayConnected, activeDomains, activeSessions, auditEvents24h,
+      pendingOperations, processingOperations, deadOperations, recentAudit
+    ] = await Promise.all([
+      db.user.count(),
+      db.user.count({ where: { accountStatus: 'PENDING' } }),
+      db.user.count({ where: { accountStatus: 'APPROVED' } }),
+      db.user.count({ where: { disabledAt: { not: null } } }),
+      db.user.count({ where: { emailVerifiedAt: null } }),
+      db.user.count({ where: { mfaEnabledAt: { not: null } } }),
+      db.store.count({ where: { active: true } }),
+      db.checkout.count({ where: { archivedAt: null } }),
+      db.checkout.count({ where: { archivedAt: null, status: 'PUBLISHED' } }),
+      db.paymentAttempt.count({ where: { createdAt: { gte: since30d } } }),
+      db.paymentAttempt.count({ where: { status: 'PENDING' } }),
+      db.paymentAttempt.count({ where: { status: 'PAID', paidAt: { gte: since30d } } }),
+      db.paymentAttempt.aggregate({ where: { status: 'PAID', paidAt: { gte: since30d } }, _sum: { amountCents: true } }),
+      db.shopifyConnection.count({ where: { revokedAt: null, reconnectRequiredAt: null } }),
+      db.shopifyConnection.count({ where: { OR: [{ revokedAt: { not: null } }, { reconnectRequiredAt: { not: null } }] } }),
+      db.gatewayConnection.count({ where: { active: true, verifiedAt: { not: null } } }),
+      db.storeDomain.count({ where: { status: 'ACTIVE' } }),
+      db.session.count({ where: { revokedAt: null, expiresAt: { gt: now } } }),
+      db.auditLog.count({ where: { createdAt: { gte: since24h } } }),
+      db.integrationDeliveryJob.count({ where: { status: 'PENDING' } }),
+      db.integrationDeliveryJob.count({ where: { status: 'PROCESSING' } }),
+      db.integrationDeliveryJob.count({ where: { status: 'DEAD' } }),
+      db.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take: 8, select: { id: true, action: true, actorType: true, targetType: true, targetId: true, createdAt: true } })
+    ]);
+    const status = deadOperations > 0 ? 'critical' : pendingOperations + processingOperations + shopifyAttention > 0 ? 'attention' : 'operational';
+    return reply.header('cache-control', 'private, no-store').send({
+      generatedAt: now,
+      status,
+      metrics: {
+        users: { total: users, pending: pendingUsers, approved: approvedUsers, blocked: blockedUsers, emailUnverified: unverifiedUsers, mfaEnabled: mfaUsers },
+        commerce: { stores, checkouts, publishedCheckouts, paymentAttempts, pendingPayments, paidPayments, revenueCents30d: paidRevenue._sum.amountCents ?? 0 },
+        integrations: { shopifyConnected, shopifyAttention, gatewayConnected, activeDomains },
+        security: { activeSessions, mfaAdoptionPercent: users ? Math.round((mfaUsers / users) * 100) : 0, auditEvents24h },
+        operations: { pending: pendingOperations, processing: processingOperations, dead: deadOperations }
+      },
+      recentAudit: recentAudit.map(event => ({ ...event, id: event.id.toString() }))
+    });
+  });
+
   app.get('/admin/operations', async (request, reply) => {
     if (!await adminSession(request)) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso administrativo necessário.'));
     const [deliveries, shopify, customerEmails, merchantEmails] = await Promise.all([
