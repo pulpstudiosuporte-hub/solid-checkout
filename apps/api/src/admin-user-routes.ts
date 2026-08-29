@@ -80,7 +80,7 @@ export function registerAdminUserRoutes(app: FastifyInstance, environment: AppEn
     const monthlyWaived = request.body?.monthlyWaived === true;
     const expiresAtInput = request.body?.expiresAt === null || request.body?.expiresAt === '' ? null : request.body?.expiresAt;
     const reason = typeof request.body?.reason === 'string' ? request.body.reason.trim().replace(/\s+/g, ' ') : '';
-    if (plan !== null && !['START', 'PRIME', 'ELITE'].includes(String(plan))) return reply.code(400).send(failure(request, 'INVALID_PLAN', 'Escolha um plano válido.'));
+    if (plan !== null && (typeof plan !== 'string' || !['START', 'PRIME', 'ELITE'].includes(plan))) return reply.code(400).send(failure(request, 'INVALID_PLAN', 'Escolha um plano válido.'));
     const selectedPlan = plan === null ? null : plan as 'START' | 'PRIME' | 'ELITE';
     if (feeBasisPoints !== null && (!Number.isInteger(feeBasisPoints) || feeBasisPoints < 0 || feeBasisPoints > 1000)) return reply.code(400).send(failure(request, 'INVALID_FEE', 'A taxa deve ficar entre 0% e 10%.'));
     const expiresAt = typeof expiresAtInput === 'string' ? new Date(expiresAtInput) : null;

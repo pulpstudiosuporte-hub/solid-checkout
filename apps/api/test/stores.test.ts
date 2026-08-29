@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { AppEnvironment } from '@solid/config';
 import { buildApp } from '../src/app.js';
 import type { AuthRepository, LoginUser, SessionUser } from '../src/auth-repository.js';
+import type { DokployDomainClient } from '../src/dokploy-client.js';
 import type { StoreDomainSummary, StoreRepository, StoreSummary } from '../src/store-repository.js';
 
 const origin = 'http://localhost:5173';
@@ -31,6 +32,17 @@ class MemoryStores implements StoreRepository {
   deleteDomainForUser(_userId: string, _sessionId: string, domainPublicId: string): Promise<boolean> { if (!this.domain || this.domain.publicId !== domainPublicId) return Promise.resolve(false); this.domain = null; return Promise.resolve(true); }
 }
 
+class FailingDokploy implements DokployDomainClient {
+  deletedDomainIds: string[] = [];
+  createCheckoutDomain(): Promise<string> { return Promise.resolve('unused'); }
+  findCheckoutDomain(): Promise<string | null> { return Promise.resolve(null); }
+  reconcileCheckoutDomain(): Promise<string> { return Promise.resolve('unused'); }
+  deleteCheckoutDomain(domainId: string): Promise<void> {
+    this.deletedDomainIds.push(domainId);
+    return Promise.reject(new Error('Dokploy indisponível'));
+  }
+}
+
 const headers = { origin, cookie: `solid_session=${sessionToken}; solid_csrf=${csrfToken}`, 'x-csrf-token': csrfToken };
 
 describe('contexto de lojas', () => {
@@ -52,5 +64,28 @@ describe('contexto de lojas', () => {
     const app = buildApp(env, { authRepository: new MemoryAuth(), storeRepository: new MemoryStores() });
     const response = await app.inject({ method: 'POST', url: '/stores/store-foreign/select', headers });
     expect(response.statusCode).toBe(404); await app.close();
+  });
+  it('mantém o novo domínio salvo quando a limpeza anterior no Dokploy falha', async () => {
+    const stores = new MemoryStores();
+    stores.domain = { publicId: 'domain-old', hostname: 'old.example.com', status: 'ACTIVE', verifiedAt: new Date(), activatedAt: new Date(), lastCheckedAt: new Date(), dokployDomainId: 'dokploy-old' };
+    const dokploy = new FailingDokploy();
+    const app = buildApp(env, { authRepository: new MemoryAuth(), storeRepository: stores, dokployClient: dokploy });
+    const response = await app.inject({ method: 'PUT', url: '/store-domain', headers, payload: { hostname: 'new.example.com' } });
+    expect(response.statusCode).toBe(200);
+    expect(stores.domain?.hostname).toBe('new.example.com');
+    expect(dokploy.deletedDomainIds).toEqual(['dokploy-old']);
+    await app.close();
+  });
+
+  it('remove o domínio do banco mesmo quando a limpeza no Dokploy falha', async () => {
+    const stores = new MemoryStores();
+    stores.domain = { publicId: 'domain-a', hostname: 'checkout.example.com', status: 'ACTIVE', verifiedAt: new Date(), activatedAt: new Date(), lastCheckedAt: new Date(), dokployDomainId: 'dokploy-a' };
+    const dokploy = new FailingDokploy();
+    const app = buildApp(env, { authRepository: new MemoryAuth(), storeRepository: stores, dokployClient: dokploy });
+    const response = await app.inject({ method: 'DELETE', url: '/store-domain/domain-a', headers });
+    expect(response.statusCode).toBe(204);
+    expect(stores.domain).toBeNull();
+    expect(dokploy.deletedDomainIds).toEqual(['dokploy-a']);
+    await app.close();
   });
 });

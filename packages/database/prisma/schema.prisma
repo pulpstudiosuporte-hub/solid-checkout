@@ -165,6 +165,7 @@ model Store {
   coupons Coupon[]
   notificationStates NotificationState[]
   deliveryJobs IntegrationDeliveryJob[]
+  mediaAssets MediaAsset[]
 
   @@map("stores")
 }
@@ -273,11 +274,14 @@ model ProductImage {
 
 model MediaAsset {
   id        String   @id @default(uuid()) @db.Uuid
+  storeId   String?  @map("store_id") @db.Uuid
   filename  String   @unique @db.VarChar(64)
   content   Bytes
   sizeBytes Int      @map("size_bytes")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  store     Store?   @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
+  @@index([storeId, createdAt])
   @@map("media_assets")
 }
 

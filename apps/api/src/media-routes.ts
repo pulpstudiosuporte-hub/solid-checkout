@@ -10,6 +10,7 @@ import type { CatalogRepository } from './catalog-repository.js';
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const same = (left: string, right: string): boolean => timingSafeEqual(Buffer.from(sha256(left), 'hex'), Buffer.from(sha256(right), 'hex'));
 const error = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
+const STORE_MEDIA_QUOTA_BYTES = 100 * 1024 * 1024;
 
 export function registerMediaRoutes(app: FastifyInstance, environment: AppEnvironment, auth: AuthRepository, catalog: CatalogRepository, database: PrismaClient): void {
   const secure = environment.NODE_ENV === 'production';
@@ -40,10 +41,16 @@ export function registerMediaRoutes(app: FastifyInstance, environment: AppEnviro
     }
     if (output.length > 3 * 1024 * 1024) output = await sharp(output).webp({ quality: 68, effort: 4 }).toBuffer();
 
+    const usage = await database.mediaAsset.aggregate({ where: { storeId: context.storeId }, _sum: { sizeBytes: true } });
+    if ((usage._sum.sizeBytes ?? 0) + output.length > STORE_MEDIA_QUOTA_BYTES) {
+      return reply.code(413).send(error(request, 'MEDIA_QUOTA_EXCEEDED', 'A loja atingiu o limite de 100 MB de imagens.'));
+    }
+
     const filename = `${randomUUID()}.webp`;
-    await database.mediaAsset.create({ data: { filename, content: Uint8Array.from(output), sizeBytes: output.length } });
+    await database.mediaAsset.create({ data: { storeId: context.storeId, filename, content: Uint8Array.from(output), sizeBytes: output.length } });
+    const metadata = await sharp(output).metadata();
     const base = environment.API_PUBLIC_URL?.replace(/\/$/, '') ?? '';
-    return reply.code(201).send({ imageUrl: `${base}/media/${filename}`, bytes: output.length, width: 1600, format: 'webp' });
+    return reply.code(201).send({ imageUrl: `${base}/media/${filename}`, bytes: output.length, width: metadata.width, height: metadata.height, format: 'webp' });
   });
 
   app.get<{ Params: { filename: string } }>('/media/:filename', async (request, reply) => {

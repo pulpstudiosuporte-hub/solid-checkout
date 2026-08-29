@@ -3,7 +3,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import rawBody from 'fastify-raw-body';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { AppEnvironment } from '@solid/config';
 import type { ErrorResponse, HealthResponse } from '@solid/contracts';
 import type { AuthRepository } from './auth-repository.js';
@@ -32,12 +32,26 @@ import { registerBillingRoutes } from './billing-routes.js';
 import { registerAbandonedCartRoutes } from './abandoned-cart-routes.js';
 
 export function buildApp(environment: AppEnvironment, dependencies: { authRepository?: AuthRepository; catalogRepository?: CatalogRepository; storeRepository?: StoreRepository; shopifyRepository?: ShopifyRepository; gatewayRepository?: PrismaGatewayRepository; orderRepository?: OrderRepository; dokployClient?: DokployDomainClient; database?: PrismaClient } = {}): FastifyInstance {
+  const checkoutOriginCache = new Map<string, { allowed: boolean; expiresAt: number }>();
   const app = Fastify({
-    logger: environment.NODE_ENV === 'test' ? false : { level: environment.LOG_LEVEL, redact: { paths: ['req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie', '*.password', '*.token', '*.cpf'], censor: '[REDACTED]' } },
+    logger: environment.NODE_ENV === 'test' ? false : {
+      level: environment.LOG_LEVEL,
+      redact: {
+        paths: [
+          'req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie',
+          'req.body.password', 'req.body.currentPassword', 'req.body.newPassword',
+          'req.body.token', 'req.body.accessToken', 'req.body.apiKey',
+          'req.body.publicKey', 'req.body.secretKey', 'req.body.cpf',
+          '*.password', '*.token', '*.accessToken', '*.apiKey', '*.publicKey',
+          '*.secretKey', '*.cpf', '*.document', '*.documentNumber',
+          '*.customerDataEncrypted', '*.shippingAddressEncrypted', 'err.details'
+        ],
+        censor: '[REDACTED]'
+      }
+    },
     trustProxy: environment.TRUST_PROXY,
     bodyLimit: 1_048_576,
-    requestIdHeader: 'x-request-id',
-    genReqId: request => request.headers['x-request-id']?.toString().slice(0, 128) ?? crypto.randomUUID()
+    genReqId: () => randomUUID()
   });
 
   void app.register(helmet, { global: true, contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], baseUri: ["'none'"], formAction: ["'none'"], frameAncestors: ["'none'"] } }, hsts: environment.NODE_ENV === 'production' ? { maxAge: 31_536_000, includeSubDomains: true, preload: true } : false });
@@ -45,7 +59,13 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
     if (!origin || environment.CORS_ORIGINS.includes(origin)) return callback(null, true);
     let hostname = ''; try { const url = new URL(origin); if (url.protocol !== 'https:') return callback(null, false); hostname = url.hostname.toLowerCase(); } catch { return callback(null, false); }
     if (!dependencies.storeRepository?.isCheckoutDomainAllowed) return callback(null, false);
-    void dependencies.storeRepository.isCheckoutDomainAllowed(hostname).then(allowed => callback(null, allowed)).catch(() => callback(null, false));
+    const cached = checkoutOriginCache.get(hostname);
+    if (cached && cached.expiresAt > Date.now()) return callback(null, cached.allowed);
+    void dependencies.storeRepository.isCheckoutDomainAllowed(hostname).then(allowed => {
+      if (checkoutOriginCache.size >= 1_000) checkoutOriginCache.delete(checkoutOriginCache.keys().next().value ?? '');
+      checkoutOriginCache.set(hostname, { allowed, expiresAt: Date.now() + 60_000 });
+      callback(null, allowed);
+    }).catch(() => callback(null, false));
   }, credentials: true, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], allowedHeaders: ['authorization', 'content-type', 'x-csrf-token', 'x-request-id', 'x-solid-user-context'], maxAge: 600 });
   void app.register(rateLimit, { max: 100, timeWindow: '1 minute', ban: 3, errorResponseBuilder: (_request, context) => ({ error: { code: 'RATE_LIMITED', message: `Muitas requisições. Tente novamente em ${context.after}.`, requestId: _request.id } }) });
   if (dependencies.authRepository) {

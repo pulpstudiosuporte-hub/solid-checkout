@@ -23,4 +23,15 @@ describe('API foundation', () => {
     const body = errorResponseSchema.parse(response.json());
     expect(response.statusCode).toBe(404); expect(body.error).toMatchObject({ code: 'NOT_FOUND' }); expect(body.error.requestId).toBeTruthy();
   });
+  it('gera request id no servidor e ignora valores enviados pelo cliente', async () => {
+    const app = buildApp(env);
+    const accepted = await app.inject({ method: 'GET', url: '/missing', headers: { 'x-request-id': 'checkout:request-123' } });
+    const rejected = await app.inject({ method: 'GET', url: '/missing', headers: { 'x-request-id': 'valor com espaços' } });
+    await app.close();
+    const acceptedBody = errorResponseSchema.parse(accepted.json());
+    const rejectedBody = errorResponseSchema.parse(rejected.json());
+    expect(acceptedBody.error.requestId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(rejectedBody.error.requestId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(acceptedBody.error.requestId).not.toBe('checkout:request-123');
+  });
 });

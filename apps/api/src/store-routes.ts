@@ -77,9 +77,12 @@ export function registerStoreRoutes(app: FastifyInstance, environment: AppEnviro
     if (!validCheckoutHostname(hostname)) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Use um subdomínio válido, como checkout.sualoja.com.'));
     try {
       const previous = await stores.getDomainForUser(session.userId, session.sessionId);
-      if (previous && previous.hostname !== hostname && previous.dokployDomainId && dokploy) await dokploy.deleteCheckoutDomain(previous.dokployDomainId);
       const domain = await stores.saveDomainForUser(session.userId, session.sessionId, hostname, request.id);
       if (!domain) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Somente proprietários e administradores podem alterar domínios.'));
+      if (previous && previous.hostname !== hostname && previous.dokployDomainId && dokploy) {
+        try { await dokploy.deleteCheckoutDomain(previous.dokployDomainId); }
+        catch (error) { request.log.warn({ err: error, hostname: previous.hostname, domainId: previous.dokployDomainId }, 'previous_dokploy_domain_cleanup_deferred'); }
+      }
       return reply.send({ domain, cnameTarget: checkoutTarget });
     } catch (error) {
       if (typeof error === 'object' && error && 'code' in error && error.code === 'P2002') return reply.code(409).send(errorBody(request, 'DOMAIN_IN_USE', 'Este domínio já está conectado a outra loja SOLID.'));
@@ -110,8 +113,11 @@ export function registerStoreRoutes(app: FastifyInstance, environment: AppEnviro
     if (ensureMfa(request, reply, session)) return;
     const current = await stores.getDomainForUser(session.userId, session.sessionId);
     if (!current || current.publicId !== request.params.domainId) return reply.code(404).send(errorBody(request, 'DOMAIN_NOT_FOUND', 'Domínio não encontrado.'));
-    if (current.dokployDomainId && dokploy) { try { await dokploy.deleteCheckoutDomain(current.dokployDomainId); } catch (error) { request.log.error({ err: error, hostname: current.hostname }, 'dokploy_domain_deletion_failed'); return reply.code(502).send(errorBody(request, 'DOMAIN_DELETION_FAILED', 'Não foi possível remover a rota do checkout. Tente novamente.')); } }
     if (!await stores.deleteDomainForUser(session.userId, session.sessionId, request.params.domainId, request.id)) return reply.code(404).send(errorBody(request, 'DOMAIN_NOT_FOUND', 'Domínio não encontrado.'));
+    if (current.dokployDomainId && dokploy) {
+      try { await dokploy.deleteCheckoutDomain(current.dokployDomainId); }
+      catch (error) { request.log.warn({ err: error, hostname: current.hostname, domainId: current.dokployDomainId }, 'dokploy_domain_cleanup_deferred'); }
+    }
     return reply.code(204).send();
   });
 }
