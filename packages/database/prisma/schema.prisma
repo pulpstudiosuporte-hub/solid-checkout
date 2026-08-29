@@ -166,6 +166,8 @@ model Store {
   notificationStates NotificationState[]
   deliveryJobs IntegrationDeliveryJob[]
   mediaAssets MediaAsset[]
+  abandonedRecoverySettings AbandonedRecoverySettings?
+  abandonedRecoveryDeliveries AbandonedRecoveryDelivery[]
 
   @@map("stores")
 }
@@ -395,6 +397,7 @@ model CheckoutSession {
   items             CheckoutSessionItem[]
   paymentAttempts   PaymentAttempt[]
   deliveryJobs      IntegrationDeliveryJob[]
+  abandonedRecoveryDeliveries AbandonedRecoveryDelivery[]
   coupon            Coupon?               @relation(fields: [couponId], references: [id], onDelete: SetNull)
 
   @@index([checkoutId, status, expiresAt])
@@ -428,6 +431,44 @@ model IntegrationDeliveryJob {
   @@index([status, nextAttemptAt, claimedAt])
   @@index([storeId, createdAt(sort: Desc)])
   @@map("integration_delivery_jobs")
+}
+
+model AbandonedRecoverySettings {
+  id                 String   @id @default(uuid()) @db.Uuid
+  storeId            String   @unique @map("store_id") @db.Uuid
+  enabled            Boolean  @default(false)
+  activatedAt        DateTime? @map("activated_at") @db.Timestamptz(3)
+  firstDelayMinutes  Int      @default(60) @map("first_delay_minutes")
+  secondEnabled      Boolean  @default(false) @map("second_enabled")
+  secondDelayHours   Int      @default(24) @map("second_delay_hours")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  store              Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("abandoned_recovery_settings")
+}
+
+model AbandonedRecoveryDelivery {
+  id                String            @id @default(uuid()) @db.Uuid
+  publicId          String            @unique @default(cuid()) @map("public_id") @db.VarChar(32)
+  storeId           String            @map("store_id") @db.Uuid
+  checkoutSessionId String            @map("checkout_session_id") @db.Uuid
+  step              Int
+  status            DeliveryJobStatus @default(PENDING)
+  scheduledAt       DateTime          @map("scheduled_at") @db.Timestamptz(3)
+  attempts          Int               @default(0)
+  claimedAt         DateTime?         @map("claimed_at") @db.Timestamptz(3)
+  deliveredAt       DateTime?         @map("delivered_at") @db.Timestamptz(3)
+  lastError         String?           @map("last_error") @db.VarChar(500)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  store             Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  checkoutSession   CheckoutSession   @relation(fields: [checkoutSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([checkoutSessionId, step])
+  @@index([status, scheduledAt, claimedAt])
+  @@index([storeId, createdAt(sort: Desc)])
+  @@map("abandoned_recovery_deliveries")
 }
 
 model Coupon {

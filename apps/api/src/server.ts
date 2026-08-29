@@ -13,6 +13,7 @@ import { startShopifyOrderReconciliation } from './shopify-order-reconciliation.
 import { startConfirmationEmailDelivery } from './confirmation-email.js';
 import { startIntegrationDelivery } from './integration-delivery.js';
 import { startSecurityCleanup } from './security-cleanup.js';
+import { startAbandonedRecovery } from './abandoned-recovery.js';
 import { createStorePushDispatcher } from './web-push-service.js';
 import { startJobLeader } from './job-leader.js';
 
@@ -30,7 +31,8 @@ const stopJobLeader = startJobLeader(environment.DATABASE_URL, app.log, () => {
     startShopifyOrderReconciliation(environment, shopifyRepository, app.log),
     startConfirmationEmailDelivery(environment, database, app.log),
     startIntegrationDelivery(environment, gatewayRepository, app.log),
-    startSecurityCleanup(database, app.log)
+    startSecurityCleanup(database, app.log),
+    startAbandonedRecovery(environment, database, app.log)
   ];
   return () => stops.forEach(stop => stop());
 });

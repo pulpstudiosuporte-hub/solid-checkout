@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
 import type { Prisma, PrismaClient } from '@solid/database';
@@ -8,6 +8,7 @@ import { planLimits } from './plan-entitlements.js';
 import { effectiveBilling } from './billing-entitlements.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
+const safeEqual = (left: string, right: string): boolean => timingSafeEqual(Buffer.from(sha256(left), 'hex'), Buffer.from(sha256(right), 'hex'));
 const errorBody = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
 
 function customerData(value: string | null, key: string, request: FastifyRequest, id: string) {
@@ -23,6 +24,22 @@ function customerData(value: string | null, key: string, request: FastifyRequest
 
 export function registerAbandonedCartRoutes(app: FastifyInstance, environment: AppEnvironment, auth: AuthRepository, database: PrismaClient): void {
   const sessionCookie = environment.NODE_ENV === 'production' ? '__Host-solid_session' : 'solid_session';
+  const csrfCookie = environment.NODE_ENV === 'production' ? '__Host-solid_csrf' : 'solid_csrf';
+  const recoveryContext = async (request: FastifyRequest, mutation = false) => {
+    const token = request.cookies[sessionCookie];
+    const current = token ? await auth.findActiveSession(sha256(token), new Date()) : null;
+    if (!current) return null;
+    if (mutation) {
+      const origin = request.headers.origin;
+      const cookie = request.cookies[csrfCookie];
+      const header = request.headers['x-csrf-token'];
+      if (typeof origin !== 'string' || !environment.CORS_ORIGINS.includes(origin) || !cookie || typeof header !== 'string' || !safeEqual(cookie, header) || !safeEqual(sha256(header), current.csrfTokenHash)) return null;
+    }
+    const active = await database.session.findFirst({ where: { id: current.sessionId, userId: current.userId, revokedAt: null }, select: { activeStoreId: true } });
+    if (!active?.activeStoreId) return null;
+    const membership = await database.storeMember.findUnique({ where: { storeId_userId: { storeId: active.activeStoreId, userId: current.userId } }, select: { role: true } });
+    return membership ? { storeId: active.activeStoreId, role: membership.role } : null;
+  };
 
   app.get<{ Querystring: { page?: string; pageSize?: string; status?: string } }>('/abandoned-carts', async (request, reply) => {
     const token = request.cookies[sessionCookie];
@@ -102,5 +119,42 @@ export function registerAbandonedCartRoutes(app: FastifyInstance, environment: A
     }, { totalCents: 0, pendingCents: 0, abandonedCount: 0, pendingCount: 0 });
 
     return reply.header('cache-control', 'private, no-store').send({ items, total, page, pageSize, pages: Math.max(1, Math.ceil(total / pageSize)), retentionDays, metrics });
+  });
+
+  app.get('/abandoned-carts/recovery-settings', async (request, reply) => {
+    const context = await recoveryContext(request);
+    if (!context) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
+    const settings = await database.abandonedRecoverySettings.findUnique({ where: { storeId: context.storeId } });
+    const [delivered, pending, failed] = await Promise.all([
+      database.abandonedRecoveryDelivery.count({ where: { storeId: context.storeId, status: 'DELIVERED', lastError: null } }),
+      database.abandonedRecoveryDelivery.count({ where: { storeId: context.storeId, status: { in: ['PENDING', 'PROCESSING'] } } }),
+      database.abandonedRecoveryDelivery.count({ where: { storeId: context.storeId, status: 'DEAD' } })
+    ]);
+    return reply.header('cache-control', 'private, no-store').send({
+      settings: settings ? { enabled: settings.enabled, firstDelayMinutes: settings.firstDelayMinutes, secondEnabled: settings.secondEnabled, secondDelayHours: settings.secondDelayHours } : { enabled: false, firstDelayMinutes: 60, secondEnabled: false, secondDelayHours: 24 },
+      writable: context.role === 'OWNER' || context.role === 'ADMIN',
+      metrics: { delivered, pending, failed }
+    });
+  });
+
+  app.put<{ Body: { enabled?: unknown; firstDelayMinutes?: unknown; secondEnabled?: unknown; secondDelayHours?: unknown } }>('/abandoned-carts/recovery-settings', async (request, reply) => {
+    const context = await recoveryContext(request, true);
+    if (!context || !['OWNER', 'ADMIN'].includes(context.role)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    const { enabled, firstDelayMinutes, secondEnabled, secondDelayHours } = request.body ?? {};
+    if (typeof enabled !== 'boolean' || typeof secondEnabled !== 'boolean' || !Number.isInteger(firstDelayMinutes) || Number(firstDelayMinutes) < 15 || Number(firstDelayMinutes) > 10_080 || !Number.isInteger(secondDelayHours) || Number(secondDelayHours) < 1 || Number(secondDelayHours) > 168) {
+      return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Revise os intervalos da recuperação.'));
+    }
+    if (secondEnabled && Number(secondDelayHours) * 60 <= Number(firstDelayMinutes)) {
+      return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'O segundo lembrete deve ser enviado depois do primeiro.'));
+    }
+    if (enabled && (!environment.RESEND_API_KEY || !environment.EMAIL_FROM || !environment.APP_ENCRYPTION_KEY)) return reply.code(503).send(errorBody(request, 'EMAIL_NOT_CONFIGURED', 'O envio de e-mail ainda não está disponível no servidor.'));
+    const existing = await database.abandonedRecoverySettings.findUnique({ where: { storeId: context.storeId }, select: { enabled: true, activatedAt: true } });
+    const activatedAt = enabled ? (!existing?.enabled || !existing.activatedAt ? new Date() : existing.activatedAt) : null;
+    const settings = await database.abandonedRecoverySettings.upsert({
+      where: { storeId: context.storeId },
+      create: { storeId: context.storeId, enabled, activatedAt, firstDelayMinutes: Number(firstDelayMinutes), secondEnabled, secondDelayHours: Number(secondDelayHours) },
+      update: { enabled, activatedAt, firstDelayMinutes: Number(firstDelayMinutes), secondEnabled, secondDelayHours: Number(secondDelayHours) }
+    });
+    return reply.send({ settings: { enabled: settings.enabled, firstDelayMinutes: settings.firstDelayMinutes, secondEnabled: settings.secondEnabled, secondDelayHours: settings.secondDelayHours } });
   });
 }
