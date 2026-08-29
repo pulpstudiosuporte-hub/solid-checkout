@@ -8,7 +8,7 @@ const environmentSchema = z.object({
   CORS_ORIGINS: z.string().default('http://localhost:5173').transform(value => value.split(',').map(origin => origin.trim()).filter(Boolean)),
   TRUST_PROXY: z.enum(['true', 'false']).default('false'),
   DATABASE_URL: z.string().regex(/^postgres(?:ql)?:\/\//, 'deve ser uma URL PostgreSQL').optional(),
-  APP_URL: z.string().url().optional(),
+  APP_URL: z.string().url().transform(value => value.replace(/[\\/]+$/, '')).optional(),
   API_PUBLIC_URL: z.string().url().optional(),
   MEDIA_STORAGE_PATH: z.string().min(1).default('/app/uploads'),
   SHOPIFY_CLIENT_ID: z.string().min(1).optional(),
