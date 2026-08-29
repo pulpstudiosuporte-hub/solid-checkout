@@ -2,6 +2,7 @@ import { parseEnvironment } from '@solid/config';
 import { buildApp } from './app.js';
 import { createDatabaseClient } from '@solid/database';
 import { PrismaAuthRepository } from './auth-repository.js';
+import { registerAdminOperationRoutes } from './admin-operation-routes.js';
 import { PrismaCatalogRepository } from './catalog-repository.js';
 import { PrismaStoreRepository } from './store-repository.js';
 import { PrismaShopifyRepository } from './shopify-repository.js';
@@ -47,7 +48,10 @@ const shutdown = async (signal: string): Promise<void> => {
 process.once('SIGINT', () => void shutdown('SIGINT'));
 process.once('SIGTERM', () => void shutdown('SIGTERM'));
 
+const adminAuthRepository = new PrismaAuthRepository(database);
+
 try {
+  registerAdminOperationRoutes(app, environment, adminAuthRepository, database);
   await app.listen({ host: environment.API_HOST, port: environment.API_PORT });
 } catch (error: unknown) {
   const safeError = error instanceof Error ? error : new Error('Unknown startup error');
