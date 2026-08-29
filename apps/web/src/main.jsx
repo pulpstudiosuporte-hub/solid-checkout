@@ -224,5 +224,23 @@ function App(){
 createRoot(document.getElementById('root')).render(<App/>);
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+  let reloadingForServiceWorker = false;
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloadingForServiceWorker) return;
+    reloadingForServiceWorker = true;
+    window.location.reload();
+  });
+
+  window.addEventListener('load', async () => {
+    try {
+      const registration = await navigator.serviceWorker.register('/sw.js', {
+        updateViaCache: 'none',
+      });
+
+      await registration.update();
+    } catch {
+      // O painel continua utilizável mesmo quando o navegador bloqueia PWA.
+    }
+  });
 }
