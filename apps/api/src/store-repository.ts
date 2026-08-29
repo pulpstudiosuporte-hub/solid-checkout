@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@solid/database';
 import { planLimits } from './plan-entitlements.js';
+import { effectiveBilling } from './billing-entitlements.js';
 
 export type StoreSummary = Readonly<{ publicId: string; name: string; slug: string; role: 'OWNER' | 'ADMIN' | 'ANALYST'; active: boolean }>;
 export type StoreDomainSummary = Readonly<{ publicId: string; hostname: string; status: string; verifiedAt: Date | null; activatedAt: Date | null; lastCheckedAt: Date | null; dokployDomainId: string | null }>;
@@ -33,10 +34,10 @@ export class PrismaStoreRepository implements StoreRepository {
   async createForUser(userId: string, sessionId: string, name: string, slug: string, requestId: string): Promise<StoreSummary | null> {
     return this.database.$transaction(async transaction => {
       const [subscription, ownedStoreCount] = await Promise.all([
-        transaction.billingSubscription.findUnique({ where: { userId }, select: { plan: true } }),
+        transaction.billingSubscription.findUnique({ where: { userId } }),
         transaction.storeMember.count({ where: { userId, role: 'OWNER', store: { active: true } } }),
       ]);
-      if (ownedStoreCount >= planLimits(subscription?.plan).stores) return null;
+      if (ownedStoreCount >= planLimits(subscription ? effectiveBilling(subscription).plan : undefined).stores) return null;
       const store = await transaction.store.create({ data: { name, slug }, select: { id: true, publicId: true, name: true, slug: true } });
       await transaction.storeMember.create({ data: { userId, storeId: store.id, role: 'OWNER' } });
       const updated = await transaction.session.updateMany({ where: { id: sessionId, userId, revokedAt: null }, data: { activeStoreId: store.id } });

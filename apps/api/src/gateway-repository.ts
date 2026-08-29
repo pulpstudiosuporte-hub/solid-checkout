@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@solid/database';
+import { effectiveBilling } from './billing-entitlements.js';
 import { canTransitionPayment } from './payment-rules.js';
 import type { StorePushDispatcher } from './web-push-service.js';
 
@@ -199,7 +200,7 @@ export class PrismaGatewayRepository {
         const originalFee = status === 'REFUNDED'
           ? await transaction.billingLedgerEntry.findUnique({ where: { paymentAttemptId_type: { paymentAttemptId: attemptId, type: 'TRANSACTION_FEE' } } })
           : null;
-        const feeBasisPoints = originalFee?.feeBasisPoints ?? billing.feeBasisPoints;
+        const feeBasisPoints = originalFee?.feeBasisPoints ?? effectiveBilling(billing).feeBasisPoints;
         const feeCents = originalFee?.amountCents ?? Math.round(current.amountCents * feeBasisPoints / 10_000);
         await transaction.billingLedgerEntry.upsert({
           where: { paymentAttemptId_type: { paymentAttemptId: attemptId, type: status === 'PAID' ? 'TRANSACTION_FEE' : 'REFUND_CREDIT' } },
@@ -211,8 +212,8 @@ export class PrismaGatewayRepository {
   }
 
   async billingAccessAllowed(storeId: string): Promise<boolean> {
-    const owner = await this.database.storeMember.findFirst({ where: { storeId, role: 'OWNER' }, orderBy: { createdAt: 'asc' }, select: { user: { select: { billingSubscription: { select: { blockedAt: true, status: true } } } } } });
+    const owner = await this.database.storeMember.findFirst({ where: { storeId, role: 'OWNER' }, orderBy: { createdAt: 'asc' }, select: { user: { select: { billingSubscription: true } } } });
     const billing = owner?.user.billingSubscription;
-    return !billing || (!billing.blockedAt && !['UNPAID', 'CANCELED'].includes(billing.status));
+    return !billing || effectiveBilling(billing).sponsored || (!billing.blockedAt && !['UNPAID', 'CANCELED'].includes(billing.status));
   }
 }

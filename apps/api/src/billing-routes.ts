@@ -6,6 +6,7 @@ import Stripe from 'stripe';
 import type { AuthRepository, SessionUser } from './auth-repository.js';
 import { createRoasPix, getRoasPix } from './roas-client.js';
 import { decryptSecret, encryptSecret } from './shopify-crypto.js';
+import { effectiveBilling } from './billing-entitlements.js';
 
 const plans = {
   START: { name: 'Start', monthlyPriceCents: 0, feeBasisPoints: 200 },
@@ -66,12 +67,13 @@ export function registerBillingRoutes(app: FastifyInstance, environment: AppEnvi
   app.get('/billing', async (request, reply) => {
     const session = await activeSession(request); if (!session) return reply.code(401).send(failure(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     const subscription = await ensureSubscription(session.userId);
+    const effective = effectiveBilling(subscription);
     const periodStart = subscription.currentPeriodStart ?? new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
     const entries = await db.billingLedgerEntry.aggregate({ where: { userId: session.userId, occurredAt: { gte: periodStart }, billedAt: null }, _sum: { grossAmountCents: true, amountCents: true }, _count: true });
     return reply.header('cache-control', 'private, no-store').send({
       configured: stripeReady || billingRoasReady,
       paymentMethods: { card: stripeReady, pix: billingRoasReady },
-      subscription: { plan: subscription.plan, status: subscription.status, monthlyPriceCents: subscription.monthlyPriceCents, feeBasisPoints: subscription.feeBasisPoints, paymentProvider: subscription.paymentProvider, currentPeriodStart: subscription.currentPeriodStart, currentPeriodEnd: subscription.currentPeriodEnd, graceUntil: subscription.graceUntil, blocked: Boolean(subscription.blockedAt), cardConfigured: Boolean(subscription.stripeCustomerId && subscription.stripeSubscriptionId) },
+      subscription: { plan: effective.plan, basePlan: subscription.plan, status: subscription.status, monthlyPriceCents: effective.monthlyPriceCents, feeBasisPoints: effective.feeBasisPoints, sponsored: effective.sponsored, monthlyWaived: effective.monthlyWaived, sponsorshipExpiresAt: effective.expiresAt, sponsorshipReason: effective.reason, paymentProvider: subscription.paymentProvider, currentPeriodStart: subscription.currentPeriodStart, currentPeriodEnd: subscription.currentPeriodEnd, graceUntil: subscription.graceUntil, blocked: effective.sponsored ? false : Boolean(subscription.blockedAt), cardConfigured: Boolean(subscription.stripeCustomerId && subscription.stripeSubscriptionId) },
       usage: { grossAmountCents: entries._sum.grossAmountCents ?? 0, feeAmountCents: entries._sum.amountCents ?? 0, transactions: entries._count },
       plans: Object.entries(plans).map(([id, plan]) => ({ id, ...plan })),
     });

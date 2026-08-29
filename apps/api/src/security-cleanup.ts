@@ -1,5 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify';
 import type { PrismaClient } from '@solid/database';
+import { effectiveBilling } from './billing-entitlements.js';
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -21,11 +22,12 @@ export async function runSecurityCleanup(database: PrismaClient, logger: Fastify
     database.auditLog.deleteMany({ where: { createdAt: { lt: auditLimit } } })
   ]);
   const stores = await database.store.findMany({
-    select: { id: true, members: { where: { role: 'OWNER' }, take: 1, select: { user: { select: { billingSubscription: { select: { plan: true } } } } } } }
+    select: { id: true, members: { where: { role: 'OWNER' }, take: 1, select: { user: { select: { billingSubscription: true } } } } }
   });
   const storeIdsByRetention = new Map<number, string[]>([[30, []], [90, []], [180, []]]);
   for (const store of stores) {
-    const plan = store.members[0]?.user.billingSubscription?.plan ?? 'START';
+    const subscription = store.members[0]?.user.billingSubscription;
+    const plan = subscription ? effectiveBilling(subscription).plan : 'START';
     const days = plan === 'ELITE' ? 180 : plan === 'PRIME' ? 90 : 30;
     storeIdsByRetention.get(days)!.push(store.id);
   }

@@ -3,6 +3,7 @@ import type { AppEnvironment } from '@solid/config';
 import type { PrismaClient } from '@solid/database';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AuthRepository, SessionUser } from './auth-repository.js';
+import { effectiveBilling } from './billing-entitlements.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const safeEqual = (left: string, right: string): boolean => timingSafeEqual(Buffer.from(sha256(left), 'hex'), Buffer.from(sha256(right), 'hex'));
@@ -37,10 +38,67 @@ export function registerAdminUserRoutes(app: FastifyInstance, environment: AppEn
       db.user.count({ where }),
       db.user.findMany({
         where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * pageSize, take: pageSize,
-        select: { publicId: true, name: true, email: true, accountStatus: true, platformAdmin: true, disabledAt: true, emailVerifiedAt: true, createdAt: true, memberships: { select: { role: true, store: { select: { name: true, publicId: true } } } } }
+        select: { publicId: true, name: true, email: true, accountStatus: true, platformAdmin: true, disabledAt: true, emailVerifiedAt: true, createdAt: true, billingSubscription: true, memberships: { select: { role: true, store: { select: { name: true, publicId: true } } } } }
       })
     ]);
-    return reply.header('cache-control', 'private, no-store').send({ users, pagination: { page, pageSize, total, pages: Math.max(1, Math.ceil(total / pageSize)) } });
+    const normalizedUsers = users.map(({ billingSubscription, ...user }) => {
+      const effective = billingSubscription ? effectiveBilling(billingSubscription) : { plan: 'START', feeBasisPoints: 200, monthlyPriceCents: 0, sponsored: false, monthlyWaived: false, expiresAt: null, reason: null };
+      return {
+        ...user,
+        billing: {
+          basePlan: billingSubscription?.plan ?? 'START',
+          plan: effective.plan,
+          feeBasisPoints: effective.feeBasisPoints,
+          monthlyPriceCents: effective.monthlyPriceCents,
+          sponsored: effective.sponsored,
+          monthlyWaived: effective.monthlyWaived,
+          expiresAt: effective.expiresAt,
+          reason: effective.reason,
+          override: billingSubscription ? {
+            plan: billingSubscription.adminPlanOverride,
+            feeBasisPoints: billingSubscription.adminFeeBasisPoints,
+            monthlyWaived: billingSubscription.adminMonthlyWaived,
+            expiresAt: billingSubscription.adminOverrideExpiresAt,
+            reason: billingSubscription.adminOverrideReason,
+          } : null,
+        },
+      };
+    });
+    return reply.header('cache-control', 'private, no-store').send({ users: normalizedUsers, pagination: { page, pageSize, total, pages: Math.max(1, Math.ceil(total / pageSize)) } });
+  });
+
+  app.patch<{ Params: { publicId: string }; Body: { plan?: unknown; feeBasisPoints?: unknown; monthlyWaived?: unknown; expiresAt?: unknown; reason?: unknown } }>('/admin/users/:publicId/billing-override', async (request, reply) => {
+    const session = await adminSession(request);
+    if (!session) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso administrativo necessário.'));
+    if (!mutationAllowed(request, session)) return reply.code(403).send(failure(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
+    const target = await db.user.findUnique({ where: { publicId: request.params.publicId }, select: { id: true, publicId: true, platformAdmin: true, billingSubscription: true } });
+    if (!target) return reply.code(404).send(failure(request, 'USER_NOT_FOUND', 'Usuário não encontrado.'));
+    if (target.platformAdmin) return reply.code(409).send(failure(request, 'ADMIN_OVERRIDE_FORBIDDEN', 'Use este benefício apenas em contas de clientes.'));
+
+    const plan = request.body?.plan === null || request.body?.plan === '' ? null : request.body?.plan;
+    const feeBasisPoints = request.body?.feeBasisPoints === null || request.body?.feeBasisPoints === '' ? null : Number(request.body?.feeBasisPoints);
+    const monthlyWaived = request.body?.monthlyWaived === true;
+    const expiresAtInput = request.body?.expiresAt === null || request.body?.expiresAt === '' ? null : request.body?.expiresAt;
+    const reason = typeof request.body?.reason === 'string' ? request.body.reason.trim().replace(/\s+/g, ' ') : '';
+    if (plan !== null && !['START', 'PRIME', 'ELITE'].includes(String(plan))) return reply.code(400).send(failure(request, 'INVALID_PLAN', 'Escolha um plano válido.'));
+    const selectedPlan = plan === null ? null : plan as 'START' | 'PRIME' | 'ELITE';
+    if (feeBasisPoints !== null && (!Number.isInteger(feeBasisPoints) || feeBasisPoints < 0 || feeBasisPoints > 1000)) return reply.code(400).send(failure(request, 'INVALID_FEE', 'A taxa deve ficar entre 0% e 10%.'));
+    const expiresAt = typeof expiresAtInput === 'string' ? new Date(expiresAtInput) : null;
+    if (expiresAt && (Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date())) return reply.code(400).send(failure(request, 'INVALID_EXPIRATION', 'Informe uma validade futura.'));
+    const hasOverride = selectedPlan !== null || feeBasisPoints !== null || monthlyWaived;
+    if (hasOverride && (reason.length < 3 || reason.length > 240)) return reply.code(400).send(failure(request, 'INVALID_REASON', 'Informe um motivo entre 3 e 240 caracteres.'));
+    if (monthlyWaived && target.billingSubscription?.stripeSubscriptionId && !['CANCELED', 'INCOMPLETE'].includes(target.billingSubscription.status)) return reply.code(409).send(failure(request, 'ACTIVE_STRIPE_SUBSCRIPTION', 'Cancele primeiro a assinatura ativa na Stripe para evitar nova cobrança mensal.'));
+
+    const subscription = await db.$transaction(async transaction => {
+      const updated = await transaction.billingSubscription.upsert({
+        where: { userId: target.id },
+        create: { userId: target.id, adminPlanOverride: selectedPlan, adminFeeBasisPoints: feeBasisPoints, adminMonthlyWaived: monthlyWaived, adminOverrideExpiresAt: expiresAt, adminOverrideReason: hasOverride ? reason : null },
+        update: { adminPlanOverride: selectedPlan, adminFeeBasisPoints: feeBasisPoints, adminMonthlyWaived: monthlyWaived, adminOverrideExpiresAt: hasOverride ? expiresAt : null, adminOverrideReason: hasOverride ? reason : null },
+      });
+      await transaction.auditLog.create({ data: { actorType: 'USER', actorUserId: session.userId, action: hasOverride ? 'admin.billing_override_updated' : 'admin.billing_override_removed', targetType: 'user', targetId: target.publicId, requestId: request.id, metadata: { plan: selectedPlan, feeBasisPoints, monthlyWaived, expiresAt: expiresAt?.toISOString() ?? null, reason: hasOverride ? reason : null } } });
+      return updated;
+    });
+    return reply.send({ billing: { ...effectiveBilling(subscription), basePlan: subscription.plan, override: { plan: subscription.adminPlanOverride, feeBasisPoints: subscription.adminFeeBasisPoints, monthlyWaived: subscription.adminMonthlyWaived, expiresAt: subscription.adminOverrideExpiresAt, reason: subscription.adminOverrideReason } } });
   });
 
   app.post<{ Params: { publicId: string } }>('/admin/users/:publicId/approve', async (request, reply) => {

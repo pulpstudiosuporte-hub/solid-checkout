@@ -5,6 +5,7 @@ import type { Prisma, PrismaClient } from '@solid/database';
 import type { AuthRepository } from './auth-repository.js';
 import { decryptSecret } from './shopify-crypto.js';
 import { planLimits } from './plan-entitlements.js';
+import { effectiveBilling } from './billing-entitlements.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const errorBody = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
@@ -42,9 +43,10 @@ export function registerAbandonedCartRoutes(app: FastifyInstance, environment: A
     const owner = await database.storeMember.findFirst({
       where: { storeId: active.activeStoreId, role: 'OWNER' },
       orderBy: { createdAt: 'asc' },
-      select: { user: { select: { billingSubscription: { select: { plan: true } } } } }
+      select: { user: { select: { billingSubscription: true } } }
     });
-    const retentionDays = planLimits(owner?.user.billingSubscription?.plan).abandonedCartRetentionDays;
+    const subscription = owner?.user.billingSubscription;
+    const retentionDays = planLimits(subscription ? effectiveBilling(subscription).plan : undefined).abandonedCartRetentionDays;
     const now = new Date();
     const retainedSince = new Date(now.getTime() - retentionDays * 86_400_000);
     const pending: Prisma.CheckoutSessionWhereInput = {
