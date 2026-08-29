@@ -68,7 +68,7 @@ export function registerBillingRoutes(app: FastifyInstance, environment: AppEnvi
     if (!plan) return reply.code(400).send(failure(request, 'INVALID_PLAN', 'Escolha um plano válido.'));
     const current = await ensureSubscription(session.userId);
     if (current.stripeSubscriptionId && current.stripeCustomerId) {
-      const portal = await stripe.billingPortal.sessions.create({ customer: current.stripeCustomerId, return_url: `${environment.APP_URL!.replace(/\/$/, '')}/?billing=return` });
+      const portal = await stripe.billingPortal.sessions.create({ customer: current.stripeCustomerId, locale: 'pt-BR', return_url: `${environment.APP_URL!.replace(/\/$/, '')}/?billing=return` });
       return reply.send({ url: portal.url });
     }
     let customerId = current.stripeCustomerId;
@@ -80,6 +80,7 @@ export function registerBillingRoutes(app: FastifyInstance, environment: AppEnvi
     const price = plan === 'START' ? environment.STRIPE_PRICE_START! : plan === 'PRIME' ? environment.STRIPE_PRICE_PRIME! : environment.STRIPE_PRICE_ELITE!;
     const checkout = await stripe.checkout.sessions.create({
       mode: 'subscription', customer: customerId, line_items: [{ price, quantity: 1 }],
+      locale: 'pt-BR',
       payment_method_collection: 'always',
       success_url: `${environment.APP_URL!.replace(/\/$/, '')}/?billing=success`, cancel_url: `${environment.APP_URL!.replace(/\/$/, '')}/?billing=cancelled`,
       allow_promotion_codes: false, billing_address_collection: 'required',
@@ -95,7 +96,7 @@ export function registerBillingRoutes(app: FastifyInstance, environment: AppEnvi
     if (!stripeReady || !stripe) return reply.code(503).send(failure(request, 'STRIPE_NOT_CONFIGURED', 'A cobrança por cartão ainda não foi configurada.'));
     const subscription = await ensureSubscription(session.userId);
     if (!subscription.stripeCustomerId) return reply.code(409).send(failure(request, 'CARD_NOT_CONFIGURED', 'Cadastre um cartão escolhendo um plano.'));
-    const portal = await stripe.billingPortal.sessions.create({ customer: subscription.stripeCustomerId, return_url: `${environment.APP_URL!.replace(/\/$/, '')}/?billing=return` });
+    const portal = await stripe.billingPortal.sessions.create({ customer: subscription.stripeCustomerId, locale: 'pt-BR', return_url: `${environment.APP_URL!.replace(/\/$/, '')}/?billing=return` });
     return reply.send({ url: portal.url });
   });
 
