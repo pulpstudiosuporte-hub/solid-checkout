@@ -191,15 +191,27 @@ function App(){
   function finishLogin(result){const userId=result.user.publicId||result.user.id;bindTabToUser(userId);const channel=typeof BroadcastChannel!=='undefined'?new BroadcastChannel('solid-auth'):null;channel?.postMessage({type:'auth-changed',userId});channel?.close();setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken});window.history.replaceState({},'', '/');}
   async function handleLogin(email,password){const result=await login(email,password);if(!result.mfaRequired)finishLogin(result);return result;}
   async function handleMfaLogin(challengeToken,code,authCsrfToken){const result=await completeMfaLogin(challengeToken,code,authCsrfToken);finishLogin(result);return result;}
+  async function handlePasswordReset(token,newPassword){
+    await resetPassword(token,newPassword);
+    clearTabUser();
+    const channel=typeof BroadcastChannel!=='undefined'?new BroadcastChannel('solid-auth'):null;
+    channel?.postMessage({type:'auth-changed',userId:null});
+    channel?.close();
+    setAuth({status:'anonymous',user:null,csrfToken:null});
+    setStores([]);
+    setCheckout(false);
+    setEditor(false);
+  }
   async function handleLogout(){let pushSubscription=null;try{pushSubscription=await currentWebPushSubscription();await logout(auth.csrfToken,pushSubscription?.endpoint);}finally{await disableWebPushOnThisDevice(pushSubscription).catch(()=>{});clearTabUser();const channel=typeof BroadcastChannel!=='undefined'?new BroadcastChannel('solid-auth'):null;channel?.postMessage({type:'auth-changed',userId:null});channel?.close();setAuth({status:'anonymous',user:null,csrfToken:null});setStores([]);setCheckout(false);setEditor(false);window.history.replaceState({},'', '/#/login');}}
   async function handleSelectStore(storeId){setStoreBusy(true);try{await selectStore(storeId,auth.csrfToken);setStores(current=>current.map(store=>({...store,active:store.publicId===storeId})));setPage('Visão geral');}finally{setStoreBusy(false)}}
   async function handleCreateStore(name){setStoreBusy(true);try{const result=await createStore(name,auth.csrfToken);setStores(current=>[...current.map(store=>({...store,active:false})),result.store]);setPage('Visão geral');}finally{setStoreBusy(false)}}
   async function handleArchiveStore(storeId){setStoreBusy(true);try{await archiveStore(storeId,auth.csrfToken);const result=await getStores();setStores(result.items);setPage('Visão geral');}finally{setStoreBusy(false)}}
   if(publicSessionMatch) return <PublicCheckoutErrorBoundary><PublicSessionRoute sessionId={publicSessionMatch[1]} urlToken={publicSessionToken}/></PublicCheckoutErrorBoundary>;
   if(publicMatch) return <PublicCheckoutErrorBoundary><PublicCheckout storeSlug={publicMatch[1]} checkoutSlug={publicMatch[2]}/></PublicCheckoutErrorBoundary>;
+  if(window.location.hash.startsWith('#/redefinir-senha')) return <Login onSubmit={handleLogin} onMfaSubmit={handleMfaLogin} onRegister={registerAccount} onVerify={verifyAccount} onForgot={forgotPassword} onReset={handlePasswordReset}/>;
   if(sessionConflict) return <SessionConflict/>;
   if(auth.status==='checking') return <SessionLoading/>;
-  if(auth.status==='anonymous'){return <Login onSubmit={handleLogin} onMfaSubmit={handleMfaLogin} onRegister={registerAccount} onVerify={verifyAccount} onForgot={forgotPassword} onReset={resetPassword}/>;}
+  if(auth.status==='anonymous'){return <Login onSubmit={handleLogin} onMfaSubmit={handleMfaLogin} onRegister={registerAccount} onVerify={verifyAccount} onForgot={forgotPassword} onReset={handlePasswordReset}/>;}
   if(window.location.hash==='#/login')window.history.replaceState({},'', '/');
   if(editor) return <CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/>;
   if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>;
