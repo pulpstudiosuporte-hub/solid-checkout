@@ -2,6 +2,8 @@ import React, { useEffect, useId, useState } from 'react';
 import { CalendarDays, LoaderCircle, RefreshCw } from 'lucide-react';
 import { getDashboard } from './api';
 
+const WorldMap = React.lazy(() => import('./components/ui/WorldMap').then(module => ({ default: module.WorldMap })));
+
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const number = new Intl.NumberFormat('pt-BR');
 const finite = value => Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -62,6 +64,8 @@ export default function AnalyticsPage({ storeKey }) {
   const data = normalizeDashboard(state.data);
   const a = data.analytics;
   const maxStep = Math.max(1, a.checkoutSteps.visitors); const maxProduct = Math.max(1, ...a.products.map(item => item.revenueCents));
+  const cityLocations = a.geography.locations.filter(location => location.city).sort((left, right) => finite(right.visitors) - finite(left.visitors));
+  const maxCityVisitors = Math.max(1, ...cityLocations.map(location => finite(location.visitors)));
   const bestDay = data.series.reduce((best, item) => item.revenueCents > (best?.revenueCents || -1) ? item : best, null);
   return <main className="page analytics-page">
     <header className="analytics-heading"><div><h1>Análises</h1><p>Indicadores comerciais e operacionais da sua loja.</p></div><div className="analytics-controls" role="group" aria-label="Período das análises">{[['today','Hoje'],['yesterday','Ontem'],['7d','Últimos 7 dias'],['month','Mês atual'],['year','Ano atual']].map(([id,label]) => <button key={id} className={period === id ? 'active' : ''} onClick={() => setPeriod(id)}>{label}</button>)}<button aria-label="Escolher período personalizado" title="Período personalizado"><CalendarDays size={16}/></button><button onClick={() => setRefresh(value => value + 1)}><RefreshCw size={16}/> Atualizar</button></div></header>
@@ -86,7 +90,7 @@ export default function AnalyticsPage({ storeKey }) {
     <SectionTitle eyebrow="COMPORTAMENTO" subtitle="Receita adicional e uso de descontos">Crescimento</SectionTitle>
     <div className="analytics-grid two"><section className="analytics-card"><div className="analytics-card-head"><h2>Vendas adicionais</h2><p>Receita extra de order bumps</p></div><div className="analytics-values two-values"><Value label="Order bumps aceitos" value={a.orderBumps.items}/><Value label="Receita adicional" value={money.format(a.orderBumps.revenueCents/100)}/></div></section><section className="analytics-card"><div className="analytics-card-head"><h2>Cupons</h2><p>Performance dos descontos</p></div><div className="analytics-values three"><Value label="Pedidos com cupom" value={a.coupons.orders}/><Value label="Receita com cupom" value={money.format(a.coupons.revenueCents/100)}/><Value label="Total de desconto" value={money.format(a.coupons.discountCents/100)}/></div></section></div>
 
-    <SectionTitle eyebrow="GEOGRAFIA" subtitle="Será preenchida quando a captura anonimizada de localização for ativada">Distribuição geográfica</SectionTitle>
-    <div className="analytics-grid two"><section className="analytics-card geo-placeholder"><div className="analytics-card-head"><h2>Mapa de vendas por estado</h2><p>Distribuição geográfica no Brasil</p></div><div className="dot-map brazil" aria-label="Mapa aguardando dados"><span>Dados de localização ainda não instrumentados</span></div></section><section className="analytics-card geo-placeholder"><div className="analytics-card-head"><h2>Vendas por país</h2><p>Distribuição geográfica da receita</p></div><div className="dot-map world" aria-label="Mapa aguardando dados"><span>Dados de localização ainda não instrumentados</span></div></section></div>
+    <SectionTitle eyebrow="GEOGRAFIA" subtitle="Visitantes únicos identificados pela localização anonimizada da Cloudflare">Distribuição geográfica</SectionTitle>
+    <div className="analytics-grid two"><section className="analytics-card geo-placeholder"><div className="analytics-card-head"><h2>Mapa de visitantes</h2><p>Posição aproximada por cidade no período</p></div><div className="dot-map world"><React.Suspense fallback={<LoaderCircle className="spin" aria-label="Carregando mapa"/>}><WorldMap locations={a.geography.locations}/></React.Suspense></div><div className="analytics-values three compact"><Value label="Visitantes" value={number.format(a.geography.visitors)}/><Value label="Cidades" value={number.format(a.geography.cities)}/><Value label="Países" value={number.format(a.geography.countries)}/></div></section><section className="analytics-card"><div className="analytics-card-head"><h2>Top cidades</h2><p>Visitantes únicos, sem duplicar reaberturas do checkout</p></div><div className="analytics-bars cities">{cityLocations.length ? cityLocations.slice(0,15).map(location => <Bar key={`${location.country}-${location.region}-${location.city}`} label={location.city} value={finite(location.visitors)} max={maxCityVisitors} detail={`${location.region || location.country} · ${number.format(finite(location.visitors))} visitantes`}/>) : <div className="analytics-empty">As próximas visitas com localização completa aparecerão aqui.</div>}</div></section></div>
   </main>;
 }

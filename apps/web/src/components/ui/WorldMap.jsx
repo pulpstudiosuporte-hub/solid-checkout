@@ -1,5 +1,6 @@
 import React, { useId, useMemo } from 'react';
 import DottedMap from 'dotted-map';
+import './world-map.css';
 
 const projectPoint = (latitude, longitude) => ({
   x: (Number(longitude) + 180) * (800 / 360),
@@ -19,14 +20,15 @@ export function WorldMap({ locations = [], lineColor = '#7657ed' }) {
     const svg = map.getSVG({ radius: 0.22, color: '#a9bfd6', shape: 'circle', backgroundColor: '#eef4fa' });
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   }, []);
-  const points = locations
+  const detailedLocations = locations.some(location => location.city) ? locations.filter(location => location.city) : locations;
+  const points = detailedLocations
     .filter(location => Number.isFinite(Number(location.latitude)) && Number.isFinite(Number(location.longitude)))
     .map(location => ({ ...location, point: projectPoint(location.latitude, location.longitude) }));
   const origin = points[0];
 
   return <div className="world-map-visual" role="img" aria-label={points.length ? `Mapa com ${points.length} localizações de visitantes` : 'Mapa-múndi sem visitas no período'}>
     <img src={mapSource} alt="" draggable="false"/>
-    <svg viewBox="0 0 800 400" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <svg viewBox="0 0 800 400" preserveAspectRatio="none" aria-hidden="true">
       <defs>
         <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor={lineColor} stopOpacity="0"/>

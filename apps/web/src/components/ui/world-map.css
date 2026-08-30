@@ -1,0 +1,13 @@
+.world-map-visual > img {
+  object-fit: fill;
+}
+
+.home-geo .geo-location-list {
+  display: none;
+}
+
+.analytics-bars.cities {
+  min-height: 260px;
+  max-height: 390px;
+  overflow-y: auto;
+}
