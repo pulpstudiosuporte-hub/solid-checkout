@@ -37,6 +37,19 @@ const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
 });
+
+const checkoutVisitorId = () => {
+  const key = "solid-checkout-visitor-id";
+  try {
+    const current = localStorage.getItem(key);
+    if (current) return current;
+    const created = crypto.randomUUID();
+    localStorage.setItem(key, created);
+    return created;
+  } catch {
+    return crypto.randomUUID();
+  }
+};
 const cookieValue = (name) => document.cookie.split(';').map(value => value.trim()).find(value => value.startsWith(`${name}=`))?.slice(name.length + 1) || '';
 const loadMetaPixel = (pixelId) => {
   if (!pixelId || typeof window === 'undefined') return;
@@ -194,7 +207,7 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
     setBusy(true);
     setState((current) => ({ ...current, error: "" }));
     try {
-      const search = new URLSearchParams(window.location.search); const hashSearch = new URLSearchParams(window.location.hash.split('?')[1] || ''); const read = key => search.get(key) || hashSearch.get(key); const fbclid = read('fbclid'); const trackingParameters = { ...Object.fromEntries(['src','sck','utm_source','utm_campaign','utm_medium','utm_content','utm_term'].map(key => [key, read(key)])), fbp: cookieValue('_fbp') || null, fbc: cookieValue('_fbc') || (fbclid ? `fb.1.${Date.now()}.${fbclid}` : null), event_source_url: window.location.href };
+      const search = new URLSearchParams(window.location.search); const hashSearch = new URLSearchParams(window.location.hash.split('?')[1] || ''); const read = key => search.get(key) || hashSearch.get(key); const fbclid = read('fbclid'); const trackingParameters = { ...Object.fromEntries(['src','sck','utm_source','utm_campaign','utm_medium','utm_content','utm_term'].map(key => [key, read(key)])), fbp: cookieValue('_fbp') || null, fbc: cookieValue('_fbc') || (fbclid ? `fb.1.${Date.now()}.${fbclid}` : null), event_source_url: window.location.href, visitor_id: checkoutVisitorId() };
       const result = await createPublicCheckoutSession(
         storeSlug,
         checkoutSlug,
@@ -279,7 +292,7 @@ function useCheckoutPresence(sessionId, token) {
         touchPublicCheckoutPresence(sessionId, token).catch(() => {});
     };
     heartbeat();
-    const interval = window.setInterval(heartbeat, 30_000);
+    const interval = window.setInterval(heartbeat, 20_000);
     document.addEventListener("visibilitychange", heartbeat);
     return () => {
       window.clearInterval(interval);

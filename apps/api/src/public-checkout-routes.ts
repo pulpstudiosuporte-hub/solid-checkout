@@ -18,7 +18,7 @@ const slug = (value: unknown): string | null => typeof value === 'string' && /^[
 const publicId = (value: unknown): string | null => typeof value === 'string' && /^[A-Za-z0-9_-]{8,32}$/.test(value) ? value : null;
 const errorBody = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
 const digits = (value: unknown): string => typeof value === 'string' ? value.replace(/\D/g, '') : '';
-const trackingKeys = ['src', 'sck', 'utm_source', 'utm_campaign', 'utm_medium', 'utm_content', 'utm_term', 'fbp', 'fbc', 'event_source_url'] as const;
+const trackingKeys = ['src', 'sck', 'utm_source', 'utm_campaign', 'utm_medium', 'utm_content', 'utm_term', 'fbp', 'fbc', 'event_source_url', 'visitor_id'] as const;
 const trackingParameters = (value: unknown): Record<string, string | null> => { const input = typeof value === 'object' && value !== null ? value as Record<string, unknown> : {}; return Object.fromEntries(trackingKeys.map(key => [key, typeof input[key] === 'string' && input[key].trim() ? input[key].trim().slice(0, 500) : null])); };
 const geoHeader = (request: FastifyRequest, name: string, max = 120): string | null => { const value = request.headers[name]; return typeof value === 'string' && value.trim().length > 0 && value.length <= max ? value.trim() : null; };
 const validCpf = (value: string): boolean => { if (!/^\d{11}$/.test(value) || /^(\d)\1{10}$/.test(value)) return false; const check = (length: number) => { let sum = 0; for (let index = 0; index < length; index += 1) sum += Number(value[index]) * (length + 1 - index); const mod = sum % 11; return mod < 2 ? 0 : 11 - mod; }; return check(9) === Number(value[9]) && check(10) === Number(value[10]); };

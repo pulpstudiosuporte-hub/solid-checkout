@@ -46,7 +46,7 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
     const end = period === 'yesterday' ? new Date(start.getTime() + 86_400_000 - 1) : now;
     const storeId = selected.activeStoreId;
 
-    const [createdSessions, paidAttempts, products, checkouts, published, gateways, activeVisitors] = await Promise.all([
+    const [createdSessions, paidAttempts, products, checkouts, published, gateways, activeSessions] = await Promise.all([
       db.checkoutSession.findMany({
         where: { checkout: { storeId }, createdAt: { gte: start, lte: end } },
         select: {
@@ -65,8 +65,17 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
       db.checkout.count({ where: { storeId, archivedAt: null } }),
       db.checkout.count({ where: { storeId, status: 'PUBLISHED', archivedAt: null } }),
       db.gatewayConnection.count({ where: { storeId, active: true } }),
-      db.checkoutSession.count({ where: { checkout: { storeId }, status: 'OPEN', expiresAt: { gt: now }, updatedAt: { gte: new Date(now.getTime() - 2 * 60_000) } } }),
+      db.checkoutSession.findMany({ where: { checkout: { storeId }, status: 'OPEN', expiresAt: { gt: now }, updatedAt: { gte: new Date(now.getTime() - 60_000) } }, select: { id: true, trackingParameters: true } }),
     ]);
+
+    const activeVisitorKeys = new Set(activeSessions.map(row => {
+      const tracking = typeof row.trackingParameters === 'object' && row.trackingParameters && !Array.isArray(row.trackingParameters) ? row.trackingParameters as Record<string, unknown> : {};
+      const visitorId = typeof tracking.visitor_id === 'string' ? tracking.visitor_id : null;
+      const ip = typeof tracking.client_ip_address === 'string' ? tracking.client_ip_address : null;
+      const agent = typeof tracking.client_user_agent === 'string' ? tracking.client_user_agent : null;
+      return visitorId || (ip ? sha256(`${ip}:${agent ?? ''}`) : row.id);
+    }));
+    const activeVisitors = activeVisitorKeys.size;
 
     const paidBySession = new Map<string, { amountCents: number; paidAt: Date }>();
     for (const attempt of paidAttempts) if (attempt.paidAt) paidBySession.set(attempt.checkoutSessionId, { amountCents: attempt.amountCents, paidAt: attempt.paidAt });
