@@ -233,7 +233,7 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 
   window.addEventListener('load', async () => {
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js', {
+      const registration = await navigator.serviceWorker.register(`/sw.js?v=${__SOLID_BUILD_VERSION__}`, {
         updateViaCache: 'none',
       });
 

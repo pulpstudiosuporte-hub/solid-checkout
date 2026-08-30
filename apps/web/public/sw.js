@@ -1,4 +1,4 @@
-const CACHE = 'solid-shell-v2';
+const CACHE = 'solid-shell-v3';
 const STATIC_ASSETS = ['/', '/manifest.webmanifest', '/brand/solid-symbol.png'];
 
 self.addEventListener('install', event => {

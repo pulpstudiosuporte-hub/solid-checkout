@@ -13,6 +13,9 @@ const csp = [
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    __SOLID_BUILD_VERSION__: JSON.stringify(Date.now().toString(36)),
+  },
   server: { host: '127.0.0.1', port: 5173, headers: { 'Content-Security-Policy': csp, 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin' } },
   preview: { host: '127.0.0.1', port: 4173 },
   build: {
