@@ -1,7 +1,7 @@
 # Roadmap competitivo do SOLID Checkout
 
-**Status:** proposta de planejamento  
-**Horizonte sugerido:** 6 ciclos de produto, com duração definida conforme o tamanho do time  
+**Status:** proposta de planejamento
+**Horizonte sugerido:** 6 ciclos de produto, com duração definida conforme o tamanho do time
 **Objetivo:** elevar o SOLID Checkout ao nível funcional das principais plataformas brasileiras de checkout, usando a Corvex como referência de mercado, sem copiar sua identidade, textos ou implementação.
 
 ## 1. Visão do produto
