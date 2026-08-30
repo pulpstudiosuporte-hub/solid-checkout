@@ -7,6 +7,8 @@ import type { AuthRepository } from './auth-repository.js';
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const failure = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
 const dayFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' });
+const hourFormatter = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hourCycle: 'h23' });
+const weekdayFormatter = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long' });
 const countryCentroids: Record<string, readonly [number, number]> = {
   BR: [-14.235, -51.9253], US: [37.0902, -95.7129], PT: [39.3999, -8.2245],
   AR: [-38.4161, -63.6167], CL: [-35.6751, -71.543], CO: [4.5709, -74.2973],
@@ -83,6 +85,7 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
     const paidBySession = new Map<string, { amountCents: number; paidAt: Date }>();
     for (const attempt of paidAttempts) if (attempt.paidAt) paidBySession.set(attempt.checkoutSessionId, { amountCents: attempt.amountCents, paidAt: attempt.paidAt });
     const paid = [...paidBySession.values()];
+    const paidSessionIds = new Set(paidBySession.keys());
     const lastDay = period === 'yesterday' ? end : now;
     const days = Math.max(1, Math.round((new Date(`${dayFormatter.format(lastDay)}T03:00:00.000Z`).getTime() - start.getTime()) / 86_400_000) + 1);
     const series = Array.from({ length: days }, (_, index) => {
@@ -101,8 +104,32 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
     const cancelled = createdSessions.filter(row => row.status === 'CANCELLED' || row.paymentAttempts[0]?.status === 'CANCELLED').length;
     const customerHashes = createdSessions.map(row => row.customerEmailHash).filter((value): value is string => Boolean(value));
     const uniqueCustomers = new Set(customerHashes).size;
-    const couponSessions = createdSessions.filter(row => row.couponCode);
-    const bumpItems = createdSessions.flatMap(row => row.items ?? []).filter(item => item.isOrderBump);
+    const paidSessions = createdSessions.filter(row => paidSessionIds.has(row.id));
+    const couponSessions = paidSessions.filter(row => row.couponCode);
+    const couponMap = new Map<string, { code: string; orders: number; revenueCents: number; discountCents: number }>();
+    for (const row of couponSessions) {
+      const code = row.couponCode || 'Sem código';
+      const current = couponMap.get(code) || { code, orders: 0, revenueCents: 0, discountCents: 0 };
+      current.orders += 1;
+      current.revenueCents += paidBySession.get(row.id)?.amountCents ?? row.totalCents ?? 0;
+      current.discountCents += row.discountCents ?? 0;
+      couponMap.set(code, current);
+    }
+    const hourlySales = Array.from({ length: 24 }, (_, hour) => ({ hour, orders: 0, revenueCents: 0 }));
+    const weekdayNames = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+    const weekdaySales = weekdayNames.map(day => ({ day, orders: 0, revenueCents: 0 }));
+    for (const sale of paid) {
+      const hour = Number(hourFormatter.format(sale.paidAt));
+      const weekday = weekdayFormatter.format(sale.paidAt).toLocaleLowerCase('pt-BR');
+      const dayIndex = weekdayNames.indexOf(weekday);
+      const hourBucket = hourlySales[hour];
+      const weekdayBucket = dayIndex >= 0 ? weekdaySales[dayIndex] : undefined;
+      if (hourBucket) { hourBucket.orders += 1; hourBucket.revenueCents += sale.amountCents; }
+      if (weekdayBucket) { weekdayBucket.orders += 1; weekdayBucket.revenueCents += sale.amountCents; }
+    }
+    const bestHour = hourlySales.reduce((best, item) => item.orders > best.orders || (item.orders === best.orders && item.revenueCents > best.revenueCents) ? item : best, hourlySales[0]!);
+    const bestWeekday = weekdaySales.reduce((best, item) => item.orders > best.orders || (item.orders === best.orders && item.revenueCents > best.revenueCents) ? item : best, weekdaySales[0]!);
+    const bumpItems = paidSessions.flatMap(row => row.items ?? []).filter(item => item.isOrderBump);
     const productMap = new Map<string, { title: string; quantity: number; revenueCents: number }>();
     for (const row of createdSessions) for (const item of row.items ?? []) {
       const current = productMap.get(item.titleSnapshot) || { title: item.titleSnapshot, quantity: 0, revenueCents: 0 };
@@ -131,6 +158,23 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
       current.visitorKeys.add(uniqueVisitor); locatedVisitorKeys.add(uniqueVisitor); geoMap.set(key, current);
     }
     const locations = [...geoMap.values()].map(({ visitorKeys, ...location }) => ({ ...location, visitors: visitorKeys.size })).sort((a, b) => b.visitors - a.visitors);
+    const stateSalesMap = new Map<string, { state: string; orders: number; revenueCents: number }>();
+    const citySalesMap = new Map<string, { city: string; state: string; orders: number; revenueCents: number }>();
+    for (const row of paidSessions) {
+      const tracking = trackingRecord(row.trackingParameters);
+      const state = typeof tracking.geo_region_code === 'string' ? tracking.geo_region_code : typeof tracking.geo_region === 'string' ? tracking.geo_region : null;
+      const city = typeof tracking.geo_city === 'string' ? tracking.geo_city : null;
+      const revenueCents = paidBySession.get(row.id)?.amountCents ?? 0;
+      if (state) {
+        const current = stateSalesMap.get(state) || { state, orders: 0, revenueCents: 0 };
+        current.orders += 1; current.revenueCents += revenueCents; stateSalesMap.set(state, current);
+      }
+      if (state && city) {
+        const key = `${state}:${city}`;
+        const current = citySalesMap.get(key) || { city, state, orders: 0, revenueCents: 0 };
+        current.orders += 1; current.revenueCents += revenueCents; citySalesMap.set(key, current);
+      }
+    }
     return reply.header('cache-control', 'private, no-store').send({
       userName: session.user.name,
       revenueCents: paidRevenueCents,
@@ -153,9 +197,11 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
         },
         coupons: {
           orders: couponSessions.length,
-          revenueCents: couponSessions.reduce((sum, row) => sum + (row.totalCents ?? 0), 0),
+          revenueCents: couponSessions.reduce((sum, row) => sum + (paidBySession.get(row.id)?.amountCents ?? 0), 0),
           discountCents: couponSessions.reduce((sum, row) => sum + (row.discountCents ?? 0), 0),
+          items: [...couponMap.values()].sort((a, b) => b.revenueCents - a.revenueCents),
         },
+        bestMoments: { bestHour: bestHour.orders ? bestHour.hour : null, bestWeekday: bestWeekday.orders ? bestWeekday.day : null, hourly: hourlySales, weekdays: weekdaySales },
         orderBumps: {
           items: bumpItems.reduce((sum, item) => sum + item.quantity, 0),
           revenueCents: bumpItems.reduce((sum, item) => sum + item.totalCents, 0),
@@ -163,6 +209,10 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
         gateways: [...gatewayMap.values()].map(item => ({ ...item, conversionRate: item.attempts ? Math.round(item.paid / item.attempts * 10_000) / 100 : 0 })),
         products: [...productMap.values()].sort((a, b) => b.revenueCents - a.revenueCents).slice(0, 8),
         geography: { locations, countries: new Set(locations.map(item => item.country)).size, regions: new Set(locations.filter(item => item.region).map(item => `${item.country}:${item.region}`)).size, cities: new Set(locations.filter(item => item.city).map(item => `${item.country}:${item.region ?? ''}:${item.city}`)).size, visitors: locatedVisitorKeys.size },
+        salesGeography: {
+          states: [...stateSalesMap.values()].sort((a, b) => b.revenueCents - a.revenueCents),
+          cities: [...citySalesMap.values()].sort((a, b) => b.revenueCents - a.revenueCents),
+        },
       },
       checklist: { store: true, product: products > 0, checkout: checkouts > 0, gateway: gateways > 0, published: published > 0 },
     });
