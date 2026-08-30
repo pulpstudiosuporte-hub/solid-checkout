@@ -1,3 +1,6 @@
+Exit code: 0
+Wall time: 0.5 seconds
+Output:
 const fallbackApiUrl = 'http://127.0.0.1:3333';
 
 export const apiBaseUrl = (import.meta.env.VITE_API_URL || fallbackApiUrl).replace(/\/$/, '');
@@ -29,9 +32,9 @@ async function fetch(input, init = {}) {
   return response;
 }
 
-// Imagens enviadas pelo painel são armazenadas e servidas pela API.  Mantemos
+// Imagens enviadas pelo painel sÃ£o armazenadas e servidas pela API.  Mantemos
 // esse caminho centralizado para que registros antigos, que eventualmente
-// tenham salvo outro host, continuem funcionando após uma troca de domínio.
+// tenham salvo outro host, continuem funcionando apÃ³s uma troca de domÃ­nio.
 export function resolveMediaUrl(value) {
   if (typeof value !== 'string' || !value) return value;
   const match = value.match(/\/media\/([0-9a-f-]{36}\.webp)(?:[?#].*)?$/i);
@@ -65,7 +68,7 @@ export async function openBillingPortal(csrfToken) { return readJson(await fetch
 async function readJson(response) {
   const body = await response.json().catch(() => null);
   if (!response.ok) {
-    const error = new Error(body?.error?.message || 'Não foi possível concluir a solicitação.');
+    const error = new Error(body?.error?.message || 'NÃ£o foi possÃ­vel concluir a solicitaÃ§Ã£o.');
     error.code = body?.error?.code;
     error.status = response.status;
     throw error;
@@ -225,5 +228,6 @@ export async function approveAdminUser(userId, csrfToken) { return readJson(awai
 export async function blockAdminUser(userId, csrfToken) { return readJson(await fetch(`${apiBaseUrl}/admin/users/${encodeURIComponent(userId)}/block`, { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken } })); }
 export async function updateAdminBillingOverride(userId, input, csrfToken) { return readJson(await fetch(`${apiBaseUrl}/admin/users/${encodeURIComponent(userId)}/billing-override`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(input) })); }
 export async function getAdminOperations(signal) { return readJson(await fetch(`${apiBaseUrl}/admin/operations`, { credentials: 'include', headers: { Accept: 'application/json' }, signal })); }
-export async function getAdminAdvancedOverview(signal) { return readJson(await fetch(`${apiBaseUrl}/admin/advanced/overview`, { credentials: 'include', headers: { Accept: 'application/json' }, signal })); }
 export async function retryAdminOperation(jobId, csrfToken) { return readJson(await fetch(`${apiBaseUrl}/admin/operations/${encodeURIComponent(jobId)}/retry`, { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken } })); }
+
+
