@@ -95,8 +95,8 @@ export default function DashboardPage({ setPage, storeKey }) {
   return <main className="page home-overview">
     <header className="home-greeting"><h1>{greeting}, {firstName}!</h1><button onClick={() => setPage('Análises')}><TrendingUp size={16}/> Ver análises completas</button></header>
     <section className="home-kpis" aria-label="Indicadores de hoje">
-      <Metric icon={Radio} label="Visitantes agora" value={Number(data.activeVisitors || 0)} tone="green" helper="Ativos nos últimos 2 minutos"/>
-      <Metric icon={CircleDollarSign} label="Pedidos gerados" value={money.format(analytics.generatedRevenueCents / 100)} tone="purple" helper={`${analytics.sessions} sessões criadas`}/>
+      <Metric icon={Radio} label="Visitantes agora" value={Number(data.activeVisitors || 0)} tone="green" helper="Ativos no último minuto"/>
+      <Metric icon={CircleDollarSign} label="Pedidos gerados" value={money.format(analytics.generatedRevenueCents / 100)} tone="purple" helper={`${Number(analytics.generatedOrders || 0)} Pix gerados`}/>
       <Metric icon={ShoppingCart} label="Pedidos hoje" value={data.paidOrders} tone="blue" helper="Pagamentos aprovados"/>
       <Metric icon={TrendingUp} label="Taxa de conversão" value={`${data.conversionRate.toLocaleString('pt-BR')}%`} tone="orange" helper="Sessões que viraram venda"/>
     </section>

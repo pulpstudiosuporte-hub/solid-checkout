@@ -22,7 +22,10 @@ function dashboardDatabase(): PrismaClient {
   return {
     session: { findUnique: () => Promise.resolve({ activeStoreId: 'store-a' }) },
     storeMember: { findUnique: () => Promise.resolve({ storeId: 'store-a', userId: 'user-a' }) },
-    checkoutSession: { findMany: () => Promise.resolve([{ id: 'checkout-session-a', paymentAttempts: [{ status: 'PAID' }] }, { id: 'checkout-session-b', paymentAttempts: [{ status: 'PENDING' }] }]), count: () => Promise.resolve(1) },
+    checkoutSession: { findMany: () => Promise.resolve([
+      { id: 'checkout-session-a', totalCents: 13_467, trackingParameters: { visitor_id: 'visitor-a', geo_country: 'BR', geo_region_code: 'SP', geo_city: 'São Paulo' }, paymentAttempts: [{ status: 'PAID', provider: 'WESTPAY', amountCents: 13_467 }] },
+      { id: 'checkout-session-b', totalCents: 5_600, trackingParameters: { visitor_id: 'visitor-a', geo_country: 'BR', geo_region_code: 'SP', geo_city: 'São Paulo' }, paymentAttempts: [{ status: 'PENDING', provider: 'WESTPAY', amountCents: 5_600 }] },
+    ]), count: () => Promise.resolve(1) },
     paymentAttempt: { findMany: () => Promise.resolve([{ checkoutSessionId: 'checkout-session-a', amountCents: 13_467, paidAt: new Date() }]) },
     product: { count: () => Promise.resolve(1) },
     checkout: { count: () => Promise.resolve(1) },
@@ -37,7 +40,7 @@ describe('indicadores da loja ativa', () => {
     const response = await app.inject({ method: 'GET', url: '/dashboard?period=today', headers: { cookie: `solid_session=${token}` } });
     expect(response.statusCode).toBe(200);
     expect(response.headers['cache-control']).toBe('private, no-store');
-    expect(response.json()).toMatchObject({ userName: 'Ragnar Costa', revenueCents: 13_467, paidOrders: 1, pendingPix: 1, conversionRate: 50, checklist: { store: true, product: true, checkout: true, gateway: true, published: true } });
+    expect(response.json()).toMatchObject({ userName: 'Ragnar Costa', revenueCents: 13_467, paidOrders: 1, pendingPix: 1, activeVisitors: 1, conversionRate: 50, analytics: { generatedOrders: 2, generatedRevenueCents: 19_067, geography: { visitors: 1, countries: 1, regions: 1, cities: 1 } }, checklist: { store: true, product: true, checkout: true, gateway: true, published: true } });
     await app.close();
   });
 });

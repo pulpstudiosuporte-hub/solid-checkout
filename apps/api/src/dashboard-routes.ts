@@ -12,6 +12,13 @@ const countryCentroids: Record<string, readonly [number, number]> = {
   AR: [-38.4161, -63.6167], CL: [-35.6751, -71.543], CO: [4.5709, -74.2973],
   MX: [23.6345, -102.5528], CA: [56.1304, -106.3468], GB: [55.3781, -3.436],
 };
+const trackingRecord = (value: unknown): Record<string, unknown> => typeof value === 'object' && value && !Array.isArray(value) ? value as Record<string, unknown> : {};
+const visitorKey = (tracking: Record<string, unknown>, fallback: string): string => {
+  const visitorId = typeof tracking.visitor_id === 'string' ? tracking.visitor_id : null;
+  const ip = typeof tracking.client_ip_address === 'string' ? tracking.client_ip_address : null;
+  const agent = typeof tracking.client_user_agent === 'string' ? tracking.client_user_agent : null;
+  return visitorId || (ip ? sha256(`${ip}:${agent ?? ''}`) : fallback);
+};
 
 type DashboardPeriod = 'today' | 'yesterday' | '7d' | 'month' | 'year';
 
@@ -69,11 +76,7 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
     ]);
 
     const activeVisitorKeys = new Set(activeSessions.map(row => {
-      const tracking = typeof row.trackingParameters === 'object' && row.trackingParameters && !Array.isArray(row.trackingParameters) ? row.trackingParameters as Record<string, unknown> : {};
-      const visitorId = typeof tracking.visitor_id === 'string' ? tracking.visitor_id : null;
-      const ip = typeof tracking.client_ip_address === 'string' ? tracking.client_ip_address : null;
-      const agent = typeof tracking.client_user_agent === 'string' ? tracking.client_user_agent : null;
-      return visitorId || (ip ? sha256(`${ip}:${agent ?? ''}`) : row.id);
+      return visitorKey(trackingRecord(row.trackingParameters), row.id);
     }));
     const activeVisitors = activeVisitorKeys.size;
 
@@ -89,7 +92,8 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
     });
 
     const paidCreatedSessions = createdSessions.filter(row => row.paymentAttempts[0]?.status === 'PAID').length;
-    const generatedRevenueCents = createdSessions.reduce((sum, row) => sum + (row.totalCents ?? 0), 0);
+    const generatedSessions = createdSessions.filter(row => row.paymentAttempts.length > 0);
+    const generatedRevenueCents = generatedSessions.reduce((sum, row) => sum + (row.paymentAttempts[0]?.amountCents ?? 0), 0);
     const paidRevenueCents = paid.reduce((sum, attempt) => sum + attempt.amountCents, 0);
     const abandoned = createdSessions.filter(row => row.status === 'EXPIRED' || (row.status === 'OPEN' && row.createdAt && row.createdAt < new Date(now.getTime() - 30 * 60_000))).length;
     const pending = createdSessions.filter(row => row.paymentAttempts[0]?.status === 'PENDING').length;
@@ -110,9 +114,10 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
       const current = gatewayMap.get(attempt.provider) || { provider: attempt.provider, attempts: 0, paid: 0, revenueCents: 0 };
       current.attempts += 1; if (attempt.status === 'PAID') { current.paid += 1; current.revenueCents += attempt.amountCents; } gatewayMap.set(attempt.provider, current);
     }
-    const geoMap = new Map<string, { country: string; region: string | null; city: string | null; latitude: number | null; longitude: number | null; visitors: number }>();
+    const geoMap = new Map<string, { country: string; region: string | null; city: string | null; latitude: number | null; longitude: number | null; visitorKeys: Set<string> }>();
+    const locatedVisitorKeys = new Set<string>();
     for (const row of createdSessions) {
-      const tracking = typeof row.trackingParameters === 'object' && row.trackingParameters && !Array.isArray(row.trackingParameters) ? row.trackingParameters as Record<string, unknown> : {};
+      const tracking = trackingRecord(row.trackingParameters);
       const country = typeof tracking.geo_country === 'string' ? tracking.geo_country : null;
       if (!country) continue;
       const region = typeof tracking.geo_region_code === 'string' ? tracking.geo_region_code : typeof tracking.geo_region === 'string' ? tracking.geo_region : null;
@@ -121,10 +126,11 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
       const latitude = typeof tracking.geo_latitude === 'string' && Number.isFinite(Number(tracking.geo_latitude)) ? Number(tracking.geo_latitude) : fallbackCoordinates?.[0] ?? null;
       const longitude = typeof tracking.geo_longitude === 'string' && Number.isFinite(Number(tracking.geo_longitude)) ? Number(tracking.geo_longitude) : fallbackCoordinates?.[1] ?? null;
       const key = `${country}:${region ?? ''}:${city ?? ''}`;
-      const current = geoMap.get(key) || { country, region, city, latitude, longitude, visitors: 0 };
-      current.visitors += 1; geoMap.set(key, current);
+      const uniqueVisitor = visitorKey(tracking, row.id);
+      const current = geoMap.get(key) || { country, region, city, latitude, longitude, visitorKeys: new Set<string>() };
+      current.visitorKeys.add(uniqueVisitor); locatedVisitorKeys.add(uniqueVisitor); geoMap.set(key, current);
     }
-    const locations = [...geoMap.values()].sort((a, b) => b.visitors - a.visitors);
+    const locations = [...geoMap.values()].map(({ visitorKeys, ...location }) => ({ ...location, visitors: visitorKeys.size })).sort((a, b) => b.visitors - a.visitors);
     return reply.header('cache-control', 'private, no-store').send({
       userName: session.user.name,
       revenueCents: paidRevenueCents,
@@ -134,7 +140,7 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
       conversionRate: createdSessions.length ? Math.round(paidCreatedSessions / createdSessions.length * 10_000) / 100 : 0,
       series,
       analytics: {
-        sessions: createdSessions.length, generatedRevenueCents, paidRevenueCents,
+        sessions: createdSessions.length, generatedOrders: generatedSessions.length, generatedRevenueCents, paidRevenueCents,
         averageTicketCents: paid.length ? Math.round(paidRevenueCents / paid.length) : 0,
         abandoned, abandonmentRate: createdSessions.length ? Math.round(abandoned / createdSessions.length * 10_000) / 100 : 0,
         pending, cancelled, refunded, uniqueCustomers,
@@ -156,7 +162,7 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
         },
         gateways: [...gatewayMap.values()].map(item => ({ ...item, conversionRate: item.attempts ? Math.round(item.paid / item.attempts * 10_000) / 100 : 0 })),
         products: [...productMap.values()].sort((a, b) => b.revenueCents - a.revenueCents).slice(0, 8),
-        geography: { locations, countries: new Set(locations.map(item => item.country)).size, regions: new Set(locations.map(item => `${item.country}:${item.region ?? ''}`)).size, cities: new Set(locations.filter(item => item.city).map(item => `${item.country}:${item.region ?? ''}:${item.city}`)).size, visitors: locations.reduce((sum, item) => sum + item.visitors, 0) },
+        geography: { locations, countries: new Set(locations.map(item => item.country)).size, regions: new Set(locations.filter(item => item.region).map(item => `${item.country}:${item.region}`)).size, cities: new Set(locations.filter(item => item.city).map(item => `${item.country}:${item.region ?? ''}:${item.city}`)).size, visitors: locatedVisitorKeys.size },
       },
       checklist: { store: true, product: products > 0, checkout: checkouts > 0, gateway: gateways > 0, published: published > 0 },
     });
