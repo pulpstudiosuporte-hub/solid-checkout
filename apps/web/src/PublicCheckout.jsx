@@ -271,8 +271,26 @@ function useExpiry(expiresAt) {
   };
 }
 
+function useCheckoutPresence(sessionId, token) {
+  useEffect(() => {
+    if (!sessionId || !token) return undefined;
+    const heartbeat = () => {
+      if (document.visibilityState === "visible")
+        touchPublicCheckoutPresence(sessionId, token).catch(() => {});
+    };
+    heartbeat();
+    const interval = window.setInterval(heartbeat, 30_000);
+    document.addEventListener("visibilitychange", heartbeat);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", heartbeat);
+    };
+  }, [sessionId, token]);
+}
+
 function SessionContent({ session: initialSession, token }) {
   const [session, setSession] = useState(initialSession);
+  useCheckoutPresence(session.publicId, token);
   const expiry = useExpiry(session.expiresAt);
   const [form, setForm] = useState({
     name: "",
@@ -924,13 +942,6 @@ export function PublicSessionCheckout({ sessionId, token }) {
           setState({ loading: false, session: null, error: error.message });
       });
     return () => controller.abort();
-  }, [sessionId, token]);
-  useEffect(() => {
-    const heartbeat = () => { if (document.visibilityState === 'visible') touchPublicCheckoutPresence(sessionId, token).catch(() => {}); };
-    heartbeat();
-    const interval = window.setInterval(heartbeat, 30_000);
-    document.addEventListener('visibilitychange', heartbeat);
-    return () => { window.clearInterval(interval); document.removeEventListener('visibilitychange', heartbeat); };
   }, [sessionId, token]);
   if (state.loading)
     return (

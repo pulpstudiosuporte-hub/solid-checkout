@@ -7,6 +7,11 @@ import type { AuthRepository } from './auth-repository.js';
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const failure = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
 const dayFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' });
+const countryCentroids: Record<string, readonly [number, number]> = {
+  BR: [-14.235, -51.9253], US: [37.0902, -95.7129], PT: [39.3999, -8.2245],
+  AR: [-38.4161, -63.6167], CL: [-35.6751, -71.543], CO: [4.5709, -74.2973],
+  MX: [23.6345, -102.5528], CA: [56.1304, -106.3468], GB: [55.3781, -3.436],
+};
 
 type DashboardPeriod = 'today' | 'yesterday' | '7d' | 'month' | 'year';
 
@@ -103,8 +108,9 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
       if (!country) continue;
       const region = typeof tracking.geo_region_code === 'string' ? tracking.geo_region_code : typeof tracking.geo_region === 'string' ? tracking.geo_region : null;
       const city = typeof tracking.geo_city === 'string' ? tracking.geo_city : null;
-      const latitude = typeof tracking.geo_latitude === 'string' && Number.isFinite(Number(tracking.geo_latitude)) ? Number(tracking.geo_latitude) : null;
-      const longitude = typeof tracking.geo_longitude === 'string' && Number.isFinite(Number(tracking.geo_longitude)) ? Number(tracking.geo_longitude) : null;
+      const fallbackCoordinates = countryCentroids[country.toUpperCase()];
+      const latitude = typeof tracking.geo_latitude === 'string' && Number.isFinite(Number(tracking.geo_latitude)) ? Number(tracking.geo_latitude) : fallbackCoordinates?.[0] ?? null;
+      const longitude = typeof tracking.geo_longitude === 'string' && Number.isFinite(Number(tracking.geo_longitude)) ? Number(tracking.geo_longitude) : fallbackCoordinates?.[1] ?? null;
       const key = `${country}:${region ?? ''}:${city ?? ''}`;
       const current = geoMap.get(key) || { country, region, city, latitude, longitude, visitors: 0 };
       current.visitors += 1; geoMap.set(key, current);
