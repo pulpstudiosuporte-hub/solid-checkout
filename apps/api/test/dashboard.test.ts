@@ -22,7 +22,7 @@ function dashboardDatabase(): PrismaClient {
   return {
     session: { findUnique: () => Promise.resolve({ activeStoreId: 'store-a' }) },
     storeMember: { findUnique: () => Promise.resolve({ storeId: 'store-a', userId: 'user-a' }) },
-    checkoutSession: { findMany: () => Promise.resolve([{ id: 'checkout-session-a', paymentAttempts: [{ status: 'PAID' }] }, { id: 'checkout-session-b', paymentAttempts: [{ status: 'PENDING' }] }]) },
+    checkoutSession: { findMany: () => Promise.resolve([{ id: 'checkout-session-a', paymentAttempts: [{ status: 'PAID' }] }, { id: 'checkout-session-b', paymentAttempts: [{ status: 'PENDING' }] }]), count: () => Promise.resolve(1) },
     paymentAttempt: { findMany: () => Promise.resolve([{ checkoutSessionId: 'checkout-session-a', amountCents: 13_467, paidAt: new Date() }]) },
     product: { count: () => Promise.resolve(1) },
     checkout: { count: () => Promise.resolve(1) },

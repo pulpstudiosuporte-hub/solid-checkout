@@ -63,6 +63,7 @@ function RevenueChart({ series }) {
 
 export default function DashboardPage({ setPage, storeKey }) {
   const [period, setPeriod] = useState('today');
+  const [liveTick, setLiveTick] = useState(0);
   const [state, setState] = useState({ loading: true, data: null, error: '' });
 
   useEffect(() => {
@@ -72,7 +73,8 @@ export default function DashboardPage({ setPage, storeKey }) {
       if (error.name !== 'AbortError') setState({ loading: false, data: null, error: error.message });
     });
     return () => controller.abort();
-  }, [period, storeKey]);
+  }, [period, storeKey, liveTick]);
+  useEffect(() => { const interval = window.setInterval(() => setLiveTick(value => value + 1), 30_000); return () => window.clearInterval(interval); }, []);
 
   if (state.loading) return <main className="page"><div className="products-state"><LoaderCircle className="spin"/><b>Carregando indicadores...</b></div></main>;
   if (!state.data) return <main className="page"><div className="products-state error"><b>Não foi possível carregar a visão geral</b><span>{state.error}</span></div></main>;
@@ -82,19 +84,22 @@ export default function DashboardPage({ setPage, storeKey }) {
     sessions: data.paidOrders + data.pendingPix,
     generatedRevenueCents: data.revenueCents,
   };
+  const geography = analytics.geography || { locations: [], countries: 0, regions: 0, cities: 0, visitors: 0 };
+  const locations = Array.isArray(geography.locations) ? geography.locations : [];
+  const mappedLocations = locations.filter(location => Number.isFinite(Number(location.latitude)) && Number.isFinite(Number(location.longitude)));
   const firstName = data.userName?.split(' ')[0] || 'empreendedor';
   const hour = new Date().getHours(); const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
 
   return <main className="page home-overview">
     <header className="home-greeting"><h1>{greeting}, {firstName}!</h1><button onClick={() => setPage('Análises')}><TrendingUp size={16}/> Ver análises completas</button></header>
     <section className="home-kpis" aria-label="Indicadores de hoje">
-      <Metric icon={Radio} label="Visitantes agora" value={analytics.sessions} tone="green" helper="Atualização ao vivo"/>
+      <Metric icon={Radio} label="Visitantes agora" value={Number(data.activeVisitors || 0)} tone="green" helper="Ativos nos últimos 2 minutos"/>
       <Metric icon={CircleDollarSign} label="Pedidos gerados" value={money.format(analytics.generatedRevenueCents / 100)} tone="purple" helper={`${analytics.sessions} sessões criadas`}/>
       <Metric icon={ShoppingCart} label="Pedidos hoje" value={data.paidOrders} tone="blue" helper="Pagamentos aprovados"/>
       <Metric icon={TrendingUp} label="Taxa de conversão" value={`${data.conversionRate.toLocaleString('pt-BR')}%`} tone="orange" helper="Sessões que viraram venda"/>
     </section>
     <section className="home-main-grid">
-      <article className="card home-geo"><div className="home-card-title"><div><h2>Alcance geográfico</h2><p>Onde seus visitantes estão acessando o checkout.</p></div><select value={period} onChange={event => setPeriod(event.target.value)} aria-label="Período do alcance"><option value="today">Hoje</option><option value="7d">Últimos 7 dias</option><option value="month">Este mês</option></select></div><div className="dot-map world"><Globe2 size={28}/><span>O mapa será preenchido quando a localização anonimizada estiver ativa.</span></div><div className="home-geo-stats"><div><span>Cidades alcançadas</span><strong>0</strong><small>Dados em preparação</small></div><div><span>Visitantes</span><strong>{analytics.sessions}</strong><small>No período selecionado</small></div><div><span>Taxa de crescimento</span><strong>—</strong><small>Comparativo em preparação</small></div></div></article>
+      <article className="card home-geo"><div className="home-card-title"><div><h2>Alcance geográfico</h2><p>Onde seus visitantes estão acessando o checkout.</p></div><select value={period} onChange={event => setPeriod(event.target.value)} aria-label="Período do alcance"><option value="today">Hoje</option><option value="7d">Últimos 7 dias</option><option value="month">Este mês</option></select></div><div className={`dot-map world ${locations.length ? 'has-locations' : ''}`}>{locations.map((location,index) => location.latitude !== null && location.longitude !== null ? <i key={`${location.country}-${location.region}-${location.city}-${index}`} className="geo-point" style={{ left: `${(Number(location.longitude)+180)/360*100}%`, top: `${(90-Number(location.latitude))/180*100}%` }} title={`${location.city || location.region || location.country}: ${location.visitors} visitantes`}/> : null)}{!locations.length && <><Globe2 size={28}/><span>O mapa começará a preencher com as próximas visitas identificadas pela Cloudflare.</span></>}</div>{locations.length > 0 && <div className="geo-location-list">{locations.slice(0,5).map((location,index)=><span key={`${location.country}-${location.region}-${location.city}-${index}`}><b>{location.city || location.region || location.country}</b><small>{location.region ? `${location.region} · ` : ''}{location.country} · {location.visitors}</small></span>)}</div>}<div className="home-geo-stats"><div><span>Cidades alcançadas</span><strong>{Number(geography.cities || 0)}</strong><small>{Number(geography.regions || 0)} regiões</small></div><div><span>Visitantes localizados</span><strong>{Number(geography.visitors || 0)}</strong><small>No período selecionado</small></div><div><span>Países alcançados</span><strong>{Number(geography.countries || 0)}</strong><small>Localização anonimizada</small></div></div></article>
       <aside className="card home-news"><div className="home-news-cover"><span>NOVIDADES SOLID</span><b>Seu painel de conversão evoluiu</b></div>{[['Nova área de Análises disponível','Agora'],['Indicadores de checkout e gateways','Agora'],['Editor de checkout com modelos','Recente'],['Recuperação de carrinhos ativa','Recente']].map(([title,time]) => <button key={title} onClick={() => title.includes('Análises') && setPage('Análises')}><span>{title}</span><small>{time}</small><ArrowRight size={15}/></button>)}<button className="home-news-cta" onClick={() => setPage('Análises')}>Explorar os indicadores <ArrowRight size={16}/></button></aside>
     </section>
     <section className="home-tools"><h2>Ferramentas para expandir seu negócio</h2><p>Configure os recursos essenciais para aumentar sua conversão.</p><div><button onClick={() => setPage('Checkouts')}><b>Personalize seu checkout</b><span>Edite layout, conteúdo e elementos de conversão.</span><ArrowRight size={17}/></button><button onClick={() => setPage('Order bumps')}><b>Aumente o ticket médio</b><span>Crie ofertas complementares no checkout.</span><ArrowRight size={17}/></button><button onClick={() => setPage('Carrinhos')}><b>Recupere vendas</b><span>Acompanhe oportunidades que não foram concluídas.</span><ArrowRight size={17}/></button></div></section>

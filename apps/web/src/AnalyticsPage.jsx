@@ -12,6 +12,7 @@ function normalizeDashboard(raw) {
   const stepSource = source.checkoutSteps && typeof source.checkoutSteps === 'object' ? source.checkoutSteps : {};
   const couponSource = source.coupons && typeof source.coupons === 'object' ? source.coupons : {};
   const bumpSource = source.orderBumps && typeof source.orderBumps === 'object' ? source.orderBumps : {};
+  const geographySource = source.geography && typeof source.geography === 'object' ? source.geography : {};
   const sessions = finite(source.sessions || paidOrders + pendingPix);
   return {
     ...raw, paidOrders, pendingPix, revenueCents: finite(raw?.revenueCents), conversionRate: finite(raw?.conversionRate), series,
@@ -24,6 +25,7 @@ function normalizeDashboard(raw) {
       orderBumps: { items: finite(bumpSource.items), revenueCents: finite(bumpSource.revenueCents) },
       gateways: Array.isArray(source.gateways) ? source.gateways.map(item => ({ provider: String(item?.provider || 'Gateway'), attempts: finite(item?.attempts), paid: finite(item?.paid), revenueCents: finite(item?.revenueCents), conversionRate: finite(item?.conversionRate) })) : [],
       products: Array.isArray(source.products) ? source.products.map(item => ({ title: String(item?.title || 'Produto'), quantity: finite(item?.quantity), revenueCents: finite(item?.revenueCents) })) : [],
+      geography: { locations: Array.isArray(geographySource.locations) ? geographySource.locations : [], countries: finite(geographySource.countries), regions: finite(geographySource.regions), cities: finite(geographySource.cities), visitors: finite(geographySource.visitors) },
     },
   };
 }

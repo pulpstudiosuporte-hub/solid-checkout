@@ -20,6 +20,7 @@ const errorBody = (request: FastifyRequest, code: string, message: string) => ({
 const digits = (value: unknown): string => typeof value === 'string' ? value.replace(/\D/g, '') : '';
 const trackingKeys = ['src', 'sck', 'utm_source', 'utm_campaign', 'utm_medium', 'utm_content', 'utm_term', 'fbp', 'fbc', 'event_source_url'] as const;
 const trackingParameters = (value: unknown): Record<string, string | null> => { const input = typeof value === 'object' && value !== null ? value as Record<string, unknown> : {}; return Object.fromEntries(trackingKeys.map(key => [key, typeof input[key] === 'string' && input[key].trim() ? input[key].trim().slice(0, 500) : null])); };
+const geoHeader = (request: FastifyRequest, name: string, max = 120): string | null => { const value = request.headers[name]; return typeof value === 'string' && value.trim().length > 0 && value.length <= max ? value.trim() : null; };
 const validCpf = (value: string): boolean => { if (!/^\d{11}$/.test(value) || /^(\d)\1{10}$/.test(value)) return false; const check = (length: number) => { let sum = 0; for (let index = 0; index < length; index += 1) sum += Number(value[index]) * (length + 1 - index); const mod = sum % 11; return mod < 2 ? 0 : 11 - mod; }; return check(9) === Number(value[9]) && check(10) === Number(value[10]); };
 const validCnpj = (value: string): boolean => { if (!/^\d{14}$/.test(value) || /^(\d)\1{13}$/.test(value)) return false; const calculate = (length: number) => { const weights = length === 12 ? [5,4,3,2,9,8,7,6,5,4,3,2] : [6,5,4,3,2,9,8,7,6,5,4,3,2]; const sum = weights.reduce((total, weight, index) => total + Number(value[index]) * weight, 0); const mod = sum % 11; return mod < 2 ? 0 : 11 - mod; }; return calculate(12) === Number(value[12]) && calculate(13) === Number(value[13]); };
 const sessionCredentials = (sessionIdValue: unknown, authorization: string | undefined): { sessionId: string; tokenHash: string } | null => { const sessionId = publicId(sessionIdValue); const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : ''; return sessionId && token.length >= 32 && token.length <= 128 ? { sessionId, tokenHash: sha256(token) } : null; };
@@ -61,7 +62,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     const variantPublicId = request.body?.variantId === undefined ? undefined : publicId(request.body.variantId);
     if (!storeSlug || !checkoutSlug || typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1 || quantity > 1000 || request.body?.variantId !== undefined && !variantPublicId) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Itens do checkout inválidos.'));
     const token = randomBytes(32).toString('base64url');
-    const sessionTracking = { ...trackingParameters(request.body?.trackingParameters), client_ip_address: request.ip, client_user_agent: String(request.headers['user-agent'] || '').slice(0, 500) };
+    const sessionTracking = { ...trackingParameters(request.body?.trackingParameters), client_ip_address: request.ip, client_user_agent: String(request.headers['user-agent'] || '').slice(0, 500), geo_country: geoHeader(request, 'cf-ipcountry', 2), geo_region: geoHeader(request, 'cf-region'), geo_region_code: geoHeader(request, 'cf-region-code', 12), geo_city: geoHeader(request, 'cf-ipcity'), geo_latitude: geoHeader(request, 'cf-iplatitude', 24), geo_longitude: geoHeader(request, 'cf-iplongitude', 24) };
     const session = await catalog.createPublicCheckoutSession({ storeSlug, checkoutSlug, quantity, tokenHash: sha256(token), source: 'DIRECT', trackingParameters: sessionTracking, expiresAt: new Date(Date.now() + 30 * 60_000), ...(variantPublicId ? { variantPublicId } : {}) });
     if (!session) return reply.code(409).send(errorBody(request, 'CHECKOUT_UNAVAILABLE', 'Produto, variante ou estoque indisponível.'));
     return reply.header('cache-control', 'no-store').code(201).send({ session, token });
@@ -75,6 +76,15 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     const session = await catalog.getPublicCheckoutSession(sessionId, sha256(token), new Date());
     if (!session) return reply.code(404).send(errorBody(request, 'SESSION_NOT_FOUND', 'Sessão expirada ou indisponível.'));
     return reply.header('cache-control', 'no-store').send({ session });
+  });
+
+  app.put<{ Params: { sessionId: string }; Headers: { authorization?: string } }>('/public/checkout-sessions/:sessionId/presence', { config: { rateLimit: { max: 6, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization);
+    if (!credentials) return reply.code(401).send(errorBody(request, 'INVALID_SESSION', 'Sessão inválida.'));
+    if (!catalog.touchPublicCheckoutSession) return reply.code(503).send(errorBody(request, 'PRESENCE_UNAVAILABLE', 'Presença temporariamente indisponível.'));
+    const touched = await catalog.touchPublicCheckoutSession(credentials.sessionId, credentials.tokenHash, new Date());
+    if (!touched) return reply.code(404).send(errorBody(request, 'SESSION_NOT_FOUND', 'Sessão expirada ou indisponível.'));
+    return reply.header('cache-control', 'no-store').code(204).send();
   });
 
   app.get<{ Params: { sessionId: string }; Headers: { authorization?: string } }>('/public/checkout-sessions/:sessionId/tracking/meta', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {

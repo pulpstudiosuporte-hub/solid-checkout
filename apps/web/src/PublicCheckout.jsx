@@ -29,6 +29,7 @@ import {
   selectPublicShippingMethod,
   setPublicOrderBump,
   applyPublicCoupon,
+  touchPublicCheckoutPresence,
 } from "./api";
 import "./public-session.css";
 
@@ -923,6 +924,13 @@ export function PublicSessionCheckout({ sessionId, token }) {
           setState({ loading: false, session: null, error: error.message });
       });
     return () => controller.abort();
+  }, [sessionId, token]);
+  useEffect(() => {
+    const heartbeat = () => { if (document.visibilityState === 'visible') touchPublicCheckoutPresence(sessionId, token).catch(() => {}); };
+    heartbeat();
+    const interval = window.setInterval(heartbeat, 30_000);
+    document.addEventListener('visibilitychange', heartbeat);
+    return () => { window.clearInterval(interval); document.removeEventListener('visibilitychange', heartbeat); };
   }, [sessionId, token]);
   if (state.loading)
     return (

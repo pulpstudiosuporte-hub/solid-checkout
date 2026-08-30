@@ -41,12 +41,12 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
     const end = period === 'yesterday' ? new Date(start.getTime() + 86_400_000 - 1) : now;
     const storeId = selected.activeStoreId;
 
-    const [createdSessions, paidAttempts, products, checkouts, published, gateways] = await Promise.all([
+    const [createdSessions, paidAttempts, products, checkouts, published, gateways, activeVisitors] = await Promise.all([
       db.checkoutSession.findMany({
         where: { checkout: { storeId }, createdAt: { gte: start, lte: end } },
         select: {
           id: true, status: true, totalCents: true, discountCents: true, couponCode: true,
-          customerEmailHash: true, customerCapturedAt: true, shippingCapturedAt: true, createdAt: true,
+          customerEmailHash: true, customerCapturedAt: true, shippingCapturedAt: true, createdAt: true, trackingParameters: true,
           items: { select: { titleSnapshot: true, quantity: true, totalCents: true, isOrderBump: true } },
           paymentAttempts: { where: { providerTransactionId: { not: null } }, orderBy: { createdAt: 'desc' }, take: 1, select: { status: true, provider: true, amountCents: true } },
         },
@@ -60,6 +60,7 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
       db.checkout.count({ where: { storeId, archivedAt: null } }),
       db.checkout.count({ where: { storeId, status: 'PUBLISHED', archivedAt: null } }),
       db.gatewayConnection.count({ where: { storeId, active: true } }),
+      db.checkoutSession.count({ where: { checkout: { storeId }, status: 'OPEN', expiresAt: { gt: now }, updatedAt: { gte: new Date(now.getTime() - 2 * 60_000) } } }),
     ]);
 
     const paidBySession = new Map<string, { amountCents: number; paidAt: Date }>();
@@ -95,11 +96,26 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
       const current = gatewayMap.get(attempt.provider) || { provider: attempt.provider, attempts: 0, paid: 0, revenueCents: 0 };
       current.attempts += 1; if (attempt.status === 'PAID') { current.paid += 1; current.revenueCents += attempt.amountCents; } gatewayMap.set(attempt.provider, current);
     }
+    const geoMap = new Map<string, { country: string; region: string | null; city: string | null; latitude: number | null; longitude: number | null; visitors: number }>();
+    for (const row of createdSessions) {
+      const tracking = typeof row.trackingParameters === 'object' && row.trackingParameters && !Array.isArray(row.trackingParameters) ? row.trackingParameters as Record<string, unknown> : {};
+      const country = typeof tracking.geo_country === 'string' ? tracking.geo_country : null;
+      if (!country) continue;
+      const region = typeof tracking.geo_region_code === 'string' ? tracking.geo_region_code : typeof tracking.geo_region === 'string' ? tracking.geo_region : null;
+      const city = typeof tracking.geo_city === 'string' ? tracking.geo_city : null;
+      const latitude = typeof tracking.geo_latitude === 'string' && Number.isFinite(Number(tracking.geo_latitude)) ? Number(tracking.geo_latitude) : null;
+      const longitude = typeof tracking.geo_longitude === 'string' && Number.isFinite(Number(tracking.geo_longitude)) ? Number(tracking.geo_longitude) : null;
+      const key = `${country}:${region ?? ''}:${city ?? ''}`;
+      const current = geoMap.get(key) || { country, region, city, latitude, longitude, visitors: 0 };
+      current.visitors += 1; geoMap.set(key, current);
+    }
+    const locations = [...geoMap.values()].sort((a, b) => b.visitors - a.visitors);
     return reply.header('cache-control', 'private, no-store').send({
       userName: session.user.name,
       revenueCents: paidRevenueCents,
       paidOrders: paid.length,
       pendingPix: pending,
+      activeVisitors,
       conversionRate: createdSessions.length ? Math.round(paidCreatedSessions / createdSessions.length * 10_000) / 100 : 0,
       series,
       analytics: {
@@ -125,6 +141,7 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
         },
         gateways: [...gatewayMap.values()].map(item => ({ ...item, conversionRate: item.attempts ? Math.round(item.paid / item.attempts * 10_000) / 100 : 0 })),
         products: [...productMap.values()].sort((a, b) => b.revenueCents - a.revenueCents).slice(0, 8),
+        geography: { locations, countries: new Set(locations.map(item => item.country)).size, regions: new Set(locations.map(item => `${item.country}:${item.region ?? ''}`)).size, cities: new Set(locations.filter(item => item.city).map(item => `${item.country}:${item.region ?? ''}:${item.city}`)).size, visitors: locations.reduce((sum, item) => sum + item.visitors, 0) },
       },
       checklist: { store: true, product: products > 0, checkout: checkouts > 0, gateway: gateways > 0, published: published > 0 },
     });

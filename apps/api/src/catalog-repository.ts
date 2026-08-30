@@ -29,6 +29,7 @@ export interface CatalogRepository {
   getPublicCheckout(storeSlug: string, checkoutSlug: string): Promise<object | null>;
   createPublicCheckoutSession(input: CheckoutSessionInput): Promise<object | null>;
   getPublicCheckoutSession(publicId: string, tokenHash: string, now: Date): Promise<object | null>;
+  touchPublicCheckoutSession?(publicId: string, tokenHash: string, now: Date): Promise<boolean>;
   getPaidDigitalDelivery(publicId: string, tokenHash: string): Promise<object | null>;
   createShopifyCartSession(input: ShopifyCartSessionInput): Promise<object | null>;
   updatePublicCheckoutCustomer(publicId: string, tokenHash: string, now: Date, input: CheckoutCustomerInput): Promise<object | null>;
@@ -220,6 +221,11 @@ export class PrismaCatalogRepository implements CatalogRepository {
     const orderBumps = configured.flatMap(bump => { const product = byId.get(bump.productId); return product ? [{ ...product, offerTitle: bump.title, offerMessage: bump.message }] : []; });
     const checkout = { slug: session.checkout.slug, name: session.checkout.name, publishedConfig: session.checkout.publishedConfig, store: session.checkout.store, product: session.checkout.product };
     return { ...session, checkout, orderBump: orderBumps[0] ?? null, orderBumps, customerCaptured: Boolean(session.customerCapturedAt), shippingCaptured: Boolean(session.shippingCapturedAt), customerCapturedAt: undefined, shippingCapturedAt: undefined };
+  }
+
+  async touchPublicCheckoutSession(publicId: string, tokenHash: string, now: Date): Promise<boolean> {
+    const result = await this.database.checkoutSession.updateMany({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, data: { updatedAt: now } });
+    return result.count === 1;
   }
 
   async getPaidDigitalDelivery(publicId: string, tokenHash: string): Promise<object | null> {
