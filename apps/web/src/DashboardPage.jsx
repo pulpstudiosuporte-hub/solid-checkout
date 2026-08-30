@@ -1,7 +1,6 @@
 import React, { useEffect, useId, useState } from 'react';
-import { ArrowRight, Check, CircleDollarSign, Clock3, FileText, LoaderCircle, ShoppingCart, Sparkles, TrendingUp } from 'lucide-react';
+import { ArrowRight, CircleDollarSign, Globe2, LoaderCircle, Radio, ShoppingCart, TrendingUp } from 'lucide-react';
 import { getDashboard } from './api';
-import { RecentOrders } from './OrdersPage';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const compactMoney = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 });
@@ -63,7 +62,7 @@ function RevenueChart({ series }) {
 }
 
 export default function DashboardPage({ setPage, storeKey }) {
-  const [period, setPeriod] = useState('7d');
+  const [period, setPeriod] = useState('today');
   const [state, setState] = useState({ loading: true, data: null, error: '' });
 
   useEffect(() => {
@@ -79,39 +78,21 @@ export default function DashboardPage({ setPage, storeKey }) {
   if (!state.data) return <main className="page"><div className="products-state error"><b>Não foi possível carregar a visão geral</b><span>{state.error}</span></div></main>;
 
   const data = state.data;
-  const tasks = [
-    ['Criar sua loja Solid', data.checklist.store, 'Visão geral'], ['Adicionar primeiro produto', data.checklist.product, 'Produtos'],
-    ['Criar um checkout', data.checklist.checkout, 'Checkouts'], ['Conectar gateway Pix', data.checklist.gateway, 'Gateways'],
-    ['Publicar e testar', data.checklist.published, 'Checkouts'],
-  ];
-  const completed = tasks.filter(task => task[1]).length;
   const firstName = data.userName?.split(' ')[0] || 'empreendedor';
-  const exportCsv = () => {
-    const rows = ['Data,Receita (centavos),Pedidos pagos', ...data.series.map(item => `${item.date},${item.revenueCents},${item.paidOrders}`)];
-    const url = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' }));
-    const link = document.createElement('a'); link.href = url; link.download = `solid-${period}.csv`; link.click(); URL.revokeObjectURL(url);
-  };
+  const hour = new Date().getHours(); const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
 
-  return <main className="page dashboard dashboard-v2">
-    <section className="solid-command-bar" aria-label="Atalho de configuração">
-      <div><span className="solid-command-icon"><Sparkles size={18}/></span><div><b>Deixe sua operação pronta para vender</b><p>{completed === 5 ? 'Configuração essencial concluída. Acompanhe os resultados em tempo real.' : `Faltam ${5 - completed} ${5 - completed === 1 ? 'etapa' : 'etapas'} para concluir a configuração essencial.`}</p></div></div>
-      <button onClick={() => setPage(tasks.find(task => !task[1])?.[2] || 'Checkouts')}>{completed === 5 ? 'Ver checkouts' : 'Continuar configuração'}<ArrowRight size={16}/></button>
+  return <main className="page home-overview">
+    <header className="home-greeting"><h1>{greeting}, {firstName}!</h1><button onClick={() => setPage('Análises')}><TrendingUp size={16}/> Ver análises completas</button></header>
+    <section className="home-kpis" aria-label="Indicadores de hoje">
+      <Metric icon={Radio} label="Visitantes agora" value={data.analytics.sessions} tone="green" helper="Atualização ao vivo"/>
+      <Metric icon={CircleDollarSign} label="Pedidos gerados" value={money.format(data.analytics.generatedRevenueCents / 100)} tone="purple" helper={`${data.analytics.sessions} sessões criadas`}/>
+      <Metric icon={ShoppingCart} label="Pedidos hoje" value={data.paidOrders} tone="blue" helper="Pagamentos aprovados"/>
+      <Metric icon={TrendingUp} label="Taxa de conversão" value={`${data.conversionRate.toLocaleString('pt-BR')}%`} tone="orange" helper="Sessões que viraram venda"/>
     </section>
-    <section className="dashboard-hero">
-      <div><p className="eyebrow">VISÃO GERAL</p><h1>Olá, {firstName}</h1><p>Seu negócio em um só lugar, com os números que importam.</p></div>
-      <div className="title-actions"><label className="period-select"><span className="sr-only">Período dos indicadores</span><select value={period} onChange={event => setPeriod(event.target.value)}><option value="today">Hoje</option><option value="7d">Últimos 7 dias</option><option value="month">Este mês</option></select></label><button className="secondary" onClick={exportCsv}><FileText size={17}/> Exportar</button></div>
-      <Sparkles className="dashboard-hero-spark" aria-hidden="true"/>
+    <section className="home-main-grid">
+      <article className="card home-geo"><div className="home-card-title"><div><h2>Alcance geográfico</h2><p>Onde seus visitantes estão acessando o checkout.</p></div><select value={period} onChange={event => setPeriod(event.target.value)} aria-label="Período do alcance"><option value="today">Hoje</option><option value="7d">Últimos 7 dias</option><option value="month">Este mês</option></select></div><div className="dot-map world"><Globe2 size={28}/><span>O mapa será preenchido quando a localização anonimizada estiver ativa.</span></div><div className="home-geo-stats"><div><span>Cidades alcançadas</span><strong>0</strong><small>Dados em preparação</small></div><div><span>Visitantes</span><strong>{data.analytics.sessions}</strong><small>No período selecionado</small></div><div><span>Taxa de crescimento</span><strong>—</strong><small>Comparativo em preparação</small></div></div></article>
+      <aside className="card home-news"><div className="home-news-cover"><span>NOVIDADES SOLID</span><b>Seu painel de conversão evoluiu</b></div>{[['Nova área de Análises disponível','Agora'],['Indicadores de checkout e gateways','Agora'],['Editor de checkout com modelos','Recente'],['Recuperação de carrinhos ativa','Recente']].map(([title,time]) => <button key={title} onClick={() => title.includes('Análises') && setPage('Análises')}><span>{title}</span><small>{time}</small><ArrowRight size={15}/></button>)}<button className="home-news-cta" onClick={() => setPage('Análises')}>Explorar os indicadores <ArrowRight size={16}/></button></aside>
     </section>
-    <section className="metrics dashboard-metrics" aria-label="Indicadores principais">
-      <Metric icon={CircleDollarSign} label="Receita confirmada" value={money.format(data.revenueCents / 100)} tone="purple" helper="Receita líquida confirmada"/>
-      <Metric icon={ShoppingCart} label="Pedidos pagos" value={data.paidOrders} tone="blue" helper="Pagamentos aprovados"/>
-      <Metric icon={TrendingUp} label="Conversão" value={`${data.conversionRate.toLocaleString('pt-BR')}%`} tone="green" helper="Sessões que viraram venda"/>
-      <Metric icon={Clock3} label="Aguardando Pix" value={data.pendingPix} tone="orange" helper="Oportunidades em aberto"/>
-    </section>
-    <section className="grid-main dashboard-grid">
-      <article className="card chart-card dashboard-chart-card"><div className="card-head"><div><p className="eyebrow">DESEMPENHO</p><h2>Receita no período</h2><p>Valores confirmados diretamente pelos gateways</p></div><span className="chart-legend"><i/>Receita</span></div><RevenueChart series={data.series}/></article>
-      <aside className="card progress-card dashboard-progress"><div className="card-head"><div><p className="eyebrow">CONFIGURAÇÃO</p><h2>{completed === 5 ? 'Sua operação está pronta' : 'Comece por aqui'}</h2><p>{completed === 5 ? 'Todos os passos essenciais foram concluídos.' : 'Prepare sua loja para começar a vender.'}</p></div><strong className="progress-count">{completed}/5</strong></div><div className="progress" aria-label={`${completed} de 5 passos concluídos`}><span style={{ width: `${completed * 20}%` }}/></div><div className="dashboard-tasks">{tasks.map(([title, done, page], index) => <button key={title} className={`task ${done ? 'done' : ''}`} onClick={() => !done && setPage(page)} disabled={done}><span>{done ? <Check size={15}/> : index + 1}</span><b>{title}</b>{!done && <ArrowRight size={16}/>}</button>)}</div></aside>
-    </section>
-    <RecentOrders storeKey={storeKey} onViewAll={() => setPage('Pedidos')}/>
+    <section className="home-tools"><h2>Ferramentas para expandir seu negócio</h2><p>Configure os recursos essenciais para aumentar sua conversão.</p><div><button onClick={() => setPage('Checkouts')}><b>Personalize seu checkout</b><span>Edite layout, conteúdo e elementos de conversão.</span><ArrowRight size={17}/></button><button onClick={() => setPage('Order bumps')}><b>Aumente o ticket médio</b><span>Crie ofertas complementares no checkout.</span><ArrowRight size={17}/></button><button onClick={() => setPage('Carrinhos')}><b>Recupere vendas</b><span>Acompanhe oportunidades que não foram concluídas.</span><ArrowRight size={17}/></button></div></section>
   </main>;
 }
