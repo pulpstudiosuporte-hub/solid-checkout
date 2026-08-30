@@ -24,7 +24,7 @@ export default class PageErrorBoundary extends Component {
     return <main className="page page-error" role="alert">
       <section className="card page-error-card">
         <span><AlertTriangle size={25}/></span>
-        <div><p className="eyebrow">NAVEGAÇÃO</p><h1>Não foi possível abrir esta página</h1><p>O painel continua funcionando. Tente carregar o módulo novamente ou volte à visão geral.</p></div>
+        <div><p className="eyebrow">NAVEGAÇÃO</p><h1>Não foi possível abrir esta página</h1><p>O painel continua funcionando. Tente carregar o módulo novamente ou volte ao início.</p><small className="page-error-code">Referência: {this.state.error?.name || 'RenderError'}</small></div>
         <div className="page-error-actions"><button className="secondary" type="button" onClick={this.retry}><RefreshCw size={17}/> Tentar novamente</button><button className="primary" type="button" onClick={this.props.onHome}><Home size={17}/> Visão geral</button></div>
       </section>
     </main>;

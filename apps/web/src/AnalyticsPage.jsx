@@ -4,6 +4,29 @@ import { getDashboard } from './api';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const number = new Intl.NumberFormat('pt-BR');
+const finite = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+
+function normalizeDashboard(raw) {
+  const series = Array.isArray(raw?.series) ? raw.series.map(item => ({ date: typeof item?.date === 'string' ? item.date : '', revenueCents: finite(item?.revenueCents), paidOrders: finite(item?.paidOrders) })) : [];
+  const paidOrders = finite(raw?.paidOrders); const pendingPix = finite(raw?.pendingPix); const source = raw?.analytics && typeof raw.analytics === 'object' ? raw.analytics : {};
+  const stepSource = source.checkoutSteps && typeof source.checkoutSteps === 'object' ? source.checkoutSteps : {};
+  const couponSource = source.coupons && typeof source.coupons === 'object' ? source.coupons : {};
+  const bumpSource = source.orderBumps && typeof source.orderBumps === 'object' ? source.orderBumps : {};
+  const sessions = finite(source.sessions || paidOrders + pendingPix);
+  return {
+    ...raw, paidOrders, pendingPix, revenueCents: finite(raw?.revenueCents), conversionRate: finite(raw?.conversionRate), series,
+    analytics: {
+      sessions, generatedRevenueCents: finite(source.generatedRevenueCents ?? raw?.revenueCents), paidRevenueCents: finite(source.paidRevenueCents ?? raw?.revenueCents),
+      averageTicketCents: finite(source.averageTicketCents ?? (paidOrders ? finite(raw?.revenueCents) / paidOrders : 0)), abandoned: finite(source.abandoned), abandonmentRate: finite(source.abandonmentRate),
+      pending: finite(source.pending ?? pendingPix), cancelled: finite(source.cancelled), refunded: finite(source.refunded), uniqueCustomers: finite(source.uniqueCustomers),
+      checkoutSteps: { visitors: finite(stepSource.visitors ?? sessions), personal: finite(stepSource.personal), shipping: finite(stepSource.shipping), payment: finite(stepSource.payment ?? paidOrders + pendingPix), paid: finite(stepSource.paid ?? paidOrders) },
+      coupons: { orders: finite(couponSource.orders), revenueCents: finite(couponSource.revenueCents), discountCents: finite(couponSource.discountCents) },
+      orderBumps: { items: finite(bumpSource.items), revenueCents: finite(bumpSource.revenueCents) },
+      gateways: Array.isArray(source.gateways) ? source.gateways.map(item => ({ provider: String(item?.provider || 'Gateway'), attempts: finite(item?.attempts), paid: finite(item?.paid), revenueCents: finite(item?.revenueCents), conversionRate: finite(item?.conversionRate) })) : [],
+      products: Array.isArray(source.products) ? source.products.map(item => ({ title: String(item?.title || 'Produto'), quantity: finite(item?.quantity), revenueCents: finite(item?.revenueCents) })) : [],
+    },
+  };
+}
 
 function Value({ label, value, helper }) {
   return <div className="analytics-value"><span>{label}</span><strong>{value}</strong>{helper && <small>{helper}</small>}</div>;
@@ -34,8 +57,8 @@ export default function AnalyticsPage({ storeKey }) {
   useEffect(() => { const controller = new AbortController(); setState(current => ({ ...current, loading: true, error: '' })); getDashboard(period, controller.signal).then(data => setState({ loading: false, data, error: '' })).catch(error => { if (error.name !== 'AbortError') setState({ loading: false, data: null, error: error.message }); }); return () => controller.abort(); }, [period, refresh, storeKey]);
   if (state.loading && !state.data) return <main className="page"><div className="products-state"><LoaderCircle className="spin"/><b>Preparando suas análises...</b></div></main>;
   if (!state.data) return <main className="page"><div className="products-state error"><b>Não foi possível carregar as análises</b><span>{state.error}</span></div></main>;
-  const data = state.data;
-  const a = data.analytics || { sessions: data.paidOrders + data.pendingPix, generatedRevenueCents: data.revenueCents, paidRevenueCents: data.revenueCents, averageTicketCents: data.paidOrders ? Math.round(data.revenueCents / data.paidOrders) : 0, abandoned: 0, abandonmentRate: 0, pending: data.pendingPix, cancelled: 0, refunded: 0, uniqueCustomers: 0, checkoutSteps: { visitors: data.paidOrders + data.pendingPix, personal: 0, shipping: 0, payment: data.paidOrders + data.pendingPix, paid: data.paidOrders }, coupons: { orders: 0, revenueCents: 0, discountCents: 0 }, orderBumps: { items: 0, revenueCents: 0 }, gateways: [], products: [] };
+  const data = normalizeDashboard(state.data);
+  const a = data.analytics;
   const maxStep = Math.max(1, a.checkoutSteps.visitors); const maxProduct = Math.max(1, ...a.products.map(item => item.revenueCents));
   const bestDay = data.series.reduce((best, item) => item.revenueCents > (best?.revenueCents || -1) ? item : best, null);
   return <main className="page analytics-page">
