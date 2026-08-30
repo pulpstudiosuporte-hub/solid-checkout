@@ -11,6 +11,7 @@
     "test": "vitest run --dir test"
   },
   "dependencies": {
+    "dotted-map": "3.1.0",
     "lucide-react": "1.31.0",
     "qrcode.react": "4.2.0",
     "react": "19.2.8",

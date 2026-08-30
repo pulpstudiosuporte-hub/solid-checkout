@@ -2,24 +2,10 @@ import React, { useEffect, useId, useState } from 'react';
 import { ArrowRight, CircleDollarSign, Globe2, LoaderCircle, Radio, ShoppingCart, TrendingUp } from 'lucide-react';
 import { getDashboard } from './api';
 
+const WorldMap = React.lazy(() => import('./components/ui/WorldMap').then(module => ({ default: module.WorldMap })));
+
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const compactMoney = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 });
-
-function WorldMap() {
-  return <svg className="dashboard-world-map" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-    <g>
-      <path d="M60 105l37-38 72-26 73 8 41 25 46 5 24 31-29 30-15 39-34 18-17 42-31 10-19-25-36-7-20-38-35-20-20-25z"/>
-      <path d="M254 247l35 14 32 41-3 47-18 38-17 60-22 35-23-18 4-47-18-34-7-53 15-45z"/>
-      <path d="M422 72l37-20 45 11 24 29-18 21-40-3-29 15-26-19z"/>
-      <path d="M467 134l41-17 40 13 17 26 48 5 25 22 45 4 25 25-17 29-56 2-24 21-45-8-30 10-29-25-30-8-20-31-33-16 8-34z"/>
-      <path d="M498 238l48 2 35 29 20 53-20 66-37 62-29-8-17-54-25-48 7-53z"/>
-      <path d="M690 109l49-34 62-7 38 19 58 4 51 31-10 35-43 12-21 37-51-3-43 28-33-21-42 9-27-29 16-31-22-19z"/>
-      <path d="M805 253l29-13 31 16-14 32-31 12-20-19z"/>
-      <path d="M829 339l42-23 60 15 24 38-25 40-55 12-47-24-16-31z"/>
-      <path d="M924 238l13-14 17 13-7 20-18-2z"/>
-    </g>
-  </svg>;
-}
 
 function Metric({ icon: Icon, label, value, tone, helper }) {
   return <article className={`dashboard-metric card ${tone}`}>
@@ -115,7 +101,7 @@ export default function DashboardPage({ setPage, storeKey }) {
       <Metric icon={TrendingUp} label="Taxa de conversão" value={`${data.conversionRate.toLocaleString('pt-BR')}%`} tone="orange" helper="Sessões que viraram venda"/>
     </section>
     <section className="home-main-grid">
-      <article className="card home-geo"><div className="home-card-title"><div><h2>Alcance geográfico</h2><p>Onde seus visitantes estão acessando o checkout.</p></div><select value={period} onChange={event => setPeriod(event.target.value)} aria-label="Período do alcance"><option value="today">Hoje</option><option value="7d">Últimos 7 dias</option><option value="month">Este mês</option></select></div><div className={`dot-map world ${locations.length ? 'has-locations' : ''}`}><WorldMap/>{locations.map((location,index) => location.latitude !== null && location.longitude !== null ? <i key={`${location.country}-${location.region}-${location.city}-${index}`} className="geo-point" style={{ left: `${(Number(location.longitude)+180)/360*100}%`, top: `${(90-Number(location.latitude))/180*100}%` }} title={`${location.city || location.region || location.country}: ${location.visitors} visitantes`}/> : null)}{!locations.length && <><Globe2 size={28}/><span>O mapa começará a preencher com as próximas visitas identificadas pela Cloudflare.</span></>}</div>{locations.length > 0 && <div className="geo-location-list">{locations.slice(0,5).map((location,index)=><span key={`${location.country}-${location.region}-${location.city}-${index}`}><b>{location.city || location.region || location.country}</b><small>{location.region ? `${location.region} · ` : ''}{location.country} · {location.visitors}</small></span>)}</div>}<div className="home-geo-stats"><div><span>Cidades alcançadas</span><strong>{Number(geography.cities || 0)}</strong><small>{Number(geography.regions || 0)} regiões</small></div><div><span>Visitantes localizados</span><strong>{Number(geography.visitors || 0)}</strong><small>No período selecionado</small></div><div><span>Países alcançados</span><strong>{Number(geography.countries || 0)}</strong><small>Localização anonimizada</small></div></div></article>
+      <article className="card home-geo"><div className="home-card-title"><div><h2>Alcance geográfico</h2><p>Onde seus visitantes estão acessando o checkout.</p></div><select value={period} onChange={event => setPeriod(event.target.value)} aria-label="Período do alcance"><option value="today">Hoje</option><option value="7d">Últimos 7 dias</option><option value="month">Este mês</option></select></div><div className={`dot-map world ${locations.length ? 'has-locations' : ''}`}><React.Suspense fallback={<LoaderCircle className="spin" aria-label="Carregando mapa"/>}><WorldMap locations={locations}/></React.Suspense>{!locations.length && <><Globe2 size={28}/><span>O mapa começará a preencher com as próximas visitas identificadas pela Cloudflare.</span></>}</div>{locations.length > 0 && <div className="geo-location-list">{locations.slice(0,5).map((location,index)=><span key={`${location.country}-${location.region}-${location.city}-${index}`}><b>{location.city || location.region || location.country}</b><small>{location.region ? `${location.region} · ` : ''}{location.country} · {location.visitors}</small></span>)}</div>}<div className="home-geo-stats"><div><span>Cidades alcançadas</span><strong>{Number(geography.cities || 0)}</strong><small>{Number(geography.regions || 0)} regiões</small></div><div><span>Visitantes localizados</span><strong>{Number(geography.visitors || 0)}</strong><small>No período selecionado</small></div><div><span>Países alcançados</span><strong>{Number(geography.countries || 0)}</strong><small>Localização anonimizada</small></div></div></article>
       <aside className="card home-news"><div className="home-news-cover"><span>NOVIDADES SOLID</span><b>Seu painel de conversão evoluiu</b></div>{[['Nova área de Análises disponível','Agora'],['Indicadores de checkout e gateways','Agora'],['Editor de checkout com modelos','Recente'],['Recuperação de carrinhos ativa','Recente']].map(([title,time]) => <button key={title} onClick={() => title.includes('Análises') && setPage('Análises')}><span>{title}</span><small>{time}</small><ArrowRight size={15}/></button>)}<button className="home-news-cta" onClick={() => setPage('Análises')}>Explorar os indicadores <ArrowRight size={16}/></button></aside>
     </section>
     <section className="home-tools"><h2>Ferramentas para expandir seu negócio</h2><p>Configure os recursos essenciais para aumentar sua conversão.</p><div><button onClick={() => setPage('Checkouts')}><b>Personalize seu checkout</b><span>Edite layout, conteúdo e elementos de conversão.</span><ArrowRight size={17}/></button><button onClick={() => setPage('Order bumps')}><b>Aumente o ticket médio</b><span>Crie ofertas complementares no checkout.</span><ArrowRight size={17}/></button><button onClick={() => setPage('Carrinhos')}><b>Recupere vendas</b><span>Acompanhe oportunidades que não foram concluídas.</span><ArrowRight size={17}/></button></div></section>
