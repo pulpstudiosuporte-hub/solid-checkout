@@ -43,7 +43,7 @@ export class PrismaOrderRepository implements OrderRepository {
     publicId: true, status: true, totalCents: true, discountCents: true, couponCode: true, shippingPriceCents: true, currency: true,
     customerDataEncrypted: true, shippingAddressEncrypted: true, shippingMethodName: true, createdAt: true, completedAt: true,
     items: { select: { titleSnapshot: true, variantSnapshot: true, quantity: true, imageUrlSnapshot: true } },
-    paymentAttempts: { where: { providerTransactionId: { not: null } }, orderBy: { createdAt: 'desc' as const }, take: 1, select: { publicId: true, provider: true, status: true, createdAt: true, paidAt: true, expiresAt: true } }
+    paymentAttempts: { where: { providerTransactionId: { not: null } }, orderBy: { createdAt: 'desc' as const }, select: { publicId: true, provider: true, status: true, createdAt: true, paidAt: true, expiresAt: true } }
   };
 
   async list(storeId: string, page: number, pageSize: number) {

@@ -64,21 +64,30 @@ function RevenueChart({ series }) {
 }
 
 export default function DashboardPage({ setPage, storeKey }) {
-  const [period, setPeriod] = useState('today');
+  const [geoPeriod, setGeoPeriod] = useState('today');
   const [liveTick, setLiveTick] = useState(0);
-  const [state, setState] = useState({ loading: true, data: null, error: '' });
+  const [state, setState] = useState({ loading: true, data: null, error: '', storeKey: null });
+  const [geoState, setGeoState] = useState({ data: null, error: '', storeKey: null, period: 'today' });
 
   useEffect(() => {
     const controller = new AbortController();
-    setState({ loading: true, data: null, error: '' });
-    getDashboard(period, controller.signal).then(data => setState({ loading: false, data, error: '' })).catch(error => {
-      if (error.name !== 'AbortError') setState({ loading: false, data: null, error: error.message });
+    setState(current => ({ ...current, loading: true, error: '', ...(current.storeKey === storeKey ? {} : { data: null, storeKey }) }));
+    getDashboard('today', controller.signal).then(data => setState({ loading: false, data, error: '', storeKey })).catch(error => {
+      if (error.name !== 'AbortError') setState(current => ({ ...current, loading: false, error: error.message, storeKey }));
     });
     return () => controller.abort();
-  }, [period, storeKey, liveTick]);
+  }, [storeKey, liveTick]);
+  useEffect(() => {
+    if (geoPeriod === 'today') return;
+    const controller = new AbortController();
+    getDashboard(geoPeriod, controller.signal).then(data => setGeoState({ data, error: '', storeKey, period: geoPeriod })).catch(error => {
+      if (error.name !== 'AbortError') setGeoState({ data: null, error: error.message, storeKey, period: geoPeriod });
+    });
+    return () => controller.abort();
+  }, [geoPeriod, storeKey]);
   useEffect(() => { const interval = window.setInterval(() => setLiveTick(value => value + 1), 30_000); return () => window.clearInterval(interval); }, []);
 
-  if (state.loading) return <main className="page"><div className="products-state"><LoaderCircle className="spin"/><b>Carregando indicadores...</b></div></main>;
+  if (state.loading && !state.data) return <main className="page"><div className="products-state"><LoaderCircle className="spin"/><b>Carregando indicadores...</b></div></main>;
   if (!state.data) return <main className="page"><div className="products-state error"><b>Não foi possível carregar a visão geral</b><span>{state.error}</span></div></main>;
 
   const data = state.data;
@@ -86,9 +95,9 @@ export default function DashboardPage({ setPage, storeKey }) {
     sessions: data.paidOrders + data.pendingPix,
     generatedRevenueCents: data.revenueCents,
   };
-  const geography = analytics.geography || { locations: [], countries: 0, regions: 0, cities: 0, visitors: 0 };
+  const selectedGeoData = geoPeriod === 'today' ? data : (geoState.storeKey === storeKey && geoState.period === geoPeriod ? geoState.data : null);
+  const geography = selectedGeoData?.analytics?.geography || { locations: [], countries: 0, regions: 0, cities: 0, visitors: 0 };
   const locations = Array.isArray(geography.locations) ? geography.locations : [];
-  const mappedLocations = locations.filter(location => Number.isFinite(Number(location.latitude)) && Number.isFinite(Number(location.longitude)));
   const firstName = data.userName?.split(' ')[0] || 'empreendedor';
   const hour = new Date().getHours(); const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
 
@@ -101,7 +110,7 @@ export default function DashboardPage({ setPage, storeKey }) {
       <Metric icon={TrendingUp} label="Taxa de conversão" value={`${data.conversionRate.toLocaleString('pt-BR')}%`} tone="orange" helper="Sessões que viraram venda"/>
     </section>
     <section className="home-main-grid">
-      <article className="card home-geo"><div className="home-card-title"><div><h2>Alcance geográfico</h2><p>Onde seus visitantes estão acessando o checkout.</p></div><select value={period} onChange={event => setPeriod(event.target.value)} aria-label="Período do alcance"><option value="today">Hoje</option><option value="7d">Últimos 7 dias</option><option value="month">Este mês</option></select></div><div className={`dot-map world ${locations.length ? 'has-locations' : ''}`}><React.Suspense fallback={<LoaderCircle className="spin" aria-label="Carregando mapa"/>}><WorldMap locations={locations}/></React.Suspense>{!locations.length && <><Globe2 size={28}/><span>O mapa começará a preencher com as próximas visitas identificadas pela Cloudflare.</span></>}</div>{locations.length > 0 && <div className="geo-location-list">{locations.slice(0,5).map((location,index)=><span key={`${location.country}-${location.region}-${location.city}-${index}`}><b>{location.city || location.region || location.country}</b><small>{location.region ? `${location.region} · ` : ''}{location.country} · {location.visitors}</small></span>)}</div>}<div className="home-geo-stats"><div><span>Cidades alcançadas</span><strong>{Number(geography.cities || 0)}</strong><small>{Number(geography.regions || 0)} regiões</small></div><div><span>Visitantes localizados</span><strong>{Number(geography.visitors || 0)}</strong><small>No período selecionado</small></div><div><span>Países alcançados</span><strong>{Number(geography.countries || 0)}</strong><small>Localização anonimizada</small></div></div></article>
+      <article className="card home-geo"><div className="home-card-title"><div><h2>Alcance geográfico</h2><p>Onde seus visitantes estão acessando o checkout.</p></div><select value={geoPeriod} onChange={event => setGeoPeriod(event.target.value)} aria-label="Período do alcance"><option value="today">Hoje</option><option value="7d">Últimos 7 dias</option><option value="month">Este mês</option></select></div><div className={`dot-map world ${locations.length ? 'has-locations' : ''}`}><React.Suspense fallback={<LoaderCircle className="spin" aria-label="Carregando mapa"/>}><WorldMap locations={locations}/></React.Suspense>{!locations.length && <><Globe2 size={28}/><span>{geoState.error && geoPeriod !== 'today' ? 'Não foi possível atualizar o mapa agora.' : 'O mapa começará a preencher com as próximas visitas identificadas pela Cloudflare.'}</span></>}</div>{locations.length > 0 && <div className="geo-location-list">{locations.slice(0,5).map((location,index)=><span key={`${location.country}-${location.region}-${location.city}-${index}`}><b>{location.city || location.region || location.country}</b><small>{location.region ? `${location.region} · ` : ''}{location.country} · {location.visitors}</small></span>)}</div>}<div className="home-geo-stats"><div><span>Cidades alcançadas</span><strong>{Number(geography.cities || 0)}</strong><small>{Number(geography.regions || 0)} regiões</small></div><div><span>Visitantes localizados</span><strong>{Number(geography.visitors || 0)}</strong><small>No período selecionado</small></div><div><span>Países alcançados</span><strong>{Number(geography.countries || 0)}</strong><small>Localização anonimizada</small></div></div></article>
       <aside className="card home-news"><div className="home-news-cover"><span>NOVIDADES SOLID</span><b>Seu painel de conversão evoluiu</b></div>{[['Nova área de Análises disponível','Agora'],['Indicadores de checkout e gateways','Agora'],['Editor de checkout com modelos','Recente'],['Recuperação de carrinhos ativa','Recente']].map(([title,time]) => <button key={title} onClick={() => title.includes('Análises') && setPage('Análises')}><span>{title}</span><small>{time}</small><ArrowRight size={15}/></button>)}<button className="home-news-cta" onClick={() => setPage('Análises')}>Explorar os indicadores <ArrowRight size={16}/></button></aside>
     </section>
     <section className="home-tools"><h2>Ferramentas para expandir seu negócio</h2><p>Configure os recursos essenciais para aumentar sua conversão.</p><div><button onClick={() => setPage('Checkouts')}><b>Personalize seu checkout</b><span>Edite layout, conteúdo e elementos de conversão.</span><ArrowRight size={17}/></button><button onClick={() => setPage('Order bumps')}><b>Aumente o ticket médio</b><span>Crie ofertas complementares no checkout.</span><ArrowRight size={17}/></button><button onClick={() => setPage('Carrinhos')}><b>Recupere vendas</b><span>Acompanhe oportunidades que não foram concluídas.</span><ArrowRight size={17}/></button></div></section>

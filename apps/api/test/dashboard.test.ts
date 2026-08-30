@@ -23,7 +23,7 @@ function dashboardDatabase(): PrismaClient {
     session: { findUnique: () => Promise.resolve({ activeStoreId: 'store-a' }) },
     storeMember: { findUnique: () => Promise.resolve({ storeId: 'store-a', userId: 'user-a' }) },
     checkoutSession: { findMany: () => Promise.resolve([
-      { id: 'checkout-session-a', totalCents: 13_467, trackingParameters: { visitor_id: 'visitor-a', geo_country: 'BR', geo_region_code: 'SP', geo_city: 'São Paulo' }, paymentAttempts: [{ status: 'PAID', provider: 'WESTPAY', amountCents: 13_467 }] },
+      { id: 'checkout-session-a', totalCents: 13_467, trackingParameters: { visitor_id: 'visitor-a', geo_country: 'BR', geo_region_code: 'SP', geo_city: 'São Paulo' }, paymentAttempts: [{ status: 'FAILED', provider: 'WESTPAY', amountCents: 13_467 }] },
       { id: 'checkout-session-b', totalCents: 5_600, trackingParameters: { visitor_id: 'visitor-a', geo_country: 'BR', geo_region_code: 'SP', geo_city: 'São Paulo' }, paymentAttempts: [{ status: 'PENDING', provider: 'WESTPAY', amountCents: 5_600 }] },
     ]), count: () => Promise.resolve(1) },
     paymentAttempt: { findMany: () => Promise.resolve([{ checkoutSessionId: 'checkout-session-a', amountCents: 13_467, paidAt: new Date() }]) },

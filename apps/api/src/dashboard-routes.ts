@@ -94,7 +94,7 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
       return { date, revenueCents: matches.reduce((sum, attempt) => sum + attempt.amountCents, 0), paidOrders: matches.length };
     });
 
-    const paidCreatedSessions = createdSessions.filter(row => row.paymentAttempts[0]?.status === 'PAID').length;
+    const paidCreatedSessions = createdSessions.filter(row => paidSessionIds.has(row.id)).length;
     const generatedSessions = createdSessions.filter(row => row.paymentAttempts.length > 0);
     const generatedRevenueCents = generatedSessions.reduce((sum, row) => sum + (row.paymentAttempts[0]?.amountCents ?? 0), 0);
     const paidRevenueCents = paid.reduce((sum, attempt) => sum + attempt.amountCents, 0);
