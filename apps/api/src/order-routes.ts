@@ -1,13 +1,14 @@
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
 import type { AuthRepository } from './auth-repository.js';
-import type { OrderRepository } from './order-repository.js';
+import type { OrderListFilters, OrderRepository } from './order-repository.js';
 import { decryptSecret } from './shopify-crypto.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const errorBody = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
 const preferredAttempt = <T extends { status: string }>(attempts: readonly T[]): T | null => attempts.find(attempt => attempt.status === 'PAID') ?? attempts[0] ?? null;
+const countryFromTracking = (value: unknown): string => typeof value === 'object' && value && !Array.isArray(value) && typeof (value as Record<string, unknown>).geo_country === 'string' ? String((value as Record<string, unknown>).geo_country).toUpperCase() : '—';
 
 function decryptPanelData(encrypted: string | null, encryptionKey: string, request: FastifyRequest, orderId: string, event: string): Record<string, unknown> {
   if (!encrypted) return {};
@@ -29,7 +30,7 @@ function addressForPanel(encrypted: string | null, encryptionKey: string, reques
 export function registerOrderRoutes(app: FastifyInstance, environment: AppEnvironment, auth: AuthRepository, orders: OrderRepository): void {
   const sessionCookie = environment.NODE_ENV === 'production' ? '__Host-solid_session' : 'solid_session';
 
-  app.get<{ Querystring: { page?: string; pageSize?: string } }>('/orders', async (request, reply) => {
+  app.get<{ Querystring: { page?: string; pageSize?: string; search?: string; status?: string; from?: string; to?: string; sort?: string } }>('/orders', async (request, reply) => {
     const token = request.cookies[sessionCookie];
     const current = token ? await auth.findActiveSession(sha256(token), new Date()) : null;
     if (!current) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
@@ -40,11 +41,19 @@ export function registerOrderRoutes(app: FastifyInstance, environment: AppEnviro
 
     const page = Number(request.query.page ?? '1');
     const pageSize = Number(request.query.pageSize ?? '20');
-    if (!Number.isInteger(page) || page < 1 || !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) {
+    const statuses = new Set(['PAID', 'PENDING', 'FAILED', 'CANCELLED', 'EXPIRED', 'REFUNDED']);
+    const sorts = new Set(['newest', 'oldest', 'highest', 'lowest']);
+    const status = request.query.status?.toUpperCase(); const sort = request.query.sort || 'newest';
+    const from = request.query.from ? new Date(`${request.query.from}T00:00:00.000-03:00`) : undefined;
+    const to = request.query.to ? new Date(`${request.query.to}T23:59:59.999-03:00`) : undefined;
+    if (!Number.isInteger(page) || page < 1 || !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100 || (request.query.search?.length ?? 0) > 120 || (status && !statuses.has(status)) || !sorts.has(sort) || (from && Number.isNaN(from.getTime())) || (to && Number.isNaN(to.getTime()))) {
       return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Paginação inválida.'));
     }
 
-    const result = await orders.list(context.storeId, page, pageSize);
+    const normalizedSearch = request.query.search?.trim();
+    const emailHash = normalizedSearch?.includes('@') ? createHmac('sha256', createHmac('sha256', Buffer.from(environment.APP_ENCRYPTION_KEY, 'base64')).update('solid-checkout-pii-index-v1').digest()).update(normalizedSearch.toLowerCase()).digest('hex') : undefined;
+    const filters: OrderListFilters = { ...(normalizedSearch ? { search: normalizedSearch } : {}), ...(emailHash ? { emailHash } : {}), ...(status ? { status } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}), sort: sort as NonNullable<OrderListFilters['sort']> };
+    const result = await orders.list(context.storeId, page, pageSize, filters);
     const items = result.items.map(order => {
       const customer = customerForPanel(order.customerDataEncrypted, encryptionKey, request, order.publicId);
       const attempt = preferredAttempt(order.paymentAttempts);
@@ -61,6 +70,7 @@ export function registerOrderRoutes(app: FastifyInstance, environment: AppEnviro
         shippingMethodName: order.shippingMethodName,
         currency: order.currency,
         customer,
+        country: countryFromTracking(order.trackingParameters),
         items: order.items,
         createdAt: order.createdAt,
         paidAt: attempt?.paidAt ?? order.completedAt,
