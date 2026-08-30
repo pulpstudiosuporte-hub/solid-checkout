@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useMemo, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { CalendarDays, LoaderCircle, RefreshCw } from 'lucide-react';
 import { getDashboard } from './api';
 
@@ -37,7 +37,7 @@ export default function AnalyticsPage({ storeKey }) {
   const data = state.data;
   const a = data.analytics || { sessions: data.paidOrders + data.pendingPix, generatedRevenueCents: data.revenueCents, paidRevenueCents: data.revenueCents, averageTicketCents: data.paidOrders ? Math.round(data.revenueCents / data.paidOrders) : 0, abandoned: 0, abandonmentRate: 0, pending: data.pendingPix, cancelled: 0, refunded: 0, uniqueCustomers: 0, checkoutSteps: { visitors: data.paidOrders + data.pendingPix, personal: 0, shipping: 0, payment: data.paidOrders + data.pendingPix, paid: data.paidOrders }, coupons: { orders: 0, revenueCents: 0, discountCents: 0 }, orderBumps: { items: 0, revenueCents: 0 }, gateways: [], products: [] };
   const maxStep = Math.max(1, a.checkoutSteps.visitors); const maxProduct = Math.max(1, ...a.products.map(item => item.revenueCents));
-  const bestDay = useMemo(() => data.series.reduce((best, item) => item.revenueCents > (best?.revenueCents || -1) ? item : best, null), [data.series]);
+  const bestDay = data.series.reduce((best, item) => item.revenueCents > (best?.revenueCents || -1) ? item : best, null);
   return <main className="page analytics-page">
     <header className="analytics-heading"><div><h1>Análises</h1><p>Indicadores comerciais e operacionais da sua loja.</p></div><div className="analytics-controls" role="group" aria-label="Período das análises">{[['today','Hoje'],['yesterday','Ontem'],['7d','Últimos 7 dias'],['month','Mês atual'],['year','Ano atual']].map(([id,label]) => <button key={id} className={period === id ? 'active' : ''} onClick={() => setPeriod(id)}>{label}</button>)}<button aria-label="Escolher período personalizado" title="Período personalizado"><CalendarDays size={16}/></button><button onClick={() => setRefresh(value => value + 1)}><RefreshCw size={16}/> Atualizar</button></div></header>
 
