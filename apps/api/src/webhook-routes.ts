@@ -137,5 +137,70 @@ export function registerWebhookRoutes(app: FastifyInstance, environment: AppEnvi
   app.post<{ Body: { name?: unknown; description?: unknown; url?: unknown; secret?: unknown; active?: unknown; events?: unknown } }>('/store-webhooks', async (request, reply) => { const ctx = await context(request, true); if (!ctx?.writable) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.')); if (!environment.APP_ENCRYPTION_KEY) return reply.code(503).send(errorBody(request, 'SERVICE_UNAVAILABLE', 'Criptografia indisponível.')); if (await database.webhookEndpoint.count({ where: { storeId: ctx.storeId } }) >= MAX_ENDPOINTS_PER_STORE) return reply.code(409).send(errorBody(request, 'LIMIT_REACHED', `Limite de ${MAX_ENDPOINTS_PER_STORE} webhooks por loja atingido.`)); try { const name = typeof request.body?.name === 'string' ? request.body.name.trim() : ''; if (name.length < 2 || name.length > 120) throw new Error('Informe um nome entre 2 e 120 caracteres.'); const description = typeof request.body.description === 'string' ? request.body.description.trim().slice(0, 240) : null; const resolved = await resolveSafeWebhookUrl(request.body.url); const events = validEvents(request.body.events); const secret = typeof request.body.secret === 'string' && request.body.secret.trim().length >= 16 ? request.body.secret.trim() : randomBytes(32).toString('hex'); const item = await database.webhookEndpoint.create({ data: { storeId: ctx.storeId, name, description: description || null, url: resolved.url.toString(), active: request.body.active !== false, events, secretEncrypted: encryptSecret(secret, environment.APP_ENCRYPTION_KEY) }, select: { publicId: true, name: true, description: true, url: true, active: true, events: true } }); return reply.code(201).send({ item, secret }); } catch (error) { return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', error instanceof Error ? error.message : 'Dados inválidos.')); } });
   app.patch<{ Params: { id: string }; Body: { name?: unknown; description?: unknown; url?: unknown; active?: unknown; events?: unknown } }>('/store-webhooks/:id', async (request, reply) => { const ctx = await context(request, true); if (!ctx?.writable) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.')); const existing = await database.webhookEndpoint.findFirst({ where: { publicId: request.params.id, storeId: ctx.storeId } }); if (!existing) return reply.code(404).send(errorBody(request, 'NOT_FOUND', 'Webhook não encontrado.')); try { const data: { name?: string; description?: string | null; url?: string; active?: boolean; events?: string[] } = {}; if (request.body.name !== undefined) { const name = typeof request.body.name === 'string' ? request.body.name.trim() : ''; if (name.length < 2 || name.length > 120) throw new Error('Nome inválido.'); data.name = name; } if (request.body.description !== undefined) data.description = typeof request.body.description === 'string' ? request.body.description.trim().slice(0, 240) || null : null; if (request.body.url !== undefined) data.url = (await resolveSafeWebhookUrl(request.body.url)).url.toString(); if (typeof request.body.active === 'boolean') data.active = request.body.active; if (request.body.events !== undefined) data.events = validEvents(request.body.events); const item = await database.webhookEndpoint.update({ where: { id: existing.id }, data, select: { publicId: true, name: true, description: true, url: true, active: true, events: true } }); return reply.send({ item }); } catch (error) { return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', error instanceof Error ? error.message : 'Dados inválidos.')); } });
   app.delete<{ Params: { id: string } }>('/store-webhooks/:id', async (request, reply) => { const ctx = await context(request, true); if (!ctx?.writable) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.')); const result = await database.webhookEndpoint.deleteMany({ where: { publicId: request.params.id, storeId: ctx.storeId } }); return result.count ? reply.code(204).send() : reply.code(404).send(errorBody(request, 'NOT_FOUND', 'Webhook não encontrado.')); });
-  app.post<{ Params: { id: string }; Body: { event?: unknown } }>('/store-webhooks/:id/test', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => { const ctx = await context(request, true); if (!ctx?.writable) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.')); if (!environment.APP_ENCRYPTION_KEY) return reply.code(503).send(errorBody(request, 'SERVICE_UNAVAILABLE', 'Criptografia indisponível.')); const endpoint = await database.webhookEndpoint.findFirst({ where: { publicId: request.params.id, storeId: ctx.storeId } }); if (!endpoint) return reply.code(404).send(errorBody(request, 'NOT_FOUND', 'Webhook não encontrado.')); const event = typeof request.body?.event === 'string' ? request.body.event : 'order.created'; if (!webhookEvents.includes(event as WebhookEvent)) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Evento inválido.')); const eventId = `evt_test_${Date.now()}_${randomBytes(4).toString('hex')}`; const payload = { id: eventId, event, createdAt: new Date().toISOString(), test: true, data: { order: { id: 'SLD-EXEMPLO', paymentId: 'PAY-EXEMPLO', status: 'PENDING', totalCents: 9990, currency: 'BRL' } } }; try { const result = await sendWebhook(endpoint.url, endpoint.secretEncrypted, environment.APP_ENCRYPTION_KEY, event, payload); const success = result.statusCode >= 200 && result.statusCode < 300; await database.webhookDelivery.create({ data: { storeId: ctx.storeId, webhookEndpointId: endpoint.id, event, eventId, payload, status: success ? 'DELIVERED' : 'DEAD', success, statusCode: result.statusCode, durationMs: result.durationMs, deliveredAt: success ? new Date() : null, error: success ? null : `HTTP ${result.statusCode}` } }); return reply.send({ success, statusCode: result.statusCode, durationMs: result.durationMs }); } catch (error) { await database.webhookDelivery.create({ data: { storeId: ctx.storeId, webhookEndpointId: endpoint.id, event, eventId, payload, status: 'DEAD', success: false, attempts: 1, error: (error instanceof Error ? error.message : 'Falha no envio').slice(0, 500) } }); return reply.code(502).send(errorBody(request, 'DELIVERY_FAILED', 'Não foi possível entregar o teste ao endpoint.')); } });
+  app.post<{ Params: { id: string }; Body: { event?: unknown } }>(
+    '/store-webhooks/:id/test',
+    { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const ctx = await context(request, true);
+      if (!ctx?.writable)
+        return reply
+          .code(403)
+          .send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+      if (!environment.APP_ENCRYPTION_KEY)
+        return reply
+          .code(503)
+          .send(
+            errorBody(
+              request,
+              'SERVICE_UNAVAILABLE',
+              'Criptografia indisponível.',
+            ),
+          );
+      const endpoint = await database.webhookEndpoint.findFirst({
+        where: { publicId: request.params.id, storeId: ctx.storeId },
+        select: { id: true },
+      });
+      if (!endpoint)
+        return reply
+          .code(404)
+          .send(errorBody(request, 'NOT_FOUND', 'Webhook não encontrado.'));
+      const event =
+        typeof request.body?.event === 'string'
+          ? request.body.event
+          : 'order.created';
+      if (!webhookEvents.includes(event as WebhookEvent))
+        return reply
+          .code(400)
+          .send(errorBody(request, 'VALIDATION_ERROR', 'Evento inválido.'));
+
+      const eventId = `evt_test_${Date.now()}_${randomBytes(4).toString('hex')}`;
+      const payload = {
+        id: eventId,
+        event,
+        createdAt: new Date().toISOString(),
+        test: true,
+        data: {
+          order: {
+            id: 'SLD-EXEMPLO',
+            paymentId: 'PAY-EXEMPLO',
+            status: 'PENDING',
+            totalCents: 9990,
+            currency: 'BRL',
+          },
+        },
+      } as Prisma.InputJsonValue;
+      await database.webhookDelivery.create({
+        data: {
+          storeId: ctx.storeId,
+          webhookEndpointId: endpoint.id,
+          event,
+          eventId,
+          payload,
+          status: 'PENDING',
+          nextAttemptAt: new Date(),
+        },
+      });
+      return reply.code(202).send({ accepted: true, status: 'PENDING' });
+    },
+  );
 }
