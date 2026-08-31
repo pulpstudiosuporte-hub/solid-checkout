@@ -26,13 +26,13 @@ export function registerGatewayRoutes(app: FastifyInstance, environment: AppEnvi
   app.get('/integrations/westpay/status', async (request, reply) => {
     const current = await session(request); if (!current) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     const context = await repository.context(current.userId, current.sessionId); if (!context) return reply.code(409).send(errorBody(request, 'STORE_REQUIRED', 'Selecione uma loja.'));
-    const status = await repository.status(context.storeId); return reply.send({ connected: Boolean(status?.active && status.verifiedAt), ...status });
+    const status = await repository.status(context.storeId); return reply.send({ connected: Boolean(status?.active && status.verifiedAt), primary: Boolean(status?.active && status.verifiedAt && status.priority === 0), ...status });
   });
 
   app.get('/integrations/roas/status', async (request, reply) => {
     const current = await session(request); if (!current) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     const context = await repository.context(current.userId, current.sessionId); if (!context) return reply.code(409).send(errorBody(request, 'STORE_REQUIRED', 'Selecione uma loja.'));
-    const status = await repository.status(context.storeId, 'ROAS'); return reply.send({ connected: Boolean(status?.active && status.verifiedAt), ...status });
+    const status = await repository.status(context.storeId, 'ROAS'); return reply.send({ connected: Boolean(status?.active && status.verifiedAt), primary: Boolean(status?.active && status.verifiedAt && status.priority === 0), ...status });
   });
 
   app.get('/integrations/utmify/status', async (request, reply) => {
@@ -66,7 +66,8 @@ export function registerGatewayRoutes(app: FastifyInstance, environment: AppEnvi
     if (!/^live_[A-Za-z0-9_-]{8,}$/.test(apiKey) || publicKey.length < 8 || publicKey.length > 512) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Confira a API Key live_ e a Public Key da WestPay.'));
     try { await testWestPay({ apiKey, publicKey }); } catch (error) { request.log.warn({ err: error }, 'westpay_credentials_rejected'); return reply.code(422).send(errorBody(request, 'WESTPAY_CREDENTIALS_REJECTED', 'A WestPay recusou essas credenciais. Confira as chaves.')); }
     const value = await repository.save(context.storeId, 'WESTPAY', encryptSecret(apiKey, environment.APP_ENCRYPTION_KEY), encryptSecret(publicKey, environment.APP_ENCRYPTION_KEY));
-    return reply.send({ connected: true, ...value });
+    await repository.recordGatewayConfiguration(context.storeId, current.userId, 'gateway.connected', 'WESTPAY', request.id);
+    return reply.send({ connected: true, primary: value.priority === 0, ...value });
   });
 
   app.put<{ Body: { secretKey?: unknown; publicKey?: unknown } }>('/integrations/roas', { config: { rateLimit: { max: 5, timeWindow: '5 minutes' } } }, async (request, reply) => {
@@ -78,7 +79,29 @@ export function registerGatewayRoutes(app: FastifyInstance, environment: AppEnvi
     if (secretKey.length < 8 || secretKey.length > 512 || publicKey.length < 8 || publicKey.length > 512) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Informe a Secret Key e a Public Key da Roas.'));
     try { await testRoas({ secretKey, publicKey }); } catch (error) { request.log.warn({ err: error }, 'roas_credentials_rejected'); return reply.code(422).send(errorBody(request, 'ROAS_CREDENTIALS_REJECTED', 'A Roas recusou essas credenciais. Confira as chaves.')); }
     const value = await repository.save(context.storeId, 'ROAS', encryptSecret(secretKey, environment.APP_ENCRYPTION_KEY), encryptSecret(publicKey, environment.APP_ENCRYPTION_KEY));
+    await repository.recordGatewayConfiguration(context.storeId, current.userId, 'gateway.connected', 'ROAS', request.id);
+    return reply.send({ connected: true, primary: value.priority === 0, ...value });
+  });
+
+  app.put<{ Body: { provider?: unknown } }>('/integrations/gateways/primary', { config: { rateLimit: { max: 10, timeWindow: '5 minutes' } } }, async (request, reply) => {
+    const current = await session(request); if (!current || !csrfValid(request, current)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    if (mfaRequired(request, reply, current)) return;
+    const context = await repository.context(current.userId, current.sessionId); if (!context || context.role === 'ANALYST') return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Somente proprietários e administradores podem alterar o gateway principal.'));
+    const provider = request.body?.provider === 'ROAS' || request.body?.provider === 'WESTPAY' ? request.body.provider : null;
+    if (!provider) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Gateway inválido.'));
+    const value = await repository.setPrimary(context.storeId, provider); if (!value) return reply.code(409).send(errorBody(request, 'GATEWAY_UNAVAILABLE', 'Conecte e valide o gateway antes de torná-lo principal.'));
+    await repository.recordGatewayConfiguration(context.storeId, current.userId, 'gateway.primary_changed', provider, request.id);
     return reply.send({ connected: true, primary: true, ...value });
+  });
+
+  app.delete<{ Params: { provider: string } }>('/integrations/gateways/:provider', { config: { rateLimit: { max: 10, timeWindow: '5 minutes' } } }, async (request, reply) => {
+    const current = await session(request); if (!current || !csrfValid(request, current)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    if (mfaRequired(request, reply, current)) return;
+    const context = await repository.context(current.userId, current.sessionId); if (!context || context.role === 'ANALYST') return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Somente proprietários e administradores podem desconectar gateways.'));
+    const provider = request.params.provider.toUpperCase() === 'ROAS' ? 'ROAS' : request.params.provider.toUpperCase() === 'WESTPAY' ? 'WESTPAY' : null;
+    if (!provider) return reply.code(404).send(errorBody(request, 'NOT_FOUND', 'Gateway não encontrado.'));
+    await repository.disconnect(context.storeId, provider); await repository.recordGatewayConfiguration(context.storeId, current.userId, 'gateway.disconnected', provider, request.id);
+    return reply.code(204).send();
   });
 
   app.put<{ Body: { token?: unknown } }>('/integrations/utmify', { config: { rateLimit: { max: 5, timeWindow: '5 minutes' } } }, async (request, reply) => {

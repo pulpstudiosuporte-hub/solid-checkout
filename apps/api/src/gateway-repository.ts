@@ -7,7 +7,7 @@ import { enqueueStoreWebhookEvent } from './webhook-routes.js';
 export type GatewayContext = Readonly<{ storeId: string; role: 'OWNER' | 'ADMIN' | 'ANALYST' }>;
 export type PaymentProvider = 'ROAS' | 'WESTPAY';
 export type IntegrationProvider = PaymentProvider | 'UTMIFY' | 'META';
-type GatewayStatus = Readonly<{ active: boolean; verifiedAt: Date | null; updatedAt: Date }>;
+type GatewayStatus = Readonly<{ active: boolean; priority: number; verifiedAt: Date | null; updatedAt: Date }>;
 type GatewayCredentials = Readonly<{ apiKeyEncrypted: string; publicKeyEncrypted: string }>;
 type PaymentAttemptSummary = Readonly<{ id: string; publicId: string; provider: string; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; amountCents: number; pixCodeEncrypted: string | null; expiresAt: Date | null }>;
 type CompletedAttempt = Readonly<{ publicId: string; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; amountCents: number; expiresAt: Date | null }>;
@@ -29,19 +29,41 @@ export class PrismaGatewayRepository {
   }
 
   status(storeId: string, provider: IntegrationProvider = 'WESTPAY'): Promise<GatewayStatus | null> {
-    return this.database.gatewayConnection.findUnique({ where: { storeId_provider: { storeId, provider } }, select: { active: true, verifiedAt: true, updatedAt: true } });
+    return this.database.gatewayConnection.findUnique({ where: { storeId_provider: { storeId, provider } }, select: { active: true, priority: true, verifiedAt: true, updatedAt: true } });
   }
 
-  save(storeId: string, provider: IntegrationProvider, apiKeyEncrypted: string, publicKeyEncrypted: string): Promise<GatewayStatus> {
-    return this.database.gatewayConnection.upsert({ where: { storeId_provider: { storeId, provider } }, create: { storeId, provider, apiKeyEncrypted, publicKeyEncrypted, active: true, verifiedAt: new Date() }, update: { apiKeyEncrypted, publicKeyEncrypted, active: true, verifiedAt: new Date() }, select: { active: true, verifiedAt: true, updatedAt: true } });
+  async save(storeId: string, provider: IntegrationProvider, apiKeyEncrypted: string, publicKeyEncrypted: string): Promise<GatewayStatus> {
+    const paymentProvider = provider === 'ROAS' || provider === 'WESTPAY';
+    const activePayments = paymentProvider ? await this.database.gatewayConnection.count({ where: { storeId, active: true, verifiedAt: { not: null }, provider: { in: ['ROAS', 'WESTPAY'] } } }) : 1;
+    return this.database.gatewayConnection.upsert({ where: { storeId_provider: { storeId, provider } }, create: { storeId, provider, apiKeyEncrypted, publicKeyEncrypted, active: true, priority: activePayments ? 100 : 0, verifiedAt: new Date() }, update: { apiKeyEncrypted, publicKeyEncrypted, active: true, verifiedAt: new Date(), ...(paymentProvider && !activePayments ? { priority: 0 } : {}) }, select: { active: true, priority: true, verifiedAt: true, updatedAt: true } });
   }
 
   credentials(storeId: string, provider: IntegrationProvider = 'WESTPAY'): Promise<GatewayCredentials | null> {
     return this.database.gatewayConnection.findFirst({ where: { storeId, provider, active: true }, select: { apiKeyEncrypted: true, publicKeyEncrypted: true } });
   }
 
-  disconnect(storeId: string, provider: IntegrationProvider): Promise<{ count: number }> {
-    return this.database.gatewayConnection.updateMany({ where: { storeId, provider }, data: { active: false } });
+  async disconnect(storeId: string, provider: IntegrationProvider): Promise<{ count: number }> {
+    return this.database.$transaction(async transaction => {
+      const result = await transaction.gatewayConnection.updateMany({ where: { storeId, provider }, data: { active: false, priority: 100 } });
+      if (provider === 'ROAS' || provider === 'WESTPAY') {
+        const fallback = await transaction.gatewayConnection.findFirst({ where: { storeId, active: true, verifiedAt: { not: null }, provider: { in: ['ROAS', 'WESTPAY'] } }, orderBy: [{ priority: 'asc' }, { updatedAt: 'asc' }], select: { id: true } });
+        if (fallback) await transaction.gatewayConnection.update({ where: { id: fallback.id }, data: { priority: 0 } });
+      }
+      return result;
+    });
+  }
+
+  async setPrimary(storeId: string, provider: PaymentProvider): Promise<GatewayStatus | null> {
+    return this.database.$transaction(async transaction => {
+      const connection = await transaction.gatewayConnection.findUnique({ where: { storeId_provider: { storeId, provider } }, select: { id: true, active: true, verifiedAt: true } });
+      if (!connection?.active || !connection.verifiedAt) return null;
+      await transaction.gatewayConnection.updateMany({ where: { storeId, active: true, provider: { in: ['ROAS', 'WESTPAY'] } }, data: { priority: 100 } });
+      return transaction.gatewayConnection.update({ where: { id: connection.id }, data: { priority: 0 }, select: { active: true, priority: true, verifiedAt: true, updatedAt: true } });
+    });
+  }
+
+  async recordGatewayConfiguration(storeId: string, userId: string, action: string, provider: PaymentProvider, requestId: string): Promise<void> {
+    await this.database.auditLog.create({ data: { storeId, actorType: 'USER', actorUserId: userId, action, targetType: 'gateway_connection', targetId: provider, requestId, metadata: { provider } } });
   }
 
   async recordIntegrationEvent(storeId: string, provider: IntegrationProvider, event: string, success: boolean, metadata: Record<string, unknown> = {}): Promise<void> {
@@ -123,8 +145,12 @@ export class PrismaGatewayRepository {
   }
 
   async primaryProvider(storeId: string): Promise<PaymentProvider | null> {
-    const connections = await this.database.gatewayConnection.findMany({ where: { storeId, active: true, provider: { in: ['ROAS', 'WESTPAY'] } }, select: { provider: true } });
-    return connections.some(connection => connection.provider === 'ROAS') ? 'ROAS' : connections.some(connection => connection.provider === 'WESTPAY') ? 'WESTPAY' : null;
+    return (await this.paymentProviders(storeId))[0] ?? null;
+  }
+
+  async paymentProviders(storeId: string): Promise<PaymentProvider[]> {
+    const connections = await this.database.gatewayConnection.findMany({ where: { storeId, active: true, verifiedAt: { not: null }, provider: { in: ['ROAS', 'WESTPAY'] } }, orderBy: [{ priority: 'asc' }, { updatedAt: 'asc' }], select: { provider: true } });
+    return connections.map(connection => connection.provider as PaymentProvider);
   }
 
   async paymentContext(publicId: string, tokenHash: string, now: Date) {
@@ -133,6 +159,10 @@ export class PrismaGatewayRepository {
 
   latestAttempt(checkoutSessionId: string, provider?: PaymentProvider): Promise<PaymentAttemptSummary | null> {
     return this.database.paymentAttempt.findFirst({ where: { checkoutSessionId, ...(provider ? { provider } : {}) }, orderBy: { createdAt: 'desc' } });
+  }
+
+  async failAttempt(attemptId: string): Promise<void> {
+    await this.database.paymentAttempt.updateMany({ where: { id: attemptId, status: 'PENDING', providerTransactionId: null }, data: { status: 'FAILED' } });
   }
 
   async publicPaymentStatus(publicId: string, tokenHash: string) {

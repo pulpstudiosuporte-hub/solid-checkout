@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppEnvironment } from '@solid/config';
 import type { CatalogRepository } from '../src/catalog-repository.js';
 import type { PrismaGatewayRepository } from '../src/gateway-repository.js';
@@ -7,15 +7,23 @@ import { encryptSecret } from '../src/shopify-crypto.js';
 import { canTransitionPayment, type PaymentState } from '../src/payment-rules.js';
 
 const { createRoasPix, getRoasPix } = vi.hoisted(() => ({ createRoasPix: vi.fn(), getRoasPix: vi.fn() }));
+const { createWestPayPix, findWestPayPix } = vi.hoisted(() => ({ createWestPayPix: vi.fn(), findWestPayPix: vi.fn() }));
 vi.mock('../src/roas-client.js', () => ({
   createRoasPix,
   getRoasPix,
   RoasRequestError: class RoasRequestError extends Error { constructor(readonly status: number, readonly details: readonly string[]) { super(`Roas request failed (${status})`); } }
 }));
+vi.mock('../src/westpay-client.js', () => ({
+  createWestPayPix,
+  findWestPayPix,
+  getWestPayPix: vi.fn(),
+  WestPayRequestError: class WestPayRequestError extends Error { constructor(readonly status: number, readonly details: readonly string[]) { super(`WestPay request failed (${status})`); } }
+}));
 
 const key = Buffer.alloc(32, 7).toString('base64');
 const env: AppEnvironment = { NODE_ENV: 'test', API_HOST: '127.0.0.1', API_PORT: 3333, API_PUBLIC_URL: 'https://api.solidcheckout.xyz', LOG_LEVEL: 'silent', CORS_ORIGINS: ['https://pay.solidcheckout.xyz'], TRUST_PROXY: false, APP_ENCRYPTION_KEY: key };
 const token = 't'.repeat(43);
+beforeEach(() => vi.clearAllMocks());
 
 function fixture() {
   let paymentState: PaymentState = 'PENDING'; let completedAttempt: Record<string, unknown> | null = null; let confirmations = 0;
@@ -23,12 +31,13 @@ function fixture() {
   const credentials = { apiKeyEncrypted: encryptSecret('secret-key', key), publicKeyEncrypted: encryptSecret('public-key', key) };
   const context = { id: 'internal-session', publicId: 'session-public', totalCents: 500, discountCents: 0, shippingPriceCents: 0, customerDataEncrypted: customer, shippingAddressEncrypted: null, expiresAt: new Date(Date.now() + 600_000), quantity: 1, unitPriceCents: 500, checkout: { storeId: 'store-a', store: { name: 'Loja' }, product: { id: 'product-internal', checkoutTitle: 'Produto teste', fulfillmentType: 'DIGITAL' } }, items: [{ productId: 'product-internal', titleSnapshot: 'Produto teste', unitPriceCents: 500, quantity: 1 }] };
   const gateway = {
-    paymentContext: vi.fn().mockResolvedValue(context), primaryProvider: vi.fn().mockResolvedValue('ROAS'),
+    paymentContext: vi.fn().mockResolvedValue(context), primaryProvider: vi.fn().mockResolvedValue('ROAS'), paymentProviders: vi.fn().mockResolvedValue(['ROAS']),
     billingAccessAllowed: vi.fn().mockResolvedValue(true),
-    credentials: vi.fn((_storeId: string, provider = 'WESTPAY') => Promise.resolve(provider === 'ROAS' ? credentials : null)),
+    credentials: vi.fn(() => Promise.resolve(credentials)),
     latestAttempt: vi.fn(() => Promise.resolve(completedAttempt)),
-    createAttempt: vi.fn().mockResolvedValue({ id: 'attempt-internal', publicId: 'attempt-public', provider: 'ROAS', status: 'PENDING', amountCents: 500, pixCodeEncrypted: null, expiresAt: null }),
+    createAttempt: vi.fn((_sessionId: string, provider: 'ROAS' | 'WESTPAY') => Promise.resolve({ id: `attempt-${provider.toLowerCase()}`, publicId: `attempt-${provider.toLowerCase()}-public`, provider, status: 'PENDING', amountCents: 500, pixCodeEncrypted: null, expiresAt: null })),
     completeAttempt: vi.fn((_id: string, _providerId: string, pixCodeEncrypted: string, expiresAt: Date | null) => { completedAttempt = { id: 'attempt-internal', publicId: 'attempt-public', provider: 'ROAS', status: 'PENDING', amountCents: 500, pixCodeEncrypted, expiresAt }; return Promise.resolve({ publicId: 'attempt-public', status: 'PENDING', amountCents: 500, expiresAt }); }),
+    failAttempt: vi.fn().mockResolvedValue(undefined),
     utmifyOrderContext: vi.fn().mockResolvedValue(null),
     webhookContext: vi.fn().mockResolvedValue({ id: 'attempt-internal', publicId: 'attempt-public', checkoutSessionId: 'internal-session', amountCents: 500, status: paymentState, session: { checkout: { storeId: 'store-a' } } }),
     recordWebhookEvent: vi.fn().mockResolvedValue(undefined),
@@ -47,6 +56,18 @@ describe('fluxo Pix integrado com Roas simulada', () => {
     const firstBody = first.json<{ payment: { pixCode: string } }>(); const secondBody = second.json<{ payment: { pixCode: string } }>();
     expect(firstBody.payment.pixCode).toBe('pix-copia-e-cola'); expect(secondBody.payment.pixCode).toBe('pix-copia-e-cola');
     expect(createRoasPix).toHaveBeenCalledTimes(1); expect(test.raw.createAttempt).toHaveBeenCalledTimes(1);
+  });
+
+  it('usa o gateway de contingência quando o principal está indisponível', async () => {
+    createRoasPix.mockRejectedValueOnce(new Error('Roas indisponível'));
+    findWestPayPix.mockResolvedValue(null);
+    createWestPayPix.mockResolvedValue({ id: 'westpay-transaction', pix: { qrcode: 'pix-contingencia', expiresAt: null } });
+    const test = fixture(); test.raw.paymentProviders.mockResolvedValue(['ROAS', 'WESTPAY']);
+    const app = buildApp(env, { catalogRepository: test.catalog, gatewayRepository: test.gateway });
+    const response = await app.inject({ method: 'POST', url: '/public/checkout-sessions/session-public/payments/westpay/pix', headers: { authorization: `Bearer ${token}` } }); await app.close();
+    expect(response.statusCode).toBe(201); expect(response.json<{ payment: { pixCode: string } }>().payment.pixCode).toBe('pix-contingencia');
+    expect(createRoasPix).toHaveBeenCalledTimes(1); expect(createWestPayPix).toHaveBeenCalledTimes(1);
+    expect(test.raw.failAttempt).toHaveBeenCalledWith('attempt-roas');
   });
 
   it('ignora valor divergente e confirma uma única vez quando o webhook é repetido', async () => {

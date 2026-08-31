@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Barcode, Check, CheckCircle2, CreditCard, Eye, EyeOff, Info, Landmark, LoaderCircle, QrCode, RefreshCw, Save, Search, Settings2, ShieldCheck, WalletCards, X } from 'lucide-react';
-import { getPlatformContent, getRoasStatus, getWestPayStatus, saveRoas, saveWestPay } from './api';
+import { ArrowRight, Barcode, Check, CheckCircle2, CreditCard, Eye, EyeOff, Info, Landmark, LoaderCircle, Power, QrCode, RefreshCw, Save, Search, Settings2, ShieldCheck, Star, WalletCards, X } from 'lucide-react';
+import { disconnectGateway, getPlatformContent, getRoasStatus, getWestPayStatus, saveRoas, saveWestPay, setPrimaryGateway } from './api';
 import { gatewayAssetMap, gatewayCatalog } from './gateway-catalog';
 import './gateways-page.css';
 import './gateway-modal.css';
@@ -31,8 +31,9 @@ function PaymentMethod({ icon: Icon, title, description, enabled, locked = false
   return <div className={`gateway-method ${locked ? 'locked' : ''}`}><Icon size={18}/><div><b>{title}</b><span>{description}</span></div><span className={`gateway-method-switch ${enabled ? 'on' : ''}`} aria-label={enabled ? 'Ativo' : 'Indisponível'}><i/></span></div>;
 }
 
-function GatewayModal({ gateway, asset, status, forms, setForms, busy, onSubmit, onClose }) {
+function GatewayModal({ gateway, asset, status, forms, setForms, busy, onSubmit, onMakePrimary, onDisconnect, onClose }) {
   const [revealPublic, setRevealPublic] = useState(false); const [revealSecret, setRevealSecret] = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const closeRef = useRef(null); const supported = Boolean(gateway.supported); const connected = Boolean(status?.connected);
   useEffect(() => {
     const previousOverflow = document.body.style.overflow; document.body.style.overflow = 'hidden'; closeRef.current?.focus();
@@ -48,16 +49,17 @@ function GatewayModal({ gateway, asset, status, forms, setForms, busy, onSubmit,
       <div className="gateway-modal-main">
         <header className="gateway-modal-title"><GatewayLogo gateway={gateway} asset={asset}/><div><h2 id="gateway-modal-title">{gateway.name}</h2><p>{supported ? `Integre sua loja à ${gateway.name}` : 'Integração planejada para o catálogo SOLID'}</p></div></header>
         {!supported ? <div className="gateway-unavailable"><CreditCard size={28}/><h3>Este gateway estará disponível em breve</h3><p>A logo e a presença no catálogo já podem ser administradas, mas nenhuma credencial ou pagamento será processado até a integração oficial ser concluída.</p><button type="button" className="secondary" onClick={onClose}>Voltar ao catálogo</button></div> : <form onSubmit={onSubmit}>
-          <section className="gateway-modal-card gateway-accounts"><div className="gateway-section-heading"><div><h3>Conta conectada</h3><p>Gerencie a conexão usada para processar os pagamentos desta loja.</p></div><span>1 conta por gateway</span></div><div className="gateway-account-row"><div><b>{gateway.name} principal</b>{connected && <em>Ativa</em>}<span>PIX</span></div><Check size={18}/></div></section>
+          <section className="gateway-modal-card gateway-accounts"><div className="gateway-section-heading"><div><h3>Conta conectada</h3><p>Gerencie a conexão usada para processar os pagamentos desta loja.</p></div><span>1 conta por gateway</span></div><div className="gateway-account-row"><div><b>{gateway.name}</b>{connected && <em>Ativa</em>}<span>{status?.primary ? 'Principal · PIX' : connected ? 'Contingência · PIX' : 'PIX'}</span></div><Check size={18}/></div></section>
           <section className="gateway-modal-card gateway-credentials"><div className="gateway-section-heading"><div><h3>Credenciais</h3><p>Informe as chaves fornecidas pelo gateway para autenticar a integração.</p></div></div>
             <label>Chave pública<span><input type={revealPublic ? 'text' : 'password'} autoComplete="new-password" value={values.publicKey} onChange={event => setForms(current => ({ ...current, [gateway.id]: { ...current[gateway.id], publicKey: event.target.value } }))} placeholder={connected ? 'Digite para substituir a chave atual' : 'Cole a chave pública'} required/><button type="button" onClick={() => setRevealPublic(value => !value)} aria-label={revealPublic ? 'Ocultar chave pública' : 'Mostrar chave pública'}>{revealPublic ? <EyeOff size={17}/> : <Eye size={17}/>}</button></span></label>
             <label>{gateway.id === 'ROAS' ? 'Chave secreta' : 'API Key'}<span><input type={revealSecret ? 'text' : 'password'} autoComplete="new-password" value={values[secretName]} onChange={event => setForms(current => ({ ...current, [gateway.id]: { ...current[gateway.id], [secretName]: event.target.value } }))} placeholder={connected ? 'Digite para substituir a chave atual' : 'Cole a chave secreta'} required/><button type="button" onClick={() => setRevealSecret(value => !value)} aria-label={revealSecret ? 'Ocultar chave secreta' : 'Mostrar chave secreta'}>{revealSecret ? <EyeOff size={17}/> : <Eye size={17}/>}</button></span></label>
           </section>
           <section className="gateway-modal-card"><div className="gateway-section-heading"><div><h3>Métodos de pagamento</h3><p>Os métodos disponíveis refletem o suporte real da integração.</p></div></div><div className="gateway-methods"><PaymentMethod icon={CreditCard} title="Cartão de crédito" description="Ainda não suportado por esta conexão." enabled={false} locked/><PaymentMethod icon={QrCode} title="Pix" description="QR Code e copia e cola com confirmação automática." enabled/><PaymentMethod icon={Barcode} title="Boleto" description="Ainda não suportado por esta conexão." enabled={false} locked/></div></section>
           <button className="primary gateway-modal-save" disabled={busy}>{busy ? <LoaderCircle className="spin" size={17}/> : <Save size={17}/>} {connected ? 'Salvar alterações' : `Conectar ${gateway.name}`}</button>
+          {connected && <div className="gateway-management-actions"><button type="button" className="secondary" disabled={busy || status?.primary} onClick={onMakePrimary}><Star size={16}/>{status?.primary ? 'Gateway principal' : 'Tornar principal'}</button><button type="button" className={confirmDisconnect ? 'danger' : 'secondary danger-outline'} disabled={busy} onClick={() => confirmDisconnect ? onDisconnect() : setConfirmDisconnect(true)}><Power size={16}/>{confirmDisconnect ? 'Confirmar desconexão' : 'Desconectar'}</button>{confirmDisconnect && <button type="button" className="gateway-cancel-disconnect" onClick={() => setConfirmDisconnect(false)} disabled={busy}>Cancelar</button>}</div>}
         </form>}
       </div>
-      <aside className="gateway-modal-aside"><section><h3>Status da integração</h3><p>Define se este gateway processa pagamentos na sua loja.</p><div><span>Status atual</span><b className={connected ? 'active' : ''}>{connected ? <><RefreshCw size={13}/> Ativo</> : supported ? 'Não conectado' : 'Em breve'}</b></div></section><section><Info size={18}/><div><h3>Dica sobre credenciais</h3><p>Use apenas chaves oficiais do gateway. Nunca envie credenciais por chat ou suporte.</p></div></section><section><ShieldCheck size={18}/><div><h3>Armazenamento seguro</h3><p>As chaves são validadas e protegidas com criptografia AES-GCM.</p></div></section></aside>
+      <aside className="gateway-modal-aside"><section><h3>Status da integração</h3><p>Define se este gateway processa pagamentos na sua loja.</p><div><span>{status?.primary ? 'Rota principal' : connected ? 'Rota de contingência' : 'Status atual'}</span><b className={connected ? 'active' : ''}>{connected ? <><RefreshCw size={13}/> Ativo</> : supported ? 'Não conectado' : 'Em breve'}</b></div></section><section><Info size={18}/><div><h3>Contingência automática</h3><p>Ao desconectar o gateway principal, a conexão secundária assume a prioridade imediatamente.</p></div></section><section><ShieldCheck size={18}/><div><h3>Armazenamento seguro</h3><p>As chaves são validadas e protegidas com criptografia AES-GCM.</p></div></section></aside>
     </section>
   </div>;
 }
@@ -100,6 +102,17 @@ export default function GatewaysPage({ csrfToken, storeKey }) {
     } catch (error) { setMessage(error.message); } finally { setBusy(false); }
   };
 
+  const makePrimary = async () => {
+    if (!selected) return; setBusy(true); setMessage('');
+    try { await setPrimaryGateway(selected, csrfToken); setMessage(`${providers[selected].name} definida como gateway principal.`); await load(); }
+    catch (error) { setMessage(error.message); } finally { setBusy(false); }
+  };
+  const disconnect = async () => {
+    if (!selected) return; const providerName = providers[selected].name; setBusy(true); setMessage('');
+    try { await disconnectGateway(selected, csrfToken); await load(); closeModal(); setMessage(`${providerName} desconectada. A contingência disponível foi promovida automaticamente.`); }
+    catch (error) { setMessage(error.message); } finally { setBusy(false); }
+  };
+
   return <main className="page gateways-page">
     <section className="page-title gateway-page-title"><div><h1>Formas de Pagamento</h1><p>Gerencie os gateways de pagamento e as formas disponíveis para sua loja.</p></div></section>
     <div className="gateway-tabs" role="tablist" aria-label="Configurações de pagamento"><button role="tab" aria-selected="true"><Settings2 size={16}/> Gateways</button><button role="tab" aria-selected="false" disabled><RefreshCw size={15}/> Retentativa <small>Em breve</small></button></div>
@@ -111,6 +124,6 @@ export default function GatewaysPage({ csrfToken, storeKey }) {
         <div className="gateway-catalog-group available"><h2>Gateways disponíveis <span>({available.length})</span></h2>{available.length ? <div className="gateway-catalog-grid">{available.map(gateway => <GatewayCard key={gateway.id} gateway={gateway} asset={assetByKey.get(gateway.assetKey)} connected={false} selected={selected === gateway.id} onSelect={setSelected}/>)}</div> : <div className="gateway-catalog-empty">Nenhum gateway encontrado para estes filtros.</div>}</div>
       </>}
     </section>
-    {selectedGateway && <GatewayModal gateway={selectedGateway} asset={assetByKey.get(selectedGateway.assetKey)} status={statuses[selected]} forms={forms} setForms={setForms} busy={busy} onSubmit={submit} onClose={closeModal}/>}
+    {selectedGateway && <GatewayModal gateway={selectedGateway} asset={assetByKey.get(selectedGateway.assetKey)} status={statuses[selected]} forms={forms} setForms={setForms} busy={busy} onSubmit={submit} onMakePrimary={makePrimary} onDisconnect={disconnect} onClose={closeModal}/>}
   </main>;
 }

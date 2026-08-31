@@ -150,17 +150,18 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization); if (!credentials) return reply.code(401).send(errorBody(request, 'INVALID_SESSION', 'Sessão inválida.'));
     const context = await gateways.paymentContext(credentials.sessionId, credentials.tokenHash, new Date()); if (!context) return reply.code(409).send(errorBody(request, 'CHECKOUT_INCOMPLETE', 'Confirme os dados necessários antes do pagamento.'));
     if (!await gateways.billingAccessAllowed(context.checkout.storeId)) return reply.code(402).send(errorBody(request, 'STORE_BILLING_BLOCKED', 'Esta loja está temporariamente indisponível para novos pagamentos.'));
-    const provider = await gateways.primaryProvider(context.checkout.storeId); if (!provider) return reply.code(409).send(errorBody(request, 'GATEWAY_UNAVAILABLE', 'A loja ainda não configurou um gateway Pix.'));
-    const encryptedCredentials = await gateways.credentials(context.checkout.storeId, provider); if (!encryptedCredentials) return reply.code(409).send(errorBody(request, 'GATEWAY_UNAVAILABLE', 'O gateway selecionado não está disponível.'));
-    const westpayCredentials = { apiKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) };
-    const roasCredentials = { secretKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) };
-    const amountCents = context.totalCents - context.discountCents + context.shippingPriceCents; let attempt = await gateways.latestAttempt(context.id, provider);
-    if (attempt?.pixCodeEncrypted && attempt.status === 'PENDING') return reply.header('cache-control', 'no-store').send({ payment: { publicId: attempt.publicId, status: 'pending', amountCents: attempt.amountCents, pixCode: decryptSecret(attempt.pixCodeEncrypted, environment.APP_ENCRYPTION_KEY), expiresAt: attempt.expiresAt } });
-    if (!attempt || attempt.status !== 'PENDING') attempt = await gateways.createAttempt(context.id, provider, amountCents, `${provider.toLowerCase()}:${context.id}:${Date.now()}`);
-    const externalRef = `solid-${attempt.publicId}`;
+    const providers = await gateways.paymentProviders(context.checkout.storeId); if (!providers.length) return reply.code(409).send(errorBody(request, 'GATEWAY_UNAVAILABLE', 'A loja ainda não configurou um gateway Pix.'));
+    const previous = await gateways.latestAttempt(context.id); if (previous?.pixCodeEncrypted && previous.status === 'PENDING') return reply.header('cache-control', 'no-store').send({ payment: { publicId: previous.publicId, status: 'pending', amountCents: previous.amountCents, pixCode: decryptSecret(previous.pixCodeEncrypted, environment.APP_ENCRYPTION_KEY), expiresAt: previous.expiresAt } });
+    const amountCents = context.totalCents - context.discountCents + context.shippingPriceCents;
     const paymentItems = context.items.length ? context.items : [{ productId: context.checkout.product.id, titleSnapshot: context.checkout.product.checkoutTitle, unitPriceCents: context.unitPriceCents, quantity: context.quantity }];
-    try {
-      const customer = JSON.parse(decryptSecret(context.customerDataEncrypted!, environment.APP_ENCRYPTION_KEY)) as Record<string, string>; const address = context.shippingAddressEncrypted ? JSON.parse(decryptSecret(context.shippingAddressEncrypted, environment.APP_ENCRYPTION_KEY)) as Record<string, string> : null;
+    const customer = JSON.parse(decryptSecret(context.customerDataEncrypted!, environment.APP_ENCRYPTION_KEY)) as Record<string, string>; const address = context.shippingAddressEncrypted ? JSON.parse(decryptSecret(context.shippingAddressEncrypted, environment.APP_ENCRYPTION_KEY)) as Record<string, string> : null;
+    for (const provider of providers) {
+      const encryptedCredentials = await gateways.credentials(context.checkout.storeId, provider); if (!encryptedCredentials) continue;
+      const westpayCredentials = { apiKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) };
+      const roasCredentials = { secretKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) };
+      let attempt = await gateways.latestAttempt(context.id, provider); if (!attempt || attempt.status !== 'PENDING') attempt = await gateways.createAttempt(context.id, provider, amountCents, `${provider.toLowerCase()}:${context.id}:${Date.now()}`);
+      const externalRef = `solid-${attempt.publicId}`;
+      try {
       if (provider === 'ROAS') {
         const transaction = await createRoasPix(roasCredentials, { payment_method: 'pix', customer: { document: { type: digits(customer.document).length === 14 ? 'cnpj' : 'cpf', number: digits(customer.document) }, name: customer.name, email: customer.email, phone: digits(customer.phone).startsWith('55') ? digits(customer.phone) : `55${digits(customer.phone)}` }, items: paymentItems.map(item => ({ title: item.titleSnapshot, unit_price: item.unitPriceCents, quantity: item.quantity })), amount: amountCents, postback_url: `${environment.API_PUBLIC_URL.replace(/\/$/, '')}/webhooks/roas`, metadata: { provider_name: 'SOLID Checkout', checkout_session: context.publicId } });
         if (!transaction.id || !transaction.pixCode) throw new Error('Roas returned an incomplete PIX response');
@@ -192,16 +193,18 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
         catch (error) { request.log.error({ err: error, checkoutSessionId: context.id }, 'shopify_pending_order_sync_failed'); }
       }
       return reply.header('cache-control', 'no-store').code(201).send({ payment: { ...saved, status: 'pending', pixCode: transaction.pix.qrcode } });
-    } catch (error) {
-      request.log.warn({ err: error, provider, checkoutSession: context.publicId }, 'pix_creation_failed');
-      if (error instanceof WestPayRequestError && error.status === 422) {
-        const detail = error.details.find(value => /m[ií]nim|minimum|amount|valor/i.test(value)) ?? '';
-        const amount = detail.match(/R\$\s*\d+(?:[.,]\d{1,2})?/i)?.[0];
-        const message = amount ? `O valor mínimo permitido pela WestPay para este Pix é ${amount}.` : 'O valor ou os dados do pagamento não foram aceitos pela WestPay.';
-        return reply.code(422).send(errorBody(request, 'WESTPAY_VALIDATION_ERROR', message));
+      } catch (error) {
+        request.log.warn({ err: error, provider, checkoutSession: context.publicId }, 'pix_creation_failed');
+        if (error instanceof WestPayRequestError && error.status === 422) {
+          const detail = error.details.find(value => /m[ií]nim|minimum|amount|valor/i.test(value)) ?? '';
+          const amount = detail.match(/R\$\s*\d+(?:[.,]\d{1,2})?/i)?.[0];
+          const message = amount ? `O valor mínimo permitido pela WestPay para este Pix é ${amount}.` : 'O valor ou os dados do pagamento não foram aceitos pela WestPay.';
+          return reply.code(422).send(errorBody(request, 'WESTPAY_VALIDATION_ERROR', message));
+        }
+        await gateways.failAttempt(attempt.id);
       }
-      return reply.code(502).send(errorBody(request, 'WESTPAY_UNAVAILABLE', 'Não foi possível gerar o Pix agora. Tente novamente.'));
     }
+    return reply.code(502).send(errorBody(request, 'GATEWAY_UNAVAILABLE', 'Os gateways configurados estão temporariamente indisponíveis. Tente novamente.'));
   });
 
   app.get<{ Params: { sessionId: string }; Headers: { authorization?: string } }>('/public/checkout-sessions/:sessionId/payments/latest', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
