@@ -12,7 +12,7 @@ const templatePresets={minimal:{template:'minimal',layout:'split',primary:'#7357
 const groups=[['Modelos',LayoutTemplate],['Aparência',Type],['Cores',Palette],['Cabeçalho',Monitor],['Elementos',WalletCards],['Conteúdo das etapas',Type],['Pagamentos',WalletCards],['Rodapé',Type],['Políticas',ShieldCheck],['Efeitos dos botões',Save],['Escassez',Clock3],['Rastreamento de saída',Eye],['Campos personalizados',Type],['Moeda e idioma',WalletCards],['SEO',Monitor]];
 Object.assign(defaultCheckoutConfig,{contentWidth:1120,elementGlobalStyle:{radius:12,spacing:12,fontScale:100},orderBumpProductId:'',orderBumpTitle:'',orderBumpMessage:''});
 Object.assign(defaultCheckoutConfig,{buttonBgColor:'#7357e9',inputBorderColor:'#e5e5e9',inputRadius:10,progressInactiveTextColor:'#777780',progressLabelColor:'#777780',progressActiveLabelColor:'#17171a'});
-Object.assign(defaultCheckoutConfig,{heroDevice:'all',timerDevice:'all',progressDevice:'all',summaryDevice:'all',summaryBannerDevice:'desktop',trustDevice:'all'});
+Object.assign(defaultCheckoutConfig,{heroDevice:'all',timerDevice:'all',progressDevice:'all',summaryDevice:'desktop',summaryBannerDevice:'desktop',trustDevice:'all'});
 const checkoutFontStack=font=>font==='Georgia'?'Georgia, serif':`"${font||'Plus Jakarta Sans'}", Arial, sans-serif`;
 const visibleOnDevice=(setting,device)=>!setting||setting==='all'||(setting==='mobile'?device==='mobile':device!=='mobile');
 const editorLocale={

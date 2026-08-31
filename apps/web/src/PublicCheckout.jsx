@@ -143,7 +143,10 @@ const publicConfig = (value) => ({
   heroDevice: "all",
   timerDevice: "all",
   progressDevice: "all",
-  summaryDevice: "all",
+  // Legacy checkouts do not have a device preference saved. Keep the full
+  // order summary on desktop by default instead of leaking the desktop card
+  // into the mobile flow. Merchants can still explicitly choose "all".
+  summaryDevice: "desktop",
   summaryBannerDevice: "desktop",
   trustDevice: "all",
   layout: "split",
