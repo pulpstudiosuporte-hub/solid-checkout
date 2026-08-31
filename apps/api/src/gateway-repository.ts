@@ -2,6 +2,7 @@ import type { PrismaClient } from '@solid/database';
 import { effectiveBilling } from './billing-entitlements.js';
 import { canTransitionPayment } from './payment-rules.js';
 import type { StorePushDispatcher } from './web-push-service.js';
+import type { StoreWebhookDispatcher } from './webhook-routes.js';
 
 export type GatewayContext = Readonly<{ storeId: string; role: 'OWNER' | 'ADMIN' | 'ANALYST' }>;
 export type PaymentProvider = 'ROAS' | 'WESTPAY';
@@ -17,8 +18,10 @@ type UtmifyOrderContext = Readonly<{ id: string; publicId: string; createdAt: Da
 
 export class PrismaGatewayRepository {
   private push: StorePushDispatcher | undefined;
+  private storeWebhook: StoreWebhookDispatcher | undefined;
   constructor(private readonly database: PrismaClient) {}
   setPushDispatcher(push: StorePushDispatcher | undefined): void { this.push = push; }
+  setStoreWebhookDispatcher(dispatcher: StoreWebhookDispatcher | undefined): void { this.storeWebhook = dispatcher; }
 
   async context(userId: string, sessionId: string): Promise<GatewayContext | null> {
     const session = await this.database.session.findFirst({ where: { id: sessionId, userId, revokedAt: null }, select: { activeStoreId: true } });
@@ -171,6 +174,7 @@ export class PrismaGatewayRepository {
     const metadata = { provider, paymentStatus: 'PENDING', amountCents: attempt.amountCents };
     await this.database.auditLog.create({ data: { storeId: attempt.session.checkout.storeId, actorType: 'SYSTEM', action: 'payment.pix_created', targetType: 'payment_attempt', targetId: attempt.publicId, requestId, metadata } });
     await this.push?.(attempt.session.checkout.storeId, 'payment.pix_created', metadata, attempt.publicId);
+    void this.storeWebhook?.(attempt.session.checkout.storeId, 'order.created', { order: { id: attempt.publicId, status: 'PENDING', totalCents: attempt.amountCents, currency: 'BRL' } }).catch(() => undefined);
   }
 
   webhookContext(providerTransactionId: string): Promise<WebhookContext | null> {
@@ -184,11 +188,11 @@ export class PrismaGatewayRepository {
   }
 
   async confirmPayment(attemptId: string, checkoutSessionId: string, status: 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED', paidAt?: Date) {
-    await this.database.$transaction(async transaction => {
+    const transitioned = await this.database.$transaction(async transaction => {
       const current = await transaction.paymentAttempt.findUnique({ where: { id: attemptId }, select: { status: true, amountCents: true, session: { select: { checkout: { select: { store: { select: { members: { where: { role: 'OWNER' }, orderBy: { createdAt: 'asc' }, take: 1, select: { userId: true } } } } } } } } } });
-      if (!current || current.status === 'REFUNDED' || current.status === status) return;
+      if (!current || current.status === 'REFUNDED' || current.status === status) return false;
       const canTransition = canTransitionPayment(current.status, status);
-      if (!canTransition) return;
+      if (!canTransition) return false;
       await transaction.paymentAttempt.update({ where: { id: attemptId }, data: { status, ...(paidAt ? { paidAt } : {}) } });
       if (status === 'PAID') {
         const completed = await transaction.checkoutSession.updateMany({ where: { id: checkoutSessionId, status: 'OPEN' }, data: { status: 'COMPLETED', completedAt: paidAt ?? new Date() } });
@@ -208,7 +212,11 @@ export class PrismaGatewayRepository {
           update: {},
         });
       }
+      return true;
     });
+    const delivered = await this.database.paymentAttempt.findUnique({ where: { id: attemptId }, select: { publicId: true, amountCents: true, session: { select: { publicId: true, checkout: { select: { storeId: true } } } } } });
+    const event = status === 'PAID' ? 'order.paid' : status === 'REFUNDED' ? 'order.refunded' : status === 'CANCELLED' || status === 'EXPIRED' ? 'order.cancelled' : 'payment.failed';
+    if (transitioned && delivered) void this.storeWebhook?.(delivered.session.checkout.storeId, event, { order: { id: delivered.session.publicId, paymentId: delivered.publicId, status, totalCents: delivered.amountCents, currency: 'BRL', paidAt: paidAt?.toISOString() ?? null } }).catch(() => undefined);
   }
 
   async billingAccessAllowed(storeId: string): Promise<boolean> {

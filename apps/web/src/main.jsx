@@ -5,7 +5,7 @@ import {
   CircleDollarSign, Clock3, Copy, CreditCard, Eye, FileText,
   Globe2, Home, LayoutTemplate, Link2, Menu, Package, PanelLeftClose, PanelLeftOpen, Plug, Plus,
   Search, Settings, ShieldCheck, ShoppingBag, ShoppingCart, Sparkles, Store,
-  Tag, TrendingUp, Truck, Users, X, Zap, LogOut, ServerCog
+  Tag, TrendingUp, Truck, Users, X, Zap, LogOut, ServerCog, Webhook
 } from 'lucide-react';
 import './styles.css';
 import './admin-design.css';
@@ -34,13 +34,14 @@ import InstallAppPrompt from './InstallAppPrompt';
 import BillingPage from './BillingPage';
 import AbandonedCartsPage from './AbandonedCartsPage';
 import AnalyticsPage from './AnalyticsPage';
+import WebhooksPage from './WebhooksPage';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const navGroups = [
   { label: 'Gestão', items: [
     { label: 'Início', icon: Home }, { label: 'Análises', icon: BarChart3 }, { label: 'Pedidos', icon: ShoppingBag },
-    { label: 'Carrinhos', icon: ShoppingCart }, { label: 'Produtos', icon: Package },
+    { label: 'Carrinhos', icon: ShoppingCart }, { label: 'Produtos', icon: Package }, { label: 'Webhooks', icon: Webhook },
   ]},
   { label: 'Checkout', items: [
     { label: 'Checkouts', icon: LayoutTemplate }, { label: 'Domínios', icon: Globe2 },
@@ -217,7 +218,7 @@ function App(){
   if(editor) return <CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/>;
   if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>;
   const activeStore=stores.find(store=>store.active);
-  const pageContent=page==='Início'?<Dashboard setPage={setPage} storeKey={activeStore?.publicId}/>:page==='Análises'?<AnalyticsPage storeKey={activeStore?.publicId}/>:page==='Pedidos'?<OrdersPage storeKey={activeStore?.publicId}/>:page==='Carrinhos'?<AbandonedCartsPage storeKey={activeStore?.publicId} csrfToken={auth.csrfToken}/>:page==='Meu plano'?<BillingPage csrfToken={auth.csrfToken}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Operações'?<AdminOperationsPage csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Gateways'?<GatewaysPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Domínios'?<DomainsPage csrfToken={auth.csrfToken}/>:page==='Produtos'?<ProductsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onOpenIntegrations={()=>setPage('Integrações')}/>:page==='Order bumps'?<OrderBumpsPage csrfToken={auth.csrfToken}/>:page==='Cupons'?<CouponsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>;
+  const pageContent=page==='Início'?<Dashboard setPage={setPage} storeKey={activeStore?.publicId}/>:page==='Análises'?<AnalyticsPage storeKey={activeStore?.publicId}/>:page==='Pedidos'?<OrdersPage storeKey={activeStore?.publicId}/>:page==='Carrinhos'?<AbandonedCartsPage storeKey={activeStore?.publicId} csrfToken={auth.csrfToken}/>:page==='Webhooks'?<WebhooksPage storeKey={activeStore?.publicId} csrfToken={auth.csrfToken}/>:page==='Meu plano'?<BillingPage csrfToken={auth.csrfToken}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Operações'?<AdminOperationsPage csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Gateways'?<GatewaysPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Domínios'?<DomainsPage csrfToken={auth.csrfToken}/>:page==='Produtos'?<ProductsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onOpenIntegrations={()=>setPage('Integrações')}/>:page==='Order bumps'?<OrderBumpsPage csrfToken={auth.csrfToken}/>:page==='Cupons'?<CouponsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>;
   return <div className={`app ${sidebarCollapsed?'sidebar-collapsed':''}`}><InstallAppPrompt/><Sidebar open={sidebar} collapsed={sidebarCollapsed} onToggleCollapsed={()=>setSidebarCollapsed(value=>!value)} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout} stores={stores} storeBusy={storeBusy} onSelectStore={handleSelectStore} onCreateStore={handleCreateStore} onArchiveStore={handleArchiveStore}/><div className="main-shell"><Header page={page} toggleSidebar={()=>setSidebar(true)} apiStatus={apiStatus} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onNavigate={setPage}/><PageErrorBoundary routeKey={`${activeStore?.publicId || 'store'}:${page}`} onHome={()=>setPage('Início')}>{pageContent}</PageErrorBoundary></div></div>
 }
 

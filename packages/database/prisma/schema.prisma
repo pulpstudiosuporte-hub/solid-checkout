@@ -168,8 +168,48 @@ model Store {
   mediaAssets MediaAsset[]
   abandonedRecoverySettings AbandonedRecoverySettings?
   abandonedRecoveryDeliveries AbandonedRecoveryDelivery[]
+  webhookEndpoints WebhookEndpoint[]
+  webhookDeliveries WebhookDelivery[]
 
   @@map("stores")
+}
+
+model WebhookEndpoint {
+  id              String            @id @default(uuid()) @db.Uuid
+  publicId        String            @unique @default(cuid()) @map("public_id") @db.VarChar(32)
+  storeId         String            @map("store_id") @db.Uuid
+  name            String            @db.VarChar(120)
+  description     String?           @db.VarChar(240)
+  url             String            @db.VarChar(2048)
+  secretEncrypted String            @map("secret_encrypted") @db.Text
+  active          Boolean           @default(true)
+  events          String[]
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  store           Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  deliveries      WebhookDelivery[]
+
+  @@index([storeId, active, createdAt(sort: Desc)])
+  @@map("webhook_endpoints")
+}
+
+model WebhookDelivery {
+  id                String          @id @default(uuid()) @db.Uuid
+  publicId          String          @unique @default(cuid()) @map("public_id") @db.VarChar(32)
+  storeId           String          @map("store_id") @db.Uuid
+  webhookEndpointId String          @map("webhook_endpoint_id") @db.Uuid
+  event             String          @db.VarChar(64)
+  statusCode        Int?            @map("status_code")
+  success           Boolean         @default(false)
+  durationMs        Int?            @map("duration_ms")
+  error             String?         @db.VarChar(500)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  store             Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  webhookEndpoint   WebhookEndpoint @relation(fields: [webhookEndpointId], references: [id], onDelete: Cascade)
+
+  @@index([webhookEndpointId, createdAt(sort: Desc)])
+  @@index([storeId, createdAt(sort: Desc)])
+  @@map("webhook_deliveries")
 }
 
 model StoreDomain {
