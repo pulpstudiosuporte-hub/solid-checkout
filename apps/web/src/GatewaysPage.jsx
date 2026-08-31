@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, CheckCircle2, CreditCard, KeyRound, Landmark, LoaderCircle, RefreshCw, Save, Search, Settings2, ShieldCheck, WalletCards } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowRight, Barcode, Check, CheckCircle2, CreditCard, Eye, EyeOff, Info, Landmark, LoaderCircle, QrCode, RefreshCw, Save, Search, Settings2, ShieldCheck, WalletCards, X } from 'lucide-react';
 import { getPlatformContent, getRoasStatus, getWestPayStatus, saveRoas, saveWestPay } from './api';
 import { gatewayAssetMap, gatewayCatalog } from './gateway-catalog';
 import './gateways-page.css';
+import './gateway-modal.css';
 
 const providers = {
   ROAS: { name: 'Roas', description: 'Pix com liquidação e reconciliação automática.', icon: Landmark, fields: ['Secret Key', 'Public Key'] },
@@ -17,13 +18,48 @@ function GatewayLogo({ gateway, asset }) {
 
 function GatewayCard({ gateway, asset, connected, selected, onSelect }) {
   const available = Boolean(gateway.supported);
-  return <button type="button" className={`gateway-catalog-card ${connected ? 'connected' : ''} ${selected ? 'selected' : ''}`} onClick={() => available && onSelect(gateway.id)} disabled={!available} aria-label={available ? `${connected ? 'Gerenciar' : 'Configurar'} ${gateway.name}` : `${gateway.name}, em breve`}>
+  return <button type="button" className={`gateway-catalog-card ${connected ? 'connected' : ''} ${selected ? 'selected' : ''} ${!available ? 'coming-soon' : ''}`} onClick={() => onSelect(gateway.id)} aria-label={available ? `${connected ? 'Gerenciar' : 'Configurar'} ${gateway.name}` : `Ver disponibilidade de ${gateway.name}`}>
     <GatewayLogo gateway={gateway} asset={asset}/>
     <div><strong>{gateway.name}</strong><em>{gateway.scope}</em></div>
     <small>{gateway.description}</small>
     <span className={`gateway-card-status ${connected ? 'active' : ''}`}>{connected ? 'Ativo' : available ? 'Configurar' : 'Em breve'}</span>
     <span className="gateway-card-arrow" aria-hidden="true"><ArrowRight size={15}/></span>
   </button>;
+}
+
+function PaymentMethod({ icon: Icon, title, description, enabled, locked = false }) {
+  return <div className={`gateway-method ${locked ? 'locked' : ''}`}><Icon size={18}/><div><b>{title}</b><span>{description}</span></div><span className={`gateway-method-switch ${enabled ? 'on' : ''}`} aria-label={enabled ? 'Ativo' : 'Indisponível'}><i/></span></div>;
+}
+
+function GatewayModal({ gateway, asset, status, forms, setForms, busy, onSubmit, onClose }) {
+  const [revealPublic, setRevealPublic] = useState(false); const [revealSecret, setRevealSecret] = useState(false);
+  const closeRef = useRef(null); const supported = Boolean(gateway.supported); const connected = Boolean(status?.connected);
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow; document.body.style.overflow = 'hidden'; closeRef.current?.focus();
+    const keyboard = event => { if (event.key === 'Escape' && !busy) onClose(); };
+    window.addEventListener('keydown', keyboard);
+    return () => { document.body.style.overflow = previousOverflow; window.removeEventListener('keydown', keyboard); };
+  }, [busy, onClose]);
+  const values = gateway.id === 'ROAS' ? forms.ROAS : forms.WESTPAY;
+  const secretName = gateway.id === 'ROAS' ? 'secretKey' : 'apiKey';
+  return <div className="gateway-modal-backdrop" onMouseDown={event => event.target === event.currentTarget && !busy && onClose()}>
+    <section className="gateway-modal" role="dialog" aria-modal="true" aria-labelledby="gateway-modal-title">
+      <button ref={closeRef} className="gateway-modal-close" type="button" onClick={onClose} disabled={busy} aria-label="Fechar configuração"><X size={19}/></button>
+      <div className="gateway-modal-main">
+        <header className="gateway-modal-title"><GatewayLogo gateway={gateway} asset={asset}/><div><h2 id="gateway-modal-title">{gateway.name}</h2><p>{supported ? `Integre sua loja à ${gateway.name}` : 'Integração planejada para o catálogo SOLID'}</p></div></header>
+        {!supported ? <div className="gateway-unavailable"><CreditCard size={28}/><h3>Este gateway estará disponível em breve</h3><p>A logo e a presença no catálogo já podem ser administradas, mas nenhuma credencial ou pagamento será processado até a integração oficial ser concluída.</p><button type="button" className="secondary" onClick={onClose}>Voltar ao catálogo</button></div> : <form onSubmit={onSubmit}>
+          <section className="gateway-modal-card gateway-accounts"><div className="gateway-section-heading"><div><h3>Conta conectada</h3><p>Gerencie a conexão usada para processar os pagamentos desta loja.</p></div><span>1 conta por gateway</span></div><div className="gateway-account-row"><div><b>{gateway.name} principal</b>{connected && <em>Ativa</em>}<span>PIX</span></div><Check size={18}/></div></section>
+          <section className="gateway-modal-card gateway-credentials"><div className="gateway-section-heading"><div><h3>Credenciais</h3><p>Informe as chaves fornecidas pelo gateway para autenticar a integração.</p></div></div>
+            <label>Chave pública<span><input type={revealPublic ? 'text' : 'password'} autoComplete="new-password" value={values.publicKey} onChange={event => setForms(current => ({ ...current, [gateway.id]: { ...current[gateway.id], publicKey: event.target.value } }))} placeholder={connected ? 'Digite para substituir a chave atual' : 'Cole a chave pública'} required/><button type="button" onClick={() => setRevealPublic(value => !value)} aria-label={revealPublic ? 'Ocultar chave pública' : 'Mostrar chave pública'}>{revealPublic ? <EyeOff size={17}/> : <Eye size={17}/>}</button></span></label>
+            <label>{gateway.id === 'ROAS' ? 'Chave secreta' : 'API Key'}<span><input type={revealSecret ? 'text' : 'password'} autoComplete="new-password" value={values[secretName]} onChange={event => setForms(current => ({ ...current, [gateway.id]: { ...current[gateway.id], [secretName]: event.target.value } }))} placeholder={connected ? 'Digite para substituir a chave atual' : 'Cole a chave secreta'} required/><button type="button" onClick={() => setRevealSecret(value => !value)} aria-label={revealSecret ? 'Ocultar chave secreta' : 'Mostrar chave secreta'}>{revealSecret ? <EyeOff size={17}/> : <Eye size={17}/>}</button></span></label>
+          </section>
+          <section className="gateway-modal-card"><div className="gateway-section-heading"><div><h3>Métodos de pagamento</h3><p>Os métodos disponíveis refletem o suporte real da integração.</p></div></div><div className="gateway-methods"><PaymentMethod icon={CreditCard} title="Cartão de crédito" description="Ainda não suportado por esta conexão." enabled={false} locked/><PaymentMethod icon={QrCode} title="Pix" description="QR Code e copia e cola com confirmação automática." enabled/><PaymentMethod icon={Barcode} title="Boleto" description="Ainda não suportado por esta conexão." enabled={false} locked/></div></section>
+          <button className="primary gateway-modal-save" disabled={busy}>{busy ? <LoaderCircle className="spin" size={17}/> : <Save size={17}/>} {connected ? 'Salvar alterações' : `Conectar ${gateway.name}`}</button>
+        </form>}
+      </div>
+      <aside className="gateway-modal-aside"><section><h3>Status da integração</h3><p>Define se este gateway processa pagamentos na sua loja.</p><div><span>Status atual</span><b className={connected ? 'active' : ''}>{connected ? <><RefreshCw size={13}/> Ativo</> : supported ? 'Não conectado' : 'Em breve'}</b></div></section><section><Info size={18}/><div><h3>Dica sobre credenciais</h3><p>Use apenas chaves oficiais do gateway. Nunca envie credenciais por chat ou suporte.</p></div></section><section><ShieldCheck size={18}/><div><h3>Armazenamento seguro</h3><p>As chaves são validadas e protegidas com criptografia AES-GCM.</p></div></section></aside>
+    </section>
+  </div>;
 }
 
 export default function GatewaysPage({ csrfToken, storeKey }) {
@@ -50,8 +86,9 @@ export default function GatewaysPage({ csrfToken, storeKey }) {
   const visible = useMemo(() => { const term = search.trim().toLocaleLowerCase('pt-BR'); return gatewayCatalog.filter(item => (scope === 'Todos' || item.scope === scope) && (!term || `${item.name} ${item.description}`.toLocaleLowerCase('pt-BR').includes(term))); }, [scope, search]);
   const configured = visible.filter(item => statuses[item.id]?.connected);
   const available = visible.filter(item => !statuses[item.id]?.connected);
-  const current = selected ? providers[selected] : null;
-  const Icon = current?.icon;
+  const selectedGateway = gatewayCatalog.find(item => item.id === selected) || null;
+  const current = selectedGateway?.supported ? providers[selected] : null;
+  const closeModal = useCallback(() => setSelected(null), []);
 
   const submit = async event => {
     event.preventDefault(); if (!selected || !current) return;
@@ -74,6 +111,6 @@ export default function GatewaysPage({ csrfToken, storeKey }) {
         <div className="gateway-catalog-group available"><h2>Gateways disponíveis <span>({available.length})</span></h2>{available.length ? <div className="gateway-catalog-grid">{available.map(gateway => <GatewayCard key={gateway.id} gateway={gateway} asset={assetByKey.get(gateway.assetKey)} connected={false} selected={selected === gateway.id} onSelect={setSelected}/>)}</div> : <div className="gateway-catalog-empty">Nenhum gateway encontrado para estes filtros.</div>}</div>
       </>}
     </section>
-    {current && <section className="gateway-layout" id="gateway-configuration"><form className="card gateway-form" onSubmit={submit}><div className="gateway-heading"><span>{Icon && <Icon size={25}/>}</span><div><div className="gateway-title-line"><h2>Configurar {current.name}</h2>{statuses[selected].connected && <span className="gateway-badge">Ativo</span>}</div><p>{current.description}</p></div></div>{statuses[selected].loading ? <div className="integration-loading"><LoaderCircle className="spin"/> Verificando...</div> : <><label>{current.fields[0]}<input type="password" autoComplete="new-password" value={selected === 'ROAS' ? forms.ROAS.secretKey : forms.WESTPAY.apiKey} onChange={event => setForms(value => ({ ...value, [selected]: { ...value[selected], [selected === 'ROAS' ? 'secretKey' : 'apiKey']: event.target.value } }))} placeholder={selected === 'ROAS' ? 'Cole a Secret Key da Roas' : 'live_...'} required/></label><label>{current.fields[1]}<input type="password" autoComplete="new-password" value={forms[selected].publicKey} onChange={event => setForms(value => ({ ...value, [selected]: { ...value[selected], publicKey: event.target.value } }))} placeholder={`Cole a Public Key da ${current.name}`} required/></label><small className="gateway-note"><KeyRound size={14}/> As chaves são validadas e armazenadas com criptografia AES-GCM.</small><button className="primary" disabled={busy}>{busy ? <LoaderCircle className="spin" size={17}/> : <Save size={17}/>} {statuses[selected].connected ? 'Atualizar credenciais' : `Conectar ${current.name}`}</button></>}</form><aside className="card gateway-security"><ShieldCheck size={25}/><h2>Pagamento protegido</h2><p>O checkout calcula o total no servidor e envia somente os dados necessários ao gateway.</p><ul><li>Credenciais nunca chegam ao navegador</li><li>Preço e frete são recalculados no servidor</li><li>Cada tentativa é identificada por sessão</li><li>O status é confirmado diretamente no gateway</li></ul></aside></section>}
+    {selectedGateway && <GatewayModal gateway={selectedGateway} asset={assetByKey.get(selectedGateway.assetKey)} status={statuses[selected]} forms={forms} setForms={setForms} busy={busy} onSubmit={submit} onClose={closeModal}/>}
   </main>;
 }
