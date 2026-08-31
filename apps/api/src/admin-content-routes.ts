@@ -18,6 +18,16 @@ const optionalUrl = (value: unknown): string | null | undefined => {
 };
 const statuses = ['BACKLOG', 'PLANNED', 'IN_PROGRESS', 'DONE'] as const;
 const categories = ['NEWS', 'IMPROVEMENT', 'FIX', 'INTEGRATION', 'SECURITY'] as const;
+const automaticReleases = [
+  { publicId: 'auto-20260831-integrations', category: 'NEWS' as const, title: 'Catálogo de integrações renovado', description: 'Agora você encontra, pesquisa e gerencia integrações e gateways em uma central organizada.', publishedAt: new Date('2026-08-31T21:00:00.000Z') },
+  { publicId: 'auto-20260831-search', category: 'IMPROVEMENT' as const, title: 'Busca avançada no painel', description: 'Use Ctrl K para encontrar páginas, recursos e ações por nome ou palavras relacionadas.', publishedAt: new Date('2026-08-31T20:00:00.000Z') },
+  { publicId: 'auto-20260831-checkout', category: 'IMPROVEMENT' as const, title: 'Checkout responsivo e personalizável', description: 'Novos controles visuais, elementos editáveis e melhorias de compatibilidade para checkouts publicados.', publishedAt: new Date('2026-08-31T19:00:00.000Z') },
+  { publicId: 'auto-20260831-gateway', category: 'INTEGRATION' as const, title: 'Prioridade e contingência de gateways', description: 'Defina o gateway principal e organize alternativas para manter os pagamentos disponíveis.', publishedAt: new Date('2026-08-31T18:00:00.000Z') },
+  { publicId: 'auto-20260830-webhooks', category: 'INTEGRATION' as const, title: 'Webhooks duráveis por loja', description: 'Envie eventos de pedidos para sistemas externos com assinatura, tentativas e histórico de entrega.', publishedAt: new Date('2026-08-30T22:00:00.000Z') },
+  { publicId: 'auto-20260830-security', category: 'SECURITY' as const, title: 'Proteções de conta ampliadas', description: 'Fluxos de recuperação, sessão protegida e verificações adicionais para ações sensíveis.', publishedAt: new Date('2026-08-30T21:00:00.000Z') },
+];
+const releaseSelect = { publicId: true, category: true, title: true, description: true, imageUrl: true, videoUrl: true, published: true, publishedAt: true } as const;
+const withReleaseSource = <T extends { publicId: string }>(item: T): T & { automatic: boolean } => ({ ...item, automatic: item.publicId.startsWith('auto-') });
 const destinations = ['Início', 'Novidades', 'Análises', 'Pedidos', 'Carrinhos', 'Produtos', 'Integrações', 'Webhooks'] as const;
 
 export function registerAdminContentRoutes(app: FastifyInstance, environment: AppEnvironment, auth: AuthRepository, db: PrismaClient): void {
@@ -36,24 +46,33 @@ export function registerAdminContentRoutes(app: FastifyInstance, environment: Ap
     const origin = request.headers.origin; const header = request.headers['x-csrf-token']; const cookie = request.cookies[csrfCookie];
     return typeof origin === 'string' && environment.CORS_ORIGINS.includes(origin) && typeof header === 'string' && Boolean(cookie) && same(cookie!, header) && same(sha256(header), current.csrfTokenHash);
   };
+  const ensureAutomaticReleases = async (): Promise<void> => {
+    await Promise.all(automaticReleases.map(release => db.productRelease.upsert({
+      where: { publicId: release.publicId },
+      create: { ...release, published: true },
+      update: {},
+    })));
+  };
 
   app.get('/platform-content', async (request, reply) => {
     if (!await session(request)) return reply.code(401).send(failure(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
+    await ensureAutomaticReleases();
     const [releases, assets] = await Promise.all([
-      db.productRelease.findMany({ where: { published: true }, orderBy: { publishedAt: 'desc' }, take: 50, select: { publicId: true, category: true, title: true, description: true, imageUrl: true, videoUrl: true, publishedAt: true } }),
+      db.productRelease.findMany({ where: { published: true }, orderBy: { publishedAt: 'desc' }, take: 50, select: releaseSelect }),
       db.integrationCatalogAsset.findMany({ select: { integrationKey: true, imageUrl: true, altText: true } }),
     ]);
-    return reply.header('cache-control', 'private, no-store').send({ releases, integrationAssets: assets });
+    return reply.header('cache-control', 'private, no-store').send({ releases: releases.map(withReleaseSource), integrationAssets: assets });
   });
 
   app.get('/admin/content', async (request, reply) => {
     if (!await admin(request)) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso administrativo necessário.'));
+    await ensureAutomaticReleases();
     const [feedback, releases, assets] = await Promise.all([
       db.productFeedback.findMany({ orderBy: [{ approved: 'asc' }, { status: 'asc' }, { createdAt: 'desc' }], take: 200, select: { publicId: true, type: true, status: true, approved: true, title: true, description: true, createdAt: true, user: { select: { name: true, email: true } }, store: { select: { name: true } }, _count: { select: { votes: true } } } }),
-      db.productRelease.findMany({ orderBy: { publishedAt: 'desc' }, take: 100, select: { publicId: true, category: true, title: true, description: true, imageUrl: true, videoUrl: true, published: true, publishedAt: true } }),
+      db.productRelease.findMany({ orderBy: { publishedAt: 'desc' }, take: 100, select: releaseSelect }),
       db.integrationCatalogAsset.findMany({ orderBy: { integrationKey: 'asc' }, select: { integrationKey: true, imageUrl: true, altText: true, updatedAt: true } }),
     ]);
-    return reply.header('cache-control', 'private, no-store').send({ feedback: feedback.map(item => ({ ...item, author: item.user.name, email: item.user.email, store: item.store?.name ?? 'Sem loja', votes: item._count.votes, user: undefined, _count: undefined })), releases, integrationAssets: assets });
+    return reply.header('cache-control', 'private, no-store').send({ feedback: feedback.map(item => ({ ...item, author: item.user.name, email: item.user.email, store: item.store?.name ?? 'Sem loja', votes: item._count.votes, user: undefined, _count: undefined })), releases: releases.map(withReleaseSource), integrationAssets: assets });
   });
 
   app.patch<{ Params: { feedbackId: string }; Body: { status?: string; approved?: boolean } }>('/admin/content/feedback/:feedbackId', async (request, reply) => {
@@ -83,13 +102,35 @@ export function registerAdminContentRoutes(app: FastifyInstance, environment: Ap
     const imageUrl = optionalUrl(request.body?.imageUrl); const videoUrl = optionalUrl(request.body?.videoUrl);
     if (title.length < 5 || description.length < 10 || imageUrl === undefined || videoUrl === undefined) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Revise título, descrição e URLs HTTPS.'));
     const category = categories.includes(request.body?.category as typeof categories[number]) ? request.body.category as typeof categories[number] : 'NEWS';
-    const release = await db.productRelease.create({ data: { category, title, description, imageUrl, videoUrl, published: request.body?.published !== false }, select: { publicId: true, category: true, title: true, description: true, imageUrl: true, videoUrl: true, published: true, publishedAt: true } });
-    return reply.code(201).send({ release });
+    const release = await db.productRelease.create({ data: { category, title, description, imageUrl, videoUrl, published: request.body?.published !== false }, select: releaseSelect });
+    return reply.code(201).send({ release: withReleaseSource(release) });
+  });
+
+  app.patch<{ Params: { releaseId: string }; Body: { category?: string; title?: string; description?: string; imageUrl?: string; videoUrl?: string; published?: boolean } }>('/admin/content/releases/:releaseId', async (request, reply) => {
+    const current = await admin(request); if (!current || !mutationAllowed(request, current)) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso negado.'));
+    const publicId = clean(request.params.releaseId, 32);
+    const data: { category?: typeof categories[number]; title?: string; description?: string; imageUrl?: string | null; videoUrl?: string | null; published?: boolean } = {};
+    if (request.body?.category !== undefined) {
+      if (!categories.includes(request.body.category as typeof categories[number])) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Categoria inválida.'));
+      data.category = request.body.category as typeof categories[number];
+    }
+    if (request.body?.title !== undefined) { data.title = clean(request.body.title, 140); if (data.title.length < 5) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Título muito curto.')); }
+    if (request.body?.description !== undefined) { data.description = clean(request.body.description, 4000); if (data.description.length < 10) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Descrição muito curta.')); }
+    if (request.body?.imageUrl !== undefined) { const imageUrl = optionalUrl(request.body.imageUrl); if (imageUrl === undefined) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Imagem HTTPS inválida.')); data.imageUrl = imageUrl; }
+    if (request.body?.videoUrl !== undefined) { const videoUrl = optionalUrl(request.body.videoUrl); if (videoUrl === undefined) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Vídeo HTTPS inválido.')); data.videoUrl = videoUrl; }
+    if (typeof request.body?.published === 'boolean') data.published = request.body.published;
+    if (!Object.keys(data).length) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Nenhuma alteração informada.'));
+    const existing = await db.productRelease.findUnique({ where: { publicId }, select: { id: true } });
+    if (!existing) return reply.code(404).send(failure(request, 'NOT_FOUND', 'Publicação não encontrada.'));
+    const release = await db.productRelease.update({ where: { publicId }, data, select: releaseSelect });
+    return reply.send({ release: withReleaseSource(release) });
   });
 
   app.delete<{ Params: { releaseId: string } }>('/admin/content/releases/:releaseId', async (request, reply) => {
     const current = await admin(request); if (!current || !mutationAllowed(request, current)) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso negado.'));
-    await db.productRelease.deleteMany({ where: { publicId: clean(request.params.releaseId, 32) } });
+    const publicId = clean(request.params.releaseId, 32);
+    if (publicId.startsWith('auto-')) return reply.code(400).send(failure(request, 'AUTOMATIC_RELEASE', 'Atualizações automáticas podem ser editadas ou ocultadas, mas não excluídas.'));
+    await db.productRelease.deleteMany({ where: { publicId } });
     return reply.code(204).send();
   });
 

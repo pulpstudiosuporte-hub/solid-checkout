@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BellRing, Bug, CheckCircle2, Eye, EyeOff, FileVideo2, Image, Inbox, LoaderCircle, Megaphone, RefreshCw, Send, Sparkles, Trash2, Upload } from 'lucide-react';
-import { createAdminRelease, deleteAdminFeedback, deleteAdminRelease, getAdminContent, saveAdminIntegrationAsset, sendAdminBroadcast, updateAdminFeedback, uploadPlatformImage } from './api';
+import { BellRing, Bug, CheckCircle2, Eye, EyeOff, FileVideo2, Image, Inbox, LoaderCircle, Megaphone, Pencil, RefreshCw, Send, Sparkles, Trash2, Upload, X } from 'lucide-react';
+import { createAdminRelease, deleteAdminFeedback, deleteAdminRelease, getAdminContent, saveAdminIntegrationAsset, sendAdminBroadcast, updateAdminFeedback, updateAdminRelease, uploadPlatformImage } from './api';
 import { gatewayAssetOptions } from './gateway-catalog';
 import { releaseCategoryMap } from './platform-content';
 
@@ -57,6 +57,7 @@ export default function AdminContentPage({ csrfToken }) {
   const [state, setState] = useState({ loading: true, data: null, error: '' });
   const [busy, setBusy] = useState(''); const [message, setMessage] = useState('');
   const [release, setRelease] = useState({ category: 'NEWS', title: '', description: '', imageUrl: '', videoUrl: '', published: true });
+  const [editingReleaseId, setEditingReleaseId] = useState('');
   const [asset, setAsset] = useState({ integrationKey: 'shopify', imageUrl: '', altText: '' });
   const [broadcast, setBroadcast] = useState({ title: '', message: '', destination: 'Novidades' });
   const load = async signal => {
@@ -74,10 +75,20 @@ export default function AdminContentPage({ csrfToken }) {
   const counts = useMemo(() => ({ feedback: state.data?.feedback?.length || 0, releases: state.data?.releases?.length || 0, integrations: state.data?.integrationAssets?.length || 0 }), [state.data]);
   const publish = async event => {
     event.preventDefault(); setBusy('release'); setMessage('');
-    try { await createAdminRelease(release, csrfToken); setRelease({ category: 'NEWS', title: '', description: '', imageUrl: '', videoUrl: '', published: true }); await load(); setMessage('Novidade publicada.'); }
+    try {
+      if (editingReleaseId) await updateAdminRelease(editingReleaseId, release, csrfToken);
+      else await createAdminRelease(release, csrfToken);
+      setRelease({ category: 'NEWS', title: '', description: '', imageUrl: '', videoUrl: '', published: true }); setEditingReleaseId(''); await load(); setMessage(editingReleaseId ? 'Publicação atualizada.' : 'Novidade publicada.');
+    }
     catch (error) { setMessage(error.message); }
     finally { setBusy(''); }
   };
+  const editRelease = item => {
+    setEditingReleaseId(item.publicId);
+    setRelease({ category: item.category, title: item.title, description: item.description, imageUrl: item.imageUrl || '', videoUrl: item.videoUrl || '', published: item.published });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const cancelReleaseEdit = () => { setEditingReleaseId(''); setRelease({ category: 'NEWS', title: '', description: '', imageUrl: '', videoUrl: '', published: true }); };
   const saveAsset = event => { event.preventDefault(); void act('asset', () => saveAdminIntegrationAsset(asset.integrationKey, asset, csrfToken), 'Imagem da integração atualizada.'); };
   const notify = event => { event.preventDefault(); void act('broadcast', () => sendAdminBroadcast(broadcast, csrfToken), 'Notificação enviada para todas as lojas ativas.'); };
 
@@ -88,15 +99,16 @@ export default function AdminContentPage({ csrfToken }) {
     {!state.data?.feedback?.length && <div className="admin-content-empty"><Inbox/><b>Nenhum feedback recebido</b></div>}
   </section>;
   else if (tab === 'releases') content = <div className="admin-content-split">
-    <form className="card admin-content-form" onSubmit={publish}><h2>Publicar novidade</h2>
+    <form className="card admin-content-form" onSubmit={publish}><div className="admin-release-form-heading"><div><h2>{editingReleaseId ? 'Editar publicação' : 'Publicar novidade'}</h2><p>{editingReleaseId ? 'Altere qualquer campo, imagem ou visibilidade.' : 'Crie uma publicação manual com imagem ou vídeo.'}</p></div>{editingReleaseId && <button type="button" onClick={cancelReleaseEdit} aria-label="Cancelar edição"><X size={17}/></button>}</div>
       <label>Categoria<select value={release.category} onChange={event => setRelease(current => ({ ...current, category: event.target.value }))}>{Object.entries(categoryLabels).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <label>Título<input value={release.title} maxLength="140" required onChange={event => setRelease(current => ({ ...current, title: event.target.value }))}/></label>
       <label>Descrição<textarea rows="5" maxLength="4000" required value={release.description} onChange={event => setRelease(current => ({ ...current, description: event.target.value }))}/></label>
       <ImageField value={release.imageUrl} onChange={imageUrl => setRelease(current => ({ ...current, imageUrl }))} csrfToken={csrfToken}/>
       <label>Vídeo (YouTube, Vimeo ou arquivo HTTPS)<input type="url" value={release.videoUrl} onChange={event => setRelease(current => ({ ...current, videoUrl: event.target.value }))} placeholder="https://..."/></label>
-      <button className="primary" disabled={busy === 'release'}>{busy === 'release' ? <LoaderCircle className="spin"/> : <Megaphone/>} Publicar</button>
+      <label className="admin-release-published" htmlFor="release-published"><input id="release-published" type="checkbox" checked={release.published} onChange={event => setRelease(current => ({ ...current, published: event.target.checked }))}/><span><b>Visível para os lojistas</b><small>Pode ser alterado depois sem excluir a publicação.</small></span></label>
+      <button className="primary" disabled={busy === 'release'}>{busy === 'release' ? <LoaderCircle className="spin"/> : editingReleaseId ? <CheckCircle2/> : <Megaphone/>} {editingReleaseId ? 'Salvar alterações' : 'Publicar'}</button>
     </form>
-    <section className="admin-release-list">{state.data?.releases?.map(item => <article className="card" key={item.publicId}>{item.imageUrl && <img src={item.imageUrl} alt=""/>}<div><span>{categoryLabels[item.category]}</span><h3>{item.title}</h3><p>{item.description}</p>{item.videoUrl && <a href={item.videoUrl} target="_blank" rel="noreferrer"><FileVideo2 size={14}/> Abrir vídeo</a>}</div><button aria-label={`Excluir ${item.title}`} onClick={() => window.confirm('Excluir esta publicação?') && void act(item.publicId, () => deleteAdminRelease(item.publicId, csrfToken), 'Publicação excluída.')}><Trash2 size={16}/></button></article>)}</section>
+    <section className="admin-release-list">{state.data?.releases?.map(item => <article className={`card ${item.published ? '' : 'unpublished'}`} key={item.publicId}>{item.imageUrl ? <img src={item.imageUrl} alt={`Imagem de ${item.title}`}/> : <span className="admin-release-placeholder"><Image size={22}/></span>}<div><div className="admin-release-badges"><span>{categoryLabels[item.category]}</span><em>{item.automatic ? 'Automática' : 'Manual'}</em><em className={item.published ? 'published' : 'hidden'}>{item.published ? 'Publicada' : 'Oculta'}</em></div><h3>{item.title}</h3><p>{item.description}</p>{item.videoUrl && <a href={item.videoUrl} target="_blank" rel="noreferrer"><FileVideo2 size={14}/> Abrir vídeo</a>}</div><div className="admin-release-actions"><button type="button" aria-label={`Editar ${item.title}`} onClick={() => editRelease(item)}><Pencil size={16}/></button><button type="button" aria-label={item.published ? `Ocultar ${item.title}` : `Publicar ${item.title}`} disabled={busy === item.publicId} onClick={() => void act(item.publicId, () => updateAdminRelease(item.publicId, { published: !item.published }, csrfToken), item.published ? 'Publicação ocultada.' : 'Publicação publicada.')}>{item.published ? <EyeOff size={16}/> : <Eye size={16}/>}</button>{!item.automatic && <button type="button" className="danger" aria-label={`Excluir ${item.title}`} onClick={() => window.confirm('Excluir esta publicação?') && void act(item.publicId, () => deleteAdminRelease(item.publicId, csrfToken), 'Publicação excluída.')}><Trash2 size={16}/></button>}</div></article>)}</section>
   </div>;
   else if (tab === 'integrations') content = <div className="admin-content-split">
     <form className="card admin-content-form" onSubmit={saveAsset}><h2>Imagem da integração ou gateway</h2>

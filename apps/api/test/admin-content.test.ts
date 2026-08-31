@@ -20,9 +20,9 @@ class AdminAuth implements AuthRepository {
   updatePasswordAndRevokeOtherSessions(): Promise<void> { return Promise.resolve(); }
 }
 
-function contentDatabase(spies?: { updateFeedback?: ReturnType<typeof vi.fn>; deleteFeedback?: ReturnType<typeof vi.fn>; createMedia?: ReturnType<typeof vi.fn>; upsertAsset?: ReturnType<typeof vi.fn> }): PrismaClient {
+function contentDatabase(spies?: { updateFeedback?: ReturnType<typeof vi.fn>; deleteFeedback?: ReturnType<typeof vi.fn>; createMedia?: ReturnType<typeof vi.fn>; upsertAsset?: ReturnType<typeof vi.fn>; updateRelease?: ReturnType<typeof vi.fn> }): PrismaClient {
   return {
-    productRelease: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn(), deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    productRelease: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn(), upsert: vi.fn().mockResolvedValue({}), findUnique: vi.fn().mockResolvedValue({ id: 'release-a' }), update: spies?.updateRelease ?? vi.fn(), deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     integrationCatalogAsset: { findMany: vi.fn().mockResolvedValue([]), upsert: spies?.upsertAsset ?? vi.fn() },
     productFeedback: {
       findMany: vi.fn().mockResolvedValue([]),
@@ -95,6 +95,18 @@ describe('conteúdo administrável da plataforma', () => {
     expect(createMedia).toHaveBeenCalledOnce();
     const [mediaInput] = createMedia.mock.calls[0] as unknown as [{ data: { storeId: string | null } }];
     expect(mediaInput.data.storeId).toBeNull();
+    await app.close();
+  });
+
+  it('permite editar e ocultar uma atualização automática sem excluí-la', async () => {
+    const updateRelease = vi.fn().mockResolvedValue({ publicId: 'auto-20260831-search', category: 'IMPROVEMENT', title: 'Busca aprimorada', description: 'Nova descrição detalhada da busca.', imageUrl: null, videoUrl: null, published: false, publishedAt: new Date() });
+    const database = contentDatabase({ updateRelease });
+    const app = buildApp(env, { authRepository: new AdminAuth(), database });
+    const response = await app.inject({ method: 'PATCH', url: '/admin/content/releases/auto-20260831-search', headers: mutationHeaders, payload: { title: 'Busca aprimorada', description: 'Nova descrição detalhada da busca.', published: false } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ release: { automatic: true, published: false } });
+    expect(updateRelease).toHaveBeenCalledOnce();
+    expect((await app.inject({ method: 'DELETE', url: '/admin/content/releases/auto-20260831-search', headers: mutationHeaders })).statusCode).toBe(400);
     await app.close();
   });
 
