@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Check,
   CheckCircle2,
+  CircleHelp,
   Copy,
   Clock3,
   CreditCard,
@@ -11,6 +12,7 @@ import {
   MapPin,
   ShieldCheck,
   ShoppingBag,
+  Star,
   Truck,
   UserRound,
 } from "lucide-react";
@@ -136,6 +138,21 @@ const descriptionText = (value) => {
   if (typeof DOMParser === "undefined") return String(value).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
   return new DOMParser().parseFromString(value, "text/html").body.textContent?.replace(/\s+/g, " ").trim() || "";
 };
+
+function PublicCustomElement({ item }) {
+  return (
+    <section className={`public-custom-element type-${item.type}`}>
+      <div className="public-custom-icon">
+        {item.type === "testimonial" ? <Star size={20} /> : item.type === "faq" ? <CircleHelp size={20} /> : <ShieldCheck size={20} />}
+      </div>
+      <div>
+        {item.type === "testimonial" && <span className="public-custom-stars">{"★".repeat(item.rating || 5)}</span>}
+        <h2>{item.title}</h2>
+        <p>{item.text}</p>
+      </div>
+    </section>
+  );
+}
 
 function ProductImage({ src, title }) {
   return src ? (
@@ -539,6 +556,11 @@ function SessionContent({ session: initialSession, token }) {
           Pagamento
         </span>
       </nav>}
+      {(Array.isArray(config.customElements) ? config.customElements : []).map((item) => (
+        <div className="public-custom-wrap" key={item.id} style={{ order: Math.min(4, Math.max(0, item.slot)) + 0.5 }}>
+          <PublicCustomElement item={item} />
+        </div>
+      ))}
       <div
         className={`public-checkout-grid ${config.showSummary ? "" : "without-summary"}`}
         style={{order:blockOrder('content')}}

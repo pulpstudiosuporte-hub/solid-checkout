@@ -51,6 +51,19 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   const allowedBlocks = ['hero', 'timer', 'progress', 'content'];
   if (!Array.isArray(blockOrder) || blockOrder.length !== allowedBlocks.length || new Set(blockOrder).size !== allowedBlocks.length || blockOrder.some(value => typeof value !== 'string' || !allowedBlocks.includes(value))) return null;
   result.blockOrder = blockOrder;
+  const customElements = input.customElements ?? [];
+  if (!Array.isArray(customElements) || customElements.length > 20) return null;
+  const customIds = new Set<string>();
+  const sanitizedElements: Array<Record<string, unknown>> = [];
+  for (const value of customElements) {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+    const element = value as Record<string, unknown>;
+    const id = text(element.id, 64); const title = text(element.title, 100); const body = text(element.text, 500);
+    const slot = integer(element.slot, 0, 4); const rating = element.rating === undefined ? 5 : integer(element.rating, 1, 5);
+    if (!id || customIds.has(id) || !/^[A-Za-z0-9_-]+$/.test(id) || !['testimonial', 'seal', 'guarantee', 'faq'].includes(String(element.type)) || !title || !body || slot === null || rating === null) return null;
+    customIds.add(id); sanitizedElements.push({ id, type: element.type, slot, title, text: body, rating });
+  }
+  result.customElements = sanitizedElements;
   const bumpProductId = input.orderBumpProductId;
   if (bumpProductId !== undefined && (typeof bumpProductId !== 'string' || bumpProductId.length > 32 || bumpProductId && !/^[A-Za-z0-9_-]+$/.test(bumpProductId))) return null;
   result.orderBumpProductId = typeof bumpProductId === 'string' ? bumpProductId : '';
