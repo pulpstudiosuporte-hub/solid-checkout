@@ -4,6 +4,20 @@ import { getAbandonedCarts } from './api';
 import './abandoned-carts-page.css';
 
 const money = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+const emptyMetrics = { totalCents:0, averageCents:0, pendingCents:0, pendingCount:0, abandonedCount:0 };
+const finiteNumber = (value, fallback=0) => { const number=Number(value); return Number.isFinite(number)?number:fallback; };
+export function normalizeAbandonedCartsResponse(result={}) {
+  const items=(Array.isArray(result?.items)?result.items:[]).map((item,index)=>{
+    const source=item&&typeof item==='object'?item:{};
+    const lastStage=['IDENTIFICATION','SHIPPING','PAYMENT'].includes(source.lastStage)?source.lastStage:'IDENTIFICATION';
+    return {...source,publicId:source.publicId||`legacy-cart-${index}`,customer:source.customer&&typeof source.customer==='object'?source.customer:{},items:Array.isArray(source.items)?source.items:[],lastStage,totalCents:Math.max(0,finiteNumber(source.totalCents)),lastActivityAt:source.lastActivityAt||source.updatedAt||null};
+  });
+  const total=Math.max(0,finiteNumber(result?.total,items.length));
+  const metrics={...emptyMetrics,...(result?.metrics&&typeof result.metrics==='object'?result.metrics:{})};
+  metrics.totalCents=Math.max(0,finiteNumber(metrics.totalCents));
+  metrics.averageCents=Math.max(0,finiteNumber(metrics.averageCents,total?Math.round(metrics.totalCents/total):0));
+  return {...result,items,total,page:Math.max(1,finiteNumber(result?.page,1)),pageSize:Math.max(1,finiteNumber(result?.pageSize,20)),pages:Math.max(1,finiteNumber(result?.pages,1)),metrics};
+}
 const stages = { IDENTIFICATION:'Dados pessoais', SHIPPING:'Endereço', PAYMENT:'Pagamento' };
 function phone(value){ let digits=String(value||'').replace(/\D/g,'').replace(/^0+/,''); if(digits.length===10||digits.length===11)digits=`55${digits}`; return /^\d{12,15}$/.test(digits)?digits:null; }
 function whatsapp(cart){ const number=phone(cart.customer?.phone); if(!number)return null; const first=cart.customer?.name?.trim().split(/\s+/)[0]; return `https://wa.me/${number}?text=${encodeURIComponent(`${first?`Olá, ${first}!`:'Olá!'} Vi que você iniciou uma compra em nossa loja e não concluiu. Posso ajudar?`)}`; }
@@ -13,13 +27,13 @@ export default function AbandonedCartsPage({storeKey}){
   const [page,setPage]=useState(1); const [pageSize,setPageSize]=useState(20); const [searchInput,setSearchInput]=useState('');
   const [filters,setFilters]=useState({search:'',stage:'',period:'',sort:'newest'});
   const [state,setState]=useState({loading:true,error:'',items:[],total:0,pages:1,metrics:{totalCents:0,averageCents:0}});
-  const load=()=>{ const controller=new AbortController(); setState(current=>({...current,loading:true,error:''})); getAbandonedCarts({page,pageSize,...filters},controller.signal).then(result=>setState({loading:false,error:'',...result})).catch(error=>{if(error.name!=='AbortError')setState(current=>({...current,loading:false,error:error.message}));}); return controller; };
+  const load=()=>{ const controller=new AbortController(); setState(current=>({...current,loading:true,error:''})); getAbandonedCarts({page,pageSize,...filters},controller.signal).then(result=>setState({loading:false,error:'',...normalizeAbandonedCartsResponse(result)})).catch(error=>{if(error.name!=='AbortError')setState(current=>({...current,loading:false,error:error.message}));}); return controller; };
   useEffect(()=>{const timer=setTimeout(()=>setFilters(value=>({...value,search:searchInput.trim()})),300);return()=>clearTimeout(timer);},[searchInput]);
   useEffect(()=>{const controller=load();return()=>controller.abort();},[page,pageSize,filters,storeKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>setPage(1),[pageSize,filters,storeKey]);
   const update=(key,value)=>setFilters(current=>({...current,[key]:value}));
-  const exportCsv=async()=>{ const first=await getAbandonedCarts({page:1,pageSize:100,...filters}); const items=[...first.items]; for(let current=2;current<=first.pages;current+=1){const result=await getAbandonedCarts({page:current,pageSize:100,...filters});items.push(...result.items);} const rows=[['Cliente','E-mail','Etapa','Valor','Última visita'],...items.map(cart=>[cart.customer?.name||'',cart.customer?.email||'',stages[cart.lastStage]||cart.lastStage,money.format(cart.totalCents/100),new Date(cart.lastActivityAt).toLocaleString('pt-BR')])]; const blob=new Blob(['\ufeff'+rows.map(row=>row.map(csvCell).join(';')).join('\n')],{type:'text/csv;charset=utf-8'}); const url=URL.createObjectURL(blob); const link=document.createElement('a');link.href=url;link.download=`carrinhos-abandonados-${new Date().toISOString().slice(0,10)}.csv`;link.click();URL.revokeObjectURL(url); };
-  const average=useMemo(()=>state.metrics.averageCents??(state.total?Math.round(state.metrics.totalCents/state.total):0),[state]);
+  const exportCsv=async()=>{ const first=normalizeAbandonedCartsResponse(await getAbandonedCarts({page:1,pageSize:100,...filters})); const items=[...first.items]; for(let current=2;current<=first.pages;current+=1){const result=normalizeAbandonedCartsResponse(await getAbandonedCarts({page:current,pageSize:100,...filters}));items.push(...result.items);} const rows=[['Cliente','E-mail','Etapa','Valor','Última visita'],...items.map(cart=>[cart.customer?.name||'',cart.customer?.email||'',stages[cart.lastStage]||cart.lastStage||'Dados pessoais',money.format(finiteNumber(cart.totalCents)/100),cart.lastActivityAt?new Date(cart.lastActivityAt).toLocaleString('pt-BR'):''])]; const blob=new Blob(['\ufeff'+rows.map(row=>row.map(csvCell).join(';')).join('\n')],{type:'text/csv;charset=utf-8'}); const url=URL.createObjectURL(blob); const link=document.createElement('a');link.href=url;link.download=`carrinhos-abandonados-${new Date().toISOString().slice(0,10)}.csv`;link.click();URL.revokeObjectURL(url); };
+  const average=useMemo(()=>finiteNumber(state.metrics?.averageCents,state.total?Math.round(finiteNumber(state.metrics?.totalCents)/state.total):0),[state]);
   return <main className="page abandoned-page abandoned-management">
     <section className="page-title abandoned-title"><div><h1>Carrinhos abandonados</h1><p>{state.total.toLocaleString('pt-BR')} carrinhos · Visualize e recupere vendas interrompidas no checkout</p></div><button className="secondary" onClick={exportCsv} disabled={state.loading||!state.total}><Download size={16}/> Exportar CSV</button></section>
     <section className="card abandoned-shell">
