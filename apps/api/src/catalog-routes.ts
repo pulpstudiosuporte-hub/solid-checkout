@@ -61,10 +61,19 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
     const element = value as Record<string, unknown>;
     const id = text(element.id, 64); const title = text(element.title, 100); const body = text(element.text, 500);
     const slot = integer(element.slot, 0, 4); const rating = element.rating === undefined ? 5 : integer(element.rating, 1, 5);
-    if (!id || customIds.has(id) || !/^[A-Za-z0-9_-]+$/.test(id) || !['testimonial', 'seal', 'guarantee', 'faq'].includes(String(element.type)) || !title || !body || slot === null || rating === null) return null;
-    customIds.add(id); sanitizedElements.push({ id, type: element.type, slot, title, text: body, rating });
+    const allowedTypes = ['announcement', 'banner', 'testimonial', 'timer', 'video', 'gallery', 'reviews', 'guarantee', 'faq', 'list', 'progress', 'sales', 'seal'];
+    const enabled = element.enabled === undefined ? true : element.enabled; const display = element.display ?? 'fixed'; const device = element.device ?? 'all'; const align = element.align ?? 'left';
+    const fontSize = element.fontSize === undefined ? 14 : integer(element.fontSize, 10, 32); const radius = element.radius === undefined ? 12 : integer(element.radius, 0, 40); const paddingY = element.paddingY === undefined ? 16 : integer(element.paddingY, 0, 64); const paddingX = element.paddingX === undefined ? 18 : integer(element.paddingX, 0, 64); const durationMinutes = element.durationMinutes === undefined ? 10 : integer(element.durationMinutes, 1, 120); const progress = element.progress === undefined ? 72 : integer(element.progress, 1, 100);
+    const textColor = element.textColor ?? '#17171a'; const backgroundColor = element.backgroundColor ?? '#ffffff'; const imageUrl = element.imageUrl ?? ''; const mediaUrl = element.mediaUrl ?? ''; const linkUrl = element.linkUrl ?? '';
+    if (!id || customIds.has(id) || !/^[A-Za-z0-9_-]+$/.test(id) || typeof element.type !== 'string' || !allowedTypes.includes(element.type) || !title || !body || slot === null || rating === null || typeof enabled !== 'boolean' || typeof display !== 'string' || !['fixed', 'carousel'].includes(display) || typeof device !== 'string' || !['all', 'desktop', 'mobile'].includes(device) || typeof align !== 'string' || !['left', 'center', 'right'].includes(align) || fontSize === null || radius === null || paddingY === null || paddingX === null || durationMinutes === null || progress === null || typeof textColor !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(textColor) || typeof backgroundColor !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(backgroundColor) || [imageUrl, mediaUrl, linkUrl].some(url => typeof url !== 'string' || url.length > 2048 || url && !url.startsWith('https://'))) return null;
+    customIds.add(id); sanitizedElements.push({ id, type: element.type, slot, title, text: body, rating, enabled, display, device, align, fontSize, radius, paddingY, paddingX, durationMinutes, progress, textColor: textColor.toLowerCase(), backgroundColor: backgroundColor.toLowerCase(), imageUrl, mediaUrl, linkUrl });
   }
   result.customElements = sanitizedElements;
+  const elementEditMode = input.elementEditMode ?? 'guided'; if (typeof elementEditMode !== 'string' || !['guided', 'free'].includes(elementEditMode)) return null; result.elementEditMode = elementEditMode;
+  const globalStyle = input.elementGlobalStyle ?? { radius: 12, spacing: 12, fontScale: 100 };
+  if (typeof globalStyle !== 'object' || globalStyle === null || Array.isArray(globalStyle)) return null;
+  const globalInput = globalStyle as Record<string, unknown>; const globalRadius = integer(globalInput.radius, 0, 32); const globalSpacing = integer(globalInput.spacing, 4, 40); const globalFontScale = integer(globalInput.fontScale, 80, 130);
+  if (globalRadius === null || globalSpacing === null || globalFontScale === null) return null; result.elementGlobalStyle = { radius: globalRadius, spacing: globalSpacing, fontScale: globalFontScale };
   const bumpProductId = input.orderBumpProductId;
   if (bumpProductId !== undefined && (typeof bumpProductId !== 'string' || bumpProductId.length > 32 || bumpProductId && !/^[A-Za-z0-9_-]+$/.test(bumpProductId))) return null;
   result.orderBumpProductId = typeof bumpProductId === 'string' ? bumpProductId : '';

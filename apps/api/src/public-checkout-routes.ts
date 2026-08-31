@@ -245,6 +245,16 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     return reply.header('cache-control', 'no-store').send({ update, session });
   });
 
+  app.put<{ Params: { sessionId: string }; Headers: { authorization?: string }; Body: { quantity?: unknown } }>('/public/checkout-sessions/:sessionId/quantity', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization); const quantity = request.body?.quantity;
+    if (!credentials || typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1 || quantity > 1000) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Quantidade inválida.'));
+    if (!catalog.updatePublicCheckoutQuantity) return reply.code(503).send(errorBody(request, 'QUANTITY_UNAVAILABLE', 'Alteração de quantidade temporariamente indisponível.'));
+    const update = await catalog.updatePublicCheckoutQuantity(credentials.sessionId, credentials.tokenHash, quantity, new Date());
+    if (!update) return reply.code(409).send(errorBody(request, 'QUANTITY_UNAVAILABLE', 'A quantidade não está disponível ou o pagamento já foi iniciado.'));
+    const session = await catalog.getPublicCheckoutSession(credentials.sessionId, credentials.tokenHash, new Date());
+    return reply.header('cache-control', 'no-store').send({ update, session });
+  });
+
   app.post<{ Body: Record<string, unknown> }>('/webhooks/westpay', { config: { rateLimit: { max: 180, timeWindow: '1 minute' } } }, async (request, reply) => {
     if (!gateways || !environment.APP_ENCRYPTION_KEY) return reply.code(503).send();
     const objectId = typeof request.body?.objectId === 'string' && /^[A-Za-z0-9_-]{8,128}$/.test(request.body.objectId) ? request.body.objectId : null;

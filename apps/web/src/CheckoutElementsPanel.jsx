@@ -1,0 +1,574 @@
+import { useMemo, useState } from "react";
+import {
+  BarChart3,
+  Check,
+  ChevronLeft,
+  CircleHelp,
+  Clock3,
+  GalleryHorizontal,
+  Image,
+  List,
+  Megaphone,
+  Pencil,
+  PlaySquare,
+  ShieldCheck,
+  ShoppingBag,
+  Star,
+  Trash2,
+} from "lucide-react";
+
+export const elementCatalog = {
+  announcement: {
+    label: "Barra de avisos",
+    category: "Mais utilizados",
+    icon: Megaphone,
+    title: "Oferta especial",
+    text: "Aproveite esta condição exclusiva por tempo limitado.",
+  },
+  banner: {
+    label: "Banner",
+    category: "Mais utilizados",
+    icon: Image,
+    title: "Destaque da campanha",
+    text: "Adicione uma imagem e uma mensagem para sua oferta.",
+  },
+  testimonial: {
+    label: "Depoimento",
+    category: "Mais utilizados",
+    icon: Star,
+    title: "Cliente verificado",
+    text: "Compra simples, rápida e segura.",
+  },
+  timer: {
+    label: "Cronômetro",
+    category: "Mais utilizados",
+    icon: Clock3,
+    title: "Oferta termina em",
+    text: "Garanta sua condição antes que o tempo acabe.",
+  },
+  video: {
+    label: "Vídeo",
+    category: "Elementos básicos",
+    icon: PlaySquare,
+    title: "Veja como funciona",
+    text: "Apresente seu produto em vídeo.",
+  },
+  gallery: {
+    label: "Galeria",
+    category: "Elementos básicos",
+    icon: GalleryHorizontal,
+    title: "Galeria do produto",
+    text: "Conheça os detalhes do produto.",
+  },
+  reviews: {
+    label: "Avaliações",
+    category: "Elementos de confiança",
+    icon: Star,
+    title: "Avaliações dos clientes",
+    text: "Quem comprou recomenda.",
+  },
+  guarantee: {
+    label: "Garantia",
+    category: "Elementos de confiança",
+    icon: ShieldCheck,
+    title: "Garantia de satisfação",
+    text: "Você pode solicitar o reembolso dentro do prazo da garantia.",
+  },
+  faq: {
+    label: "FAQ",
+    category: "Elementos de confiança",
+    icon: CircleHelp,
+    title: "Perguntas frequentes",
+    text: "Como recebo meu pedido? A confirmação é enviada após o pagamento.",
+  },
+  list: {
+    label: "Lista",
+    category: "Elementos de escassez",
+    icon: List,
+    title: "O que você vai receber",
+    text: "Acesso imediato\nSuporte especializado\nGarantia de satisfação",
+  },
+  progress: {
+    label: "Progresso",
+    category: "Elementos de escassez",
+    icon: BarChart3,
+    title: "Últimas unidades",
+    text: "Esta oferta está quase esgotada.",
+  },
+  sales: {
+    label: "Vendas",
+    category: "Elementos de escassez",
+    icon: ShoppingBag,
+    title: "Alta procura",
+    text: "Outras pessoas estão comprando esta oferta agora.",
+  },
+  seal: {
+    label: "Selo de segurança",
+    category: "Elementos de confiança",
+    icon: ShieldCheck,
+    title: "Compra 100% segura",
+    text: "Ambiente protegido e confirmação automática.",
+  },
+};
+
+const defaults = {
+  enabled: true,
+  slot: 2,
+  rating: 5,
+  display: "fixed",
+  textColor: "#17171a",
+  backgroundColor: "#ffffff",
+  fontSize: 14,
+  radius: 12,
+  paddingY: 16,
+  paddingX: 18,
+  device: "all",
+  align: "left",
+  imageUrl: "",
+  mediaUrl: "",
+  linkUrl: "",
+  durationMinutes: 10,
+  progress: 72,
+};
+const categories = [
+  "Mais utilizados",
+  "Elementos básicos",
+  "Elementos de confiança",
+  "Elementos de escassez",
+];
+const Field = ({ label, children, help }) => (
+  <label className="element-config-field">
+    <span>{label}</span>
+    {children}
+    {help && <small>{help}</small>}
+  </label>
+);
+const Toggle = ({ on, change, label }) => (
+  <button
+    type="button"
+    className={`editor-toggle ${on ? "on" : ""}`}
+    onClick={() => change(!on)}
+    aria-label={`${on ? "Desativar" : "Ativar"} ${label}`}
+  >
+    <span />
+  </button>
+);
+
+export default function CheckoutElementsPanel({
+  config,
+  updateConfig,
+  addElement,
+  updateElement,
+  removeElement,
+}) {
+  const [mode, setMode] = useState(config.elementEditMode || "guided");
+  const [editing, setEditing] = useState(null);
+  const [original, setOriginal] = useState(null);
+  const elements = Array.isArray(config.customElements)
+    ? config.customElements
+    : [];
+  const byType = useMemo(
+    () => new Map(elements.map((item) => [item.type, item])),
+    [elements],
+  );
+  const setModeValue = (value) => {
+    setMode(value);
+    updateConfig("elementEditMode", value);
+  };
+  const openEditor = (type, item) => {
+    setOriginal(item ? { ...item } : null);
+    setEditing(type);
+  };
+  const activate = (type, on) => {
+    const current = byType.get(type);
+    if (on && !current) {
+      addElement(type, 2);
+      setOriginal(null);
+      setTimeout(() => setEditing(type), 0);
+    } else if (current) updateElement(current.id, { enabled: on });
+  };
+  const current = editing ? byType.get(editing) : null;
+  const closeEditor = () => {
+    setEditing(null);
+    setOriginal(null);
+  };
+  const cancelEditor = () => {
+    if (original && current) updateElement(current.id, original);
+    closeEditor();
+  };
+  if (current) {
+    const meta = elementCatalog[current.type] || elementCatalog.seal;
+    const Icon = meta.icon;
+    const change = (key, value) => updateElement(current.id, { [key]: value });
+    return (
+      <div className="element-config-sheet">
+        <header>
+          <button type="button" onClick={cancelEditor}>
+            <ChevronLeft size={17} />
+          </button>
+          <span>
+            <Icon size={18} />
+          </span>
+          <div>
+            <b>{meta.label}</b>
+            <small>{current.type} / elemento do checkout</small>
+          </div>
+          <button
+            type="button"
+            onClick={cancelEditor}
+            aria-label="Fechar"
+          >
+            <span aria-hidden>×</span>
+          </button>
+        </header>
+        <div className="element-config-scroll">
+          <div className="setting-line">
+            <div>
+              Ativar<small>Ocultar ou exibir este elemento no checkout.</small>
+            </div>
+            <Toggle
+              on={current.enabled !== false}
+              change={(value) => change("enabled", value)}
+              label={meta.label}
+            />
+          </div>
+          <Field label="Título">
+            <input
+              value={current.title || ""}
+              maxLength="100"
+              onChange={(event) => change("title", event.target.value)}
+            />
+          </Field>
+          <Field label="Mensagem">
+            <textarea
+              rows="5"
+              value={current.text || ""}
+              maxLength="500"
+              onChange={(event) => change("text", event.target.value)}
+            />
+          </Field>
+          {current.type === "announcement" && (
+            <Field label="Tipo de exibição">
+              <select
+                value={current.display || "fixed"}
+                onChange={(event) => change("display", event.target.value)}
+              >
+                <option value="fixed">Fixo</option>
+                <option value="carousel">Carrossel</option>
+              </select>
+            </Field>
+          )}
+          {["banner", "gallery"].includes(current.type) && (
+            <Field label="URL da imagem" help="Use uma imagem HTTPS.">
+              <input
+                type="url"
+                value={current.imageUrl || ""}
+                onChange={(event) => change("imageUrl", event.target.value)}
+              />
+            </Field>
+          )}
+          {current.type === "video" && (
+            <Field
+              label="URL do vídeo"
+              help="Aceita arquivo MP4/WebM em HTTPS."
+            >
+              <input
+                type="url"
+                value={current.mediaUrl || ""}
+                onChange={(event) => change("mediaUrl", event.target.value)}
+              />
+            </Field>
+          )}
+          {current.type === "timer" && (
+            <Field label="Duração em minutos">
+              <input
+                type="number"
+                min="1"
+                max="120"
+                value={current.durationMinutes || 10}
+                onChange={(event) =>
+                  change("durationMinutes", Number(event.target.value))
+                }
+              />
+            </Field>
+          )}
+          {["testimonial", "reviews"].includes(current.type) && (
+            <Field label="Avaliação">
+              <select
+                value={current.rating || 5}
+                onChange={(event) =>
+                  change("rating", Number(event.target.value))
+                }
+              >
+                {[5, 4, 3, 2, 1].map((value) => (
+                  <option value={value} key={value}>
+                    {value} estrelas
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {current.type === "progress" && (
+            <Field label={`Progresso — ${current.progress || 72}%`}>
+              <input
+                type="range"
+                min="1"
+                max="100"
+                value={current.progress || 72}
+                onChange={(event) =>
+                  change("progress", Number(event.target.value))
+                }
+              />
+            </Field>
+          )}
+          <h3>Estilo do elemento</h3>
+          <div className="element-color-grid">
+            <Field label="Texto">
+              <input
+                type="color"
+                value={current.textColor || "#17171a"}
+                onChange={(event) => change("textColor", event.target.value)}
+              />
+            </Field>
+            <Field label="Fundo">
+              <input
+                type="color"
+                value={current.backgroundColor || "#ffffff"}
+                onChange={(event) =>
+                  change("backgroundColor", event.target.value)
+                }
+              />
+            </Field>
+          </div>
+          <div className="element-number-grid">
+            <Field label="Fonte (px)">
+              <input
+                type="number"
+                min="10"
+                max="32"
+                value={current.fontSize || 14}
+                onChange={(event) =>
+                  change("fontSize", Number(event.target.value))
+                }
+              />
+            </Field>
+            <Field label="Raio (px)">
+              <input
+                type="number"
+                min="0"
+                max="40"
+                value={current.radius ?? 12}
+                onChange={(event) =>
+                  change("radius", Number(event.target.value))
+                }
+              />
+            </Field>
+            <Field label="Padding vertical">
+              <input
+                type="number"
+                min="0"
+                max="64"
+                value={current.paddingY ?? 16}
+                onChange={(event) =>
+                  change("paddingY", Number(event.target.value))
+                }
+              />
+            </Field>
+            <Field label="Padding horizontal">
+              <input
+                type="number"
+                min="0"
+                max="64"
+                value={current.paddingX ?? 18}
+                onChange={(event) =>
+                  change("paddingX", Number(event.target.value))
+                }
+              />
+            </Field>
+          </div>
+          <Field label="Alinhamento">
+            <select
+              value={current.align || "left"}
+              onChange={(event) => change("align", event.target.value)}
+            >
+              <option value="left">Esquerda</option>
+              <option value="center">Centro</option>
+              <option value="right">Direita</option>
+            </select>
+          </Field>
+          <Field label="Exibição por dispositivo">
+            <select
+              value={current.device || "all"}
+              onChange={(event) => change("device", event.target.value)}
+            >
+              <option value="all">Todos</option>
+              <option value="desktop">Somente desktop</option>
+              <option value="mobile">Somente celular</option>
+            </select>
+          </Field>
+        </div>
+        <footer>
+          <button
+            type="button"
+            className="danger"
+            onClick={() => {
+              removeElement(current.id);
+              closeEditor();
+            }}
+          >
+            <Trash2 size={14} /> Remover
+          </button>
+          <button type="button" onClick={cancelEditor}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="primary"
+            onClick={closeEditor}
+          >
+            <Check size={14} /> Salvar
+          </button>
+        </footer>
+      </div>
+    );
+  }
+  const global = config.elementGlobalStyle || {
+    radius: 12,
+    spacing: 12,
+    fontScale: 100,
+  };
+  const changeGlobal = (key, value) => {
+    updateConfig("elementGlobalStyle", { ...global, [key]: value });
+    if (key === "radius") {
+      updateConfig(
+        "customElements",
+        elements.map((item) => ({ ...item, radius: value })),
+      );
+    }
+  };
+  return (
+    <>
+      <h3>Modo de edição</h3>
+      <div className="element-mode">
+        <button
+          type="button"
+          className={mode === "guided" ? "active" : ""}
+          onClick={() => setModeValue("guided")}
+        >
+          <b>Guiado</b>
+          <small>Recomendado</small>
+        </button>
+        <button
+          type="button"
+          className={mode === "free" ? "active" : ""}
+          onClick={() => setModeValue("free")}
+        >
+          <b>Livre</b>
+          <small>Avançado</small>
+        </button>
+      </div>
+      {categories.map((category) => (
+        <section className="element-category" key={category}>
+          <h4>{category}</h4>
+          {Object.entries(elementCatalog)
+            .filter(([, item]) => item.category === category)
+            .map(([type, item]) => {
+              const Icon = item.icon;
+              const active = byType.get(type);
+              return (
+                <div
+                  className={`element-catalog-row ${active?.enabled !== false && active ? "active" : ""}`}
+                  key={type}
+                >
+                  <span>
+                    <Icon size={17} />
+                  </span>
+                  <button
+                    type="button"
+                    className="element-row-copy"
+                    onClick={() =>
+                      active ? openEditor(type, active) : activate(type, true)
+                    }
+                  >
+                    <b>{item.label}</b>
+                    {["testimonial", "reviews", "faq", "list"].includes(
+                      type,
+                    ) && (
+                      <small>
+                        Gerencia conteúdo e estilo dentro do mesmo bloco.
+                      </small>
+                    )}
+                  </button>
+                  {active && (
+                    <button
+                      type="button"
+                      className="element-edit"
+                      onClick={() => openEditor(type, active)}
+                      aria-label={`Editar ${item.label}`}
+                    >
+                      <Pencil size={15} />
+                    </button>
+                  )}
+                  <Toggle
+                    on={Boolean(active && active.enabled !== false)}
+                    change={(value) => activate(type, value)}
+                    label={item.label}
+                  />
+                </div>
+              );
+            })}
+        </section>
+      ))}
+      {mode === "free" && (
+        <section className="element-global">
+          <h3>Estilos globais</h3>
+          <p className="panel-help">
+            Valores usados como base por todos os elementos adicionados.
+          </p>
+          <Field label={`Arredondamento — ${global.radius}px`}>
+            <input
+              type="range"
+              min="0"
+              max="32"
+              value={global.radius}
+              onChange={(event) =>
+                changeGlobal("radius", Number(event.target.value))
+              }
+            />
+          </Field>
+          <Field label={`Espaçamento — ${global.spacing}px`}>
+            <input
+              type="range"
+              min="4"
+              max="40"
+              value={global.spacing}
+              onChange={(event) =>
+                changeGlobal("spacing", Number(event.target.value))
+              }
+            />
+          </Field>
+          <Field label={`Escala da fonte — ${global.fontScale}%`}>
+            <input
+              type="range"
+              min="80"
+              max="130"
+              value={global.fontScale}
+              onChange={(event) =>
+                changeGlobal("fontScale", Number(event.target.value))
+              }
+            />
+          </Field>
+        </section>
+      )}
+    </>
+  );
+}
+
+export const newElementDefaults = (type, slot = 2) => ({
+  ...defaults,
+  id: `el_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+  type,
+  slot,
+  title: elementCatalog[type]?.title || "Novo elemento",
+  text: elementCatalog[type]?.text || "Adicione seu conteúdo.",
+});

@@ -41,6 +41,7 @@ export interface CatalogRepository {
   listPublicShippingMethods(publicId: string, tokenHash: string, now: Date): Promise<readonly object[] | null>;
   selectPublicShippingMethod(publicId: string, tokenHash: string, methodPublicId: string, now: Date): Promise<object | null>;
   setPublicOrderBump(publicId: string, tokenHash: string, productPublicId: string, enabled: boolean, now: Date): Promise<object | null>;
+  updatePublicCheckoutQuantity?(publicId: string, tokenHash: string, quantity: number, now: Date): Promise<object | null>;
 }
 
 const productSelect = { publicId: true, sourceTitle: true, checkoutTitle: true, checkoutDescription: true, handle: true, vendor: true, productType: true, tags: true, fulfillmentType: true, externalDeliveryUrl: true, imageUrl: true, priceCents: true, compareAtCents: true, stockQuantity: true, trackInventory: true, maxPerOrder: true, active: true, source: true, syncedAt: true, createdAt: true, updatedAt: true, _count: { select: { variants: true, images: true, collections: true } } } as const;
@@ -212,7 +213,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
   }
 
   async getPublicCheckoutSession(publicId: string, tokenHash: string, now: Date): Promise<object | null> {
-    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { publicId: true, quantity: true, unitPriceCents: true, totalCents: true, discountCents: true, couponCode: true, shippingPriceCents: true, currency: true, status: true, expiresAt: true, customerCapturedAt: true, shippingCapturedAt: true, checkout: { select: { storeId: true, slug: true, name: true, publishedConfig: true, store: { select: { name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, fulfillmentType: true, imageUrl: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true, isOrderBump: true, product: { select: { publicId: true } } } } } });
+    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { publicId: true, source: true, quantity: true, unitPriceCents: true, totalCents: true, discountCents: true, couponCode: true, shippingPriceCents: true, currency: true, status: true, expiresAt: true, customerCapturedAt: true, shippingCapturedAt: true, checkout: { select: { storeId: true, slug: true, name: true, publishedConfig: true, store: { select: { name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, fulfillmentType: true, imageUrl: true, maxPerOrder: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true, isOrderBump: true, product: { select: { publicId: true } } } } } });
     if (!session) return null;
     const config = session.checkout.publishedConfig as Record<string, unknown>;
     const configured = configuredOrderBumps(config);
@@ -256,6 +257,26 @@ export class PrismaCatalogRepository implements CatalogRepository {
         return { totalCents, discountCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: totalCents - discountCents + session.shippingPriceCents, enabled: false };
       }
       const discountCents = sessionDiscount(session.totalCents, session.coupon); return { totalCents: session.totalCents, discountCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: session.totalCents - discountCents + session.shippingPriceCents, enabled };
+    });
+  }
+
+  async updatePublicCheckoutQuantity(publicId: string, tokenHash: string, quantity: number, now: Date): Promise<object | null> {
+    return this.database.$transaction(async transaction => {
+      const session = await transaction.checkoutSession.findFirst({
+        where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } },
+        select: {
+          id: true, unitPriceCents: true, source: true, shippingPriceCents: true,
+          coupon: { select: { type: true, value: true, maxDiscountCents: true } },
+          variant: { select: { inventoryQuantity: true } },
+          checkout: { select: { product: { select: { maxPerOrder: true, trackInventory: true, stockQuantity: true } } } },
+          items: { select: { isOrderBump: true, totalCents: true } },
+          paymentAttempts: { take: 1, select: { id: true } }
+        }
+      });
+      if (!session || session.source !== 'DIRECT' || session.paymentAttempts.length || session.items.some(item => !item.isOrderBump) || quantity < 1 || quantity > session.checkout.product.maxPerOrder || session.checkout.product.trackInventory && (session.checkout.product.stockQuantity ?? 0) < quantity || session.variant?.inventoryQuantity !== null && session.variant?.inventoryQuantity !== undefined && session.variant.inventoryQuantity < quantity) return null;
+      const bumpsTotal = session.items.reduce((total, item) => total + item.totalCents, 0); const totalCents = session.unitPriceCents * quantity + bumpsTotal; const discountCents = sessionDiscount(totalCents, session.coupon);
+      await transaction.checkoutSession.update({ where: { id: session.id }, data: { quantity, totalCents, discountCents } });
+      return { quantity, totalCents, discountCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: totalCents - discountCents + session.shippingPriceCents };
     });
   }
 

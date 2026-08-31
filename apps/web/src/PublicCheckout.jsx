@@ -30,6 +30,7 @@ import {
   savePublicCheckoutShipping,
   selectPublicShippingMethod,
   setPublicOrderBump,
+  setPublicCheckoutQuantity,
   applyPublicCoupon,
   touchPublicCheckoutPresence,
 } from "./api";
@@ -105,6 +106,8 @@ const publicConfig = (value) => ({
   testimonialName: "Cliente verificado",
   testimonialText: "Compra simples, rápida e segura.",
   testimonials: null,
+  elementEditMode: "guided",
+  elementGlobalStyle: { radius: 12, spacing: 12, fontScale: 100 },
   footerText: "© 2026 Solid Commerce. Todos os direitos reservados.",
   privacyUrl: "#",
   termsUrl: "#",
@@ -131,6 +134,9 @@ const configStyle = (config) => ({
   "--public-timer-text": config.timerTextColor,
   "--public-timer-number": config.timerNumberColor,
   "--public-timer-radius": `${config.timerRadius}px`,
+  "--public-element-radius": `${config.elementGlobalStyle?.radius ?? 12}px`,
+  "--public-element-spacing": `${config.elementGlobalStyle?.spacing ?? 12}px`,
+  "--public-element-font-scale": `${(config.elementGlobalStyle?.fontScale ?? 100) / 100}`,
   fontFamily: config.font,
 });
 // Shopify descriptions are stored as HTML. The public checkout renders them
@@ -141,16 +147,24 @@ const descriptionText = (value) => {
   return new DOMParser().parseFromString(value, "text/html").body.textContent?.replace(/\s+/g, " ").trim() || "";
 };
 
+function CustomElementCountdown({ minutes = 10 }) {
+  const [remaining, setRemaining] = useState(Math.max(1, minutes) * 60);
+  useEffect(() => { const interval = window.setInterval(() => setRemaining(value => Math.max(0, value - 1)), 1000); return () => window.clearInterval(interval); }, []);
+  const hours = String(Math.floor(remaining / 3600)).padStart(2, '0'); const mins = String(Math.floor((remaining % 3600) / 60)).padStart(2, '0'); const seconds = String(remaining % 60).padStart(2, '0');
+  return <strong className="public-custom-countdown">{hours} : {mins} : {seconds}</strong>;
+}
+
 function PublicCustomElement({ item }) {
+  const style = { color: item.textColor, background: item.backgroundColor, borderRadius: `${item.radius ?? 12}px`, padding: `${item.paddingY ?? 16}px ${item.paddingX ?? 18}px`, fontSize: `${item.fontSize || 14}px`, textAlign: item.align || 'left' };
   return (
-    <section className={`public-custom-element type-${item.type}`}>
-      <div className="public-custom-icon">
-        {item.type === "testimonial" ? <Star size={20} /> : item.type === "faq" ? <CircleHelp size={20} /> : <ShieldCheck size={20} />}
-      </div>
+    <section className={`public-custom-element type-${item.type} device-${item.device || 'all'}`} style={style}>
+      {item.imageUrl && ['banner','gallery'].includes(item.type) ? <img className="public-custom-media" src={item.imageUrl} alt="" loading="lazy"/> : item.mediaUrl && item.type === 'video' ? <video className="public-custom-media" src={item.mediaUrl} controls preload="metadata"/> : <div className="public-custom-icon">
+        {["testimonial","reviews"].includes(item.type) ? <Star size={20} /> : item.type === "faq" ? <CircleHelp size={20} /> : item.type === 'timer' ? <Clock3 size={20}/> : <ShieldCheck size={20} />}
+      </div>}
       <div>
-        {item.type === "testimonial" && <span className="public-custom-stars">{"★".repeat(item.rating || 5)}</span>}
+        {["testimonial","reviews"].includes(item.type) && <span className="public-custom-stars">{"★".repeat(item.rating || 5)}</span>}
         <h2>{item.title}</h2>
-        <p>{item.text}</p>
+        <p>{item.text}</p>{item.type === 'timer' && <CustomElementCountdown minutes={item.durationMinutes}/>} {item.type === 'progress' && <span className="public-custom-progress"><i style={{width:`${item.progress || 72}%`}}/></span>}
       </div>
     </section>
   );
@@ -398,19 +412,18 @@ function SessionContent({ session: initialSession, token }) {
       controller.abort();
     };
   }, [address.postalCode]);
-  const items = session.items?.length
-    ? session.items
-    : [
-        {
+  const primaryItem = {
           quantity: session.quantity,
           unitPriceCents: session.unitPriceCents,
-          totalCents: session.totalCents,
+          totalCents: session.unitPriceCents * session.quantity,
           titleSnapshot: session.checkout.product.checkoutTitle,
           variantSnapshot: session.variant?.title,
           imageUrlSnapshot:
             session.variant?.imageUrl || session.checkout.product.imageUrl,
-        },
-      ];
+          isOrderBump: false,
+        };
+  const storedItems = session.items || [];
+  const items = storedItems.some(item => !item.isOrderBump) ? storedItems : [primaryItem, ...storedItems];
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const metaData = { value: session.totalCents / 100, currency: session.currency || 'BRL', content_type: 'product', content_ids: items.map(item => item.product?.publicId || item.productId).filter(Boolean), contents: items.map(item => ({ id: item.product?.publicId || item.productId || item.titleSnapshot, quantity: item.quantity, item_price: item.unitPriceCents / 100 })), num_items: itemCount };
   useEffect(() => { const controller = new AbortController(); getPublicMetaConfig(session.publicId, token, controller.signal).then(({ pixelId }) => { if (!pixelId) return; setMetaPixelId(pixelId); loadMetaPixel(pixelId); trackMeta('PageView', {}, `${session.publicId}:PageView`); trackMeta('ViewContent', metaData, `${session.publicId}:ViewContent`); trackMeta('InitiateCheckout', metaData, `${session.publicId}:InitiateCheckout`); }).catch(() => {}); return () => controller.abort(); }, [session.publicId, token]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -430,6 +443,13 @@ function SessionContent({ session: initialSession, token }) {
     } finally {
       setBusy(false);
     }
+  };
+  const changeQuantity = async (quantity) => {
+    if (quantity < 1 || quantity > (session.checkout.product.maxPerOrder || 1000) || busy || payment) return;
+    setBusy(true); setError('');
+    try { const result = await setPublicCheckoutQuantity(session.publicId, token, quantity); setSession(result.session); if (selectedShipping) setSelectedShipping(current => current ? { ...current, subtotalCents: result.update.totalCents, discountCents: result.update.discountCents, grandTotalCents: result.update.grandTotalCents } : current); }
+    catch (requestError) { setError(requestError.message); }
+    finally { setBusy(false); }
   };
   const applyCoupon = async (event) => {
     event.preventDefault(); setBusy(true); setError(""); setCouponMessage("");
@@ -558,7 +578,7 @@ function SessionContent({ session: initialSession, token }) {
           Pagamento
         </span>
       </nav>}
-      {(Array.isArray(config.customElements) ? config.customElements : []).map((item) => (
+      {(Array.isArray(config.customElements) ? config.customElements : []).filter(item => item.enabled !== false).map((item) => (
         <div className="public-custom-wrap" key={item.id} style={{ order: Math.min(4, Math.max(0, item.slot)) + 0.5 }}>
           <PublicCustomElement item={item} />
         </div>
@@ -905,7 +925,7 @@ function SessionContent({ session: initialSession, token }) {
                       item.variantSnapshot !== "Default Title" && (
                         <span>{item.variantSnapshot}</span>
                       )}
-                    <small>Quantidade: {item.quantity}</small>
+                    {!item.isOrderBump && session.source === 'DIRECT' ? <div className="public-quantity" aria-label="Quantidade do produto"><button type="button" onClick={()=>changeQuantity(item.quantity-1)} disabled={busy||Boolean(payment)||item.quantity<=1} aria-label="Diminuir quantidade">−</button><b>{item.quantity}</b><button type="button" onClick={()=>changeQuantity(item.quantity+1)} disabled={busy||Boolean(payment)||item.quantity>=(session.checkout.product.maxPerOrder||1000)} aria-label="Aumentar quantidade">+</button></div> : <small>Quantidade: {item.quantity}</small>}
                     <small>
                       {money.format(item.unitPriceCents / 100)} por unidade
                     </small>
