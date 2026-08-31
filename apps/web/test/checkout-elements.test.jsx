@@ -40,4 +40,20 @@ describe("ordenação dos elementos do checkout", () => {
 
     expect(result.map((item) => item.id)).toEqual(["a", "b"]);
   });
+
+  it("salva o alinhamento escolhido pelo ponto horizontal do drop", () => {
+    const result = reorderCustomElements(
+      [element("a", 2), element("b", 2)],
+      "a",
+      2,
+      2,
+      { horizontalAlign: "right" },
+    );
+
+    expect(result.at(-1)).toMatchObject({
+      id: "a",
+      slot: 2,
+      horizontalAlign: "right",
+    });
+  });
 });

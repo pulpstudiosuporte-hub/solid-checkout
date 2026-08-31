@@ -128,6 +128,8 @@ const defaults = {
   paddingX: 18,
   device: "all",
   align: "left",
+  widthPercent: 100,
+  horizontalAlign: "center",
   imageUrl: "",
   imageAlt: "",
   imageFit: "cover",
@@ -452,6 +454,44 @@ export default function CheckoutElementsPanel({
               />
             </Field>
           )}
+          {config.elementEditMode === "free" && (
+            <>
+              <h3>Posicionamento livre</h3>
+              <div className="element-number-grid">
+                <Field label="Largura do elemento">
+                  <select
+                    value={current.widthPercent || 100}
+                    onChange={(event) =>
+                      change("widthPercent", Number(event.target.value))
+                    }
+                  >
+                    <option value="25">25%</option>
+                    <option value="33">33%</option>
+                    <option value="50">50%</option>
+                    <option value="66">66%</option>
+                    <option value="75">75%</option>
+                    <option value="100">100%</option>
+                  </select>
+                </Field>
+                <Field label="Posição horizontal">
+                  <select
+                    value={current.horizontalAlign || "center"}
+                    onChange={(event) =>
+                      change("horizontalAlign", event.target.value)
+                    }
+                  >
+                    <option value="left">Esquerda</option>
+                    <option value="center">Centro</option>
+                    <option value="right">Direita</option>
+                  </select>
+                </Field>
+              </div>
+              <p className="element-position-help">
+                Você também pode arrastar o elemento para o lado desejado na
+                prévia.
+              </p>
+            </>
+          )}
           <h3>Estilo do elemento</h3>
           <div className="element-color-grid">
             <Field label="Texto">
@@ -622,6 +662,14 @@ export default function CheckoutElementsPanel({
                 <div
                   className={`element-catalog-row ${active?.enabled !== false && active ? "active" : ""}`}
                   key={type}
+                  draggable={mode === "free"}
+                  onDragStart={(event) => {
+                    event.dataTransfer.setData(
+                      "application/x-solid-element-type",
+                      type,
+                    );
+                    event.dataTransfer.effectAllowed = "copy";
+                  }}
                 >
                   <span>
                     <Icon size={17} />

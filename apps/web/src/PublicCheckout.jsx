@@ -173,6 +173,19 @@ function PublicCustomElement({ item }) {
   );
 }
 
+function publicCustomWrapProps(config, item) {
+  if (config.elementEditMode !== "free") return {};
+  const width = item.widthPercent || 100;
+  return {
+    className: `free align-${item.horizontalAlign || "center"}`,
+    style: {
+      "--element-free-width": `${width}%`,
+      "--element-free-max": `${Math.round(((config.contentWidth || 1120) * width) / 100)}px`,
+      "--element-free-gutter": `${Math.round((32 * width) / 100)}px`,
+    },
+  };
+}
+
 function ProductImage({ src, title }) {
   return src ? (
     <img src={src} alt={`Imagem de ${title}`} loading="lazy" />
@@ -581,11 +594,12 @@ function SessionContent({ session: initialSession, token }) {
           Pagamento
         </span>
       </nav>}
-      {(Array.isArray(config.customElements) ? config.customElements : []).filter(item => item.enabled !== false).map((item) => (
-        <div className="public-custom-wrap" key={item.id} style={{ order: Math.min(4, Math.max(0, item.slot)) + 0.5 }}>
+      {(Array.isArray(config.customElements) ? config.customElements : []).filter(item => item.enabled !== false).map((item) => {
+        const placement = publicCustomWrapProps(config, item);
+        return <div className={`public-custom-wrap ${placement.className || ''}`} key={item.id} style={{ order: Math.min(4, Math.max(0, item.slot)) + 0.5, ...placement.style }}>
           <PublicCustomElement item={item} />
-        </div>
-      ))}
+        </div>;
+      })}
       <div
         className={`public-checkout-grid ${config.showSummary ? "" : "without-summary"}`}
         style={{order:blockOrder('content')}}
