@@ -38,9 +38,39 @@ import { checkoutLayoutPositionMap } from "./checkout-layout";
 import "./public-session.css";
 import "./checkout-polish.css";
 
-const money = new Intl.NumberFormat("pt-BR", {
+const checkoutLocales = {
+  "pt-BR": {
+    identification: "Identificação", shipping: "Entrega", payment: "Pagamento",
+    fullName: "Nome completo", email: "E-mail", document: "CPF/CNPJ", phone: "Celular / WhatsApp",
+    addCoupon: "+ Adicionar cupom", specialOffer: "Oferta especial", safeData: "Seus dados estão protegidos.",
+    yourOrder: "SEU PEDIDO", item: "item", items: "itens", quantity: "Quantidade", subtotal: "Subtotal",
+    shippingCost: "Frete", discount: "Desconto", total: "Total", apply: "Aplicar", coupon: "Cupom de desconto",
+    mainProduct: "Produto principal", free: "Grátis", chooseShipping: "Escolha na etapa de entrega", notApplicable: "Não aplicável",
+    encrypted: "Seus dados são criptografados antes de serem armazenados.", whereDeliver: "Onde devemos entregar?", addressHelp: "Informe o endereço completo para calcularmos as opções de frete.", deliveryAddress: "Endereço de entrega", reviewData: "Confira os dados antes de continuar.", street: "Rua ou avenida", number: "Número", complement: "Complemento", optional: "Opcional", district: "Bairro", city: "Cidade", state: "Estado", continueShipping: "Continuar para escolher o frete", backIdentification: "Voltar para identificação", chooseDelivery: "Escolha como receber", chooseDeliveryHelp: "Selecione uma opção para continuar.", searching: "Buscando opções...", unavailable: "Nenhuma entrega disponível", businessDays: "dias úteis", backAddress: "Voltar e editar endereço", paymentConfirmed: "Pagamento confirmado", payPix: "Pague com Pix", readyPay: "Tudo pronto para pagar", generatePix: "Gerar Pix agora", copyPix: "Copiar código Pix", copied: "Código copiado", backShipping: "Voltar e escolher outro frete", backData: "Voltar e editar dados", perUnit: "por unidade", paymentReceived: "Recebemos seu pagamento e o pedido foi confirmado.", payInstructions: "Copie o código e pague no aplicativo do seu banco.", readyHelp: "O total foi conferido com segurança no servidor.", continue: "Continuar", validUntil: "Válido até",
+  },
+  "en-US": {
+    identification: "Identification", shipping: "Shipping", payment: "Payment",
+    fullName: "Full name", email: "Email", document: "Tax ID", phone: "Phone / WhatsApp",
+    addCoupon: "+ Add coupon", specialOffer: "Special offer", safeData: "Your data is protected.",
+    yourOrder: "YOUR ORDER", item: "item", items: "items", quantity: "Quantity", subtotal: "Subtotal",
+    shippingCost: "Shipping", discount: "Discount", total: "Total", apply: "Apply", coupon: "Discount code",
+    mainProduct: "Main product", free: "Free", chooseShipping: "Choose during shipping", notApplicable: "Not applicable",
+    encrypted: "Your data is encrypted before storage.", whereDeliver: "Where should we deliver?", addressHelp: "Enter the full address to calculate shipping options.", deliveryAddress: "Delivery address", reviewData: "Review the details before continuing.", street: "Street", number: "Number", complement: "Address line 2", optional: "Optional", district: "District", city: "City", state: "State", continueShipping: "Continue to shipping", backIdentification: "Back to identification", chooseDelivery: "Choose how to receive", chooseDeliveryHelp: "Select an option to continue.", searching: "Searching options...", unavailable: "No shipping option available", businessDays: "business days", backAddress: "Back to address", paymentConfirmed: "Payment confirmed", payPix: "Pay with Pix", readyPay: "Ready to pay", generatePix: "Generate Pix", copyPix: "Copy Pix code", copied: "Code copied", backShipping: "Choose another shipping option", backData: "Edit customer details", perUnit: "per unit", paymentReceived: "We received your payment and confirmed the order.", payInstructions: "Copy the code and pay in your banking app.", readyHelp: "The total was securely verified on the server.", continue: "Continue", validUntil: "Valid until",
+  },
+  es: {
+    identification: "Identificación", shipping: "Entrega", payment: "Pago",
+    fullName: "Nombre completo", email: "Correo electrónico", document: "Documento", phone: "Teléfono / WhatsApp",
+    addCoupon: "+ Añadir cupón", specialOffer: "Oferta especial", safeData: "Tus datos están protegidos.",
+    yourOrder: "TU PEDIDO", item: "artículo", items: "artículos", quantity: "Cantidad", subtotal: "Subtotal",
+    shippingCost: "Envío", discount: "Descuento", total: "Total", apply: "Aplicar", coupon: "Cupón de descuento",
+    mainProduct: "Producto principal", free: "Gratis", chooseShipping: "Elige durante la entrega", notApplicable: "No aplicable",
+    encrypted: "Tus datos se cifran antes de guardarse.", whereDeliver: "¿Dónde debemos entregar?", addressHelp: "Ingresa la dirección completa para calcular el envío.", deliveryAddress: "Dirección de entrega", reviewData: "Revisa los datos antes de continuar.", street: "Calle", number: "Número", complement: "Complemento", optional: "Opcional", district: "Barrio", city: "Ciudad", state: "Estado", continueShipping: "Continuar al envío", backIdentification: "Volver a identificación", chooseDelivery: "Elige cómo recibir", chooseDeliveryHelp: "Selecciona una opción para continuar.", searching: "Buscando opciones...", unavailable: "No hay entrega disponible", businessDays: "días hábiles", backAddress: "Volver a la dirección", paymentConfirmed: "Pago confirmado", payPix: "Pagar con Pix", readyPay: "Todo listo para pagar", generatePix: "Generar Pix", copyPix: "Copiar código Pix", copied: "Código copiado", backShipping: "Elegir otro envío", backData: "Editar datos", perUnit: "por unidad", paymentReceived: "Recibimos tu pago y confirmamos el pedido.", payInstructions: "Copia el código y paga desde la app de tu banco.", readyHelp: "El total fue verificado de forma segura.", continue: "Continuar", validUntil: "Válido hasta",
+  },
+};
+const checkoutLanguage = (language) => checkoutLocales[language] || checkoutLocales["pt-BR"];
+const checkoutMoney = (config) => new Intl.NumberFormat(config.language === "es" ? "es-ES" : (config.language || "pt-BR"), {
   style: "currency",
-  currency: "BRL",
+  currency: config.currency || "BRL",
 });
 
 const checkoutVisitorId = () => {
@@ -92,6 +122,7 @@ const publicConfig = (value) => ({
   progressActiveColor: "#7357e9",
   progressInactiveColor: "#ffffff",
   progressActiveTextColor: "#ffffff",
+  progressInactiveTextColor: "#777780",
   progressLabelColor: "#777780",
   progressActiveLabelColor: "#17171a",
   timer: true,
@@ -156,6 +187,7 @@ const configStyle = (config) => ({
   "--public-progress-active": config.progressActiveColor || config.primary,
   "--public-progress-inactive": config.progressInactiveColor || "#ffffff",
   "--public-progress-active-text": config.progressActiveTextColor || "#ffffff",
+  "--public-progress-inactive-text": config.progressInactiveTextColor || "#777780",
   "--public-progress-label": config.progressLabelColor || "#777780",
   "--public-progress-active-label": config.progressActiveLabelColor || config.textColor,
   fontFamily: config.font === "Georgia" ? "Georgia, serif" : `"${config.font || "Plus Jakarta Sans"}", Arial, sans-serif`,
@@ -464,6 +496,8 @@ function SessionContent({ session: initialSession, token }) {
   const metaData = { value: session.totalCents / 100, currency: session.currency || 'BRL', content_type: 'product', content_ids: items.map(item => item.product?.publicId || item.productId).filter(Boolean), contents: items.map(item => ({ id: item.product?.publicId || item.productId || item.titleSnapshot, quantity: item.quantity, item_price: item.unitPriceCents / 100 })), num_items: itemCount };
   useEffect(() => { const controller = new AbortController(); getPublicMetaConfig(session.publicId, token, controller.signal).then(({ pixelId }) => { if (!pixelId) return; setMetaPixelId(pixelId); loadMetaPixel(pixelId); trackMeta('PageView', {}, `${session.publicId}:PageView`); trackMeta('ViewContent', metaData, `${session.publicId}:ViewContent`); trackMeta('InitiateCheckout', metaData, `${session.publicId}:InitiateCheckout`); }).catch(() => {}); return () => controller.abort(); }, [session.publicId, token]); // eslint-disable-line react-hooks/exhaustive-deps
   const config = publicConfig(session.checkout?.publishedConfig);
+  const copy = checkoutLanguage(config.language);
+  const money = checkoutMoney(config);
   const layoutPositions = checkoutLayoutPositionMap(config);
   const layoutOrder = (kind, id) => layoutPositions.get(`${kind}:${id}`) ?? 1;
   const update = (field, value) =>
@@ -602,17 +636,17 @@ function SessionContent({ session: initialSession, token }) {
       {config.showProgress && <nav className={`checkout-progress style-${config.progressStyle || 'outline'}`} aria-label="Etapas do checkout" style={{order:layoutOrder('block','progress')}}>
         <span className="active">
           <i>1</i>
-          Identificação
+          {copy.identification}
         </span>
         <b />
         {requiresShipping && <><span className={step >= 2 ? "active" : ""}>
           <i>2</i>
-          Entrega
+          {copy.shipping}
         </span>
         <b /></>}
           <span className={step >= 4 ? "active" : ""}>
             <i>{requiresShipping ? 3 : 2}</i>
-          Pagamento
+          {copy.payment}
         </span>
       </nav>}
       {(Array.isArray(config.customElements) ? config.customElements : []).filter(item => item.enabled !== false).map((item) => {
@@ -634,7 +668,7 @@ function SessionContent({ session: initialSession, token }) {
                 <p className="customer-subtitle">{config.subtitle}</p>
                 <div className="customer-form-card">
                   <label>
-                    Nome completo
+                    {copy.fullName}
                     <input
                       autoComplete="name"
                       value={form.name}
@@ -643,7 +677,7 @@ function SessionContent({ session: initialSession, token }) {
                     />
                   </label>
                   <label>
-                    E-mail
+                    {copy.email}
                     <input
                       type="email"
                       autoComplete="email"
@@ -654,7 +688,7 @@ function SessionContent({ session: initialSession, token }) {
                   </label>
                   <div className="customer-field-grid">
                     <label>
-                      CPF/CNPJ
+                      {copy.document}
                       <input
                         inputMode="numeric"
                         value={form.document}
@@ -663,7 +697,7 @@ function SessionContent({ session: initialSession, token }) {
                       />
                     </label>
                     <label>
-                      Celular / WhatsApp
+                      {copy.phone}
                       <input
                         inputMode="tel"
                         autoComplete="tel"
@@ -677,12 +711,12 @@ function SessionContent({ session: initialSession, token }) {
                     <div className="checkout-inline-coupon">
                       {!couponOpen ? (
                         <button type="button" onClick={() => setCouponOpen(true)}>
-                          + Adicionar cupom
+                          {copy.addCoupon}
                         </button>
                       ) : (
                         <>
                           <label htmlFor="checkout-coupon-code">
-                            Cupom de desconto
+                            {copy.coupon}
                             <span>
                               <input
                                 id="checkout-coupon-code"
@@ -696,7 +730,7 @@ function SessionContent({ session: initialSession, token }) {
                                 disabled={busy || couponCode.trim().length < 3}
                                 onClick={applyCoupon}
                               >
-                                {session.couponCode ? "Atualizar" : "Aplicar"}
+                                {session.couponCode ? "↻" : copy.apply}
                               </button>
                             </span>
                           </label>
@@ -715,7 +749,7 @@ function SessionContent({ session: initialSession, token }) {
                 <input type="checkbox" checked={Boolean(session.items?.some(item => item.isOrderBump && item.product?.publicId === bump.publicId))} disabled={busy} onChange={(event) => toggleOrderBump(bump.publicId, event.target.checked)} />
                 <span className="public-order-bump-check"><Check size={14} /></span>
                 {bump.imageUrl ? <img src={bump.imageUrl} alt="" /> : <span className="public-order-bump-image"><ShoppingBag size={18}/></span>}
-                <span><b>{bump.offerTitle || config.orderBumpTitle || 'Oferta especial'}</b><strong>{bump.checkoutTitle}</strong>{descriptionText(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription) && <small>{descriptionText(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription)}</small>}</span>
+                <span><b>{bump.offerTitle || config.orderBumpTitle || copy.specialOffer}</b><strong>{bump.checkoutTitle}</strong>{descriptionText(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription) && <small>{descriptionText(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription)}</small>}</span>
                 <em>+ {money.format(bump.priceCents / 100)}</em>
               </label>)}
               {error && (
@@ -736,28 +770,25 @@ function SessionContent({ session: initialSession, token }) {
                 <ArrowRight size={19} />
               </button>
               <p className="customer-privacy">
-                <ShieldCheck size={14} /> Seus dados são criptografados antes de
-                serem armazenados.
+                <ShieldCheck size={14} /> {copy.encrypted}
               </p>
               {config.showTrust && <section className="public-trust" aria-label="Confiança da loja">
-                <div className="public-trust-benefits"><span><ShieldCheck size={15}/>{config.trustBenefit1}</span><span><Check size={15}/>{config.trustBenefit2}</span><span><ShieldCheck size={15}/>{config.trustBenefit3}</span></div>
+                <div className="public-trust-benefits"><span><i><ShieldCheck size={17}/></i><b>{config.trustBenefit1}</b></span><span><i><Check size={17}/></i><b>{config.trustBenefit2}</b></span><span><i><CreditCard size={17}/></i><b>{config.trustBenefit3}</b></span></div>
               </section>}
             </form>
           ) : step === 2 ? (
             <form onSubmit={saveShipping} noValidate>
-              <p className="eyebrow">ENTREGA</p>
-              <h1>Onde devemos entregar?</h1>
-              <p className="customer-subtitle">
-                Informe o endereço completo para calcularmos as opções de frete.
-              </p>
+              <p className="eyebrow">{copy.shipping.toUpperCase()}</p>
+              <h1>{copy.whereDeliver}</h1>
+              <p className="customer-subtitle">{copy.addressHelp}</p>
               <div className="customer-form-card">
                 <div className="customer-section-title">
                   <span>
                     <MapPin size={19} />
                   </span>
                   <div>
-                    <h2>Endereço de entrega</h2>
-                    <p>Confira os dados antes de continuar.</p>
+                    <h2>{copy.deliveryAddress}</h2>
+                    <p>{copy.reviewData}</p>
                   </div>
                 </div>
                 <label>
@@ -798,7 +829,7 @@ function SessionContent({ session: initialSession, token }) {
                   )}
                 </label>
                 <label>
-                  Rua ou avenida
+                  {copy.street}
                   <input
                     autoComplete="address-line1"
                     value={address.street}
@@ -813,7 +844,7 @@ function SessionContent({ session: initialSession, token }) {
                 </label>
                 <div className="customer-field-grid">
                   <label>
-                    Número
+                    {copy.number}
                     <input
                       ref={numberInput}
                       value={address.number}
@@ -827,7 +858,7 @@ function SessionContent({ session: initialSession, token }) {
                     />
                   </label>
                   <label>
-                    Complemento <small>Opcional</small>
+                    {copy.complement} <small>{copy.optional}</small>
                     <input
                       autoComplete="address-line2"
                       value={address.complement}
@@ -842,7 +873,7 @@ function SessionContent({ session: initialSession, token }) {
                   </label>
                 </div>
                 <label>
-                  Bairro
+                  {copy.district}
                   <input
                     value={address.neighborhood}
                     onChange={(event) =>
@@ -856,7 +887,7 @@ function SessionContent({ session: initialSession, token }) {
                 </label>
                 <div className="customer-field-grid">
                   <label>
-                    Cidade
+                    {copy.city}
                     <input
                       autoComplete="address-level2"
                       value={address.city}
@@ -870,7 +901,7 @@ function SessionContent({ session: initialSession, token }) {
                     />
                   </label>
                   <label>
-                    Estado
+                    {copy.state}
                     <input
                       autoComplete="address-level1"
                       maxLength="2"
@@ -899,7 +930,7 @@ function SessionContent({ session: initialSession, token }) {
                 {busy ? (
                   <LoaderCircle className="spin" size={18} />
                 ) : (
-                  "Continuar para escolher o frete"
+                  copy.continueShipping
                 )}
                 <ArrowRight size={19} />
               </button>
@@ -908,29 +939,29 @@ function SessionContent({ session: initialSession, token }) {
                 type="button"
                 onClick={() => setStep(1)}
               >
-                Voltar para identificação
+                {copy.backIdentification}
               </button>
             </form>
           ) : step === 3 ? (
             <div className="shipping-step">
-              <p className="eyebrow">ENTREGA</p><h1>Escolha como receber</h1>
-              <p className="customer-subtitle">Selecione uma opção para continuar. O valor é confirmado com segurança no servidor.</p>
-              {busy && shippingOptions.length === 0 ? <div className="shipping-loading"><LoaderCircle className="spin"/> Buscando opções...</div> : shippingOptions.length === 0 ? <div className="shipping-loading"><ShoppingBag/><b>Nenhuma entrega disponível</b><span>A loja ainda não configurou um método de frete ativo.</span></div> : <div className="public-shipping-options">{shippingOptions.map(method => <button type="button" key={method.publicId} onClick={() => chooseShipping(method)} disabled={busy}><span><Truck size={20}/></span><div><b>{method.name}</b><small><Clock3 size={13}/> {method.minDays === method.maxDays ? `${method.minDays} dias úteis` : `${method.minDays}–${method.maxDays} dias úteis`}</small></div><strong>{method.priceCents === 0 ? 'Grátis' : money.format(method.priceCents / 100)}</strong><ArrowRight size={18}/></button>)}</div>}
+              <p className="eyebrow">{copy.shipping.toUpperCase()}</p><h1>{copy.chooseDelivery}</h1>
+              <p className="customer-subtitle">{copy.chooseDeliveryHelp}</p>
+              {busy && shippingOptions.length === 0 ? <div className="shipping-loading"><LoaderCircle className="spin"/> {copy.searching}</div> : shippingOptions.length === 0 ? <div className="shipping-loading"><ShoppingBag/><b>{copy.unavailable}</b></div> : <div className="public-shipping-options">{shippingOptions.map(method => <button type="button" key={method.publicId} onClick={() => chooseShipping(method)} disabled={busy}><span><Truck size={20}/></span><div><b>{method.name}</b><small><Clock3 size={13}/> {method.minDays === method.maxDays ? `${method.minDays} ${copy.businessDays}` : `${method.minDays}–${method.maxDays} ${copy.businessDays}`}</small></div><strong>{method.priceCents === 0 ? copy.free : money.format(method.priceCents / 100)}</strong><ArrowRight size={18}/></button>)}</div>}
               {error && <p className="public-error" role="alert">{error}</p>}
-              <button className="customer-back" type="button" onClick={() => setStep(2)}>Voltar e editar endereço</button>
+              <button className="customer-back" type="button" onClick={() => setStep(2)}>{copy.backAddress}</button>
             </div>
           ) : (
             <div className="next-step-placeholder payment-step">
               <span>
                 <CreditCard size={25} />
               </span>
-              <p className="eyebrow">PAGAMENTO</p>
+              <p className="eyebrow">{copy.payment.toUpperCase()}</p>
               {payment && String(payment.status).toUpperCase() !== "PAID" && <div className="pix-qr-code"><QRCodeSVG value={payment.pixCode} size={188} level="M" includeMargin aria-label="QR Code para pagamento Pix" /></div>}
-              <h1>{String(payment?.status).toUpperCase() === 'PAID' ? 'Pagamento confirmado' : payment ? 'Pague com Pix' : 'Tudo pronto para pagar'}</h1>
-              {String(payment?.status).toUpperCase() === 'PAID' ? <div className="payment-confirmed" role="status"><CheckCircle2 size={38}/><p>Recebemos seu pagamento. O pedido já está confirmado e a loja foi avisada.</p>{config.successUrl && config.successUrl !== '#' && <a className="customer-continue" href={config.successUrl}>Continuar <ArrowRight size={19}/></a>}</div> : payment ? <><p>Copie o código abaixo e pague no aplicativo do seu banco. A confirmação acontece automaticamente.</p><strong className="real-pix-total">{money.format(payment.amountCents / 100)}</strong><textarea className="pix-copy-code" readOnly value={payment.pixCode}/><button type="button" className="customer-continue" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? 'Código copiado' : 'Copiar código Pix'}</button>{payment.expiresAt && <small className="pix-expiration">Válido até {new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' }).format(new Date(payment.expiresAt))}</small>}</> : <><p>O total foi conferido no servidor. Gere o Pix seguro pelo gateway da loja.</p><button type="button" className="customer-continue" onClick={generatePix} disabled={busy}>{busy ? <LoaderCircle className="spin" size={18}/> : 'Gerar Pix agora'} <ArrowRight size={19}/></button></>}
+              <h1>{String(payment?.status).toUpperCase() === 'PAID' ? copy.paymentConfirmed : payment ? copy.payPix : copy.readyPay}</h1>
+              {String(payment?.status).toUpperCase() === 'PAID' ? <div className="payment-confirmed" role="status"><CheckCircle2 size={38}/><p>{copy.paymentReceived}</p>{config.successUrl && config.successUrl !== '#' && <a className="customer-continue" href={config.successUrl}>{copy.continue} <ArrowRight size={19}/></a>}</div> : payment ? <><p>{copy.payInstructions}</p><strong className="real-pix-total">{money.format(payment.amountCents / 100)}</strong><textarea className="pix-copy-code" readOnly value={payment.pixCode}/><button type="button" className="customer-continue" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? copy.copied : copy.copyPix}</button>{payment.expiresAt && <small className="pix-expiration">{copy.validUntil} {new Intl.DateTimeFormat(config.language === 'es' ? 'es-ES' : config.language || 'pt-BR', { timeStyle: 'short' }).format(new Date(payment.expiresAt))}</small>}</> : <><p>{copy.readyHelp}</p><button type="button" className="customer-continue" onClick={generatePix} disabled={busy}>{busy ? <LoaderCircle className="spin" size={18}/> : copy.generatePix} <ArrowRight size={19}/></button></>}
               {error && <p className="public-error" role="alert">{error}</p>}
               {String(payment?.status).toUpperCase() !== 'PAID' && <button type="button" onClick={() => setStep(requiresShipping ? 3 : 1)}>
-                {requiresShipping ? 'Voltar e escolher outro frete' : 'Voltar e editar dados'}
+                {requiresShipping ? copy.backShipping : copy.backData}
               </button>}
             </div>
           )}
@@ -941,11 +972,11 @@ function SessionContent({ session: initialSession, token }) {
           <aside className="session-order-summary">
             <div className="session-summary-title">
               <div>
-                <span>Seu pedido</span>
+                <span>{copy.yourOrder}</span>
                 <h2>{config.summaryTitle}</h2>
               </div>
               <small>
-                {itemCount} {itemCount === 1 ? "item" : "itens"}
+                {itemCount} {itemCount === 1 ? copy.item : copy.items}
               </small>
             </div>
             <div className="session-items">
@@ -964,9 +995,9 @@ function SessionContent({ session: initialSession, token }) {
                       item.variantSnapshot !== "Default Title" && (
                         <span>{item.variantSnapshot}</span>
                       )}
-                    {!item.isOrderBump && session.source === 'DIRECT' ? <div className="public-quantity" aria-label="Quantidade do produto"><button type="button" onClick={()=>changeQuantity(item.quantity-1)} disabled={busy||Boolean(payment)||item.quantity<=1} aria-label="Diminuir quantidade">−</button><b>{item.quantity}</b><button type="button" onClick={()=>changeQuantity(item.quantity+1)} disabled={busy||Boolean(payment)||item.quantity>=(session.checkout.product.maxPerOrder||1000)} aria-label="Aumentar quantidade">+</button></div> : <small>Quantidade: {item.quantity}</small>}
+                    {!item.isOrderBump && session.source === 'DIRECT' ? <div className="public-quantity" aria-label={copy.quantity}><button type="button" onClick={()=>changeQuantity(item.quantity-1)} disabled={busy||Boolean(payment)||item.quantity<=1} aria-label="−">−</button><b>{item.quantity}</b><button type="button" onClick={()=>changeQuantity(item.quantity+1)} disabled={busy||Boolean(payment)||item.quantity>=(session.checkout.product.maxPerOrder||1000)} aria-label="+">+</button></div> : <small>{copy.quantity}: {item.quantity}</small>}
                     <small>
-                      {money.format(item.unitPriceCents / 100)} por unidade
+                      {money.format(item.unitPriceCents / 100)} {copy.perUnit}
                     </small>
                   </div>
                   <strong>{money.format(item.totalCents / 100)}</strong>
@@ -975,16 +1006,16 @@ function SessionContent({ session: initialSession, token }) {
             </div>
             <div className="session-totals">
               <div>
-                <span>Subtotal</span>
+                <span>{copy.subtotal}</span>
                 <b>{money.format(session.totalCents / 100)}</b>
               </div>
               <div>
-                <span>Frete</span>
-                <small>{requiresShipping ? (selectedShipping ? (selectedShipping.shippingPriceCents === 0 ? "Grátis" : money.format(selectedShipping.shippingPriceCents / 100)) : "Escolha na etapa de entrega") : "Não aplicável"}</small>
+                <span>{copy.shippingCost}</span>
+                <small>{requiresShipping ? (selectedShipping ? (selectedShipping.shippingPriceCents === 0 ? copy.free : money.format(selectedShipping.shippingPriceCents / 100)) : copy.chooseShipping) : copy.notApplicable}</small>
               </div>
-              {session.discountCents > 0 && <div className="coupon-discount"><span>Desconto ({session.couponCode})</span><b>- {money.format(session.discountCents / 100)}</b></div>}
+              {session.discountCents > 0 && <div className="coupon-discount"><span>{copy.discount} ({session.couponCode})</span><b>- {money.format(session.discountCents / 100)}</b></div>}
               <div className="session-grand-total">
-                <span>Total</span>
+                <span>{copy.total}</span>
                 <strong>{money.format((selectedShipping?.grandTotalCents ?? (session.totalCents - (session.discountCents || 0))) / 100)}</strong>
               </div>
             </div>
@@ -1008,6 +1039,7 @@ function SessionContent({ session: initialSession, token }) {
 }
 
 function ThankYouPage({ session, items, itemCount, selectedShipping, payment, config, delivery }) {
+  const money = checkoutMoney(config);
   const subtotal = session.totalCents;
   const discount = session.discountCents || 0;
   const shipping = selectedShipping?.shippingPriceCents ?? session.shippingPriceCents ?? 0;

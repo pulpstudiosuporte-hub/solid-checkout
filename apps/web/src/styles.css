@@ -337,3 +337,22 @@
 .checkout-preview-screen .ep-drop-zone,.checkout-preview-screen .ep-custom-element>button{display:none}
 @media(max-width:700px){.checkout-preview-screen>header{align-items:flex-start}.checkout-preview-screen>header small{display:none}.checkout-preview-screen>main{padding:12px}.checkout-preview-screen .editor-device{border-radius:10px}}
 .dot-map.world{position:relative;overflow:hidden;padding:0;background:#eef4fa;background-image:none;box-shadow:inset 0 0 70px rgba(94,115,145,.08)}.world-map-visual{position:absolute;inset:0;width:100%;height:100%;overflow:hidden}.world-map-visual>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;user-select:none;filter:contrast(.92) saturate(.8);mask-image:linear-gradient(to bottom,transparent 0,#000 8%,#000 92%,transparent 100%)}.world-map-visual>svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}.world-map-route{stroke-dasharray:1;stroke-dashoffset:1;animation:world-route-draw .9s ease-out forwards}.world-map-pulse{transform-box:fill-box;transform-origin:center;animation:world-point-pulse 1.8s ease-out infinite}.dot-map.world>svg,.dot-map.world>span{position:relative;z-index:2}.geo-location-list{display:flex;gap:8px;overflow:auto;padding:10px 0 2px}.geo-location-list>span{min-width:130px;border:1px solid var(--border);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:3px}.geo-location-list b{font-size:10px}.geo-location-list small{font-size:8px;color:var(--muted)}@keyframes world-route-draw{to{stroke-dashoffset:0}}@keyframes world-point-pulse{0%{transform:scale(1);opacity:.65}100%{transform:scale(3.2);opacity:0}}@media(prefers-reduced-motion:reduce){.world-map-route,.world-map-pulse{animation:none}}
+
+/* Checkout controls: independent step tokens, professional trust cards and richer CTA motion. */
+.ep-steps i{color:var(--eprogress-inactive-text)!important}
+.ep-steps .active i,.ep-steps.style-outline .active i{color:var(--eprogress-active-text)!important}
+.ep-trust>div span{min-height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:9px;background:color-mix(in srgb,var(--ep) 3%,var(--ecard));border-color:color-mix(in srgb,var(--ep) 16%,var(--eborder));color:var(--etext)}
+.ep-trust>div span>i{width:27px;height:27px;display:grid;place-items:center;border-radius:50%;background:color-mix(in srgb,var(--ep) 12%,var(--ecard));color:var(--ep);font-style:normal}
+.ep-trust>div span>b{font-size:8px;line-height:1.35}
+.ep-button{position:relative;isolation:isolate;overflow:hidden;transition:transform .22s ease,box-shadow .22s ease,filter .22s ease;background:var(--ebutton-bg,var(--ep));color:var(--ebutton-text,#fff)}
+.ep-button.effect-lift:hover{transform:translateY(-3px);box-shadow:0 12px 24px color-mix(in srgb,var(--ebutton-bg,var(--ep)) 30%,transparent)}
+.ep-button.effect-pulse{animation:ep-button-pulse 2.1s ease-in-out infinite}
+.ep-button.effect-shine:after{content:"";position:absolute;z-index:-1;inset:-60% auto -60% -35%;width:25%;transform:skewX(-18deg);background:linear-gradient(90deg,transparent,#fff8,transparent);animation:ep-button-shine 2.8s ease-in-out infinite}
+.ep-button.effect-glow{animation:ep-button-glow 1.9s ease-in-out infinite alternate}
+.ep-button.effect-gradient{background:linear-gradient(110deg,var(--ebutton-bg,var(--ep)),color-mix(in srgb,var(--ebutton-bg,var(--ep)) 62%,#fff),var(--ebutton-bg,var(--ep)));background-size:220% 100%;animation:ep-button-gradient 3s linear infinite}
+.ep-button.effect-press:hover{filter:brightness(1.06)}.ep-button.effect-press:active{transform:translateY(2px) scale(.985);box-shadow:inset 0 3px 8px #0003}
+@keyframes ep-button-pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ebutton-bg,var(--ep)) 28%,transparent)}50%{box-shadow:0 0 0 7px transparent}}
+@keyframes ep-button-shine{0%,55%{left:-35%}85%,100%{left:120%}}
+@keyframes ep-button-glow{from{box-shadow:0 7px 18px color-mix(in srgb,var(--ebutton-bg,var(--ep)) 18%,transparent)}to{box-shadow:0 9px 30px color-mix(in srgb,var(--ebutton-bg,var(--ep)) 48%,transparent)}}
+@keyframes ep-button-gradient{to{background-position:220% 0}}
+@media(prefers-reduced-motion:reduce){.ep-button{animation:none!important;transition:none!important}.ep-button:after{animation:none!important;display:none}}
