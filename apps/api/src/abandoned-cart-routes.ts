@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
 import type { Prisma, PrismaClient } from '@solid/database';
@@ -83,7 +83,13 @@ export function registerAbandonedCartRoutes(app: FastifyInstance, environment: A
     const expiredSession: Prisma.CheckoutSessionWhereInput = { OR: [{ status: { in: ['EXPIRED', 'CANCELLED'] } }, { status: 'OPEN', expiresAt: { lte: now } }] };
     const abandoned: Prisma.CheckoutSessionWhereInput = { AND: [expiredSession, { NOT: pending }] };
     const stateWhere: Prisma.CheckoutSessionWhereInput = status === 'ABANDONED' ? abandoned : status === 'PIX_PENDING' ? pending : { OR: [abandoned, pending] };
-    const where: Prisma.CheckoutSessionWhereInput = { checkout: { storeId: active.activeStoreId }, customerCapturedAt: { not: null }, createdAt: { gte: retainedSince }, status: { not: 'COMPLETED' }, AND: [stateWhere] };
+    const periodStart = period ? (period === 'today' ? new Date(`${new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(now)}T00:00:00-03:00`) : new Date(now.getTime() - (period === '7d' ? 7 : 30) * 86_400_000)) : null;
+    const stageWhere: Prisma.CheckoutSessionWhereInput | null = stage === 'PAYMENT' ? { paymentAttempts: { some: { providerTransactionId: { not: null } } } } : stage === 'SHIPPING' ? { OR: [{ shippingCapturedAt: { not: null } }, { shippingMethodName: { not: null } }], paymentAttempts: { none: { providerTransactionId: { not: null } } } } : stage === 'IDENTIFICATION' ? { shippingCapturedAt: null, shippingMethodName: null, paymentAttempts: { none: { providerTransactionId: { not: null } } } } : null;
+    const emailHash = search.includes('@') ? createHmac('sha256', createHmac('sha256', Buffer.from(environment.APP_ENCRYPTION_KEY, 'base64')).update('solid-checkout-pii-index-v1').digest()).update(search).digest('hex') : null;
+    const where: Prisma.CheckoutSessionWhereInput = {
+      checkout: { storeId: active.activeStoreId }, customerCapturedAt: { not: null }, createdAt: { gte: retainedSince }, status: { not: 'COMPLETED' },
+      AND: [stateWhere, ...(periodStart ? [{ updatedAt: { gte: periodStart } }] : []), ...(stageWhere ? [stageWhere] : []), ...(emailHash ? [{ customerEmailHash: emailHash }] : [])]
+    };
     const select = {
       publicId: true, status: true, totalCents: true, discountCents: true, shippingPriceCents: true, currency: true, couponCode: true,
       source: true, trackingParameters: true, customerDataEncrypted: true, customerCapturedAt: true, shippingCapturedAt: true,
@@ -91,10 +97,9 @@ export function registerAbandonedCartRoutes(app: FastifyInstance, environment: A
       items: { select: { titleSnapshot: true, quantity: true, imageUrlSnapshot: true } },
       paymentAttempts: { where: { providerTransactionId: { not: null } }, orderBy: { createdAt: 'desc' as const }, take: 1, select: { provider: true, status: true, expiresAt: true, createdAt: true } }
     } satisfies Prisma.CheckoutSessionSelect;
-    const [records, summaryRecords] = await database.$transaction([
-      database.checkoutSession.findMany({ where, orderBy: { updatedAt: 'desc' }, select }),
-      database.checkoutSession.findMany({ where: { checkout: { storeId: active.activeStoreId }, customerCapturedAt: { not: null }, createdAt: { gte: retainedSince }, status: { not: 'COMPLETED' }, OR: [abandoned, pending] }, select: { totalCents: true, discountCents: true, shippingPriceCents: true, status: true, expiresAt: true, paymentAttempts: { where: { providerTransactionId: { not: null } }, orderBy: { createdAt: 'desc' }, take: 1, select: { status: true, expiresAt: true } } } })
-    ]);
+    const requiresDecryptedSearch = Boolean(search && !emailHash);
+    const orderBy = sort === 'oldest' ? { updatedAt: 'asc' as const } : sort === 'highest' ? { totalCents: 'desc' as const } : sort === 'lowest' ? { totalCents: 'asc' as const } : { updatedAt: 'desc' as const };
+    const records = await database.checkoutSession.findMany({ where, orderBy, take: requiresDecryptedSearch ? 500 : pageSize, ...(requiresDecryptedSearch ? {} : { skip: (page - 1) * pageSize }), select });
 
     const normalizeStatus = (record: { paymentAttempts: readonly { status: string; expiresAt?: Date | null }[]; expiresAt: Date }) => {
       const attempt = record.paymentAttempts[0];
@@ -116,26 +121,19 @@ export function registerAbandonedCartRoutes(app: FastifyInstance, environment: A
       expiresAt: record.paymentAttempts[0]?.expiresAt ?? record.expiresAt,
       paymentProvider: record.paymentAttempts[0]?.provider ?? null
     }));
-    if (period) {
-      const start = period === 'today' ? new Date(`${new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(now)}T00:00:00-03:00`) : new Date(now.getTime() - (period === '7d' ? 7 : 30) * 86_400_000);
-      allItems = allItems.filter(item => item.lastActivityAt >= start);
-    }
-    if (stage) allItems = allItems.filter(item => item.lastStage === stage);
-    if (search) allItems = allItems.filter(item => `${item.customer.name ?? ''} ${item.customer.email ?? ''}`.toLocaleLowerCase('pt-BR').includes(search));
-    allItems.sort((left, right) => sort === 'oldest' ? left.lastActivityAt.getTime() - right.lastActivityAt.getTime() : sort === 'highest' ? right.totalCents - left.totalCents : sort === 'lowest' ? left.totalCents - right.totalCents : right.lastActivityAt.getTime() - left.lastActivityAt.getTime());
-    const total = allItems.length;
-    const items = allItems.slice((page - 1) * pageSize, page * pageSize);
-    const metrics = summaryRecords.reduce((result, record) => {
-      const currentStatus = normalizeStatus(record);
-      const amount = record.totalCents - record.discountCents + record.shippingPriceCents;
-      result.totalCents += amount;
-      if (currentStatus === 'PIX_PENDING') { result.pendingCount += 1; result.pendingCents += amount; }
-      else result.abandonedCount += 1;
-      return result;
-    }, { totalCents: 0, pendingCents: 0, abandonedCount: 0, pendingCount: 0 });
-
-    const filteredTotalCents = allItems.reduce((sum, item) => sum + item.totalCents, 0);
-    return reply.header('cache-control', 'private, no-store').send({ items, total, page, pageSize, pages: Math.max(1, Math.ceil(total / pageSize)), retentionDays, metrics: { ...metrics, totalCents: filteredTotalCents, averageCents: total ? Math.round(filteredTotalCents / total) : 0 } });
+    if (requiresDecryptedSearch) allItems = allItems.filter(item => `${item.customer.name ?? ''} ${item.customer.email ?? ''}`.toLocaleLowerCase('pt-BR').includes(search));
+    const [aggregate, pendingAggregate] = await database.$transaction([
+      database.checkoutSession.aggregate({ where, _count: true, _sum: { totalCents: true, discountCents: true, shippingPriceCents: true } }),
+      database.checkoutSession.aggregate({ where: { AND: [where, pending] }, _count: true, _sum: { totalCents: true, discountCents: true, shippingPriceCents: true } })
+    ]);
+    const databaseTotal = aggregate._count;
+    const total = requiresDecryptedSearch ? allItems.length : databaseTotal;
+    const items = requiresDecryptedSearch ? allItems.slice((page - 1) * pageSize, page * pageSize) : allItems;
+    const aggregateCents = (aggregate._sum.totalCents ?? 0) - (aggregate._sum.discountCents ?? 0) + (aggregate._sum.shippingPriceCents ?? 0);
+    const pendingCents = (pendingAggregate._sum.totalCents ?? 0) - (pendingAggregate._sum.discountCents ?? 0) + (pendingAggregate._sum.shippingPriceCents ?? 0);
+    const filteredTotalCents = requiresDecryptedSearch ? allItems.reduce((sum, item) => sum + item.totalCents, 0) : aggregateCents;
+    const metrics = { totalCents: filteredTotalCents, pendingCents, pendingCount: pendingAggregate._count, abandonedCount: Math.max(0, databaseTotal - pendingAggregate._count), averageCents: total ? Math.round(filteredTotalCents / total) : 0 };
+    return reply.header('cache-control', 'private, no-store').send({ items, total, page, pageSize, pages: Math.max(1, Math.ceil(total / pageSize)), retentionDays, metrics, searchLimited: requiresDecryptedSearch && records.length === 500 });
   });
 
   app.get('/abandoned-carts/recovery-settings', async (request, reply) => {

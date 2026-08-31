@@ -23,6 +23,7 @@ const visitorKey = (tracking: Record<string, unknown>, fallback: string): string
 };
 
 type DashboardPeriod = 'today' | 'yesterday' | '7d' | 'month' | 'year';
+const dashboardCache = new Map<string, { expiresAt: number; payload: unknown }>();
 
 function periodStart(now: Date, period: DashboardPeriod): Date {
   const today = dayFormatter.format(now);
@@ -54,6 +55,10 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
     const start = periodStart(now, period);
     const end = period === 'yesterday' ? new Date(start.getTime() + 86_400_000 - 1) : now;
     const storeId = selected.activeStoreId;
+    const cacheKey = `${storeId}:${session.userId}:${period}`;
+    const cached = dashboardCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return reply.header('cache-control', 'private, no-store').send(cached.payload);
+    if (cached) dashboardCache.delete(cacheKey);
 
     const [createdSessions, paidAttempts, products, checkouts, published, gateways, activeSessions] = await Promise.all([
       db.checkoutSession.findMany({
@@ -175,7 +180,7 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
         current.orders += 1; current.revenueCents += revenueCents; citySalesMap.set(key, current);
       }
     }
-    return reply.header('cache-control', 'private, no-store').send({
+    const payload = {
       userName: session.user.name,
       revenueCents: paidRevenueCents,
       paidOrders: paid.length,
@@ -215,6 +220,9 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
         },
       },
       checklist: { store: true, product: products > 0, checkout: checkouts > 0, gateway: gateways > 0, published: published > 0 },
-    });
+    };
+    dashboardCache.set(cacheKey, { expiresAt: Date.now() + 15_000, payload });
+    if (dashboardCache.size > 500) for (const [key, value] of dashboardCache) if (value.expiresAt <= Date.now()) dashboardCache.delete(key);
+    return reply.header('cache-control', 'private, no-store').send(payload);
   });
 }

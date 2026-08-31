@@ -16,7 +16,7 @@ import { startSecurityCleanup } from './security-cleanup.js';
 import { startAbandonedRecovery } from './abandoned-recovery.js';
 import { createStorePushDispatcher } from './web-push-service.js';
 import { startJobLeader } from './job-leader.js';
-import { createStoreWebhookDispatcher } from './webhook-routes.js';
+import { startWebhookDelivery } from './webhook-routes.js';
 
 const environment = parseEnvironment(process.env);
 if (!environment.DATABASE_URL) throw new Error('DATABASE_URL é obrigatória para iniciar a API');
@@ -25,7 +25,6 @@ const gatewayRepository = new PrismaGatewayRepository(database);
 const shopifyRepository = new PrismaShopifyRepository(database);
 const app = buildApp(environment, { authRepository: new PrismaAuthRepository(database), catalogRepository: new PrismaCatalogRepository(database), storeRepository: new PrismaStoreRepository(database), shopifyRepository, gatewayRepository, orderRepository: new PrismaOrderRepository(database), database });
 gatewayRepository.setPushDispatcher(createStorePushDispatcher(environment, database, app.log));
-gatewayRepository.setStoreWebhookDispatcher(createStoreWebhookDispatcher(environment, database));
 const stopJobLeader = startJobLeader(environment.DATABASE_URL, app.log, () => {
   const stops = [
     startWestPayReconciliation(environment, gatewayRepository, shopifyRepository, app.log),
@@ -34,7 +33,8 @@ const stopJobLeader = startJobLeader(environment.DATABASE_URL, app.log, () => {
     startConfirmationEmailDelivery(environment, database, app.log),
     startIntegrationDelivery(environment, gatewayRepository, app.log),
     startSecurityCleanup(database, app.log),
-    startAbandonedRecovery(environment, database, app.log)
+    startAbandonedRecovery(environment, database, app.log),
+    startWebhookDelivery(environment, database, app.log)
   ];
   return () => stops.forEach(stop => stop());
 });
