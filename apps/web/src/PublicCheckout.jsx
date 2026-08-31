@@ -64,6 +64,7 @@ const loadMetaPixel = (pixelId) => {
 const trackMeta = (eventName, data = {}, eventId) => { if (!window.fbq) return; const key = eventId ? `solid-meta:${eventId}` : ''; if (key && sessionStorage.getItem(key)) return; window.fbq('track', eventName, data, eventId ? { eventID: eventId } : undefined); if (key) sessionStorage.setItem(key, '1'); };
 const publicConfig = (value) => ({
   primary: "#7357e9",
+  buttonBgColor: "#7357e9",
   pageBg: "#f6f7f9",
   cardBg: "#ffffff",
   headerBg: "#ffffff",
@@ -89,6 +90,8 @@ const publicConfig = (value) => ({
   progressActiveColor: "#7357e9",
   progressInactiveColor: "#ffffff",
   progressActiveTextColor: "#ffffff",
+  progressLabelColor: "#777780",
+  progressActiveLabelColor: "#17171a",
   timer: true,
   timerText: "Sessão reservada por",
   timerMinutes: 10,
@@ -125,6 +128,7 @@ const publicConfig = (value) => ({
 });
 const configStyle = (config) => ({
   "--public-primary": config.primary,
+  "--public-button-bg": config.buttonBgColor || config.primary,
   "--public-bg": config.pageBg,
   "--public-card": config.cardBg,
   "--public-header": config.headerBg,
@@ -148,6 +152,8 @@ const configStyle = (config) => ({
   "--public-progress-active": config.progressActiveColor || config.primary,
   "--public-progress-inactive": config.progressInactiveColor || "#ffffff",
   "--public-progress-active-text": config.progressActiveTextColor || "#ffffff",
+  "--public-progress-label": config.progressLabelColor || "#777780",
+  "--public-progress-active-label": config.progressActiveLabelColor || config.textColor,
   fontFamily: config.font,
 });
 // Shopify descriptions are stored as HTML. The public checkout renders them

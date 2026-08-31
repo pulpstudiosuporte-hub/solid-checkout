@@ -724,3 +724,9 @@
 .public-custom-element.has-media:not(.type-banner):not(.type-gallery){grid-template-columns:minmax(56px,96px) minmax(0,1fr)}
 .public-custom-element.has-media:not(.type-banner):not(.type-gallery)>.public-custom-media{width:100%;height:min(var(--element-image-height,96px),140px);max-height:140px}
 @media(max-width:700px){.public-custom-element.has-media:not(.type-banner):not(.type-gallery){grid-template-columns:72px minmax(0,1fr)}.public-custom-element.has-media:not(.type-banner):not(.type-gallery)>.public-custom-media{grid-column:auto;height:72px}}
+
+/* Independent color controls from the checkout editor. */
+.public-checkout .customer-continue,.public-checkout .public-form-card button,.public-checkout .public-coupon button,.public-checkout .checkout-inline-coupon label button,.public-checkout .thank-you-cta{background:var(--public-button-bg,var(--public-primary))!important;color:var(--public-button-text)!important}
+.public-checkout .customer-form-card input,.public-checkout .public-coupon input,.public-checkout .checkout-inline-coupon input,.public-checkout input,.public-checkout select,.public-checkout textarea{background-color:var(--public-input)!important}
+.public-checkout .checkout-progress span{color:var(--public-progress-label)!important}
+.public-checkout .checkout-progress span.active{color:var(--public-progress-active-label)!important}

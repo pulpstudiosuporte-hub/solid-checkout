@@ -14,7 +14,7 @@ const hexColor = (value: unknown, fallback: string): string | null => { const ca
 const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const input = value as Record<string, unknown>; const result: Record<string, unknown> = {};
-  const enums: Record<string, readonly string[]> = { template: ['minimal', 'conversion', 'compact', 'showcase'], font: ['Plus Jakarta Sans', 'Inter', 'Arial', 'Georgia'], language: ['pt-BR', 'en-US', 'es'], currency: ['BRL', 'USD', 'EUR'], buttonEffect: ['lift', 'pulse', 'none'] };
+  const enums: Record<string, readonly string[]> = { template: ['minimal', 'conversion', 'compact', 'showcase'], font: ['Plus Jakarta Sans', 'Poppins', 'Montserrat', 'DM Sans', 'Roboto', 'Inter', 'Arial', 'Georgia'], language: ['pt-BR', 'en-US', 'es'], currency: ['BRL', 'USD', 'EUR'], buttonEffect: ['lift', 'pulse', 'none'] };
   const limits: Record<string, number> = { logoText: 24, timerText: 80, title: 120, subtitle: 300, buttonText: 60, footerText: 300 };
   const booleans = ['secureHeader', 'timer', 'showCoupon', 'showBump', 'showSummary'];
   const colors = ['primary', 'pageBg', 'cardBg', 'textColor', 'borderColor', 'inputBg'];
@@ -23,6 +23,7 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   for (const key of booleans) { if (typeof input[key] !== 'boolean') return null; result[key] = input[key]; }
   for (const key of colors) { if (typeof input[key] !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(input[key])) return null; result[key] = input[key].toLowerCase(); }
   for (const [key, fallback] of [['pageTextColor', '#17171a'], ['headerTextColor', '#17171a'], ['buttonTextColor', '#ffffff']] as const) { const color = input[key] ?? fallback; if (typeof color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color)) return null; result[key] = color.toLowerCase(); }
+  const buttonBgColor = hexColor(input.buttonBgColor, typeof input.primary === 'string' ? input.primary : '#7357e9'); if (buttonBgColor === null) return null; result.buttonBgColor = buttonBgColor;
   for (const [key, fallback] of [['timerBgColor', '#151c2c'], ['timerTextColor', '#ffffff'], ['timerNumberColor', '#ff515a']] as const) { const color = input[key] ?? fallback; if (typeof color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color)) return null; result[key] = color.toLowerCase(); }
   const radius = integer(input.radius, 0, 28); const timerMinutes = integer(input.timerMinutes, 1, 60); if (radius === null || timerMinutes === null) return null;
   result.radius = radius; result.timerMinutes = timerMinutes;
@@ -34,7 +35,7 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   for (const [key, fallback, max] of [['secureText', 'Pagamento 100% seguro', 60], ['eyebrow', 'FINALIZE SEU PEDIDO', 60], ['summaryTitle', 'Resumo da compra', 80]] as const) { const value = input[key] ?? fallback; if (typeof value !== 'string' || value.trim().length < 1 || value.trim().length > max) return null; result[key] = value.trim(); }
   for (const [key, fallback] of [['heroEnabled', false], ['showProgress', true]] as const) { const value = input[key] ?? fallback; if (typeof value !== 'boolean') return null; result[key] = value; }
   const progressStyle = input.progressStyle ?? 'outline'; if (typeof progressStyle !== 'string' || !['outline', 'solid'].includes(progressStyle)) return null; result.progressStyle = progressStyle;
-  for (const [key, fallback] of [['progressActiveColor', '#7357e9'], ['progressInactiveColor', '#ffffff'], ['progressActiveTextColor', '#ffffff']] as const) { const color = hexColor(input[key], fallback); if (color === null) return null; result[key] = color; }
+  for (const [key, fallback] of [['progressActiveColor', '#7357e9'], ['progressInactiveColor', '#ffffff'], ['progressActiveTextColor', '#ffffff'], ['progressLabelColor', '#777780'], ['progressActiveLabelColor', '#17171a']] as const) { const color = hexColor(input[key], fallback); if (color === null) return null; result[key] = color; }
   const showTrust = input.showTrust ?? true; if (typeof showTrust !== 'boolean') return null; result.showTrust = showTrust;
   for (const [key, fallback, max] of [['trustBenefit1', 'Pagamento protegido', 80], ['trustBenefit2', 'Confirmação automática', 80], ['trustBenefit3', 'Seus dados estão seguros', 80], ['testimonialName', 'Cliente verificado', 80], ['testimonialText', 'Compra simples, rápida e segura.', 240]] as const) { const value = input[key] ?? fallback; if (typeof value !== 'string' || value.trim().length < 1 || value.trim().length > max) return null; result[key] = value.trim(); }
   if (input.testimonials !== undefined) {
