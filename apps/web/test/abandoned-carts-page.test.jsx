@@ -16,4 +16,23 @@ describe('normalização dos carrinhos abandonados', () => {
   it('completa registros antigos sem itens ou etapa', () => {
     expect(normalizeAbandonedCartsResponse({ items: [{ publicId: 'legacy-a', totalCents: '1200' }] }).items[0]).toMatchObject({ publicId: 'legacy-a', totalCents: 1200, lastStage: 'IDENTIFICATION', customer: {}, items: [] });
   });
+
+  it('neutraliza campos legados que causavam TypeError durante a renderização', () => {
+    const response=normalizeAbandonedCartsResponse({items:[{
+      publicId:null,
+      customer:{name:{legacy:true},email:123,phone:null},
+      items:[null,{quantity:Symbol('legacy')},{quantity:'2'}],
+      lastStage:'desconhecida',
+      lastActivityAt:'data inválida',
+      totalCents:Symbol('legacy'),
+    }]});
+    expect(response.items[0]).toMatchObject({
+      publicId:'legacy-cart-0',
+      customer:{name:'',email:'123',phone:''},
+      items:[{quantity:0},{quantity:0},{quantity:2}],
+      lastStage:'IDENTIFICATION',
+      lastActivityAt:null,
+      totalCents:0,
+    });
+  });
 });
