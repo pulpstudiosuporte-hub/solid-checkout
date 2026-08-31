@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { reorderCustomElements } from "../src/CheckoutEditor.jsx";
+import {
+  checkoutLayoutEntries,
+  reorderCheckoutLayout,
+  reorderCustomElements,
+} from "../src/CheckoutEditor.jsx";
 
 const element = (id, slot) => ({ id, slot, enabled: true });
 
@@ -55,5 +59,66 @@ describe("ordenação dos elementos do checkout", () => {
       slot: 2,
       horizontalAlign: "right",
     });
+  });
+
+  it("inclui elementos personalizados na ordem visual completa", () => {
+    const entries = checkoutLayoutEntries({
+      blockOrder: ["hero", "timer", "progress", "content"],
+      customElements: [
+        { ...element("notice", 1), type: "notice", title: "Aviso" },
+        { ...element("faq", 3), type: "faq", title: "Dúvidas" },
+      ],
+    });
+
+    expect(entries.map((entry) => `${entry.kind}:${entry.id}`)).toEqual([
+      "block:hero",
+      "custom:notice",
+      "block:timer",
+      "block:progress",
+      "custom:faq",
+      "block:content",
+    ]);
+  });
+
+  it("move um elemento personalizado através de um bloco principal", () => {
+    const config = {
+      blockOrder: ["hero", "timer", "progress", "content"],
+      customElements: [{ ...element("notice", 2), type: "notice" }],
+    };
+
+    const result = reorderCheckoutLayout(config, "custom:notice", -1);
+
+    expect(result.blockOrder).toEqual(config.blockOrder);
+    expect(result.customElements[0]).toMatchObject({ id: "notice", slot: 1 });
+    expect(
+      checkoutLayoutEntries(result).map((entry) => `${entry.kind}:${entry.id}`),
+    ).toEqual([
+      "block:hero",
+      "custom:notice",
+      "block:timer",
+      "block:progress",
+      "block:content",
+    ]);
+  });
+
+  it("move um bloco através de um elemento sem perder sua posição", () => {
+    const config = {
+      blockOrder: ["hero", "timer", "progress", "content"],
+      customElements: [{ ...element("notice", 2), type: "notice" }],
+    };
+
+    const result = reorderCheckoutLayout(config, "block:timer", 1);
+
+    expect(result.blockOrder).toEqual(config.blockOrder);
+    expect(result.customElements[0]).toMatchObject({ id: "notice", slot: 1 });
+    expect(
+      checkoutLayoutEntries(result).map((entry) => `${entry.kind}:${entry.id}`),
+    ).toEqual([
+      "block:hero",
+      "custom:notice",
+      "block:timer",
+      "block:progress",
+      "block:content",
+    ]);
   });
 });
