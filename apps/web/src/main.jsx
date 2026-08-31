@@ -35,6 +35,7 @@ import BillingPage from './BillingPage';
 import AbandonedCartsPage from './AbandonedCartsPage';
 import AnalyticsPage from './AnalyticsPage';
 import WebhooksPage from './WebhooksPage';
+import CommandPalette from './CommandPalette';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -83,12 +84,12 @@ function Sidebar({ open, collapsed, onClose, onToggleCollapsed, page, setPage, u
   </>;
 }
 
-function Header({ toggleSidebar, apiStatus, csrfToken, storeKey, onNavigate, page }) {
+function Header({ toggleSidebar, apiStatus, csrfToken, storeKey, onNavigate, onOpenSearch, page }) {
   const statusLabel = apiStatus === 'online' ? 'API conectada' : apiStatus === 'offline' ? 'API indisponível' : 'Conectando à API';
   return <header className="topbar">
     <button className="icon-btn menu-btn" onClick={toggleSidebar} aria-label="Abrir menu"><Menu size={21}/></button>
     <div className="topbar-context"><small>Painel</small><strong>{page}</strong></div>
-    <div className="search"><Search size={18}/><input aria-label="Buscar" placeholder="Buscar no painel..."/><kbd>Ctrl K</kbd></div>
+    <button className="search" type="button" onClick={onOpenSearch} aria-label="Abrir busca avançada"><Search size={18}/><span>Buscar no painel...</span><kbd>Ctrl K</kbd></button>
     <div className="top-actions"><span className={`sandbox api-status ${apiStatus}`} role="status"><span/> {statusLabel}</span><NotificationCenter csrfToken={csrfToken} storeKey={storeKey} onNavigate={onNavigate}/></div>
   </header>;
 }
@@ -179,7 +180,7 @@ function SessionConflict() {
 }
 
 function App(){
-  const [sidebar,setSidebar]=useState(false); const [sidebarCollapsed,setSidebarCollapsed]=useState(()=>localStorage.getItem('solid-sidebar-collapsed-v1')==='true'); const [page,setPage]=useState(()=>window.location.hash.startsWith('#/integrations')?'Integrações':'Início'); const [checkout,setCheckout]=useState(false); const [editor,setEditor]=useState(false); const [previewConfig,setPreviewConfig]=useState(null); const [apiStatus,setApiStatus]=useState('checking');
+  const [sidebar,setSidebar]=useState(false); const [sidebarCollapsed,setSidebarCollapsed]=useState(()=>localStorage.getItem('solid-sidebar-collapsed-v1')==='true'); const [page,setPage]=useState(()=>window.location.hash.startsWith('#/integrations')?'Integrações':'Início'); const [checkout,setCheckout]=useState(false); const [editor,setEditor]=useState(false); const [previewConfig,setPreviewConfig]=useState(null); const [apiStatus,setApiStatus]=useState('checking'); const [searchOpen,setSearchOpen]=useState(false);
   const [auth,setAuth]=useState({status:'checking',user:null,csrfToken:null});
   const [sessionConflict,setSessionConflict]=useState(false);
   const [stores,setStores]=useState([]); const [storeBusy,setStoreBusy]=useState(false);
@@ -188,6 +189,7 @@ function App(){
   useEffect(()=>{if(auth.status!=='authenticated')return;let active=true;getStores().then(result=>active&&setStores(result.items)).catch(()=>active&&setApiStatus('offline'));return()=>{active=false}},[auth.status]);
   useEffect(()=>{const navigate=event=>typeof event.detail==='string'&&setPage(event.detail);window.addEventListener('solid:navigate',navigate);return()=>window.removeEventListener('solid:navigate',navigate)},[]);
   useEffect(()=>localStorage.setItem('solid-sidebar-collapsed-v1',String(sidebarCollapsed)),[sidebarCollapsed]);
+  useEffect(()=>{const openSearch=event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();setSearchOpen(value=>!value)}};window.addEventListener('keydown',openSearch);return()=>window.removeEventListener('keydown',openSearch)},[]);
   const publicMatch = window.location.pathname.match(/^\/c\/([a-z0-9-]+)\/([a-z0-9-]+)\/?$/) || window.location.hash.match(/^#\/c\/([a-z0-9-]+)\/([a-z0-9-]+)\/?$/);
   const publicSessionMatch = window.location.hash.match(/^#\/session\/([A-Za-z0-9_-]{8,32})/); const publicSessionToken = new URLSearchParams(window.location.hash.split('?')[1] || '').get('token');
   function finishLogin(result){const userId=result.user.publicId||result.user.id;bindTabToUser(userId);const channel=typeof BroadcastChannel!=='undefined'?new BroadcastChannel('solid-auth'):null;channel?.postMessage({type:'auth-changed',userId});channel?.close();setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken});window.history.replaceState({},'', '/');}
@@ -219,7 +221,7 @@ function App(){
   if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>;
   const activeStore=stores.find(store=>store.active);
   const pageContent=page==='Início'?<Dashboard setPage={setPage} storeKey={activeStore?.publicId}/>:page==='Análises'?<AnalyticsPage storeKey={activeStore?.publicId}/>:page==='Pedidos'?<OrdersPage storeKey={activeStore?.publicId}/>:page==='Carrinhos'?<AbandonedCartsPage storeKey={activeStore?.publicId} csrfToken={auth.csrfToken}/>:page==='Webhooks'?<WebhooksPage storeKey={activeStore?.publicId} csrfToken={auth.csrfToken}/>:page==='Meu plano'?<BillingPage csrfToken={auth.csrfToken}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Operações'?<AdminOperationsPage csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Gateways'?<GatewaysPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Domínios'?<DomainsPage csrfToken={auth.csrfToken}/>:page==='Produtos'?<ProductsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onOpenIntegrations={()=>setPage('Integrações')}/>:page==='Order bumps'?<OrderBumpsPage csrfToken={auth.csrfToken}/>:page==='Cupons'?<CouponsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>;
-  return <div className={`app ${sidebarCollapsed?'sidebar-collapsed':''}`}><InstallAppPrompt/><Sidebar open={sidebar} collapsed={sidebarCollapsed} onToggleCollapsed={()=>setSidebarCollapsed(value=>!value)} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout} stores={stores} storeBusy={storeBusy} onSelectStore={handleSelectStore} onCreateStore={handleCreateStore} onArchiveStore={handleArchiveStore}/><div className="main-shell"><Header page={page} toggleSidebar={()=>setSidebar(true)} apiStatus={apiStatus} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onNavigate={setPage}/><PageErrorBoundary routeKey={`${activeStore?.publicId || 'store'}:${page}`} onHome={()=>setPage('Início')}>{pageContent}</PageErrorBoundary></div></div>
+  return <div className={`app ${sidebarCollapsed?'sidebar-collapsed':''}`}><InstallAppPrompt/><CommandPalette open={searchOpen} onClose={()=>setSearchOpen(false)} onNavigate={setPage} platformAdmin={auth.user?.platformAdmin}/><Sidebar open={sidebar} collapsed={sidebarCollapsed} onToggleCollapsed={()=>setSidebarCollapsed(value=>!value)} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout} stores={stores} storeBusy={storeBusy} onSelectStore={handleSelectStore} onCreateStore={handleCreateStore} onArchiveStore={handleArchiveStore}/><div className="main-shell"><Header page={page} toggleSidebar={()=>setSidebar(true)} apiStatus={apiStatus} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onNavigate={setPage} onOpenSearch={()=>setSearchOpen(true)}/><PageErrorBoundary routeKey={`${activeStore?.publicId || 'store'}:${page}`} onHome={()=>setPage('Início')}>{pageContent}</PageErrorBoundary></div></div>
 }
 
 createRoot(document.getElementById('root')).render(<App/>);

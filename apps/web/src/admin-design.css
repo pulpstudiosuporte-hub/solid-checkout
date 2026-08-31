@@ -20,4 +20,36 @@
 /* Readability and breakpoint alignment with the legacy shell. */
 .app .nav-item{min-height:40px;font-size:13px}
 .solid-command-bar b{font-size:14px}.solid-command-bar p{font-size:12px;color:rgba(255,255,255,.82)}.solid-command-bar button{min-height:38px;font-size:12px}
+
+/* Busca global / command palette */
+.app button.search{justify-content:flex-start;border:1px solid var(--solid-line);padding:0 12px;color:#8f8998;text-align:left;cursor:pointer}
+.app button.search>span{flex:1;color:#77717f;font-size:12px}
+.app button.search:hover{border-color:#c9c1e7;background:#fff}
+.command-overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:clamp(70px,10vh,110px) 18px 18px;background:rgba(20,17,28,.52);backdrop-filter:blur(5px);animation:command-fade .14s ease-out}
+.command-palette{width:min(620px,100%);max-height:min(650px,calc(100dvh - 100px));overflow:hidden;border:1px solid #dfdbe8;border-radius:16px;background:#fff;box-shadow:0 30px 80px rgba(23,17,42,.28);animation:command-enter .18s ease-out}
+.command-input{display:flex;align-items:center;gap:10px;padding:15px 16px;border-bottom:1px solid #ece9f1;color:#7661d8}
+.command-input input{min-width:0;flex:1;border:0;outline:0;background:transparent;color:#1e1927;font-size:16px}
+.command-input input::placeholder{color:#9a94a4}
+.command-input button{display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:#77717f}
+.command-input button:hover{background:#f2eff8;color:#2e2638}
+.command-palette kbd{display:inline-flex;align-items:center;justify-content:center;min-width:22px;min-height:21px;padding:2px 6px;border:1px solid #e1dde8;border-radius:6px;background:#faf9fc;color:#817a89;font:600 10px/1 'Plus Jakarta Sans',sans-serif;box-shadow:0 1px 0 #e4e0e9}
+.command-help{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 16px;color:#8a8491;font-size:11px;background:#fbfafc;border-bottom:1px solid #efedf2}
+.command-help>span:last-child{display:flex;align-items:center;gap:5px}
+.command-results{max-height:min(520px,calc(100dvh - 220px));overflow-y:auto;padding:8px}
+.command-results>button{display:flex;align-items:center;gap:12px;width:100%;min-height:58px;padding:9px 11px;border:0;border-radius:10px;background:transparent;color:#3c3548;text-align:left}
+.command-results>button>span{display:grid;place-items:center;width:38px;height:38px;flex:0 0 38px;border-radius:9px;background:#f4f1fb;color:#7053e0}
+.command-results>button>div{display:grid;gap:3px;min-width:0;flex:1}
+.command-results>button b{font-size:13px}
+.command-results>button small{color:#96909d;font-size:10px}
+.command-results>button>kbd{visibility:hidden}
+.command-results>button:hover,.command-results>button.active{background:#eee9ff;color:#5837d1}
+.command-results>button.active>span{background:#7453e8;color:#fff}
+.command-results>button.active>kbd{visibility:visible}
+.command-empty{display:grid;justify-items:center;gap:7px;padding:52px 20px;color:#9992a2;text-align:center}
+.command-empty b{color:#37303f;font-size:14px}
+.command-empty span{max-width:340px;font-size:11px;line-height:1.5}
+@keyframes command-fade{from{opacity:0}to{opacity:1}}
+@keyframes command-enter{from{opacity:0;transform:translateY(-10px) scale(.985)}to{opacity:1;transform:none}}
+@media(max-width:600px){.command-overlay{align-items:stretch;padding:0}.command-palette{width:100%;max-height:100dvh;border:0;border-radius:0}.command-results{max-height:calc(100dvh - 112px)}.command-help>span:last-child{display:none}.command-input{padding-top:max(15px,env(safe-area-inset-top))}.app button.search>span{display:none}}
+@media(prefers-reduced-motion:reduce){.command-overlay,.command-palette{animation:none}}
 @media(max-width:1050px) and (min-width:901px){.app .main-shell,.app.sidebar-collapsed .main-shell{margin-left:0}.app .sidebar,.app.sidebar-collapsed .sidebar{width:238px}.app .sidebar-collapse{display:none}}
