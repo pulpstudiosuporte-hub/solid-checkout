@@ -204,6 +204,7 @@ model ProductFeedback {
   storeId     String?               @map("store_id") @db.Uuid
   type        ProductFeedbackType   @default(SUGGESTION)
   status      ProductFeedbackStatus @default(BACKLOG)
+  approved    Boolean               @default(false)
   title       String                @db.VarChar(120)
   description String                @db.Text
   createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -212,7 +213,7 @@ model ProductFeedback {
   store       Store?                @relation(fields: [storeId], references: [id], onDelete: SetNull)
   votes       ProductFeedbackVote[]
 
-  @@index([status, createdAt(sort: Desc)])
+  @@index([approved, status, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
   @@map("product_feedback")
 }

@@ -31,6 +31,7 @@ export function registerProductFeedbackRoutes(app: FastifyInstance, environment:
     const actor = await context(request);
     if (!actor) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     const items = await db.productFeedback.findMany({
+      where: { approved: true },
       take: 100,
       orderBy: [{ createdAt: 'desc' }],
       select: { publicId: true, type: true, status: true, title: true, description: true, createdAt: true, user: { select: { name: true } }, votes: { select: { userId: true } } }
@@ -52,8 +53,8 @@ export function registerProductFeedbackRoutes(app: FastifyInstance, environment:
     const actor = await context(request, true);
     if (!actor) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Sessão ou proteção CSRF inválida.'));
     const publicId = clean(request.params.feedbackId, 32);
-    const feedback = await db.productFeedback.findUnique({ where: { publicId }, select: { id: true } });
-    if (!feedback) return reply.code(404).send(errorBody(request, 'NOT_FOUND', 'Sugestão não encontrada.'));
+    const feedback = await db.productFeedback.findUnique({ where: { publicId }, select: { id: true, approved: true } });
+    if (!feedback?.approved) return reply.code(404).send(errorBody(request, 'NOT_FOUND', 'Sugestão não encontrada.'));
     const existing = await db.productFeedbackVote.findUnique({ where: { feedbackId_userId: { feedbackId: feedback.id, userId: actor.userId } }, select: { id: true } });
     if (existing) await db.productFeedbackVote.delete({ where: { id: existing.id } });
     else await db.productFeedbackVote.create({ data: { feedbackId: feedback.id, userId: actor.userId } });

@@ -49,19 +49,32 @@ export function registerAdminContentRoutes(app: FastifyInstance, environment: Ap
   app.get('/admin/content', async (request, reply) => {
     if (!await admin(request)) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso administrativo necessário.'));
     const [feedback, releases, assets] = await Promise.all([
-      db.productFeedback.findMany({ orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], take: 200, select: { publicId: true, type: true, status: true, title: true, description: true, createdAt: true, user: { select: { name: true, email: true } }, store: { select: { name: true } }, _count: { select: { votes: true } } } }),
+      db.productFeedback.findMany({ orderBy: [{ approved: 'asc' }, { status: 'asc' }, { createdAt: 'desc' }], take: 200, select: { publicId: true, type: true, status: true, approved: true, title: true, description: true, createdAt: true, user: { select: { name: true, email: true } }, store: { select: { name: true } }, _count: { select: { votes: true } } } }),
       db.productRelease.findMany({ orderBy: { publishedAt: 'desc' }, take: 100, select: { publicId: true, category: true, title: true, description: true, imageUrl: true, videoUrl: true, published: true, publishedAt: true } }),
       db.integrationCatalogAsset.findMany({ orderBy: { integrationKey: 'asc' }, select: { integrationKey: true, imageUrl: true, altText: true, updatedAt: true } }),
     ]);
     return reply.header('cache-control', 'private, no-store').send({ feedback: feedback.map(item => ({ ...item, author: item.user.name, email: item.user.email, store: item.store?.name ?? 'Sem loja', votes: item._count.votes, user: undefined, _count: undefined })), releases, integrationAssets: assets });
   });
 
-  app.patch<{ Params: { feedbackId: string }; Body: { status?: string } }>('/admin/content/feedback/:feedbackId', async (request, reply) => {
+  app.patch<{ Params: { feedbackId: string }; Body: { status?: string; approved?: boolean } }>('/admin/content/feedback/:feedbackId', async (request, reply) => {
     const current = await admin(request); if (!current || !mutationAllowed(request, current)) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso negado.'));
-    if (!statuses.includes(request.body?.status as typeof statuses[number])) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Status inválido.'));
-    const result = await db.productFeedback.updateMany({ where: { publicId: clean(request.params.feedbackId, 32) }, data: { status: request.body.status as typeof statuses[number] } });
+    const data: { status?: typeof statuses[number]; approved?: boolean } = {};
+    if (request.body?.status !== undefined) {
+      if (!statuses.includes(request.body.status as typeof statuses[number])) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Status inválido.'));
+      data.status = request.body.status as typeof statuses[number];
+    }
+    if (typeof request.body?.approved === 'boolean') data.approved = request.body.approved;
+    if (!Object.keys(data).length) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Nenhuma alteração informada.'));
+    const result = await db.productFeedback.updateMany({ where: { publicId: clean(request.params.feedbackId, 32) }, data });
     if (!result.count) return reply.code(404).send(failure(request, 'NOT_FOUND', 'Feedback não encontrado.'));
     return reply.send({ updated: true });
+  });
+
+  app.delete<{ Params: { feedbackId: string } }>('/admin/content/feedback/:feedbackId', async (request, reply) => {
+    const current = await admin(request); if (!current || !mutationAllowed(request, current)) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso negado.'));
+    const result = await db.productFeedback.deleteMany({ where: { publicId: clean(request.params.feedbackId, 32) } });
+    if (!result.count) return reply.code(404).send(failure(request, 'NOT_FOUND', 'Feedback não encontrado.'));
+    return reply.code(204).send();
   });
 
   app.post<{ Body: { category?: string; title?: string; description?: string; imageUrl?: string; videoUrl?: string; published?: boolean } }>('/admin/content/releases', async (request, reply) => {
