@@ -660,3 +660,39 @@
 .session-checkout .checkout-progress{width:min(var(--public-content-width,1120px),calc(100% - 64px))}
 .session-checkout>.session-expiry,.session-checkout .public-custom-wrap{width:min(var(--public-content-width,1120px),calc(100% - 32px))}
 @media(max-width:700px){.session-checkout .public-checkout-grid{grid-template-columns:1fr}}
+
+/* Full-size desktop composition; mobile keeps the compact responsive rules. */
+@media(min-width:701px){
+  .session-checkout>.session-expiry{min-height:54px;margin-top:28px;font-size:13px}
+  .session-checkout>.session-expiry strong{font-size:21px}
+  .session-checkout .checkout-progress{margin:20px auto 4px;padding:10px 0 22px;font-size:11px}
+  .session-checkout .checkout-progress span{gap:8px}
+  .session-checkout .checkout-progress i{width:31px;height:31px;font-size:11px}
+  .session-checkout .public-checkout-grid{margin:24px auto 38px;gap:24px}
+  .session-checkout .checkout-primary-card{padding:28px}
+  .session-checkout .checkout-primary-card .eyebrow{margin-bottom:8px;font-size:9px}
+  .session-checkout .checkout-primary-card h1{margin-bottom:7px;font-size:22px}
+  .session-checkout .checkout-primary-card .customer-subtitle{margin-bottom:22px;font-size:12px}
+  .session-checkout .checkout-primary-card .customer-form-card{gap:16px}
+  .session-checkout .checkout-primary-card .customer-form-card label{gap:8px;font-size:12px}
+  .session-checkout .checkout-primary-card .customer-form-card input{height:48px;padding-inline:14px;font-size:12px}
+  .session-checkout .checkout-primary-card .customer-field-grid{gap:14px}
+  .session-checkout .checkout-inline-coupon>button{padding-top:4px;font-size:11px}
+  .session-checkout .checkout-inline-coupon label button{padding-inline:18px;font-size:11px}
+  .session-checkout .checkout-inline-coupon small{font-size:10px}
+  .session-checkout .customer-continue{min-height:54px;margin-top:15px;font-size:13px}
+  .session-checkout .customer-privacy{font-size:10px}
+  .session-checkout .public-order-bump{margin-top:15px;padding:15px}
+  .session-checkout .session-order-summary{min-height:270px}
+  .session-checkout .session-summary-title{padding:22px 22px 16px}
+  .session-checkout .session-summary-title span{font-size:9px}
+  .session-checkout .session-summary-title h2{font-size:17px!important}
+  .session-checkout .session-summary-title>small{padding:5px 8px;font-size:9px!important}
+  .session-checkout .session-items{padding-inline:22px}
+  .session-checkout .public-line-item{grid-template-columns:64px minmax(0,1fr) auto;gap:12px;padding:16px 0!important}
+  .session-checkout .public-line-item>img,.session-checkout .public-line-item>.public-product-placeholder{width:64px!important;height:64px!important}
+  .session-checkout .line-item-copy b,.session-checkout .public-line-item>strong{font-size:11px}
+  .session-checkout .line-item-copy span,.session-checkout .line-item-copy small{font-size:9px!important}
+  .session-checkout .session-totals{padding:16px 22px 22px}
+  .session-checkout .public-trust-benefits span{min-height:48px;font-size:11px}
+}
