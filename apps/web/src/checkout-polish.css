@@ -53,6 +53,22 @@
   margin-right: 10px;
 }
 
+.ep-drop-zone {
+  min-height: 10px;
+  margin-block: 0;
+  transition:
+    min-height 0.16s,
+    margin 0.16s,
+    border-color 0.16s,
+    background 0.16s;
+}
+
+.ep-drop-zone:hover,
+.ep-drop-zone.active {
+  min-height: 34px;
+  margin-block: 4px;
+}
+
 .element-media-settings {
   margin-top: 18px;
 }
