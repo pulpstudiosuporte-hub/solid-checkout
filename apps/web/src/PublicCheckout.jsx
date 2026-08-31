@@ -524,23 +524,17 @@ function SessionContent({ session: initialSession, token }) {
       )}
       {config.showProgress && <nav className="checkout-progress" aria-label="Etapas do checkout" style={{order:blockOrder('progress')}}>
         <span className="active">
-          <i>
-            <UserRound size={15} />
-          </i>
+          <i>1</i>
           Identificação
         </span>
         <b />
         {requiresShipping && <><span className={step >= 2 ? "active" : ""}>
-          <i>
-            <MapPin size={15} />
-          </i>
+          <i>2</i>
           Entrega
         </span>
         <b /></>}
           <span className={step >= 4 ? "active" : ""}>
-            <i>
-              <CreditCard size={15} />
-          </i>
+            <i>{requiresShipping ? 3 : 2}</i>
           Pagamento
         </span>
       </nav>}
@@ -551,32 +545,20 @@ function SessionContent({ session: initialSession, token }) {
         <section className="customer-step">
           {step === 1 ? (
             <form onSubmit={advance} noValidate>
-              <p className="eyebrow">{config.eyebrow}</p>
-              <h1>{config.title}</h1>
-              <p className="customer-subtitle">{config.subtitle}</p>
-              <div className="customer-form-card">
-                <div className="customer-section-title">
-                  <span>
-                    <UserRound size={19} />
-                  </span>
-                  <div>
-                    <h2>Seus dados</h2>
-                    <p>
-                      Usaremos essas informações apenas para processar seu
-                      pedido.
-                    </p>
-                  </div>
-                </div>
-                <label>
-                  Nome completo
-                  <input
-                    autoComplete="name"
-                    value={form.name}
-                    onChange={(event) => update("name", event.target.value)}
-                    placeholder="Como aparece no documento"
-                  />
-                </label>
-                <div className="customer-field-grid">
+              <div className="checkout-primary-card">
+                <p className="eyebrow">{config.eyebrow}</p>
+                <h1>{config.title}</h1>
+                <p className="customer-subtitle">{config.subtitle}</p>
+                <div className="customer-form-card">
+                  <label>
+                    Nome completo
+                    <input
+                      autoComplete="name"
+                      value={form.name}
+                      onChange={(event) => update("name", event.target.value)}
+                      placeholder="Ex.: Maria da Silva"
+                    />
+                  </label>
                   <label>
                     E-mail
                     <input
@@ -584,29 +566,31 @@ function SessionContent({ session: initialSession, token }) {
                       autoComplete="email"
                       value={form.email}
                       onChange={(event) => update("email", event.target.value)}
-                      placeholder="voce@email.com"
+                      placeholder="Ex.: maria@email.com"
                     />
                   </label>
-                  <label>
-                    Celular / WhatsApp
-                    <input
-                      inputMode="tel"
-                      autoComplete="tel"
-                      value={form.phone}
-                      onChange={(event) => update("phone", event.target.value)}
-                      placeholder="(11) 99999-9999"
-                    />
-                  </label>
+                  <div className="customer-field-grid">
+                    <label>
+                      CPF/CNPJ
+                      <input
+                        inputMode="numeric"
+                        value={form.document}
+                        onChange={(event) => update("document", event.target.value)}
+                        placeholder="000.000.000-00"
+                      />
+                    </label>
+                    <label>
+                      Celular / WhatsApp
+                      <input
+                        inputMode="tel"
+                        autoComplete="tel"
+                        value={form.phone}
+                        onChange={(event) => update("phone", event.target.value)}
+                        placeholder="(00) 00000-0000"
+                      />
+                    </label>
+                  </div>
                 </div>
-                <label>
-                  CPF ou CNPJ
-                  <input
-                    inputMode="numeric"
-                    value={form.document}
-                    onChange={(event) => update("document", event.target.value)}
-                    placeholder="000.000.000-00"
-                  />
-                </label>
               </div>
               {config.showBump && (session.orderBumps || (session.orderBump ? [session.orderBump] : [])).map((bump) => <label className="public-order-bump" key={bump.publicId}>
                 <input type="checkbox" checked={Boolean(session.items?.some(item => item.isOrderBump && item.product?.publicId === bump.publicId))} disabled={busy} onChange={(event) => toggleOrderBump(bump.publicId, event.target.checked)} />
