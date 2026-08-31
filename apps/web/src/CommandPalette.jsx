@@ -7,6 +7,7 @@ import {
 
 const items = [
   { label: 'Início', group: 'Gestão', icon: Home, keywords: 'home painel visão geral dashboard métricas' },
+  { label: 'Novidades', group: 'Gestão', icon: Sparkles, keywords: 'atualizações roadmap sugestões ideias lançamentos melhorias' },
   { label: 'Análises', group: 'Gestão', icon: BarChart3, keywords: 'analytics indicadores receita conversão vendas métricas' },
   { label: 'Pedidos', group: 'Gestão', icon: ShoppingBag, keywords: 'vendas pagamentos pix clientes pedidos' },
   { label: 'Carrinhos', group: 'Gestão', icon: ShoppingCart, keywords: 'abandonados recuperação checkout clientes' },

@@ -31,6 +31,7 @@ import { registerAdminOperationRoutes } from './admin-operation-routes.js';
 import { registerBillingRoutes } from './billing-routes.js';
 import { registerAbandonedCartRoutes } from './abandoned-cart-routes.js';
 import { registerWebhookRoutes } from './webhook-routes.js';
+import { registerProductFeedbackRoutes } from './product-feedback-routes.js';
 
 export function buildApp(environment: AppEnvironment, dependencies: { authRepository?: AuthRepository; catalogRepository?: CatalogRepository; storeRepository?: StoreRepository; shopifyRepository?: ShopifyRepository; gatewayRepository?: PrismaGatewayRepository; orderRepository?: OrderRepository; dokployClient?: DokployDomainClient; database?: PrismaClient } = {}): FastifyInstance {
   const checkoutOriginCache = new Map<string, { allowed: boolean; expiresAt: number }>();
@@ -109,6 +110,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
   if (dependencies.authRepository && dependencies.orderRepository) registerOrderRoutes(app, environment, dependencies.authRepository, dependencies.orderRepository);
   if (dependencies.authRepository && dependencies.database) registerAbandonedCartRoutes(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.database) registerWebhookRoutes(app, environment, dependencies.authRepository, dependencies.database);
+  if (dependencies.authRepository && dependencies.database) registerProductFeedbackRoutes(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.catalogRepository) registerPublicCheckoutRoutes(app, environment, dependencies.catalogRepository, dependencies.gatewayRepository, dependencies.shopifyRepository);
 
   app.get<{ Reply: HealthResponse }>('/health/live', () => ({ status: 'ok', service: 'solid-api', version: '0.1.0', timestamp: new Date().toISOString() }));

@@ -95,6 +95,18 @@ enum BillingPixStatus {
   FAILED
 }
 
+enum ProductFeedbackType {
+  SUGGESTION
+  BUG
+}
+
+enum ProductFeedbackStatus {
+  BACKLOG
+  PLANNED
+  IN_PROGRESS
+  DONE
+}
+
 model User {
   id              String        @id @default(uuid()) @db.Uuid
   publicId        String        @unique @default(cuid()) @map("public_id") @db.VarChar(32)
@@ -122,6 +134,8 @@ model User {
   billingSubscription BillingSubscription?
   billingEntries BillingLedgerEntry[]
   billingPixInvoices BillingPixInvoice[]
+  productFeedback ProductFeedback[]
+  productFeedbackVotes ProductFeedbackVote[]
 
   @@index([accountStatus, createdAt(sort: Desc)])
   @@map("users")
@@ -170,8 +184,42 @@ model Store {
   abandonedRecoveryDeliveries AbandonedRecoveryDelivery[]
   webhookEndpoints WebhookEndpoint[]
   webhookDeliveries WebhookDelivery[]
+  productFeedback ProductFeedback[]
 
   @@map("stores")
+}
+
+model ProductFeedback {
+  id          String                @id @default(uuid()) @db.Uuid
+  publicId    String                @unique @default(cuid()) @map("public_id") @db.VarChar(32)
+  userId      String                @map("user_id") @db.Uuid
+  storeId     String?               @map("store_id") @db.Uuid
+  type        ProductFeedbackType   @default(SUGGESTION)
+  status      ProductFeedbackStatus @default(BACKLOG)
+  title       String                @db.VarChar(120)
+  description String                @db.Text
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store       Store?                @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  votes       ProductFeedbackVote[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("product_feedback")
+}
+
+model ProductFeedbackVote {
+  id         String          @id @default(uuid()) @db.Uuid
+  feedbackId String          @map("feedback_id") @db.Uuid
+  userId     String          @map("user_id") @db.Uuid
+  createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  feedback   ProductFeedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([feedbackId, userId])
+  @@index([userId])
+  @@map("product_feedback_votes")
 }
 
 model WebhookEndpoint {
