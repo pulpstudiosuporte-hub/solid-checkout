@@ -405,6 +405,33 @@
 .session-checkout .checkout-primary-card .customer-form-card label { gap: 6px; font-size: 9px; }
 .session-checkout .checkout-primary-card .customer-form-card input { height: 36px; border-radius: calc(var(--public-radius) * .7); padding: 0 11px; font-size: 9px; }
 .session-checkout .checkout-primary-card .customer-field-grid { gap: 9px; }
+.session-checkout .checkout-primary-card .eyebrow { color: var(--public-primary) !important; }
+.session-checkout .checkout-inline-coupon > button {
+  border: 0;
+  background: transparent;
+  padding: 2px 0 0;
+  color: var(--public-primary);
+  font-size: 9px;
+  text-align: left;
+}
+.session-checkout .checkout-inline-coupon label { margin-top: 2px; }
+.session-checkout .checkout-inline-coupon label > span {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+.session-checkout .checkout-inline-coupon label button {
+  border: 0;
+  border-radius: calc(var(--public-radius) * .7);
+  background: var(--public-primary);
+  padding: 0 14px;
+  color: var(--public-button-text);
+  font-size: 9px;
+  font-weight: 800;
+}
+.session-checkout .checkout-inline-coupon small { display: block; margin-top: 6px; font-size: 8px; }
+.session-checkout .checkout-inline-coupon small.success { color: #078047; }
+.session-checkout .checkout-inline-coupon small.error { color: #c83232; }
 .session-checkout .customer-continue { min-height: 45px; margin-top: 13px; border-radius: var(--public-radius); font-size: 10px; }
 .session-checkout .customer-privacy { margin-top: 10px; font-size: 8px; }
 .session-checkout .public-order-bump { margin-top: 12px; padding: 12px; border-radius: var(--public-radius); }
@@ -464,7 +491,7 @@
 }
 .customer-continue:disabled {
   cursor: not-allowed;
-  opacity: 0.48;
+  opacity: 1;
 }
 .customer-continue.effect-lift:hover:not(:disabled) {
   transform: translateY(-2px);

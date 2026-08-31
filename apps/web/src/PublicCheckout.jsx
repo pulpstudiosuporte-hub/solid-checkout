@@ -334,6 +334,7 @@ function SessionContent({ session: initialSession, token }) {
   const [copied, setCopied] = useState(false);
   const [couponCode, setCouponCode] = useState(session.couponCode || "");
   const [couponMessage, setCouponMessage] = useState("");
+  const [couponOpen, setCouponOpen] = useState(Boolean(session.couponCode));
   const [postalStatus, setPostalStatus] = useState({
     type: "idle",
     message: "",
@@ -590,6 +591,42 @@ function SessionContent({ session: initialSession, token }) {
                       />
                     </label>
                   </div>
+                  {config.showCoupon && (
+                    <div className="checkout-inline-coupon">
+                      {!couponOpen ? (
+                        <button type="button" onClick={() => setCouponOpen(true)}>
+                          + Adicionar cupom
+                        </button>
+                      ) : (
+                        <>
+                          <label htmlFor="checkout-coupon-code">
+                            Cupom de desconto
+                            <span>
+                              <input
+                                id="checkout-coupon-code"
+                                value={couponCode}
+                                onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
+                                maxLength="40"
+                                placeholder="Digite o código"
+                              />
+                              <button
+                                type="button"
+                                disabled={busy || couponCode.trim().length < 3}
+                                onClick={applyCoupon}
+                              >
+                                {session.couponCode ? "Atualizar" : "Aplicar"}
+                              </button>
+                            </span>
+                          </label>
+                          {couponMessage && (
+                            <small className={session.couponCode ? "success" : "error"}>
+                              {couponMessage}
+                            </small>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               {config.showBump && (session.orderBumps || (session.orderBump ? [session.orderBump] : [])).map((bump) => <label className="public-order-bump" key={bump.publicId}>
@@ -612,7 +649,7 @@ function SessionContent({ session: initialSession, token }) {
                 {busy ? (
                   <LoaderCircle className="spin" size={18} />
                 ) : (
-                  requiresShipping ? config.buttonText : "Continuar para pagamento"
+                  config.buttonText
                 )}
                 <ArrowRight size={19} />
               </button>
@@ -853,7 +890,6 @@ function SessionContent({ session: initialSession, token }) {
                 </article>
               ))}
             </div>
-            {config.showCoupon && <form className="public-coupon" onSubmit={applyCoupon}><label htmlFor="coupon-code">Cupom de desconto</label><div><input id="coupon-code" value={couponCode} onChange={event=>setCouponCode(event.target.value.toUpperCase())} maxLength="40" placeholder="Digite o código"/><button disabled={busy || couponCode.trim().length<3}>{session.couponCode?'Atualizar':'Aplicar'}</button></div>{couponMessage&&<small className={session.couponCode?'success':'error'}>{couponMessage}</small>}</form>}
             <div className="session-totals">
               <div>
                 <span>Subtotal</span>
