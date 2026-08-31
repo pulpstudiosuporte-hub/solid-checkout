@@ -8,6 +8,7 @@ import {
   GalleryHorizontal,
   Image,
   List,
+  LoaderCircle,
   Megaphone,
   Pencil,
   PlaySquare,
@@ -15,6 +16,7 @@ import {
   ShoppingBag,
   Star,
   Trash2,
+  Upload,
 } from "lucide-react";
 
 export const elementCatalog = {
@@ -118,6 +120,8 @@ const defaults = {
   display: "fixed",
   textColor: "#17171a",
   backgroundColor: "#ffffff",
+  iconColor: "#7357e9",
+  iconBackgroundColor: "#f0ebff",
   fontSize: 14,
   radius: 12,
   paddingY: 16,
@@ -125,6 +129,9 @@ const defaults = {
   device: "all",
   align: "left",
   imageUrl: "",
+  imageAlt: "",
+  imageFit: "cover",
+  imageHeight: 220,
   mediaUrl: "",
   linkUrl: "",
   durationMinutes: 10,
@@ -154,12 +161,101 @@ const Toggle = ({ on, change, label }) => (
   </button>
 );
 
+function ElementImageDropzone({ id, value, onChange, uploadImage }) {
+  const [busy, setBusy] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [error, setError] = useState("");
+  const send = async (file) => {
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Use uma imagem JPG, PNG ou WebP.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError("A imagem deve ter no máximo 10 MB.");
+      return;
+    }
+    if (!uploadImage) {
+      setError("O envio de imagens não está disponível neste editor.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const result = await uploadImage(file);
+      if (!result?.imageUrl)
+        throw new Error("A imagem não retornou um endereço válido.");
+      onChange(result.imageUrl);
+    } catch (caught) {
+      setError(caught?.message || "Não foi possível otimizar a imagem.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div
+      className={`element-image-dropzone ${busy ? "busy" : ""} ${dragging ? "dragging" : ""}`}
+      onDragEnter={(event) => {
+        event.preventDefault();
+        if (!busy) setDragging(true);
+      }}
+      onDragOver={(event) => event.preventDefault()}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget))
+          setDragging(false);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setDragging(false);
+        void send(event.dataTransfer.files?.[0]);
+      }}
+      aria-busy={busy}
+    >
+      <input
+        id={id}
+        className="sr-only"
+        type="file"
+        disabled={busy}
+        accept="image/jpeg,image/png,image/webp"
+        onChange={(event) => void send(event.target.files?.[0])}
+      />
+      {value ? (
+        <img src={value} alt="Prévia do elemento" />
+      ) : (
+        <Upload size={22} aria-hidden="true" />
+      )}
+      <div>
+        <b>
+          {busy ? (
+            <>
+              <LoaderCircle className="spin" size={15} /> Otimizando...
+            </>
+          ) : (
+            "Arraste a imagem aqui"
+          )}
+        </b>
+        <small>Conversão automática para WebP, até 1600 px.</small>
+        <span>
+          <label htmlFor={id}>Selecionar imagem</label>
+          {value && (
+            <button type="button" onClick={() => onChange("")}>
+              Remover
+            </button>
+          )}
+        </span>
+      </div>
+      {error && <p role="alert">{error}</p>}
+    </div>
+  );
+}
+
 export default function CheckoutElementsPanel({
   config,
   updateConfig,
   addElement,
   updateElement,
   removeElement,
+  uploadImage,
 }) {
   const [mode, setMode] = useState(config.elementEditMode || "guided");
   const [editing, setEditing] = useState(null);
@@ -213,11 +309,7 @@ export default function CheckoutElementsPanel({
             <b>{meta.label}</b>
             <small>{current.type} / elemento do checkout</small>
           </div>
-          <button
-            type="button"
-            onClick={cancelEditor}
-            aria-label="Fechar"
-          >
+          <button type="button" onClick={cancelEditor} aria-label="Fechar">
             <span aria-hidden>×</span>
           </button>
         </header>
@@ -259,13 +351,52 @@ export default function CheckoutElementsPanel({
             </Field>
           )}
           {["banner", "gallery"].includes(current.type) && (
-            <Field label="URL da imagem" help="Use uma imagem HTTPS.">
-              <input
-                type="url"
+            <div className="element-media-settings">
+              <span className="element-media-label">Imagem</span>
+              <ElementImageDropzone
+                id={`element-image-${current.id}`}
                 value={current.imageUrl || ""}
-                onChange={(event) => change("imageUrl", event.target.value)}
+                onChange={(value) => change("imageUrl", value)}
+                uploadImage={uploadImage}
               />
-            </Field>
+              <Field label="Ou use uma URL HTTPS">
+                <input
+                  type="url"
+                  value={current.imageUrl || ""}
+                  onChange={(event) => change("imageUrl", event.target.value)}
+                />
+              </Field>
+              <Field label="Texto alternativo da imagem">
+                <input
+                  value={current.imageAlt || ""}
+                  maxLength="160"
+                  onChange={(event) => change("imageAlt", event.target.value)}
+                  placeholder="Descreva a imagem para acessibilidade"
+                />
+              </Field>
+              <div className="element-number-grid">
+                <Field label="Ajuste da imagem">
+                  <select
+                    value={current.imageFit || "cover"}
+                    onChange={(event) => change("imageFit", event.target.value)}
+                  >
+                    <option value="cover">Preencher área</option>
+                    <option value="contain">Mostrar imagem inteira</option>
+                  </select>
+                </Field>
+                <Field label="Altura (px)">
+                  <input
+                    type="number"
+                    min="80"
+                    max="520"
+                    value={current.imageHeight || 220}
+                    onChange={(event) =>
+                      change("imageHeight", Number(event.target.value))
+                    }
+                  />
+                </Field>
+              </div>
+            </div>
           )}
           {current.type === "video" && (
             <Field
@@ -336,6 +467,22 @@ export default function CheckoutElementsPanel({
                 value={current.backgroundColor || "#ffffff"}
                 onChange={(event) =>
                   change("backgroundColor", event.target.value)
+                }
+              />
+            </Field>
+            <Field label="Ícone">
+              <input
+                type="color"
+                value={current.iconColor || "#7357e9"}
+                onChange={(event) => change("iconColor", event.target.value)}
+              />
+            </Field>
+            <Field label="Fundo do ícone">
+              <input
+                type="color"
+                value={current.iconBackgroundColor || "#f0ebff"}
+                onChange={(event) =>
+                  change("iconBackgroundColor", event.target.value)
                 }
               />
             </Field>
@@ -421,11 +568,7 @@ export default function CheckoutElementsPanel({
           <button type="button" onClick={cancelEditor}>
             Cancelar
           </button>
-          <button
-            type="button"
-            className="primary"
-            onClick={closeEditor}
-          >
+          <button type="button" className="primary" onClick={closeEditor}>
             <Check size={14} /> Salvar
           </button>
         </footer>

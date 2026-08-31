@@ -35,6 +35,7 @@ import {
   touchPublicCheckoutPresence,
 } from "./api";
 import "./public-session.css";
+import "./checkout-polish.css";
 
 const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -156,9 +157,11 @@ function CustomElementCountdown({ minutes = 10 }) {
 
 function PublicCustomElement({ item }) {
   const style = { color: item.textColor, background: item.backgroundColor, borderRadius: `${item.radius ?? 12}px`, padding: `${item.paddingY ?? 16}px ${item.paddingX ?? 18}px`, fontSize: `${item.fontSize || 14}px`, textAlign: item.align || 'left' };
+  const iconStyle = { color: item.iconColor || '#7357e9', background: item.iconBackgroundColor || '#f0ebff' };
+  const mediaStyle = { '--element-image-height': `${item.imageHeight || 220}px`, objectFit: item.imageFit || 'cover' };
   return (
     <section className={`public-custom-element type-${item.type} device-${item.device || 'all'}`} style={style}>
-      {item.imageUrl && ['banner','gallery'].includes(item.type) ? <img className="public-custom-media" src={item.imageUrl} alt="" loading="lazy"/> : item.mediaUrl && item.type === 'video' ? <video className="public-custom-media" src={item.mediaUrl} controls preload="metadata"/> : <div className="public-custom-icon">
+      {item.imageUrl && ['banner','gallery'].includes(item.type) ? <img className="public-custom-media" src={item.imageUrl} alt={item.imageAlt || ''} width="1600" height={item.imageHeight || 220} style={mediaStyle} loading="lazy" decoding="async"/> : item.mediaUrl && item.type === 'video' ? <video className="public-custom-media" src={item.mediaUrl} controls preload="metadata"/> : <div className="public-custom-icon" style={iconStyle}>
         {["testimonial","reviews"].includes(item.type) ? <Star size={20} /> : item.type === "faq" ? <CircleHelp size={20} /> : item.type === 'timer' ? <Clock3 size={20}/> : <ShieldCheck size={20} />}
       </div>}
       <div>
