@@ -700,3 +700,27 @@
 .public-custom-wrap{margin-block:var(--public-element-spacing,12px)}.public-custom-element{border-radius:var(--public-element-radius,12px);font-size:calc(1em * var(--public-element-font-scale,1));white-space:pre-line}.public-custom-media{width:min(240px,40%);max-height:180px;border-radius:calc(var(--public-element-radius,12px) * .7);object-fit:cover}.public-custom-element.type-banner,.public-custom-element.type-gallery,.public-custom-element.type-video{grid-template-columns:auto minmax(0,1fr)}.public-custom-element.device-mobile{display:none}@media(max-width:700px){.public-custom-element.device-desktop{display:none}.public-custom-element.device-mobile{display:grid}.public-custom-media{width:100%;max-height:220px;grid-column:1/-1}.public-custom-element.type-banner,.public-custom-element.type-gallery,.public-custom-element.type-video{grid-template-columns:1fr}}
 .public-custom-element>div{font-size:calc(1em * var(--public-element-font-scale,1))}.public-custom-element h2{font-size:1em}.public-custom-element p{font-size:.82em}.public-quantity{display:flex;align-items:center;gap:10px;margin-top:8px}.public-quantity button{width:32px;height:32px;border:1px solid var(--public-border);border-radius:8px;background:var(--public-card);color:var(--public-primary);font-size:18px;line-height:1}.public-quantity button:disabled{opacity:.4}.public-quantity b{min-width:18px;text-align:center;font-size:12px}
 .public-custom-countdown{display:block;margin-top:8px;color:var(--public-primary);font-size:1.25em;font-variant-numeric:tabular-nums;letter-spacing:.05em}
+
+/* Configurable checkout steps. */
+.checkout-progress i{border-color:var(--public-progress-inactive);background:var(--public-progress-inactive)}
+.checkout-progress .active{color:var(--public-progress-active)}
+.checkout-progress .active i{border-color:var(--public-progress-active)}
+.checkout-progress.style-solid .active i{background:var(--public-progress-active);color:var(--public-progress-active-text)}
+.checkout-progress.style-outline .active i{background:transparent;color:var(--public-progress-active)}
+
+/* Separate square banner above the order-summary card. */
+.session-summary-column{display:grid;align-self:start;gap:var(--public-element-spacing,12px);min-width:0}
+.session-summary-banner{display:block;width:100%;aspect-ratio:1;border:1px solid var(--public-border);border-radius:var(--public-element-radius,var(--public-radius));background:var(--public-card)}
+.layout-centered .session-summary-column{order:-1}
+@media(max-width:700px){.session-summary-column{order:-1}.session-summary-banner{max-height:min(78vw,440px)}}
+
+/* Font scaling now reaches every nested text node, not only the container. */
+.public-custom-element h2{font-size:1em!important;line-height:1.3}
+.public-custom-element p{font-size:.82em!important}
+.public-custom-stars{font-size:.9em}
+.public-custom-countdown{font-size:1.25em}
+
+/* Regular elements can use their own uploaded, optimized image too. */
+.public-custom-element.has-media:not(.type-banner):not(.type-gallery){grid-template-columns:minmax(56px,96px) minmax(0,1fr)}
+.public-custom-element.has-media:not(.type-banner):not(.type-gallery)>.public-custom-media{width:100%;height:min(var(--element-image-height,96px),140px);max-height:140px}
+@media(max-width:700px){.public-custom-element.has-media:not(.type-banner):not(.type-gallery){grid-template-columns:72px minmax(0,1fr)}.public-custom-element.has-media:not(.type-banner):not(.type-gallery)>.public-custom-media{grid-column:auto;height:72px}}

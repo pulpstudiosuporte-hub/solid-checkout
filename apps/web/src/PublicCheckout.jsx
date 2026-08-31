@@ -85,6 +85,10 @@ const publicConfig = (value) => ({
   secureHeader: true,
   secureText: "Pagamento 100% seguro",
   showProgress: true,
+  progressStyle: "outline",
+  progressActiveColor: "#7357e9",
+  progressInactiveColor: "#ffffff",
+  progressActiveTextColor: "#ffffff",
   timer: true,
   timerText: "Sessão reservada por",
   timerMinutes: 10,
@@ -98,6 +102,8 @@ const publicConfig = (value) => ({
   subtitle: "Preencha seus dados para continuar. Leva menos de um minuto.",
   buttonText: "Continuar para entrega",
   summaryTitle: "Resumo da compra",
+  summaryBannerUrl: "",
+  summaryBannerFit: "cover",
   layout: "split",
   showSummary: true,
   showBump: true,
@@ -139,6 +145,9 @@ const configStyle = (config) => ({
   "--public-element-radius": `${config.elementGlobalStyle?.radius ?? 12}px`,
   "--public-element-spacing": `${config.elementGlobalStyle?.spacing ?? 12}px`,
   "--public-element-font-scale": `${(config.elementGlobalStyle?.fontScale ?? 100) / 100}`,
+  "--public-progress-active": config.progressActiveColor || config.primary,
+  "--public-progress-inactive": config.progressInactiveColor || "#ffffff",
+  "--public-progress-active-text": config.progressActiveTextColor || "#ffffff",
   fontFamily: config.font,
 });
 // Shopify descriptions are stored as HTML. The public checkout renders them
@@ -161,8 +170,8 @@ function PublicCustomElement({ item }) {
   const iconStyle = { color: item.iconColor || '#7357e9', background: item.iconBackgroundColor || '#f0ebff' };
   const mediaStyle = { '--element-image-height': `${item.imageHeight || 220}px`, objectFit: item.imageFit || 'cover' };
   return (
-    <section className={`public-custom-element type-${item.type} device-${item.device || 'all'}`} style={style}>
-      {item.imageUrl && ['banner','gallery'].includes(item.type) ? <img className="public-custom-media" src={item.imageUrl} alt={item.imageAlt || ''} width="1600" height={item.imageHeight || 220} style={mediaStyle} loading="lazy" decoding="async"/> : item.mediaUrl && item.type === 'video' ? <video className="public-custom-media" src={item.mediaUrl} controls preload="metadata"/> : <div className="public-custom-icon" style={iconStyle}>
+    <section className={`public-custom-element type-${item.type} device-${item.device || 'all'} ${item.imageUrl ? 'has-media' : ''}`} style={style}>
+      {item.mediaUrl && item.type === 'video' ? <video className="public-custom-media" src={item.mediaUrl} poster={item.imageUrl || undefined} controls preload="metadata"/> : item.imageUrl ? <img className="public-custom-media" src={item.imageUrl} alt={item.imageAlt || ''} width="1600" height={item.imageHeight || 220} style={mediaStyle} loading="lazy" decoding="async"/> : <div className="public-custom-icon" style={iconStyle}>
         {["testimonial","reviews"].includes(item.type) ? <Star size={20} /> : item.type === "faq" ? <CircleHelp size={20} /> : item.type === 'timer' ? <Clock3 size={20}/> : <ShieldCheck size={20} />}
       </div>}
       <div>
@@ -580,7 +589,7 @@ function SessionContent({ session: initialSession, token }) {
           </span>
         </div>
       )}
-      {config.showProgress && <nav className="checkout-progress" aria-label="Etapas do checkout" style={{order:layoutOrder('block','progress')}}>
+      {config.showProgress && <nav className={`checkout-progress style-${config.progressStyle || 'outline'}`} aria-label="Etapas do checkout" style={{order:layoutOrder('block','progress')}}>
         <span className="active">
           <i>1</i>
           Identificação
@@ -917,6 +926,8 @@ function SessionContent({ session: initialSession, token }) {
           )}
         </section>
         {config.showSummary && (
+          <div className="session-summary-column">
+          {config.summaryBannerUrl && <img className="session-summary-banner" src={config.summaryBannerUrl} alt="Banner do resumo do pedido" style={{objectFit:config.summaryBannerFit || 'cover'}} loading="lazy" decoding="async" />}
           <aside className="session-order-summary">
             <div className="session-summary-title">
               <div>
@@ -972,6 +983,7 @@ function SessionContent({ session: initialSession, token }) {
               alterações no navegador.
             </p>
           </aside>
+          </div>
         )}
       </div>
       <footer className="public-checkout-footer">

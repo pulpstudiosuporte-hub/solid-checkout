@@ -352,9 +352,9 @@ export default function CheckoutElementsPanel({
               </select>
             </Field>
           )}
-          {["banner", "gallery"].includes(current.type) && (
+          {(
             <div className="element-media-settings">
-              <span className="element-media-label">Imagem</span>
+              <span className="element-media-label">Imagem do elemento</span>
               <ElementImageDropzone
                 id={`element-image-${current.id}`}
                 value={current.imageUrl || ""}
@@ -389,7 +389,7 @@ export default function CheckoutElementsPanel({
                 <Field label="Altura (px)">
                   <input
                     type="number"
-                    min="80"
+                    min="48"
                     max="520"
                     value={current.imageHeight || 220}
                     onChange={(event) =>
