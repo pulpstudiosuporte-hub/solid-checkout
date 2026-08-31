@@ -25,6 +25,7 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   for (const [key, fallback] of [['timerBgColor', '#151c2c'], ['timerTextColor', '#ffffff'], ['timerNumberColor', '#ff515a']] as const) { const color = input[key] ?? fallback; if (typeof color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color)) return null; result[key] = color.toLowerCase(); }
   const radius = integer(input.radius, 0, 28); const timerMinutes = integer(input.timerMinutes, 1, 60); if (radius === null || timerMinutes === null) return null;
   result.radius = radius; result.timerMinutes = timerMinutes;
+  const contentWidth = input.contentWidth === undefined ? 1120 : integer(input.contentWidth, 650, 1280); if (contentWidth === null) return null; result.contentWidth = contentWidth;
   const timerRadius = input.timerRadius === undefined ? 14 : integer(input.timerRadius, 0, 30); if (timerRadius === null) return null; result.timerRadius = timerRadius;
   const timerStyle = input.timerStyle ?? 'bar'; if (typeof timerStyle !== 'string' || !['bar', 'pill', 'outline'].includes(timerStyle)) return null; result.timerStyle = timerStyle;
   for (const key of ['privacyUrl', 'termsUrl', 'successUrl']) { const url = input[key]; if (typeof url !== 'string' || url.length > 2048 || url && url !== '#' && !url.startsWith('https://')) return null; result[key] = url; }
