@@ -1,0 +1,82 @@
+/* Readability and keyboard-accessibility refinements for platform content. */
+.admin-content-tabs button {
+  min-height: 44px;
+  font-size: 13px;
+}
+
+.admin-content-tabs em { font-size: 11px; }
+.admin-content-loading,
+.admin-content-empty { font-size: 13px; }
+.admin-feedback-card header span,
+.admin-feedback-card header b { font-size: 12px; }
+.admin-feedback-card h2 { font-size: 17px; }
+.admin-feedback-card > p { font-size: 13px; }
+.admin-feedback-card > small { font-size: 11px; }
+.admin-feedback-card > label,
+.admin-content-form > label { font-size: 12px; }
+.admin-feedback-visibility { font-size: 11px; }
+.admin-feedback-actions button,
+.admin-content-form > button,
+.admin-upload-button {
+  min-height: 44px;
+  font-size: 13px;
+}
+.admin-release-list article > div > span { font-size: 11px; }
+.admin-release-list h3 { font-size: 15px; }
+.admin-release-list p,
+.admin-release-list a { font-size: 12px; }
+.admin-assets-list b { font-size: 13px; }
+.admin-assets-list small { font-size: 11px; }
+.admin-assets-group-title {
+  margin: 12px 0 2px;
+  color: #817a87;
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.admin-broadcast-form > p { font-size: 13px; }
+
+.admin-content-page button:focus-visible,
+.admin-content-page a:focus-visible,
+.release-page button:focus-visible,
+.home-news button:focus-visible {
+  outline: 3px solid rgb(117 80 232 / 35%);
+  outline-offset: 2px;
+}
+
+.release-state {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  align-content: center;
+  gap: 9px;
+  padding: 28px;
+  border: 1px solid var(--solid-line);
+  border-radius: 12px;
+  background: #fff;
+  color: #746d79;
+  text-align: center;
+}
+.release-state svg { color: var(--solid-purple-strong); }
+.release-state b { color: #25202a; font-size: 16px; }
+.release-state span { max-width: 440px; font-size: 13px; line-height: 1.5; }
+.release-state.error svg { color: #c6531d; }
+.release-state button { min-height: 44px; margin-top: 6px; }
+
+.home-news-state {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--solid-line);
+  color: #746d79;
+  font-size: 12px;
+}
+.home-news-state svg { color: var(--solid-purple-strong); }
+.home-news-state.error svg { color: #c6531d; }
+
+@media (max-width: 640px) {
+  .admin-feedback-card h2 { font-size: 16px; }
+  .admin-content-tabs button { font-size: 12px; }
+}

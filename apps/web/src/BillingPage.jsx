@@ -28,7 +28,7 @@ export default function BillingPage({ csrfToken }) {
   useEffect(() => { load(); }, []);
   useEffect(() => {
     if (!pix?.invoiceId || pix.status !== 'PENDING') return undefined;
-    const timer = setInterval(async () => { try { const current = await getBillingPix(pix.invoiceId); setPix(value => ({ ...value, ...current })); if (current.status === 'PAID') { clearInterval(timer); await load(); } } catch {} }, 5000);
+    const timer = setInterval(async () => { try { const current = await getBillingPix(pix.invoiceId); setPix(value => ({ ...value, ...current })); if (current.status === 'PAID') { clearInterval(timer); await load(); } } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível atualizar o pagamento Pix.'); } }, 5000);
     return () => clearInterval(timer);
   }, [pix?.invoiceId, pix?.status]);
   const closeModal = () => { setSelectedPlan(null); setMethod(''); setPix(null); };

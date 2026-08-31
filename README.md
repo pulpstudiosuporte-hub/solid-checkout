@@ -1,6 +1,6 @@
 # SOLID Checkout
 
-Fundação do checkout SaaS multiempresa SOLID. O projeto ainda está em desenvolvimento e **não processa pagamentos reais**.
+Checkout SaaS multiempresa SOLID, com painel operacional, checkout público, integrações, pagamentos e conteúdo administrável.
 
 ## Estrutura
 
@@ -66,4 +66,8 @@ Em produção/staging use somente `npm run db:deploy`; nunca use `migrate dev`.
 - CI executa lint, typecheck, testes, build e auditoria de vulnerabilidades de produção.
 - O modelo inicial de ameaças está em `docs/security/THREAT_MODEL.md`.
 
-Ainda não existem autenticação, banco, autorização multiempresa ou gateway Pix. Não use dados pessoais ou credenciais reais.
+## Deploy do painel web no Dokploy
+
+Configure o serviço web para construir com o arquivo `Dockerfile.web`. Ele gera o bundle Vite e publica pelo Nginx com fallback de SPA, cache correto dos assets e headers de segurança. O serviço deve expor a porta `80` e receber `VITE_API_URL` e `VITE_TURNSTILE_SITE_KEY` como argumentos de build.
+
+O serviço da API continua usando seu fluxo próprio e deve executar `prisma migrate deploy` antes de iniciar. Nunca compartilhe o mesmo health check ou Dockerfile entre web e API.

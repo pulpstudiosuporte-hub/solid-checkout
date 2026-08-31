@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import './styles.css';
 import './admin-design.css';
+import './admin-content-accessibility.css';
 import CheckoutEditor, { defaultCheckoutConfig } from './CheckoutEditor';
 import { archiveStore, bindTabToUser, clearTabUser, completeMfaLogin, createStore, forgotPassword, getApiHealth, getSession, getStores, login, logout, registerAccount, resetPassword, selectStore, verifyAccount } from './api';
 import { currentWebPushSubscription, disableWebPushOnThisDevice } from './web-push';

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const values = new Map();
