@@ -140,6 +140,12 @@ const publicConfig = (value) => ({
   summaryTitle: "Resumo da compra",
   summaryBannerUrl: "",
   summaryBannerFit: "cover",
+  heroDevice: "all",
+  timerDevice: "all",
+  progressDevice: "all",
+  summaryDevice: "all",
+  summaryBannerDevice: "desktop",
+  trustDevice: "all",
   layout: "split",
   showSummary: true,
   showBump: true,
@@ -619,9 +625,9 @@ function SessionContent({ session: initialSession, token }) {
           </span>
         )}
       </header>
-      {config.heroEnabled && <div className={`public-checkout-hero ${config.heroImageUrl ? 'has-image' : ''}`} style={{ order:layoutOrder('block','hero'), ...(config.heroImageUrl ? { backgroundImage: `url(${config.heroImageUrl})`, '--public-mobile-hero': `url(${config.heroMobileImageUrl || config.heroImageUrl})` } : {}) }}>{!config.heroImageUrl && <><ShoppingBag size={28}/><span>Banner da loja</span></>}</div>}
+      {config.heroEnabled && <div className={`public-checkout-hero checkout-device-${config.heroDevice || 'all'} ${config.heroImageUrl ? 'has-image' : ''}`} style={{ order:layoutOrder('block','hero'), ...(config.heroImageUrl ? { backgroundImage: `url(${config.heroImageUrl})`, '--public-mobile-hero': `url(${config.heroMobileImageUrl || config.heroImageUrl})` } : {}) }}>{!config.heroImageUrl && <><ShoppingBag size={28}/><span>Banner da loja</span></>}</div>}
       {config.timer && (
-        <div className={`session-expiry timer-${config.timerStyle}`} role="status" style={{order:layoutOrder('block','timer')}}>
+        <div className={`session-expiry timer-${config.timerStyle} checkout-device-${config.timerDevice || 'all'}`} role="status" style={{order:layoutOrder('block','timer')}}>
           <span>
             {expiry.remaining ? (
               <>
@@ -633,7 +639,7 @@ function SessionContent({ session: initialSession, token }) {
           </span>
         </div>
       )}
-      {config.showProgress && <nav className={`checkout-progress style-${config.progressStyle || 'outline'}`} aria-label="Etapas do checkout" style={{order:layoutOrder('block','progress')}}>
+      {config.showProgress && <nav className={`checkout-progress style-${config.progressStyle || 'outline'} checkout-device-${config.progressDevice || 'all'}`} aria-label="Etapas do checkout" style={{order:layoutOrder('block','progress')}}>
         <span className="active">
           <i>1</i>
           {copy.identification}
@@ -656,7 +662,7 @@ function SessionContent({ session: initialSession, token }) {
         </div>;
       })}
       <div
-        className={`public-checkout-grid ${config.showSummary ? "" : "without-summary"}`}
+        className={`public-checkout-grid summary-device-${config.summaryDevice || 'all'} ${config.showSummary ? "" : "without-summary"}`}
         style={{order:layoutOrder('block','content')}}
       >
         <section className="customer-step">
@@ -772,7 +778,7 @@ function SessionContent({ session: initialSession, token }) {
               <p className="customer-privacy">
                 <ShieldCheck size={14} /> {copy.encrypted}
               </p>
-              {config.showTrust && <section className="public-trust" aria-label="Confiança da loja">
+              {config.showTrust && <section className={`public-trust checkout-device-${config.trustDevice || 'all'}`} aria-label="Confiança da loja">
                 <div className="public-trust-benefits"><span><i><ShieldCheck size={17}/></i><b>{config.trustBenefit1}</b></span><span><i><Check size={17}/></i><b>{config.trustBenefit2}</b></span><span><i><CreditCard size={17}/></i><b>{config.trustBenefit3}</b></span></div>
               </section>}
             </form>
@@ -967,8 +973,8 @@ function SessionContent({ session: initialSession, token }) {
           )}
         </section>
         {config.showSummary && (
-          <div className="session-summary-column">
-          {config.summaryBannerUrl && <img className="session-summary-banner" src={config.summaryBannerUrl} alt="Banner do resumo do pedido" style={{objectFit:config.summaryBannerFit || 'cover'}} loading="lazy" decoding="async" />}
+          <div className={`session-summary-column checkout-device-${config.summaryDevice || 'all'}`}>
+          {config.summaryBannerUrl && <img className={`session-summary-banner checkout-device-${config.summaryBannerDevice || 'desktop'}`} src={config.summaryBannerUrl} alt="Banner do resumo do pedido" style={{objectFit:config.summaryBannerFit || 'cover'}} loading="lazy" decoding="async" />}
           <aside className="session-order-summary">
             <div className="session-summary-title">
               <div>

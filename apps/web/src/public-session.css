@@ -755,3 +755,6 @@
 @keyframes public-button-gradient{to{background-position:220% 0}}
 @media(max-width:560px){.public-trust-benefits span{min-height:58px;flex-direction:row;justify-content:flex-start;text-align:left}.public-trust-benefits span>b{max-width:none}}
 @media(prefers-reduced-motion:reduce){.public-checkout .customer-continue{animation:none!important;transition:none!important}.public-checkout .customer-continue:after{animation:none!important;display:none}}
+.checkout-device-mobile{display:none!important}
+.public-checkout-grid.summary-device-mobile{grid-template-columns:1fr}
+@media(max-width:700px){.checkout-device-desktop{display:none!important}.checkout-device-mobile{display:revert!important}.session-summary-column.checkout-device-mobile{display:grid!important}}

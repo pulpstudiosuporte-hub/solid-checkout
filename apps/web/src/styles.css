@@ -356,3 +356,8 @@
 @keyframes ep-button-glow{from{box-shadow:0 7px 18px color-mix(in srgb,var(--ebutton-bg,var(--ep)) 18%,transparent)}to{box-shadow:0 9px 30px color-mix(in srgb,var(--ebutton-bg,var(--ep)) 48%,transparent)}}
 @keyframes ep-button-gradient{to{background-position:220% 0}}
 @media(prefers-reduced-motion:reduce){.ep-button{animation:none!important;transition:none!important}.ep-button:after{animation:none!important;display:none}}
+.ep-trust{display:var(--etrust-display,grid)}
+.ep-summary-column{display:var(--esummary-display,grid)}
+.ep-summary-banner{display:var(--esummary-banner-display,block)}
+.editor-device.mobile .ep-custom-element.device-desktop{display:none}
+.editor-device:not(.mobile) .ep-custom-element.device-mobile{display:none}

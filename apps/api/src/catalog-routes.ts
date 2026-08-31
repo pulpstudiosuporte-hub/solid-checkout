@@ -55,6 +55,11 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   const heroHeight = input.heroHeight === undefined ? 220 : integer(input.heroHeight, 120, 420); if (heroHeight === null) return null; result.heroHeight = heroHeight;
   for (const key of ['logoUrl', 'heroImageUrl', 'heroMobileImageUrl', 'summaryBannerUrl']) { const url = input[key] ?? ''; if (typeof url !== 'string' || url.length > 2048 || url && !url.startsWith('https://')) return null; result[key] = url; }
   const summaryBannerFit = input.summaryBannerFit ?? 'cover'; if (typeof summaryBannerFit !== 'string' || !['cover', 'contain'].includes(summaryBannerFit)) return null; result.summaryBannerFit = summaryBannerFit;
+  for (const key of ['heroDevice', 'timerDevice', 'progressDevice', 'summaryDevice', 'summaryBannerDevice', 'trustDevice']) {
+    const device = input[key] ?? 'all';
+    if (typeof device !== 'string' || !['all', 'desktop', 'mobile'].includes(device)) return null;
+    result[key] = device;
+  }
   const blockOrder = input.blockOrder ?? ['hero', 'timer', 'progress', 'content'];
   const allowedBlocks = ['hero', 'timer', 'progress', 'content'];
   if (!Array.isArray(blockOrder) || blockOrder.length !== allowedBlocks.length || new Set(blockOrder).size !== allowedBlocks.length || blockOrder.some(value => typeof value !== 'string' || !allowedBlocks.includes(value))) return null;
