@@ -623,6 +623,8 @@ export default function CheckoutElementsPanel({
   const changeGlobal = (key, value) => {
     updateConfig("elementGlobalStyle", { ...global, [key]: value });
     if (key === "radius") {
+      updateConfig("radius", value);
+      updateConfig("timerRadius", value);
       updateConfig(
         "customElements",
         elements.map((item) => ({ ...item, radius: value })),
@@ -710,13 +712,12 @@ export default function CheckoutElementsPanel({
             })}
         </section>
       ))}
-      {mode === "free" && (
-        <section className="element-global">
+      <section className="element-global">
           <h3>Estilos globais</h3>
           <p className="panel-help">
-            Valores usados como base por todos os elementos adicionados.
+            Controle o arredondamento e a distância entre todas as seções do checkout.
           </p>
-          <Field label={`Arredondamento — ${global.radius}px`}>
+          <Field label={`Arredondamento global — ${global.radius}px`}>
             <input
               type="range"
               min="0"
@@ -727,7 +728,7 @@ export default function CheckoutElementsPanel({
               }
             />
           </Field>
-          <Field label={`Espaçamento — ${global.spacing}px`}>
+          <Field label={`Espaçamento global — ${global.spacing}px`}>
             <input
               type="range"
               min="4"
@@ -749,8 +750,7 @@ export default function CheckoutElementsPanel({
               }
             />
           </Field>
-        </section>
-      )}
+      </section>
     </>
   );
 }

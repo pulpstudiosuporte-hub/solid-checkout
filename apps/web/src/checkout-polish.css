@@ -1,4 +1,30 @@
 /* Final checkout polish: responsive proportions, media and accessible interactions. */
+.session-checkout {
+  row-gap: var(--public-element-spacing, 12px);
+}
+
+.session-checkout > .public-checkout-hero,
+.session-checkout > .session-expiry,
+.session-checkout > .checkout-progress,
+.session-checkout > .public-custom-wrap,
+.session-checkout > .public-checkout-grid {
+  margin-block: 0 !important;
+}
+
+.ep-page > .ep-hero,
+.ep-page > .ep-body-block,
+.ep-page > .ep-custom-wrap {
+  margin-top: var(--eelement-spacing, 12px);
+}
+
+.ep-custom-wrap {
+  margin-bottom: 0;
+}
+
+.ep-custom-element {
+  border-radius: var(--eelement-radius, var(--eradius));
+}
+
 .public-checkout-hero {
   width: min(var(--public-content-width, 1120px), calc(100% - 32px));
 }

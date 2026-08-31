@@ -34,6 +34,7 @@ import {
   applyPublicCoupon,
   touchPublicCheckoutPresence,
 } from "./api";
+import { checkoutLayoutPositionMap } from "./checkout-layout";
 import "./public-session.css";
 import "./checkout-polish.css";
 
@@ -444,7 +445,8 @@ function SessionContent({ session: initialSession, token }) {
   const metaData = { value: session.totalCents / 100, currency: session.currency || 'BRL', content_type: 'product', content_ids: items.map(item => item.product?.publicId || item.productId).filter(Boolean), contents: items.map(item => ({ id: item.product?.publicId || item.productId || item.titleSnapshot, quantity: item.quantity, item_price: item.unitPriceCents / 100 })), num_items: itemCount };
   useEffect(() => { const controller = new AbortController(); getPublicMetaConfig(session.publicId, token, controller.signal).then(({ pixelId }) => { if (!pixelId) return; setMetaPixelId(pixelId); loadMetaPixel(pixelId); trackMeta('PageView', {}, `${session.publicId}:PageView`); trackMeta('ViewContent', metaData, `${session.publicId}:ViewContent`); trackMeta('InitiateCheckout', metaData, `${session.publicId}:InitiateCheckout`); }).catch(() => {}); return () => controller.abort(); }, [session.publicId, token]); // eslint-disable-line react-hooks/exhaustive-deps
   const config = publicConfig(session.checkout?.publishedConfig);
-  const blockOrder = (id) => Math.max(1, (Array.isArray(config.blockOrder) ? config.blockOrder : ["hero", "timer", "progress", "content"]).indexOf(id) + 1);
+  const layoutPositions = checkoutLayoutPositionMap(config);
+  const layoutOrder = (kind, id) => layoutPositions.get(`${kind}:${id}`) ?? 1;
   const update = (field, value) =>
     setForm((current) => ({ ...current, [field]: value }));
   const toggleOrderBump = async (productId, enabled) => {
@@ -564,9 +566,9 @@ function SessionContent({ session: initialSession, token }) {
           </span>
         )}
       </header>
-      {config.heroEnabled && <div className={`public-checkout-hero ${config.heroImageUrl ? 'has-image' : ''}`} style={{ order:blockOrder('hero'), ...(config.heroImageUrl ? { backgroundImage: `url(${config.heroImageUrl})`, '--public-mobile-hero': `url(${config.heroMobileImageUrl || config.heroImageUrl})` } : {}) }}>{!config.heroImageUrl && <><ShoppingBag size={28}/><span>Banner da loja</span></>}</div>}
+      {config.heroEnabled && <div className={`public-checkout-hero ${config.heroImageUrl ? 'has-image' : ''}`} style={{ order:layoutOrder('block','hero'), ...(config.heroImageUrl ? { backgroundImage: `url(${config.heroImageUrl})`, '--public-mobile-hero': `url(${config.heroMobileImageUrl || config.heroImageUrl})` } : {}) }}>{!config.heroImageUrl && <><ShoppingBag size={28}/><span>Banner da loja</span></>}</div>}
       {config.timer && (
-        <div className={`session-expiry timer-${config.timerStyle}`} role="status" style={{order:blockOrder('timer')}}>
+        <div className={`session-expiry timer-${config.timerStyle}`} role="status" style={{order:layoutOrder('block','timer')}}>
           <span>
             {expiry.remaining ? (
               <>
@@ -578,7 +580,7 @@ function SessionContent({ session: initialSession, token }) {
           </span>
         </div>
       )}
-      {config.showProgress && <nav className="checkout-progress" aria-label="Etapas do checkout" style={{order:blockOrder('progress')}}>
+      {config.showProgress && <nav className="checkout-progress" aria-label="Etapas do checkout" style={{order:layoutOrder('block','progress')}}>
         <span className="active">
           <i>1</i>
           Identificação
@@ -596,13 +598,13 @@ function SessionContent({ session: initialSession, token }) {
       </nav>}
       {(Array.isArray(config.customElements) ? config.customElements : []).filter(item => item.enabled !== false).map((item) => {
         const placement = publicCustomWrapProps(config, item);
-        return <div className={`public-custom-wrap ${placement.className || ''}`} key={item.id} style={{ order: Math.min(4, Math.max(0, item.slot)) + 0.5, ...placement.style }}>
+        return <div className={`public-custom-wrap ${placement.className || ''}`} key={item.id} style={{ order: layoutOrder('custom',item.id), ...placement.style }}>
           <PublicCustomElement item={item} />
         </div>;
       })}
       <div
         className={`public-checkout-grid ${config.showSummary ? "" : "without-summary"}`}
-        style={{order:blockOrder('content')}}
+        style={{order:layoutOrder('block','content')}}
       >
         <section className="customer-step">
           {step === 1 ? (
@@ -720,7 +722,6 @@ function SessionContent({ session: initialSession, token }) {
               </p>
               {config.showTrust && <section className="public-trust" aria-label="Confiança da loja">
                 <div className="public-trust-benefits"><span><ShieldCheck size={15}/>{config.trustBenefit1}</span><span><Check size={15}/>{config.trustBenefit2}</span><span><ShieldCheck size={15}/>{config.trustBenefit3}</span></div>
-                <div className="public-testimonials">{(Array.isArray(config.testimonials)?config.testimonials:[{id:'legacy',name:config.testimonialName,text:config.testimonialText,imageUrl:'',rating:5}]).map(item=><blockquote key={item.id}>{item.imageUrl&&<img src={item.imageUrl} alt={`Foto de ${item.name}`}/>}<div><span className="public-stars" aria-label={`${item.rating||5} de 5 estrelas`}>{'★'.repeat(item.rating||5)}{'☆'.repeat(5-(item.rating||5))}</span>“{item.text}”<footer>{item.name}</footer></div></blockquote>)}</div>
               </section>}
             </form>
           ) : step === 2 ? (

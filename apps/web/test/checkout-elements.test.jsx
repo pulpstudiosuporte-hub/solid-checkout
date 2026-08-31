@@ -4,6 +4,7 @@ import {
   reorderCheckoutLayout,
   reorderCustomElements,
 } from "../src/CheckoutEditor.jsx";
+import { checkoutLayoutPositionMap } from "../src/checkout-layout.js";
 
 const element = (id, slot) => ({ id, slot, enabled: true });
 
@@ -120,5 +121,24 @@ describe("ordenação dos elementos do checkout", () => {
       "block:progress",
       "block:content",
     ]);
+  });
+
+  it("gera a mesma ordem exclusiva usada no checkout publicado", () => {
+    const positions = checkoutLayoutPositionMap({
+      blockOrder: ["timer", "progress", "content", "hero"],
+      customElements: [
+        { ...element("notice", 0), type: "notice" },
+        { ...element("reviews", 3), type: "reviews" },
+      ],
+    });
+
+    expect(Object.fromEntries(positions)).toEqual({
+      "custom:notice": 1,
+      "block:timer": 2,
+      "block:progress": 3,
+      "block:content": 4,
+      "custom:reviews": 5,
+      "block:hero": 6,
+    });
   });
 });
