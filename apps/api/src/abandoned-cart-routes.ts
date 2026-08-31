@@ -41,7 +41,7 @@ export function registerAbandonedCartRoutes(app: FastifyInstance, environment: A
     return membership ? { storeId: active.activeStoreId, role: membership.role } : null;
   };
 
-  app.get<{ Querystring: { page?: string; pageSize?: string; status?: string } }>('/abandoned-carts', async (request, reply) => {
+  app.get<{ Querystring: { page?: string; pageSize?: string; status?: string; search?: string; stage?: string; period?: string; sort?: string } }>('/abandoned-carts', async (request, reply) => {
     const token = request.cookies[sessionCookie];
     const current = token ? await auth.findActiveSession(sha256(token), new Date()) : null;
     if (!current) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
@@ -56,6 +56,14 @@ export function registerAbandonedCartRoutes(app: FastifyInstance, environment: A
     if (!Number.isInteger(page) || page < 1 || !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Paginação inválida.'));
     const status = request.query.status;
     if (status && !['ABANDONED', 'PIX_PENDING'].includes(status)) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Status inválido.'));
+
+    const stage = request.query.stage;
+    if (stage && !['IDENTIFICATION', 'SHIPPING', 'PAYMENT'].includes(stage)) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Etapa inválida.'));
+    const period = request.query.period;
+    if (period && !['today', '7d', '30d'].includes(period)) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Período inválido.'));
+    const sort = request.query.sort ?? 'newest';
+    if (!['newest', 'oldest', 'highest', 'lowest'].includes(sort)) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Ordenação inválida.'));
+    const search = (request.query.search ?? '').trim().toLocaleLowerCase('pt-BR').slice(0, 160);
 
     const owner = await database.storeMember.findFirst({
       where: { storeId: active.activeStoreId, role: 'OWNER' },
@@ -83,9 +91,8 @@ export function registerAbandonedCartRoutes(app: FastifyInstance, environment: A
       items: { select: { titleSnapshot: true, quantity: true, imageUrlSnapshot: true } },
       paymentAttempts: { where: { providerTransactionId: { not: null } }, orderBy: { createdAt: 'desc' as const }, take: 1, select: { provider: true, status: true, expiresAt: true, createdAt: true } }
     } satisfies Prisma.CheckoutSessionSelect;
-    const [records, total, summaryRecords] = await database.$transaction([
-      database.checkoutSession.findMany({ where, orderBy: { updatedAt: 'desc' }, skip: (page - 1) * pageSize, take: pageSize, select }),
-      database.checkoutSession.count({ where }),
+    const [records, summaryRecords] = await database.$transaction([
+      database.checkoutSession.findMany({ where, orderBy: { updatedAt: 'desc' }, select }),
       database.checkoutSession.findMany({ where: { checkout: { storeId: active.activeStoreId }, customerCapturedAt: { not: null }, createdAt: { gte: retainedSince }, status: { not: 'COMPLETED' }, OR: [abandoned, pending] }, select: { totalCents: true, discountCents: true, shippingPriceCents: true, status: true, expiresAt: true, paymentAttempts: { where: { providerTransactionId: { not: null } }, orderBy: { createdAt: 'desc' }, take: 1, select: { status: true, expiresAt: true } } } })
     ]);
 
@@ -93,7 +100,7 @@ export function registerAbandonedCartRoutes(app: FastifyInstance, environment: A
       const attempt = record.paymentAttempts[0];
       return attempt?.status === 'PENDING' && (attempt.expiresAt ?? record.expiresAt) > now ? 'PIX_PENDING' : 'ABANDONED';
     };
-    const items = records.map(record => ({
+    let allItems = records.map(record => ({
       publicId: record.publicId,
       status: normalizeStatus(record),
       lastStage: record.paymentAttempts.length ? 'PAYMENT' : record.shippingCapturedAt || record.shippingMethodName ? 'SHIPPING' : 'IDENTIFICATION',
@@ -109,6 +116,15 @@ export function registerAbandonedCartRoutes(app: FastifyInstance, environment: A
       expiresAt: record.paymentAttempts[0]?.expiresAt ?? record.expiresAt,
       paymentProvider: record.paymentAttempts[0]?.provider ?? null
     }));
+    if (period) {
+      const start = period === 'today' ? new Date(`${new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(now)}T00:00:00-03:00`) : new Date(now.getTime() - (period === '7d' ? 7 : 30) * 86_400_000);
+      allItems = allItems.filter(item => item.lastActivityAt >= start);
+    }
+    if (stage) allItems = allItems.filter(item => item.lastStage === stage);
+    if (search) allItems = allItems.filter(item => `${item.customer.name ?? ''} ${item.customer.email ?? ''}`.toLocaleLowerCase('pt-BR').includes(search));
+    allItems.sort((left, right) => sort === 'oldest' ? left.lastActivityAt.getTime() - right.lastActivityAt.getTime() : sort === 'highest' ? right.totalCents - left.totalCents : sort === 'lowest' ? left.totalCents - right.totalCents : right.lastActivityAt.getTime() - left.lastActivityAt.getTime());
+    const total = allItems.length;
+    const items = allItems.slice((page - 1) * pageSize, page * pageSize);
     const metrics = summaryRecords.reduce((result, record) => {
       const currentStatus = normalizeStatus(record);
       const amount = record.totalCents - record.discountCents + record.shippingPriceCents;
@@ -118,7 +134,8 @@ export function registerAbandonedCartRoutes(app: FastifyInstance, environment: A
       return result;
     }, { totalCents: 0, pendingCents: 0, abandonedCount: 0, pendingCount: 0 });
 
-    return reply.header('cache-control', 'private, no-store').send({ items, total, page, pageSize, pages: Math.max(1, Math.ceil(total / pageSize)), retentionDays, metrics });
+    const filteredTotalCents = allItems.reduce((sum, item) => sum + item.totalCents, 0);
+    return reply.header('cache-control', 'private, no-store').send({ items, total, page, pageSize, pages: Math.max(1, Math.ceil(total / pageSize)), retentionDays, metrics: { ...metrics, totalCents: filteredTotalCents, averageCents: total ? Math.round(filteredTotalCents / total) : 0 } });
   });
 
   app.get('/abandoned-carts/recovery-settings', async (request, reply) => {
