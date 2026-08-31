@@ -9,7 +9,7 @@ import { encryptSecret } from './shopify-crypto.js';
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
 const same = (left: string, right: string) => { const a = Buffer.from(left); const b = Buffer.from(right); return a.length === b.length && timingSafeEqual(a, b); };
 const failure = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
-const actions = ['payment.pix_created', 'payment.webhook_verified', 'integration.event_failed', 'integration.shopify_reconnect_required', 'store_domain.not_verified', 'store_domain.activated', 'integration.shopify_connected'] as const;
+const actions = ['payment.pix_created', 'payment.webhook_verified', 'integration.event_failed', 'integration.shopify_reconnect_required', 'store_domain.not_verified', 'store_domain.activated', 'integration.shopify_connected', 'platform.announcement'] as const;
 
 type PushBody = { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } };
 const validPushBody = (body: PushBody): body is { endpoint: string; keys: { p256dh: string; auth: string } } => {

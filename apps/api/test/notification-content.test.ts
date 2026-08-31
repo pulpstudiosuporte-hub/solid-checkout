@@ -19,4 +19,17 @@ describe('notification content', () => {
   it('keeps old audit events without an amount readable', () => {
     expect(notificationContent('payment.pix_created', { provider: 'ROAS' }).title).toBe('Novo Pix pendente');
   });
+
+  it('formats platform announcements with the admin supplied content', () => {
+    expect(notificationContent('platform.announcement', {
+      title: 'Novo recurso',
+      message: 'A personalização do checkout evoluiu.',
+      destination: 'Novidades',
+    })).toEqual({
+      type: 'info',
+      title: 'Novo recurso',
+      message: 'A personalização do checkout evoluiu.',
+      destination: 'Novidades',
+    });
+  });
 });

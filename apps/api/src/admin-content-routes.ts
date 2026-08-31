@@ -1,0 +1,102 @@
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
+import type { AppEnvironment } from '@solid/config';
+import type { PrismaClient } from '@solid/database';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { AuthRepository, SessionUser } from './auth-repository.js';
+import { createStorePushDispatcher } from './web-push-service.js';
+
+const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
+const same = (left: string, right: string): boolean => {
+  const a = Buffer.from(sha256(left), 'hex'); const b = Buffer.from(sha256(right), 'hex');
+  return a.length === b.length && timingSafeEqual(a, b);
+};
+const failure = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
+const clean = (value: unknown, max: number): string => typeof value === 'string' ? value.trim().replace(/\0/g, '').slice(0, max) : '';
+const optionalUrl = (value: unknown): string | null | undefined => {
+  const raw = clean(value, 2048); if (!raw) return null;
+  try { const url = new URL(raw); return url.protocol === 'https:' ? url.toString() : undefined; } catch { return undefined; }
+};
+const statuses = ['BACKLOG', 'PLANNED', 'IN_PROGRESS', 'DONE'] as const;
+const categories = ['NEWS', 'IMPROVEMENT', 'FIX', 'INTEGRATION', 'SECURITY'] as const;
+const destinations = ['Início', 'Novidades', 'Análises', 'Pedidos', 'Carrinhos', 'Produtos', 'Integrações', 'Webhooks'] as const;
+
+export function registerAdminContentRoutes(app: FastifyInstance, environment: AppEnvironment, auth: AuthRepository, db: PrismaClient): void {
+  const push = createStorePushDispatcher(environment, db, app.log);
+  const secure = environment.NODE_ENV === 'production';
+  const sessionCookie = secure ? '__Host-solid_session' : 'solid_session';
+  const csrfCookie = secure ? '__Host-solid_csrf' : 'solid_csrf';
+  const session = async (request: FastifyRequest): Promise<SessionUser | null> => {
+    const token = request.cookies[sessionCookie];
+    return token ? auth.findActiveSession(sha256(token), new Date()) : null;
+  };
+  const admin = async (request: FastifyRequest): Promise<SessionUser | null> => {
+    const current = await session(request); return current?.user.platformAdmin ? current : null;
+  };
+  const mutationAllowed = (request: FastifyRequest, current: SessionUser): boolean => {
+    const origin = request.headers.origin; const header = request.headers['x-csrf-token']; const cookie = request.cookies[csrfCookie];
+    return typeof origin === 'string' && environment.CORS_ORIGINS.includes(origin) && typeof header === 'string' && Boolean(cookie) && same(cookie!, header) && same(sha256(header), current.csrfTokenHash);
+  };
+
+  app.get('/platform-content', async (request, reply) => {
+    if (!await session(request)) return reply.code(401).send(failure(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
+    const [releases, assets] = await Promise.all([
+      db.productRelease.findMany({ where: { published: true }, orderBy: { publishedAt: 'desc' }, take: 50, select: { publicId: true, category: true, title: true, description: true, imageUrl: true, videoUrl: true, publishedAt: true } }),
+      db.integrationCatalogAsset.findMany({ select: { integrationKey: true, imageUrl: true, altText: true } }),
+    ]);
+    return reply.header('cache-control', 'private, no-store').send({ releases, integrationAssets: assets });
+  });
+
+  app.get('/admin/content', async (request, reply) => {
+    if (!await admin(request)) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso administrativo necessário.'));
+    const [feedback, releases, assets] = await Promise.all([
+      db.productFeedback.findMany({ orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], take: 200, select: { publicId: true, type: true, status: true, title: true, description: true, createdAt: true, user: { select: { name: true, email: true } }, store: { select: { name: true } }, _count: { select: { votes: true } } } }),
+      db.productRelease.findMany({ orderBy: { publishedAt: 'desc' }, take: 100, select: { publicId: true, category: true, title: true, description: true, imageUrl: true, videoUrl: true, published: true, publishedAt: true } }),
+      db.integrationCatalogAsset.findMany({ orderBy: { integrationKey: 'asc' }, select: { integrationKey: true, imageUrl: true, altText: true, updatedAt: true } }),
+    ]);
+    return reply.header('cache-control', 'private, no-store').send({ feedback: feedback.map(item => ({ ...item, author: item.user.name, email: item.user.email, store: item.store?.name ?? 'Sem loja', votes: item._count.votes, user: undefined, _count: undefined })), releases, integrationAssets: assets });
+  });
+
+  app.patch<{ Params: { feedbackId: string }; Body: { status?: string } }>('/admin/content/feedback/:feedbackId', async (request, reply) => {
+    const current = await admin(request); if (!current || !mutationAllowed(request, current)) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso negado.'));
+    if (!statuses.includes(request.body?.status as typeof statuses[number])) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Status inválido.'));
+    const result = await db.productFeedback.updateMany({ where: { publicId: clean(request.params.feedbackId, 32) }, data: { status: request.body.status as typeof statuses[number] } });
+    if (!result.count) return reply.code(404).send(failure(request, 'NOT_FOUND', 'Feedback não encontrado.'));
+    return reply.send({ updated: true });
+  });
+
+  app.post<{ Body: { category?: string; title?: string; description?: string; imageUrl?: string; videoUrl?: string; published?: boolean } }>('/admin/content/releases', async (request, reply) => {
+    const current = await admin(request); if (!current || !mutationAllowed(request, current)) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso negado.'));
+    const title = clean(request.body?.title, 140); const description = clean(request.body?.description, 4000);
+    const imageUrl = optionalUrl(request.body?.imageUrl); const videoUrl = optionalUrl(request.body?.videoUrl);
+    if (title.length < 5 || description.length < 10 || imageUrl === undefined || videoUrl === undefined) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Revise título, descrição e URLs HTTPS.'));
+    const category = categories.includes(request.body?.category as typeof categories[number]) ? request.body.category as typeof categories[number] : 'NEWS';
+    const release = await db.productRelease.create({ data: { category, title, description, imageUrl, videoUrl, published: request.body?.published !== false }, select: { publicId: true, category: true, title: true, description: true, imageUrl: true, videoUrl: true, published: true, publishedAt: true } });
+    return reply.code(201).send({ release });
+  });
+
+  app.delete<{ Params: { releaseId: string } }>('/admin/content/releases/:releaseId', async (request, reply) => {
+    const current = await admin(request); if (!current || !mutationAllowed(request, current)) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso negado.'));
+    await db.productRelease.deleteMany({ where: { publicId: clean(request.params.releaseId, 32) } });
+    return reply.code(204).send();
+  });
+
+  app.put<{ Params: { integrationKey: string }; Body: { imageUrl?: string; altText?: string } }>('/admin/content/integrations/:integrationKey', async (request, reply) => {
+    const current = await admin(request); if (!current || !mutationAllowed(request, current)) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso negado.'));
+    const integrationKey = clean(request.params.integrationKey, 64).toLowerCase(); const imageUrl = optionalUrl(request.body?.imageUrl); const altText = clean(request.body?.altText, 160);
+    if (!/^[a-z0-9-]{2,64}$/.test(integrationKey) || !imageUrl) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Integração ou imagem HTTPS inválida.'));
+    const asset = await db.integrationCatalogAsset.upsert({ where: { integrationKey }, create: { integrationKey, imageUrl, altText }, update: { imageUrl, altText }, select: { integrationKey: true, imageUrl: true, altText: true, updatedAt: true } });
+    return reply.send({ asset });
+  });
+
+  app.post<{ Body: { title?: string; message?: string; destination?: string } }>('/admin/content/broadcasts', async (request, reply) => {
+    const current = await admin(request); if (!current || !mutationAllowed(request, current)) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso negado.'));
+    const title = clean(request.body?.title, 120); const message = clean(request.body?.message, 300);
+    const destination = destinations.includes(request.body?.destination as typeof destinations[number]) ? request.body.destination as typeof destinations[number] : 'Novidades';
+    if (title.length < 4 || message.length < 8) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Informe título e mensagem da notificação.'));
+    const stores = await db.store.findMany({ where: { active: true }, select: { id: true } });
+    const targetId = randomUUID();
+    if (stores.length) await db.auditLog.createMany({ data: stores.map(store => ({ storeId: store.id, actorUserId: current.userId, actorType: 'USER', action: 'platform.announcement', targetType: 'platform_release', targetId, metadata: { title, message, destination } })) });
+    if (push) await Promise.all(stores.map(store => push(store.id, 'platform.announcement', { title, message, destination }, targetId)));
+    return reply.code(201).send({ deliveredToStores: stores.length });
+  });
+}

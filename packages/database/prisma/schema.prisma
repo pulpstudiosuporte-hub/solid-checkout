@@ -107,6 +107,14 @@ enum ProductFeedbackStatus {
   DONE
 }
 
+enum ProductReleaseCategory {
+  NEWS
+  IMPROVEMENT
+  FIX
+  INTEGRATION
+  SECURITY
+}
+
 model User {
   id              String        @id @default(uuid()) @db.Uuid
   publicId        String        @unique @default(cuid()) @map("public_id") @db.VarChar(32)
@@ -220,6 +228,33 @@ model ProductFeedbackVote {
   @@unique([feedbackId, userId])
   @@index([userId])
   @@map("product_feedback_votes")
+}
+
+model ProductRelease {
+  id          String                 @id @default(uuid()) @db.Uuid
+  publicId    String                 @unique @default(cuid()) @map("public_id") @db.VarChar(32)
+  category    ProductReleaseCategory @default(NEWS)
+  title       String                 @db.VarChar(140)
+  description String                 @db.Text
+  imageUrl    String?                @map("image_url") @db.VarChar(2048)
+  videoUrl    String?                @map("video_url") @db.VarChar(2048)
+  published   Boolean                @default(true)
+  publishedAt DateTime               @default(now()) @map("published_at") @db.Timestamptz(3)
+  createdAt   DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([published, publishedAt(sort: Desc)])
+  @@map("product_releases")
+}
+
+model IntegrationCatalogAsset {
+  id             String   @id @default(uuid()) @db.Uuid
+  integrationKey String   @unique @map("integration_key") @db.VarChar(64)
+  imageUrl       String   @map("image_url") @db.VarChar(2048)
+  altText        String   @default("") @map("alt_text") @db.VarChar(160)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("integration_catalog_assets")
 }
 
 model WebhookEndpoint {

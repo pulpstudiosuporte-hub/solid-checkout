@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, CheckCircle2, ExternalLink, Globe2, Images, Layers3, LoaderCircle, MessageCircle, Plug, RefreshCw, Search, ShieldCheck, ShoppingBag, Truck, Unplug, Webhook, Workflow } from 'lucide-react';
-import { connectShopify, disconnectShopify, getMetaStatus, getShopifyStatus, getUtmifyStatus, syncShopifyCatalog } from './api';
+import { connectShopify, disconnectShopify, getMetaStatus, getPlatformContent, getShopifyStatus, getUtmifyStatus, syncShopifyCatalog } from './api';
 import ShopifyOnboarding from './ShopifyOnboarding';
 import UtmifyIntegration from './UtmifyIntegration';
 import MetaIntegration from './MetaIntegration';
@@ -53,6 +53,7 @@ export default function ShopifyIntegration({ csrfToken, storeKey }) {
   const [category, setCategory] = useState('Todas');
   const [query, setQuery] = useState('');
   const [connections, setConnections] = useState({ shopify: false, meta: false, utmify: false });
+  const [catalogAssets, setCatalogAssets] = useState({});
   useEffect(() => {
     let active = true;
     Promise.allSettled([getShopifyStatus(), getMetaStatus(), getUtmifyStatus()]).then(([shopify, meta, utmify]) => {
@@ -65,6 +66,7 @@ export default function ShopifyIntegration({ csrfToken, storeKey }) {
     });
     return () => { active = false; };
   }, [storeKey, selected]);
+  useEffect(() => { const controller = new AbortController(); getPlatformContent(controller.signal).then(data => setCatalogAssets(Object.fromEntries((data.integrationAssets || []).map(item => [item.integrationKey, item])))).catch(() => {}); return () => controller.abort(); }, []);
   if (selected === 'shopify') return <ShopifyIntegrationDetails csrfToken={csrfToken} storeKey={storeKey} onBack={() => setSelected(null)}/>;
   if (selected === 'meta') return <DetailShell title="Meta Pixel" onBack={() => setSelected(null)}><MetaIntegration csrfToken={csrfToken} storeKey={storeKey}/></DetailShell>;
   if (selected === 'utmify') return <DetailShell title="UTMify" onBack={() => setSelected(null)}><UtmifyIntegration csrfToken={csrfToken} storeKey={storeKey}/></DetailShell>;
@@ -84,7 +86,7 @@ export default function ShopifyIntegration({ csrfToken, storeKey }) {
       <aside className="card integration-categories" aria-label="Categorias de integrações"><b>Categorias</b>{categories.map(name => <button type="button" className={category === name ? 'active' : ''} aria-pressed={category === name} key={name} onClick={() => setCategory(name)}><span>{name}</span><em>{counts[name]}</em></button>)}</aside>
       <div className="integration-catalog-main">
         <label className="integration-search"><Search size={18}/><span className="sr-only">Buscar integração</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar integração..."/></label>
-        {grouped.length ? grouped.map(([name, list]) => <section className="card integration-category-card" key={name}><header><h2>{name}</h2><p>{name === 'E-commerce' ? 'Integrações com plataformas de e-commerce' : name === 'Logística e Frete' ? 'Transportadoras, cotações e cálculo de frete' : name === 'Marketing' ? 'Mensuração e rastreamento de conversões' : name === 'Atendimento' ? 'Relacionamento e recuperação de clientes' : 'Eventos e fluxos automáticos da operação'}</p></header><div>{list.map(item => <article className="integration-catalog-item" key={item.id}><span className={`integration-logo ${item.tone}`}><item.icon size={21}/></span><div><h3>{item.name}{connections[item.id] && <span className="integration-active"><CheckCircle2 size={12}/> Ativa</span>}{!item.available && <span className="integration-soon">Em breve</span>}</h3><p>{item.description}</p></div><button type="button" disabled={!item.available} onClick={() => open(item)}>{item.available ? connections[item.id] ? 'Gerenciar' : 'Configurar' : 'Em breve'}{item.available && <ArrowRight size={16}/>}</button></article>)}</div></section>) : <section className="card integration-catalog-empty"><Workflow size={27}/><h2>Nenhuma integração encontrada</h2><p>Altere a busca ou selecione outra categoria.</p><button type="button" className="secondary" onClick={() => { setQuery(''); setCategory('Todas'); }}>Limpar filtros</button></section>}
+        {grouped.length ? grouped.map(([name, list]) => <section className="card integration-category-card" key={name}><header><h2>{name}</h2><p>{name === 'E-commerce' ? 'Integrações com plataformas de e-commerce' : name === 'Logística e Frete' ? 'Transportadoras, cotações e cálculo de frete' : name === 'Marketing' ? 'Mensuração e rastreamento de conversões' : name === 'Atendimento' ? 'Relacionamento e recuperação de clientes' : 'Eventos e fluxos automáticos da operação'}</p></header><div>{list.map(item => <article className="integration-catalog-item" key={item.id}><span className={`integration-logo ${item.tone}`}>{catalogAssets[item.id] ? <img src={catalogAssets[item.id].imageUrl} alt={catalogAssets[item.id].altText || item.name}/> : <item.icon size={21}/>}</span><div><h3>{item.name}{connections[item.id] && <span className="integration-active"><CheckCircle2 size={12}/> Ativa</span>}{!item.available && <span className="integration-soon">Em breve</span>}</h3><p>{item.description}</p></div><button type="button" disabled={!item.available} onClick={() => open(item)}>{item.available ? connections[item.id] ? 'Gerenciar' : 'Configurar' : 'Em breve'}{item.available && <ArrowRight size={16}/>}</button></article>)}</div></section>) : <section className="card integration-catalog-empty"><Workflow size={27}/><h2>Nenhuma integração encontrada</h2><p>Altere a busca ou selecione outra categoria.</p><button type="button" className="secondary" onClick={() => { setQuery(''); setCategory('Todas'); }}>Limpar filtros</button></section>}
       </div>
     </div>
   </main>;

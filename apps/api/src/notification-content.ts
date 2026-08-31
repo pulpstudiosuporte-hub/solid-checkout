@@ -13,6 +13,7 @@ const amount = (value: unknown): string | null => typeof value === 'number' && N
 
 export function notificationContent(action: string, raw: unknown): NotificationPayload {
   const data = metadata(raw);
+  if (action === 'platform.announcement') return { type: 'info', title: typeof data.title === 'string' ? data.title : 'Novidade da SOLID', message: typeof data.message === 'string' ? data.message : 'Uma nova atualização está disponível.', destination: typeof data.destination === 'string' ? data.destination : 'Novidades' };
   const provider = typeof data.provider === 'string' ? data.provider : 'integra\u00e7\u00e3o';
   const payment = typeof data.providerStatus === 'string' ? data.providerStatus.toUpperCase() : typeof data.paymentStatus === 'string' ? data.paymentStatus : '';
   const formattedAmount = amount(data.amountCents);

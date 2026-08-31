@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3, CreditCard, Globe2, Home, LayoutTemplate, Package, Plug,
-  Search, ServerCog, Settings, ShoppingBag, ShoppingCart, Sparkles,
+  Search, ServerCog, Settings, ShoppingBag, ShoppingCart, Sparkles, Megaphone,
   Tag, Truck, Users, Webhook, X,
 } from 'lucide-react';
 
@@ -23,6 +23,7 @@ const items = [
   { label: 'Integrações', group: 'Marketing', icon: Plug, keywords: 'shopify conexão aplicativos integrações' },
   { label: 'Meu plano', group: 'Conta', icon: CreditCard, keywords: 'assinatura cobrança fatura plano limite' },
   { label: 'Configurações', group: 'Conta', icon: Settings, keywords: 'conta perfil segurança senha configurações' },
+  { label: 'Conteúdo', group: 'Administração', icon: Megaphone, keywords: 'feedback sugestões bugs novidades vídeos imagens integrações notificações', admin: true },
   { label: 'Usuários', group: 'Administração', icon: Users, keywords: 'admin membros acesso usuários', admin: true },
   { label: 'Operações', group: 'Administração', icon: ServerCog, keywords: 'admin fila jobs sistema operações', admin: true },
 ];
