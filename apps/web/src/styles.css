@@ -324,7 +324,7 @@
 
 /* Independent visual tokens: buttons no longer recolor accents and inputs obey their own fill. */
 .ep-button{background:var(--ebutton-bg,var(--ep))}
-.ep-card input{background-color:var(--einput)!important}
+.ep-card input{background-color:var(--einput)!important;border-color:var(--einput-border)!important;border-radius:var(--einput-radius)!important}
 .ep-steps span{color:var(--eprogress-label)!important}
 .ep-steps .active{color:var(--eprogress-active-label)!important}
 

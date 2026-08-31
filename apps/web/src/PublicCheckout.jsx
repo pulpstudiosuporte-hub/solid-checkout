@@ -74,6 +74,8 @@ const publicConfig = (value) => ({
   buttonTextColor: "#ffffff",
   borderColor: "#e5e5e9",
   inputBg: "#ffffff",
+  inputBorderColor: "#e5e5e9",
+  inputRadius: 10,
   radius: 14,
   contentWidth: 1120,
   font: "Plus Jakarta Sans",
@@ -139,6 +141,8 @@ const configStyle = (config) => ({
   "--public-muted": `color-mix(in srgb, ${config.textColor} 68%, transparent)`,
   "--public-border": config.borderColor,
   "--public-input": config.inputBg,
+  "--public-input-border": config.inputBorderColor || config.borderColor,
+  "--public-input-radius": `${config.inputRadius ?? 10}px`,
   "--public-radius": `${config.radius}px`,
   "--public-content-width": `${config.contentWidth}px`,
   "--public-hero-height": `${config.heroHeight}px`,
@@ -154,7 +158,7 @@ const configStyle = (config) => ({
   "--public-progress-active-text": config.progressActiveTextColor || "#ffffff",
   "--public-progress-label": config.progressLabelColor || "#777780",
   "--public-progress-active-label": config.progressActiveLabelColor || config.textColor,
-  fontFamily: config.font,
+  fontFamily: config.font === "Georgia" ? "Georgia, serif" : `"${config.font || "Plus Jakarta Sans"}", Arial, sans-serif`,
 });
 // Shopify descriptions are stored as HTML. The public checkout renders them
 // as plain text, so extract their readable content instead of exposing tags.

@@ -449,3 +449,30 @@
     animation: none !important;
   }
 }
+
+/* Compact media for card-like elements; banners, galleries and videos keep their wide media. */
+.public-custom-element.has-media:not(.type-banner):not(.type-gallery):not(.type-video),
+.ep-custom-element.has-media:not(.type-banner):not(.type-gallery):not(.type-video) {
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.public-custom-element.has-media:not(.type-banner):not(.type-gallery):not(.type-video) > .public-custom-media,
+.ep-custom-element.has-media:not(.type-banner):not(.type-gallery):not(.type-video) > .ep-custom-media {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  max-height: 48px;
+  aspect-ratio: 1;
+  border-radius: calc(var(--public-element-radius, var(--eelement-radius, 12px)) * .65);
+}
+
+.public-checkout .customer-form-card input,
+.public-checkout .public-coupon input,
+.public-checkout .checkout-inline-coupon input,
+.public-checkout select,
+.public-checkout textarea {
+  border-color: var(--public-input-border, var(--public-border)) !important;
+  border-radius: var(--public-input-radius, 10px) !important;
+}
