@@ -19,6 +19,7 @@ const optionalUrl = (value: unknown): string | null | undefined => {
 const statuses = ['BACKLOG', 'PLANNED', 'IN_PROGRESS', 'DONE'] as const;
 const categories = ['NEWS', 'IMPROVEMENT', 'FIX', 'INTEGRATION', 'SECURITY'] as const;
 const automaticReleases = [
+  { publicId: 'auto-20260901-settings', category: 'IMPROVEMENT' as const, title: 'Central de configurações renovada', description: 'Dados da loja e do responsável, domínios, usuários, segurança e preferências de notificações agora ficam reunidos em uma central completa.', publishedAt: new Date('2026-09-01T12:45:00.000Z') },
   { publicId: 'auto-20260831-integrations', category: 'NEWS' as const, title: 'Catálogo de integrações renovado', description: 'Agora você encontra, pesquisa e gerencia integrações e gateways em uma central organizada.', publishedAt: new Date('2026-08-31T21:00:00.000Z') },
   { publicId: 'auto-20260831-search', category: 'IMPROVEMENT' as const, title: 'Busca avançada no painel', description: 'Use Ctrl K para encontrar páginas, recursos e ações por nome ou palavras relacionadas.', publishedAt: new Date('2026-08-31T20:00:00.000Z') },
   { publicId: 'auto-20260831-checkout', category: 'IMPROVEMENT' as const, title: 'Checkout responsivo e personalizável', description: 'Novos controles visuais, elementos editáveis e melhorias de compatibilidade para checkouts publicados.', publishedAt: new Date('2026-08-31T19:00:00.000Z') },
