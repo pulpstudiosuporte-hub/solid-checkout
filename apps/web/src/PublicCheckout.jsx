@@ -252,6 +252,35 @@ function publicCustomWrapProps(config, item) {
   };
 }
 
+const publicCustomElementRegion = (item) =>
+  item?.region === "sidebar" ? "sidebar" : "main";
+
+function PublicRegionElements({ config, region }) {
+  const elements = (
+    Array.isArray(config.customElements) ? config.customElements : []
+  ).filter(
+    (item) =>
+      item.enabled !== false && publicCustomElementRegion(item) === region,
+  );
+  if (!elements.length) return null;
+  return (
+    <div className={`public-region-elements public-region-elements-${region}`}>
+      {elements.map((item) => {
+        const placement = publicCustomWrapProps(config, item);
+        return (
+          <div
+            className={`public-custom-wrap custom-type-${item.type} ${placement.className || ""}`}
+            key={item.id}
+            style={placement.style}
+          >
+            <PublicCustomElement item={item} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ProductImage({ src, title }) {
   return src ? (
     <img src={src} alt={`Imagem de ${title}`} loading="lazy" />
@@ -671,12 +700,6 @@ function SessionContent({ session: initialSession, token }) {
           {copy.payment}
         </span>
       </nav>}
-      {(Array.isArray(config.customElements) ? config.customElements : []).filter(item => item.enabled !== false).map((item) => {
-        const placement = publicCustomWrapProps(config, item);
-        return <div className={`public-custom-wrap custom-type-${item.type} ${placement.className || ''}`} key={item.id} style={{ order: layoutOrder('custom',item.id), ...placement.style }}>
-          <PublicCustomElement item={item} />
-        </div>;
-      })}
       <div
         className={`public-checkout-grid summary-device-${config.summaryDevice || 'all'} ${config.showSummary ? "" : "without-summary"}`}
         style={{order:layoutOrder('block','content')}}
@@ -999,10 +1022,17 @@ function SessionContent({ session: initialSession, token }) {
               </button>}
             </div>
           )}
+          <PublicRegionElements config={config} region="main" />
         </section>
-        {config.showSummary && (
+        {(config.showSummary ||
+          (Array.isArray(config.customElements) ? config.customElements : []).some(
+            (item) =>
+              item.enabled !== false &&
+              publicCustomElementRegion(item) === "sidebar",
+          )) && (
           <div className={`session-summary-column checkout-device-${config.summaryDevice || 'all'}`}>
           {config.summaryBannerUrl && <img className={`session-summary-banner checkout-device-${config.summaryBannerDevice || 'desktop'}`} src={config.summaryBannerUrl} alt="Banner do resumo do pedido" style={{objectFit:config.summaryBannerFit || 'cover'}} loading="lazy" decoding="async" />}
+          {config.showSummary && (
           <aside className={`session-order-summary ${summaryOpen ? "is-open" : "is-collapsed"}`}>
             <button
               type="button"
@@ -1090,6 +1120,8 @@ function SessionContent({ session: initialSession, token }) {
             </p>
             </div>
           </aside>
+          )}
+          <PublicRegionElements config={config} region="sidebar" />
           </div>
         )}
       </div>

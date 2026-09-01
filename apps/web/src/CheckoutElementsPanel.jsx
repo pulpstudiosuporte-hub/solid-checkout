@@ -281,7 +281,7 @@ export default function CheckoutElementsPanel({
   const activate = (type, on) => {
     const current = byType.get(type);
     if (on && !current) {
-      addElement(type, 2);
+      addElement(type, 0, Number.POSITIVE_INFINITY, { region: "main" });
       setOriginal(null);
       setTimeout(() => setEditing(type), 0);
     } else if (current) updateElement(current.id, { enabled: on });
@@ -327,6 +327,23 @@ export default function CheckoutElementsPanel({
               label={meta.label}
             />
           </div>
+          <Field
+            label="Posição no checkout"
+            help="O elemento será exibido em apenas uma das duas colunas."
+          >
+            <select
+              value={current.region === "sidebar" ? "sidebar" : "main"}
+              onChange={(event) =>
+                updateElement(current.id, {
+                  region: event.target.value,
+                  slot: 0,
+                })
+              }
+            >
+              <option value="main">Conteúdo principal</option>
+              <option value="sidebar">Abaixo do resumo lateral</option>
+            </select>
+          </Field>
           <Field label="Título">
             <input
               value={current.title || ""}
@@ -756,11 +773,12 @@ export default function CheckoutElementsPanel({
   );
 }
 
-export const newElementDefaults = (type, slot = 2) => ({
+export const newElementDefaults = (type, slot = 2, region = "main") => ({
   ...defaults,
   id: `el_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
   type,
   slot,
+  region,
   title: elementCatalog[type]?.title || "Novo elemento",
   text: elementCatalog[type]?.text || "Adicione seu conteúdo.",
 });

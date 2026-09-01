@@ -62,6 +62,38 @@ describe("ordenação dos elementos do checkout", () => {
     });
   });
 
+  it("move um complemento para o resumo lateral sem duplicá-lo", () => {
+    const result = reorderCustomElements(
+      [
+        { ...element("notice", 0), region: "main" },
+        { ...element("proof", 0), region: "sidebar" },
+      ],
+      "notice",
+      0,
+      1,
+      { region: "sidebar" },
+    );
+
+    expect(result.filter((item) => item.id === "notice")).toHaveLength(1);
+    expect(result.map((item) => [item.id, item.region])).toEqual([
+      ["proof", "sidebar"],
+      ["notice", "sidebar"],
+    ]);
+  });
+
+  it("trata elementos antigos sem destino como conteúdo principal", () => {
+    const result = reorderCustomElements(
+      [element("legacy", 2), { ...element("side", 0), region: "sidebar" }],
+      "legacy",
+      0,
+      0,
+    );
+
+    expect(result.find((item) => item.id === "legacy")).toMatchObject({
+      region: "main",
+    });
+  });
+
   it("inclui elementos personalizados na ordem visual completa", () => {
     const entries = checkoutLayoutEntries({
       blockOrder: ["hero", "timer", "progress", "content"],

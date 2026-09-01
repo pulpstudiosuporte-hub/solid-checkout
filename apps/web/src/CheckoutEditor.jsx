@@ -36,7 +36,6 @@ import CheckoutElementsPanel, {
 } from "./CheckoutElementsPanel";
 import {
   buildCheckoutLayoutEntries,
-  reorderCheckoutLayout,
 } from "./checkout-layout";
 import "./checkout-polish.css";
 
@@ -284,6 +283,8 @@ let applyTemplate = () => {};
 let addCustomElement = () => {};
 let updateCustomElement = () => {};
 let removeCustomElement = () => {};
+const customElementRegion = (item) =>
+  item?.region === "sidebar" ? "sidebar" : "main";
 function placeCustomElement(
   elements,
   item,
@@ -291,9 +292,13 @@ function placeCustomElement(
   index = Number.POSITIVE_INFINITY,
 ) {
   const remaining = elements.filter((current) => current.id !== item.id);
-  const moved = { ...item, slot };
+  const region = customElementRegion(item);
+  const moved = { ...item, slot, region };
   const visibleAtSlot = remaining.filter(
-    (current) => current.slot === slot && current.enabled !== false,
+    (current) =>
+      customElementRegion(current) === region &&
+      current.slot === slot &&
+      current.enabled !== false,
   );
   const before = visibleAtSlot[index];
   if (before) {
@@ -305,7 +310,11 @@ function placeCustomElement(
     return remaining;
   }
   const slotIndexes = remaining
-    .map((current, currentIndex) => (current.slot === slot ? currentIndex : -1))
+    .map((current, currentIndex) =>
+      customElementRegion(current) === region && current.slot === slot
+        ? currentIndex
+        : -1,
+    )
     .filter((currentIndex) => currentIndex >= 0);
   remaining.splice(
     slotIndexes.length ? slotIndexes.at(-1) + 1 : remaining.length,
@@ -317,13 +326,21 @@ function placeCustomElement(
 export function reorderCustomElements(elements, id, slot, index, patch = {}) {
   const item = elements.find((current) => current.id === id);
   if (!item) return elements;
+  const sourceRegion = customElementRegion(item);
+  const targetRegion = customElementRegion({ ...item, ...patch });
   const sourceIndex = elements
     .filter(
-      (current) => current.slot === item.slot && current.enabled !== false,
+      (current) =>
+        customElementRegion(current) === sourceRegion &&
+        current.slot === item.slot &&
+        current.enabled !== false,
     )
     .findIndex((current) => current.id === id);
   const targetIndex =
-    item.slot === slot && sourceIndex >= 0 && sourceIndex < index
+    sourceRegion === targetRegion &&
+    item.slot === slot &&
+    sourceIndex >= 0 &&
+    sourceIndex < index
       ? index - 1
       : index;
   return placeCustomElement(elements, { ...item, ...patch }, slot, targetIndex);
@@ -481,14 +498,31 @@ function Settings({ group, c, u }) {
       u("inputRadius", Math.min(preset.radius, 14));
   };
   const moveLayoutEntry = (entryKey, direction) => {
-    const next = reorderCheckoutLayout(c, entryKey, direction);
-    if (next === c) return;
-    const blockOrderChanged = next.blockOrder.some(
-      (id, index) => id !== (c.blockOrder || defaultBlockOrder)[index],
+    const id = entryKey.replace(/^block:/, "");
+    const order = [...(c.blockOrder || defaultBlockOrder)];
+    const from = order.indexOf(id);
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= order.length) return;
+    [order[from], order[to]] = [order[to], order[from]];
+    u("blockOrder", order);
+  };
+  const moveRegionElement = (item, direction) => {
+    const region = customElementRegion(item);
+    const regionItems = (c.customElements || []).filter(
+      (entry) =>
+        entry.enabled !== false && customElementRegion(entry) === region,
     );
+    const index = regionItems.findIndex((entry) => entry.id === item.id);
+    if (index < 0) return;
     u(
-      blockOrderChanged ? "blockOrder" : "customElements",
-      blockOrderChanged ? next.blockOrder : next.customElements,
+      "customElements",
+      reorderCustomElements(
+        c.customElements || [],
+        item.id,
+        0,
+        direction > 0 ? index + 2 : index - 1,
+        { region },
+      ),
     );
   };
   const line = (label, key) => (
@@ -949,21 +983,18 @@ function Settings({ group, c, u }) {
         />
         <h3>Ordem dos blocos principais</h3>
         <p className="panel-help">
-          Os elementos novos aparecem junto aos blocos principais. Use as setas
-          para mover qualquer item livremente.
+          Organize banner, cronômetro, etapas e formulário.
         </p>
         <div className="block-list layout-order-list">
-          {checkoutLayoutEntries(c).map((entry, index, entries) => (
+          {checkoutLayoutEntries(c)
+            .filter((entry) => entry.kind === "block")
+            .map((entry, index, entries) => (
             <div
               key={`${entry.kind}:${entry.id}`}
-              className={
-                entry.kind === "custom" ? "custom-entry" : "native-entry"
-              }
+              className="native-entry"
             >
               <span>
-                <small>
-                  {entry.kind === "custom" ? "Elemento" : "Bloco principal"}
-                </small>
+                <small>Bloco principal</small>
                 {entry.label}
               </span>
               <button
@@ -983,6 +1014,68 @@ function Settings({ group, c, u }) {
             </div>
           ))}
         </div>
+        <h3>Complementos por coluna</h3>
+        <p className="panel-help">
+          Cada elemento aparece somente no conteúdo principal ou abaixo do
+          resumo lateral.
+        </p>
+        {[
+          ["main", "Conteúdo principal"],
+          ["sidebar", "Resumo lateral"],
+        ].map(([region, label]) => {
+          const items = (c.customElements || []).filter(
+            (item) =>
+              item.enabled !== false && customElementRegion(item) === region,
+          );
+          return (
+            <section className="element-region-order" key={region}>
+              <h4>{label}</h4>
+              {!items.length && <small>Nenhum complemento nesta coluna.</small>}
+              <div className="block-list layout-order-list">
+                {items.map((item, index) => (
+                  <div className="custom-entry" key={item.id}>
+                    <span>
+                      <small>Elemento</small>
+                      {item.title || elementCatalog[item.type]?.label}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateCustomElement(item.id, {
+                          region: region === "main" ? "sidebar" : "main",
+                          slot: 0,
+                        })
+                      }
+                      aria-label={`Mover ${item.title} para ${region === "main" ? "o resumo lateral" : "o conteúdo principal"}`}
+                    >
+                      {region === "main" ? (
+                        <ChevronRight size={14} />
+                      ) : (
+                        <ArrowLeft size={14} />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveRegionElement(item, -1)}
+                      disabled={!index}
+                      aria-label={`Mover ${item.title} para cima`}
+                    >
+                      <ArrowUp size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveRegionElement(item, 1)}
+                      disabled={index === items.length - 1}
+                      aria-label={`Mover ${item.title} para baixo`}
+                    >
+                      <ArrowDown size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          );
+        })}
         <h3>Elementos nativos</h3>
         {line("Cupom", "showCoupon")}
         {line("Order bump", "showBump")}
@@ -1284,7 +1377,7 @@ function CustomElementPreview({ item, onRemove, readOnly = false }) {
   );
 }
 
-function ElementDropZone({ slot, index, onAdd, onMove, free }) {
+function ElementDropZone({ slot, index, onAdd, onMove, free, region = "main" }) {
   const [active, setActive] = useState(false);
   const drop = (event) => {
     event.preventDefault();
@@ -1299,14 +1392,15 @@ function ElementDropZone({ slot, index, onAdd, onMove, free }) {
       ? {
           horizontalAlign:
             ratio < 0.34 ? "left" : ratio > 0.66 ? "right" : "center",
+          region,
         }
-      : {};
+      : { region };
     if (type) onAdd(type, slot, index, placement);
     else if (id) onMove(id, slot, index, placement);
   };
   return (
     <div
-      className={`ep-drop-zone ${active ? "active" : ""} ${free ? "free" : ""}`}
+      className={`ep-drop-zone ep-drop-zone-${region} ${active ? "active" : ""} ${free ? "free" : ""}`}
       onDragEnter={() => setActive(true)}
       onDragLeave={() => setActive(false)}
       onDragOver={(event) => event.preventDefault()}
@@ -1316,6 +1410,46 @@ function ElementDropZone({ slot, index, onAdd, onMove, free }) {
       <span>
         {free && active ? "Esquerda · Centro · Direita" : "Solte aqui"}
       </span>
+    </div>
+  );
+}
+
+function EditorRegionElements({ config, region, onAdd, onMove, onRemove, readOnly }) {
+  const elements = (
+    Array.isArray(config.customElements) ? config.customElements : []
+  ).filter(
+    (item) => item.enabled !== false && customElementRegion(item) === region,
+  );
+  if (readOnly && !elements.length) return null;
+  return (
+    <div className={`ep-region-elements ep-region-elements-${region}`}>
+      {!readOnly && (
+        <ElementDropZone
+          slot={0}
+          index={0}
+          region={region}
+          free={config.elementEditMode === "free"}
+          onAdd={onAdd}
+          onMove={onMove}
+        />
+      )}
+      {elements.map((item, index) => (
+        <React.Fragment key={item.id}>
+          <div {...customWrapProps(config, item, "ep")}>
+            <CustomElementPreview item={item} onRemove={onRemove} readOnly={readOnly} />
+          </div>
+          {!readOnly && (
+            <ElementDropZone
+              slot={0}
+              index={index + 1}
+              region={region}
+              free={config.elementEditMode === "free"}
+              onAdd={onAdd}
+              onMove={onMove}
+            />
+          )}
+        </React.Fragment>
+      ))}
     </div>
   );
 }
@@ -1508,8 +1642,21 @@ function Preview({
                 </blockquote>
               </div>
             )}
+            <EditorRegionElements
+              config={c}
+              region="main"
+              onAdd={onAddElement}
+              onMove={onMoveElement}
+              onRemove={onRemoveElement}
+              readOnly={readOnly}
+            />
           </div>
-          {c.showSummary && (
+          {(c.showSummary ||
+            (c.customElements || []).some(
+              (item) =>
+                item.enabled !== false &&
+                customElementRegion(item) === "sidebar",
+            )) && (
             <div className="ep-summary-column">
               {c.summaryBannerUrl && (
                 <img
@@ -1519,7 +1666,7 @@ function Preview({
                   style={{ objectFit: c.summaryBannerFit || "cover" }}
                 />
               )}
-              <details
+              {c.showSummary && <details
                 className={`ep-mobile-summary ${device === "mobile" ? "" : "desktop"}`}
                 open={device === "mobile" ? undefined : true}
               >
@@ -1555,14 +1702,21 @@ function Preview({
                   <strong>{previewMoney}</strong>
                 </footer>
                 </div>
-              </details>
+              </details>}
+              <EditorRegionElements
+                config={c}
+                region="sidebar"
+                onAdd={onAddElement}
+                onMove={onMoveElement}
+                onRemove={onRemoveElement}
+                readOnly={readOnly}
+              />
             </div>
           )}
         </div>
       </div>
     ),
   };
-  const custom = Array.isArray(c.customElements) ? c.customElements : [];
   return (
     <div
       className={`editor-device ${device} template-${c.template} layout-${c.layout}`}
@@ -1582,45 +1736,7 @@ function Preview({
             </span>
           )}
         </div>
-        {[0, 1, 2, 3, 4].map((slot) => {
-          const slotItems = custom.filter(
-            (item) => item.slot === slot && item.enabled !== false,
-          );
-          return (
-            <React.Fragment key={slot}>
-              {!readOnly && (
-                <ElementDropZone
-                  slot={slot}
-                  index={0}
-                  free={c.elementEditMode === "free"}
-                  onAdd={onAddElement}
-                  onMove={onMoveElement}
-                />
-              )}
-              {slotItems.map((item, index) => (
-                <React.Fragment key={item.id}>
-                  <div {...customWrapProps(c, item, "ep")}>
-                    <CustomElementPreview
-                      item={item}
-                      onRemove={onRemoveElement}
-                      readOnly={readOnly}
-                    />
-                  </div>
-                  {!readOnly && (
-                    <ElementDropZone
-                      slot={slot}
-                      index={index + 1}
-                      free={c.elementEditMode === "free"}
-                      onAdd={onAddElement}
-                      onMove={onMoveElement}
-                    />
-                  )}
-                </React.Fragment>
-              ))}
-              {slot < 4 && blocks[(c.blockOrder || defaultBlockOrder)[slot]]}
-            </React.Fragment>
-          );
-        })}
+        {(c.blockOrder || defaultBlockOrder).map((blockId) => blocks[blockId])}
         <div className="ep-footer">
           {c.footerText}
           <span>
@@ -1711,7 +1827,11 @@ export default function CheckoutEditor({
       ...draft,
       testimonials,
       customElements: Array.isArray(draft.customElements)
-        ? draft.customElements
+        ? draft.customElements.map((item) => ({
+            ...item,
+            region: customElementRegion(item),
+            slot: 0,
+          }))
         : [],
       blockOrder: Array.isArray(draft.blockOrder)
         ? draft.blockOrder
@@ -1745,7 +1865,12 @@ export default function CheckoutEditor({
       placement.horizontalAlign !== "center"
         ? { ...placement, widthPercent: 50 }
         : placement;
-    const element = { ...newElementDefaults(type, slot), ...freePlacement };
+    const region = customElementRegion(placement);
+    const element = {
+      ...newElementDefaults(type, slot, region),
+      ...freePlacement,
+      region,
+    };
     u(
       "customElements",
       placeCustomElement(c.customElements || [], element, slot, index),
