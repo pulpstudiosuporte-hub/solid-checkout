@@ -115,6 +115,14 @@ enum ProductReleaseCategory {
   SECURITY
 }
 
+enum ChromaSenseEventType {
+  VIEW
+  CLICK
+  MOVE
+  SCROLL
+  ATTENTION
+}
+
 model User {
   id              String        @id @default(uuid()) @db.Uuid
   publicId        String        @unique @default(cuid()) @map("public_id") @db.VarChar(32)
@@ -193,6 +201,7 @@ model Store {
   webhookEndpoints WebhookEndpoint[]
   webhookDeliveries WebhookDelivery[]
   productFeedback ProductFeedback[]
+  chromaSenseSessions ChromaSenseSession[]
 
   @@map("stores")
 }
@@ -469,6 +478,7 @@ model Checkout {
   store       Store          @relation(fields: [storeId], references: [id], onDelete: Restrict)
   product     Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
   sessions    CheckoutSession[]
+  chromaSenseSessions ChromaSenseSession[]
 
   @@unique([storeId, slug])
   @@index([storeId, status, createdAt(sort: Desc)])
@@ -532,6 +542,7 @@ model CheckoutSession {
   deliveryJobs      IntegrationDeliveryJob[]
   abandonedRecoveryDeliveries AbandonedRecoveryDelivery[]
   coupon            Coupon?               @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  chromaSenseSession ChromaSenseSession?
 
   @@index([checkoutId, status, expiresAt])
   @@index([checkoutId, createdAt(sort: Desc)])
@@ -542,6 +553,56 @@ model CheckoutSession {
   @@index([status, confirmationEmailSentAt, confirmationEmailNextAttemptAt])
   @@index([status, merchantEmailSentAt, merchantEmailNextAttemptAt])
   @@map("checkout_sessions")
+}
+
+model ChromaSenseSession {
+  id                String          @id @default(uuid()) @db.Uuid
+  publicId          String          @unique @default(cuid()) @map("public_id") @db.VarChar(32)
+  storeId           String          @map("store_id") @db.Uuid
+  checkoutId        String          @map("checkout_id") @db.Uuid
+  checkoutSessionId String          @unique @map("checkout_session_id") @db.Uuid
+  pageKey           String          @default("checkout") @map("page_key") @db.VarChar(100)
+  deviceType        String          @default("desktop") @map("device_type") @db.VarChar(16)
+  viewportWidth     Int             @map("viewport_width")
+  viewportHeight    Int             @map("viewport_height")
+  eventCount        Int             @default(0) @map("event_count")
+  activeMs          Int             @default(0) @map("active_ms")
+  visibleMs         Int             @default(0) @map("visible_ms")
+  maxScrollPercent  Int             @default(0) @map("max_scroll_percent")
+  rageClickCount    Int             @default(0) @map("rage_click_count")
+  deadClickCount    Int             @default(0) @map("dead_click_count")
+  startedAt         DateTime        @default(now()) @map("started_at") @db.Timestamptz(3)
+  lastSeenAt        DateTime        @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  store             Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  checkout          Checkout        @relation(fields: [checkoutId], references: [id], onDelete: Cascade)
+  checkoutSession   CheckoutSession @relation(fields: [checkoutSessionId], references: [id], onDelete: Cascade)
+  events            ChromaSenseEvent[]
+
+  @@index([storeId, startedAt(sort: Desc)])
+  @@index([checkoutId, startedAt(sort: Desc)])
+  @@map("chromasense_sessions")
+}
+
+model ChromaSenseEvent {
+  id             String               @id @default(uuid()) @db.Uuid
+  sessionId      String               @map("session_id") @db.Uuid
+  type           ChromaSenseEventType
+  x              Float?
+  y              Float?
+  scrollPercent  Int?                 @map("scroll_percent")
+  durationMs     Int?                 @map("duration_ms")
+  target         String?              @db.VarChar(160)
+  targetLabel    String?              @map("target_label") @db.VarChar(120)
+  interactive    Boolean?
+  rage           Boolean              @default(false)
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  session        ChromaSenseSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, type, createdAt])
+  @@index([createdAt])
+  @@map("chromasense_events")
 }
 
 model IntegrationDeliveryJob {

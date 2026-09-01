@@ -35,6 +35,7 @@ import {
   touchPublicCheckoutPresence,
 } from "./api";
 import { checkoutLayoutPositionMap } from "./checkout-layout";
+import { useChromaSense } from "./useChromaSense";
 import "./public-session.css";
 import "./checkout-polish.css";
 
@@ -414,6 +415,7 @@ function useCheckoutPresence(sessionId, token) {
 function SessionContent({ session: initialSession, token }) {
   const [session, setSession] = useState(initialSession);
   useCheckoutPresence(session.publicId, token);
+  useChromaSense(session.publicId, token);
   const expiry = useExpiry(session.expiresAt);
   const [form, setForm] = useState({
     name: "",

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3, CreditCard, Globe2, Home, LayoutTemplate, Package, Plug,
   Search, ServerCog, Settings, ShoppingBag, ShoppingCart, Sparkles, Megaphone,
-  Tag, Truck, Users, Webhook, X,
+  Tag, Truck, Users, Webhook, X, ScanSearch,
 } from 'lucide-react';
 
 const items = [
@@ -11,6 +11,7 @@ const items = [
   { label: 'Análises', group: 'Gestão', icon: BarChart3, keywords: 'analytics indicadores receita conversão vendas métricas' },
   { label: 'Pedidos', group: 'Gestão', icon: ShoppingBag, keywords: 'vendas pagamentos pix clientes pedidos' },
   { label: 'Carrinhos', group: 'Gestão', icon: ShoppingCart, keywords: 'abandonados recuperação checkout clientes' },
+  { label: 'ChromaSense', group: 'Gestão', icon: ScanSearch, keywords: 'mapa calor cliques movimentos rolagem atenção comportamento insights checkout' },
   { label: 'Produtos', group: 'Gestão', icon: Package, keywords: 'catálogo estoque itens shopify produto' },
   { label: 'Webhooks', group: 'Gestão', icon: Webhook, keywords: 'eventos integrações notificações endpoint api' },
   { label: 'Checkouts', group: 'Checkout', icon: LayoutTemplate, keywords: 'editor personalização publicar páginas checkout' },

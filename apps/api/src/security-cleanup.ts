@@ -12,7 +12,9 @@ export async function runSecurityCleanup(database: PrismaClient, logger: Fastify
   const pushLimit = new Date(now.getTime() - 90 * DAY);
   const auditLimit = new Date(now.getTime() - 400 * DAY);
   const webhookLimit = new Date(now.getTime() - 90 * DAY);
-  const [signups, resetTokens, challenges, pushSubscriptions, sessions, expiredCheckouts, billingBlocked, audits, webhookDeliveries] = await database.$transaction([
+  const chromaEventLimit = new Date(now.getTime() - 90 * DAY);
+  const chromaSessionLimit = new Date(now.getTime() - 400 * DAY);
+  const [signups, resetTokens, challenges, pushSubscriptions, sessions, expiredCheckouts, billingBlocked, audits, webhookDeliveries, chromaEvents, chromaSessions] = await database.$transaction([
     database.pendingSignup.deleteMany({ where: { expiresAt: { lt: dayAgo } } }),
     database.passwordResetToken.deleteMany({ where: { OR: [{ expiresAt: { lt: dayAgo } }, { usedAt: { lt: dayAgo } }] } }),
     database.mfaChallenge.deleteMany({ where: { OR: [{ expiresAt: { lt: dayAgo } }, { consumedAt: { lt: dayAgo } }] } }),
@@ -21,7 +23,9 @@ export async function runSecurityCleanup(database: PrismaClient, logger: Fastify
     database.checkoutSession.updateMany({ where: { status: 'OPEN', expiresAt: { lte: now } }, data: { status: 'EXPIRED' } }),
     database.billingSubscription.updateMany({ where: { status: 'PAST_DUE', graceUntil: { lte: now }, blockedAt: null }, data: { status: 'UNPAID', blockedAt: now } }),
     database.auditLog.deleteMany({ where: { createdAt: { lt: auditLimit } } }),
-    database.webhookDelivery.deleteMany({ where: { createdAt: { lt: webhookLimit }, status: { in: ['DELIVERED', 'DEAD'] } } })
+    database.webhookDelivery.deleteMany({ where: { createdAt: { lt: webhookLimit }, status: { in: ['DELIVERED', 'DEAD'] } } }),
+    database.chromaSenseEvent.deleteMany({ where: { createdAt: { lt: chromaEventLimit } } }),
+    database.chromaSenseSession.deleteMany({ where: { startedAt: { lt: chromaSessionLimit } } })
   ]);
   const stores = await database.store.findMany({
     select: { id: true, members: { where: { role: 'OWNER' }, take: 1, select: { user: { select: { billingSubscription: true } } } } }
@@ -47,7 +51,7 @@ export async function runSecurityCleanup(database: PrismaClient, logger: Fastify
     });
     anonymizedCheckouts += result.count;
   }
-  logger.info({ deleted: { signups: signups.count, resetTokens: resetTokens.count, challenges: challenges.count, pushSubscriptions: pushSubscriptions.count, sessions: sessions.count, audits: audits.count, webhookDeliveries: webhookDeliveries.count }, updated: { expiredCheckouts: expiredCheckouts.count, anonymizedCheckouts, billingBlocked: billingBlocked.count } }, 'security_cleanup_completed');
+  logger.info({ deleted: { signups: signups.count, resetTokens: resetTokens.count, challenges: challenges.count, pushSubscriptions: pushSubscriptions.count, sessions: sessions.count, audits: audits.count, webhookDeliveries: webhookDeliveries.count, chromaEvents: chromaEvents.count, chromaSessions: chromaSessions.count }, updated: { expiredCheckouts: expiredCheckouts.count, anonymizedCheckouts, billingBlocked: billingBlocked.count } }, 'security_cleanup_completed');
 }
 
 export function startSecurityCleanup(database: PrismaClient, logger: FastifyBaseLogger): () => void {
