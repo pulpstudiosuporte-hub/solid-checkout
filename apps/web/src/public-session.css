@@ -247,7 +247,7 @@
   color: var(--public-header-text, #17171f);
 }
 .public-brand-text { color: var(--public-text); font-size: 21px; font-weight: 850; letter-spacing: .06em; }
-.public-checkout-hero { width: min(1120px, calc(100% - 32px)); height: var(--public-hero-height, 220px); margin: 24px auto 0; border: 1px dashed var(--public-border); border-radius: var(--public-radius); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 9px; overflow: hidden; background: color-mix(in srgb, var(--public-primary) 7%, var(--public-card)); background-position: center; background-size: cover; color: var(--public-primary); font-size: 12px; font-weight: 750; }
+.public-checkout-hero { width: min(var(--public-content-width, 1120px), calc(100% - 32px)); height: var(--public-hero-height, 220px); margin: 24px auto 0; border: 1px dashed var(--public-border); border-radius: var(--public-radius); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 9px; overflow: hidden; background: color-mix(in srgb, var(--public-primary) 7%, var(--public-card)); background-position: center; background-size: cover; color: var(--public-primary); font-size: 12px; font-weight: 750; }
 .public-checkout-hero.has-image { border-style: solid; }
 .layout-centered .public-checkout-grid { grid-template-columns: minmax(0, 760px); justify-content: center; }
 .layout-centered .session-order-summary { order: -1; }
@@ -665,11 +665,13 @@
 .public-region-elements .public-custom-wrap{width:100%;max-width:none;margin:0}
 .public-region-elements .public-custom-wrap.free{width:var(--element-free-width,100%)}
 .public-region-elements-sidebar .public-custom-wrap.free{width:100%}
+.session-checkout>.public-region-elements-top{width:min(var(--public-content-width,1120px),calc(100% - 32px));margin:var(--public-element-spacing,12px) auto 0}
+.public-region-elements-main .public-custom-wrap,.public-region-elements-sidebar .public-custom-wrap{box-sizing:border-box}
 
 /* Keep all horizontal checkout blocks aligned to the configured desktop width. */
 .session-checkout .public-checkout-grid{width:min(var(--public-content-width,1120px),calc(100% - 32px));grid-template-columns:minmax(0,1fr) minmax(220px,32%)}
-.session-checkout .checkout-progress{width:min(var(--public-content-width,1120px),calc(100% - 64px))}
-.session-checkout>.session-expiry,.session-checkout .public-custom-wrap{width:min(var(--public-content-width,1120px),calc(100% - 32px))}
+.session-checkout .checkout-progress{width:min(var(--public-content-width,1120px),calc(100% - 32px))}
+.session-checkout>.session-expiry{width:min(var(--public-content-width,1120px),calc(100% - 32px))}
 @media(max-width:700px){.session-checkout .public-checkout-grid{grid-template-columns:1fr}}
 
 /* Full-size desktop composition; mobile keeps the compact responsive rules. */

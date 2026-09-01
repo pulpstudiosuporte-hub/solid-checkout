@@ -329,6 +329,11 @@
 .ep-region-elements-sidebar .ep-custom-wrap.free{width:100%}
 .ep-region-elements .ep-drop-zone{width:100%;margin:0;min-height:34px;border-color:color-mix(in srgb,var(--ep) 22%,var(--eborder));color:color-mix(in srgb,var(--ep) 72%,#6f6f79)}
 .ep-region-elements .ep-drop-zone:hover,.ep-region-elements .ep-drop-zone.active{border-color:var(--ep);background:color-mix(in srgb,var(--ep) 7%,transparent)}
+.ep-top-region{padding-bottom:0!important}
+.ep-region-elements-top{width:100%;margin-top:0}
+.ep-region-elements-main .ep-custom-wrap,.ep-region-elements-sidebar .ep-custom-wrap{box-sizing:border-box}
+.custom-entry-region{width:84px;height:34px;border:1px solid #ded9eb;border-radius:8px;background:#fff;padding:0 6px;color:#5d46bd;font-size:9px;font-weight:700}
+.layout-order-list>div.custom-entry{grid-template-columns:minmax(0,1fr) 88px 44px 44px;gap:2px;padding-right:2px}
 .element-region-order{margin:18px 0 24px}
 .element-region-order>h4{margin:0 0 9px;font-size:10px;color:#4f4b57}
 .element-region-order>small{display:block;margin-bottom:9px;color:#8a8591;font-size:9px}

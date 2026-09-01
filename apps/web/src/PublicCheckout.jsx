@@ -252,10 +252,13 @@ function publicCustomWrapProps(config, item) {
   };
 }
 
-const publicCustomElementRegion = (item) =>
-  item?.region === "sidebar" ? "sidebar" : "main";
+const publicCustomElementRegion = (item) => {
+  if (item?.region === "sidebar") return "sidebar";
+  if (item?.region === "top") return "top";
+  return "main";
+};
 
-function PublicRegionElements({ config, region }) {
+function PublicRegionElements({ config, region, style }) {
   const elements = (
     Array.isArray(config.customElements) ? config.customElements : []
   ).filter(
@@ -264,7 +267,10 @@ function PublicRegionElements({ config, region }) {
   );
   if (!elements.length) return null;
   return (
-    <div className={`public-region-elements public-region-elements-${region}`}>
+    <div
+      className={`public-region-elements public-region-elements-${region}`}
+      style={style}
+    >
       {elements.map((item) => {
         const placement = publicCustomWrapProps(config, item);
         return (
@@ -700,6 +706,11 @@ function SessionContent({ session: initialSession, token }) {
           {copy.payment}
         </span>
       </nav>}
+      <PublicRegionElements
+        config={config}
+        region="top"
+        style={{ order: layoutOrder('block', 'content') }}
+      />
       <div
         className={`public-checkout-grid summary-device-${config.summaryDevice || 'all'} ${config.showSummary ? "" : "without-summary"}`}
         style={{order:layoutOrder('block','content')}}

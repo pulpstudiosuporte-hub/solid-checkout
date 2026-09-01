@@ -94,6 +94,24 @@ describe("ordenação dos elementos do checkout", () => {
     });
   });
 
+  it("mantém complementos superiores na faixa de largura total", () => {
+    const result = reorderCustomElements(
+      [
+        { ...element("notice", 0), region: "main" },
+        { ...element("banner", 0), region: "top" },
+      ],
+      "notice",
+      0,
+      1,
+      { region: "top" },
+    );
+
+    expect(result.map((item) => [item.id, item.region])).toEqual([
+      ["banner", "top"],
+      ["notice", "top"],
+    ]);
+  });
+
   it("inclui elementos personalizados na ordem visual completa", () => {
     const entries = checkoutLayoutEntries({
       blockOrder: ["hero", "timer", "progress", "content"],

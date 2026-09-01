@@ -329,10 +329,16 @@ export default function CheckoutElementsPanel({
           </div>
           <Field
             label="Posição no checkout"
-            help="O elemento será exibido em apenas uma das duas colunas."
+            help="Escolha a faixa superior de largura total ou apenas uma das duas colunas."
           >
             <select
-              value={current.region === "sidebar" ? "sidebar" : "main"}
+              value={
+                current.region === "sidebar"
+                  ? "sidebar"
+                  : current.region === "top"
+                    ? "top"
+                    : "main"
+              }
               onChange={(event) =>
                 updateElement(current.id, {
                   region: event.target.value,
@@ -340,6 +346,7 @@ export default function CheckoutElementsPanel({
                 })
               }
             >
+              <option value="top">Acima das duas colunas</option>
               <option value="main">Conteúdo principal</option>
               <option value="sidebar">Abaixo do resumo lateral</option>
             </select>

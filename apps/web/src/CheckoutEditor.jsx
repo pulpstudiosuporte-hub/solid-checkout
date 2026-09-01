@@ -283,8 +283,11 @@ let applyTemplate = () => {};
 let addCustomElement = () => {};
 let updateCustomElement = () => {};
 let removeCustomElement = () => {};
-const customElementRegion = (item) =>
-  item?.region === "sidebar" ? "sidebar" : "main";
+const customElementRegion = (item) => {
+  if (item?.region === "sidebar") return "sidebar";
+  if (item?.region === "top") return "top";
+  return "main";
+};
 function placeCustomElement(
   elements,
   item,
@@ -1014,12 +1017,13 @@ function Settings({ group, c, u }) {
             </div>
           ))}
         </div>
-        <h3>Complementos por coluna</h3>
+        <h3>Posição dos complementos</h3>
         <p className="panel-help">
-          Cada elemento aparece somente no conteúdo principal ou abaixo do
-          resumo lateral.
+          A faixa superior ocupa toda a largura. Abaixo dela, cada elemento
+          pertence somente ao conteúdo principal ou ao resumo lateral.
         </p>
         {[
+          ["top", "Acima das duas colunas"],
           ["main", "Conteúdo principal"],
           ["sidebar", "Resumo lateral"],
         ].map(([region, label]) => {
@@ -1038,22 +1042,21 @@ function Settings({ group, c, u }) {
                       <small>Elemento</small>
                       {item.title || elementCatalog[item.type]?.label}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() =>
+                    <select
+                      className="custom-entry-region"
+                      value={region}
+                      onChange={(event) =>
                         updateCustomElement(item.id, {
-                          region: region === "main" ? "sidebar" : "main",
+                          region: event.target.value,
                           slot: 0,
                         })
                       }
-                      aria-label={`Mover ${item.title} para ${region === "main" ? "o resumo lateral" : "o conteúdo principal"}`}
+                      aria-label={`Posição de ${item.title}`}
                     >
-                      {region === "main" ? (
-                        <ChevronRight size={14} />
-                      ) : (
-                        <ArrowLeft size={14} />
-                      )}
-                    </button>
+                      <option value="top">Faixa superior</option>
+                      <option value="main">Principal</option>
+                      <option value="sidebar">Lateral</option>
+                    </select>
                     <button
                       type="button"
                       onClick={() => moveRegionElement(item, -1)}
@@ -1736,7 +1739,23 @@ function Preview({
             </span>
           )}
         </div>
-        {(c.blockOrder || defaultBlockOrder).map((blockId) => blocks[blockId])}
+        {(c.blockOrder || defaultBlockOrder).map((blockId) => (
+          <React.Fragment key={blockId}>
+            {blockId === "content" && (
+              <div className="ep-body ep-top-region">
+                <EditorRegionElements
+                  config={c}
+                  region="top"
+                  onAdd={onAddElement}
+                  onMove={onMoveElement}
+                  onRemove={onRemoveElement}
+                  readOnly={readOnly}
+                />
+              </div>
+            )}
+            {blocks[blockId]}
+          </React.Fragment>
+        ))}
         <div className="ep-footer">
           {c.footerText}
           <span>
