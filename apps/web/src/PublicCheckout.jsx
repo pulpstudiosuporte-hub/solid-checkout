@@ -35,7 +35,10 @@ import {
   applyPublicCoupon,
   touchPublicCheckoutPresence,
 } from "./api";
-import { checkoutLayoutPositionMap } from "./checkout-layout";
+import {
+  buildCheckoutLayoutEntries,
+  checkoutLayoutPositionMap,
+} from "./checkout-layout";
 import { useChromaSense } from "./useChromaSense";
 import "./public-session.css";
 import "./checkout-polish.css";
@@ -258,12 +261,14 @@ const publicCustomElementRegion = (item) => {
   return "main";
 };
 
-function PublicRegionElements({ config, region, style }) {
+function PublicRegionElements({ config, region, elementId, style }) {
   const elements = (
     Array.isArray(config.customElements) ? config.customElements : []
   ).filter(
     (item) =>
-      item.enabled !== false && publicCustomElementRegion(item) === region,
+      item.enabled !== false &&
+      publicCustomElementRegion(item) === region &&
+      (!elementId || item.id === elementId),
   );
   if (!elements.length) return null;
   return (
@@ -706,11 +711,17 @@ function SessionContent({ session: initialSession, token }) {
           {copy.payment}
         </span>
       </nav>}
-      <PublicRegionElements
-        config={config}
-        region="top"
-        style={{ order: layoutOrder('block', 'content') }}
-      />
+      {buildCheckoutLayoutEntries(config)
+        .filter((entry) => entry.kind === "custom")
+        .map((entry) => (
+          <PublicRegionElements
+            key={`top:${entry.id}`}
+            config={config}
+            region="top"
+            elementId={entry.id}
+            style={{ order: layoutOrder("custom", entry.id) }}
+          />
+        ))}
       <div
         className={`public-checkout-grid summary-device-${config.summaryDevice || 'all'} ${config.showSummary ? "" : "without-summary"}`}
         style={{order:layoutOrder('block','content')}}

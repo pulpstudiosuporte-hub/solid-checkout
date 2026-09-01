@@ -116,8 +116,18 @@ describe("ordenação dos elementos do checkout", () => {
     const entries = checkoutLayoutEntries({
       blockOrder: ["hero", "timer", "progress", "content"],
       customElements: [
-        { ...element("notice", 1), type: "notice", title: "Aviso" },
-        { ...element("faq", 3), type: "faq", title: "Dúvidas" },
+        {
+          ...element("notice", 1),
+          region: "top",
+          type: "notice",
+          title: "Aviso",
+        },
+        {
+          ...element("faq", 3),
+          region: "top",
+          type: "faq",
+          title: "Dúvidas",
+        },
       ],
     });
 
@@ -127,14 +137,15 @@ describe("ordenação dos elementos do checkout", () => {
       "block:timer",
       "block:progress",
       "custom:faq",
-      "block:content",
     ]);
   });
 
   it("move um elemento personalizado através de um bloco principal", () => {
     const config = {
       blockOrder: ["hero", "timer", "progress", "content"],
-      customElements: [{ ...element("notice", 2), type: "notice" }],
+      customElements: [
+        { ...element("notice", 2), region: "top", type: "notice" },
+      ],
     };
 
     const result = reorderCheckoutLayout(config, "custom:notice", -1);
@@ -148,14 +159,15 @@ describe("ordenação dos elementos do checkout", () => {
       "custom:notice",
       "block:timer",
       "block:progress",
-      "block:content",
     ]);
   });
 
   it("move um bloco através de um elemento sem perder sua posição", () => {
     const config = {
       blockOrder: ["hero", "timer", "progress", "content"],
-      customElements: [{ ...element("notice", 2), type: "notice" }],
+      customElements: [
+        { ...element("notice", 2), region: "top", type: "notice" },
+      ],
     };
 
     const result = reorderCheckoutLayout(config, "block:timer", 1);
@@ -169,7 +181,6 @@ describe("ordenação dos elementos do checkout", () => {
       "custom:notice",
       "block:timer",
       "block:progress",
-      "block:content",
     ]);
   });
 
@@ -177,8 +188,8 @@ describe("ordenação dos elementos do checkout", () => {
     const positions = checkoutLayoutPositionMap({
       blockOrder: ["timer", "progress", "content", "hero"],
       customElements: [
-        { ...element("notice", 0), type: "notice" },
-        { ...element("reviews", 3), type: "reviews" },
+        { ...element("notice", 0), region: "top", type: "notice" },
+        { ...element("reviews", 3), region: "top", type: "reviews" },
       ],
     });
 
@@ -186,9 +197,27 @@ describe("ordenação dos elementos do checkout", () => {
       "custom:notice": 1,
       "block:timer": 2,
       "block:progress": 3,
-      "block:content": 4,
+      "block:hero": 4,
       "custom:reviews": 5,
-      "block:hero": 6,
+      "block:content": 6,
     });
+  });
+
+  it("não mistura complementos das colunas na faixa superior", () => {
+    const entries = checkoutLayoutEntries({
+      blockOrder: ["hero", "timer", "progress", "content"],
+      customElements: [
+        { ...element("top", 1), region: "top", type: "announcement" },
+        { ...element("main", 0), region: "main", type: "reviews" },
+        { ...element("side", 0), region: "sidebar", type: "banner" },
+      ],
+    });
+
+    expect(entries.map((entry) => `${entry.kind}:${entry.id}`)).toEqual([
+      "block:hero",
+      "custom:top",
+      "block:timer",
+      "block:progress",
+    ]);
   });
 });

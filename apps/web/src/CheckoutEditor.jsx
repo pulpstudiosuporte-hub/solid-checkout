@@ -36,6 +36,7 @@ import CheckoutElementsPanel, {
 } from "./CheckoutElementsPanel";
 import {
   buildCheckoutLayoutEntries,
+  reorderCheckoutLayout,
 } from "./checkout-layout";
 import "./checkout-polish.css";
 
@@ -491,7 +492,7 @@ function ImageDropzone({
   );
 }
 
-function Settings({ group, c, u }) {
+function Settings({ group, c, u, replaceConfig }) {
   applyTemplate = (id) => {
     const preset = templatePresets[id] || {};
     Object.entries(preset).forEach(([key, value]) => u(key, value));
@@ -501,13 +502,7 @@ function Settings({ group, c, u }) {
       u("inputRadius", Math.min(preset.radius, 14));
   };
   const moveLayoutEntry = (entryKey, direction) => {
-    const id = entryKey.replace(/^block:/, "");
-    const order = [...(c.blockOrder || defaultBlockOrder)];
-    const from = order.indexOf(id);
-    const to = from + direction;
-    if (from < 0 || to < 0 || to >= order.length) return;
-    [order[from], order[to]] = [order[to], order[from]];
-    u("blockOrder", order);
+    replaceConfig(reorderCheckoutLayout(c, entryKey, direction));
   };
   const moveRegionElement = (item, direction) => {
     const region = customElementRegion(item);
@@ -984,23 +979,41 @@ function Settings({ group, c, u }) {
           removeElement={removeCustomElement}
           uploadImage={uploadOrderBumpImage}
         />
-        <h3>Ordem dos blocos principais</h3>
+        <h3>Ordem da faixa superior</h3>
         <p className="panel-help">
-          Organize banner, cronômetro, etapas e formulário.
+          Organize banner, cronômetro, etapas e complementos acima das duas
+          colunas. O formulário e o resumo permanecem logo abaixo.
         </p>
         <div className="block-list layout-order-list">
           {checkoutLayoutEntries(c)
-            .filter((entry) => entry.kind === "block")
             .map((entry, index, entries) => (
             <div
               key={`${entry.kind}:${entry.id}`}
-              className="native-entry"
+              className={entry.kind === "block" ? "native-entry" : "custom-entry"}
             >
               <span>
-                <small>Bloco principal</small>
+                <small>{entry.kind === "block" ? "Bloco nativo" : "Complemento"}</small>
                 {entry.label}
               </span>
+              {entry.kind === "custom" && (
+                <select
+                  className="custom-entry-region"
+                  value="top"
+                  onChange={(event) =>
+                    updateCustomElement(entry.id, {
+                      region: event.target.value,
+                      slot: 0,
+                    })
+                  }
+                  aria-label={`Posição de ${entry.label}`}
+                >
+                  <option value="top">Faixa superior</option>
+                  <option value="main">Principal</option>
+                  <option value="sidebar">Lateral</option>
+                </select>
+              )}
               <button
+                type="button"
                 onClick={() => moveLayoutEntry(`${entry.kind}:${entry.id}`, -1)}
                 disabled={!index}
                 aria-label={`Mover ${entry.label} para cima`}
@@ -1008,6 +1021,7 @@ function Settings({ group, c, u }) {
                 <ArrowUp size={14} />
               </button>
               <button
+                type="button"
                 onClick={() => moveLayoutEntry(`${entry.kind}:${entry.id}`, 1)}
                 disabled={index === entries.length - 1}
                 aria-label={`Mover ${entry.label} para baixo`}
@@ -1023,7 +1037,6 @@ function Settings({ group, c, u }) {
           pertence somente ao conteúdo principal ou ao resumo lateral.
         </p>
         {[
-          ["top", "Acima das duas colunas"],
           ["main", "Conteúdo principal"],
           ["sidebar", "Resumo lateral"],
         ].map(([region, label]) => {
@@ -1417,16 +1430,27 @@ function ElementDropZone({ slot, index, onAdd, onMove, free, region = "main" }) 
   );
 }
 
-function EditorRegionElements({ config, region, onAdd, onMove, onRemove, readOnly }) {
+function EditorRegionElements({
+  config,
+  region,
+  elementId,
+  onAdd,
+  onMove,
+  onRemove,
+  readOnly,
+}) {
   const elements = (
     Array.isArray(config.customElements) ? config.customElements : []
   ).filter(
-    (item) => item.enabled !== false && customElementRegion(item) === region,
+    (item) =>
+      item.enabled !== false &&
+      customElementRegion(item) === region &&
+      (!elementId || item.id === elementId),
   );
   if (readOnly && !elements.length) return null;
   return (
     <div className={`ep-region-elements ep-region-elements-${region}`}>
-      {!readOnly && (
+      {!readOnly && !elementId && (
         <ElementDropZone
           slot={0}
           index={0}
@@ -1441,7 +1465,7 @@ function EditorRegionElements({ config, region, onAdd, onMove, onRemove, readOnl
           <div {...customWrapProps(config, item, "ep")}>
             <CustomElementPreview item={item} onRemove={onRemove} readOnly={readOnly} />
           </div>
-          {!readOnly && (
+          {!readOnly && !elementId && (
             <ElementDropZone
               slot={0}
               index={index + 1}
@@ -1739,23 +1763,29 @@ function Preview({
             </span>
           )}
         </div>
-        {(c.blockOrder || defaultBlockOrder).map((blockId) => (
-          <React.Fragment key={blockId}>
-            {blockId === "content" && (
-              <div className="ep-body ep-top-region">
-                <EditorRegionElements
-                  config={c}
-                  region="top"
-                  onAdd={onAddElement}
-                  onMove={onMoveElement}
-                  onRemove={onRemoveElement}
-                  readOnly={readOnly}
-                />
-              </div>
-            )}
-            {blocks[blockId]}
-          </React.Fragment>
-        ))}
+        {checkoutLayoutEntries(c).map((entry) =>
+          entry.kind === "block" ? (
+            <React.Fragment key={`block:${entry.id}`}>
+              {blocks[entry.id]}
+            </React.Fragment>
+          ) : (
+            <div
+              className="ep-body ep-body-block ep-top-region"
+              key={`custom:${entry.id}`}
+            >
+              <EditorRegionElements
+                config={c}
+                region="top"
+                elementId={entry.id}
+                onAdd={onAddElement}
+                onMove={onMoveElement}
+                onRemove={onRemoveElement}
+                readOnly={readOnly}
+              />
+            </div>
+          ),
+        )}
+        {blocks.content}
         <div className="ep-footer">
           {c.footerText}
           <span>
@@ -1846,11 +1876,17 @@ export default function CheckoutEditor({
       ...draft,
       testimonials,
       customElements: Array.isArray(draft.customElements)
-        ? draft.customElements.map((item) => ({
-            ...item,
-            region: customElementRegion(item),
-            slot: 0,
-          }))
+        ? draft.customElements.map((item) => {
+            const region = customElementRegion(item);
+            return {
+              ...item,
+              region,
+              slot:
+                region === "top" && Number.isInteger(item.slot)
+                  ? Math.max(0, Math.min(item.slot, 3))
+                  : 0,
+            };
+          })
         : [],
       blockOrder: Array.isArray(draft.blockOrder)
         ? draft.blockOrder
@@ -1870,6 +1906,12 @@ export default function CheckoutEditor({
       const next = { ...old, [k]: v };
       setHistory((h) => [...h.slice(-19), next]);
       return next;
+    });
+  const replaceConfig = (next) =>
+    setC((old) => {
+      const resolved = typeof next === "function" ? next(old) : next;
+      setHistory((h) => [...h.slice(-19), resolved]);
+      return resolved;
     });
   addCustomElement = (
     type,
@@ -2059,7 +2101,12 @@ export default function CheckoutEditor({
             </nav>
           ) : (
             <div className="panel-settings">
-              <Settings group={group} c={c} u={u} />
+              <Settings
+                group={group}
+                c={c}
+                u={u}
+                replaceConfig={replaceConfig}
+              />
             </div>
           )}
         </aside>
