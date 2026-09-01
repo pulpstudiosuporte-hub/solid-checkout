@@ -4,7 +4,6 @@ import {
   ArrowRight,
   Check,
   CheckCircle2,
-  CircleHelp,
   Copy,
   Clock3,
   CreditCard,
@@ -13,7 +12,6 @@ import {
   MapPin,
   ShieldCheck,
   ShoppingBag,
-  Star,
   Truck,
   UserRound,
 } from "lucide-react";
@@ -39,6 +37,7 @@ import {
   buildCheckoutLayoutEntries,
   checkoutLayoutPositionMap,
 } from "./checkout-layout";
+import CheckoutElementIcon from "./CheckoutElementIcon";
 import { useChromaSense } from "./useChromaSense";
 import "./public-session.css";
 import "./checkout-polish.css";
@@ -223,17 +222,18 @@ function CustomElementCountdown({ minutes = 10 }) {
 
 function PublicCustomElement({ item }) {
   const textColor = item.textColor || '#17171a';
-  const style = { color: textColor, '--public-custom-text': textColor, background: item.backgroundColor, borderRadius: `${item.radius ?? 12}px`, padding: `${item.paddingY ?? 16}px ${item.paddingX ?? 18}px`, fontSize: `${item.fontSize || 14}px`, textAlign: item.align || 'left' };
+  const contentAlign = ["left", "center", "right"].includes(item.align) ? item.align : "left";
+  const style = { color: textColor, '--public-custom-text': textColor, background: item.backgroundColor, borderRadius: `${item.radius ?? 12}px`, padding: `${item.paddingY ?? 16}px ${item.paddingX ?? 18}px`, fontSize: `${item.fontSize || 14}px`, textAlign: contentAlign };
   const iconStyle = { color: item.iconColor || '#7357e9', background: item.iconBackgroundColor || '#f0ebff' };
   const mediaStyle = { '--element-image-height': `${item.imageHeight || 220}px`, objectFit: item.imageFit || 'cover' };
   return (
-    <section className={`public-custom-element type-${item.type} device-${item.device || 'all'} ${item.imageUrl ? 'has-media' : ''}`} style={style}>
+    <section className={`public-custom-element type-${item.type} content-align-${contentAlign} device-${item.device || 'all'} ${item.imageUrl || (item.type === 'video' && item.mediaUrl) ? 'has-media' : ''}`} style={style}>
       {/* Captions are rendered whenever the merchant supplies a captions URL. */}
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       {item.mediaUrl && item.type === 'video' ? <video aria-label={item.title || 'Vídeo do checkout'} className="public-custom-media" src={item.mediaUrl} poster={item.imageUrl || undefined} controls preload="metadata">{item.captionsUrl && <track kind="captions" src={item.captionsUrl} srcLang="pt-BR" label="Português" default/>}</video> : item.imageUrl ? <img className="public-custom-media" src={item.imageUrl} alt={item.imageAlt || ''} width="1600" height={item.imageHeight || 220} style={mediaStyle} loading="lazy" decoding="async"/> : <div className="public-custom-icon" style={iconStyle}>
-        {["testimonial","reviews"].includes(item.type) ? <Star size={20} /> : item.type === "faq" ? <CircleHelp size={20} /> : item.type === 'timer' ? <Clock3 size={20}/> : <ShieldCheck size={20} />}
+        <CheckoutElementIcon type={item.type} size={20} />
       </div>}
-      <div>
+      <div className="public-custom-content">
         {["testimonial","reviews"].includes(item.type) && <span className="public-custom-stars">{"★".repeat(item.rating || 5)}</span>}
         <h2>{item.title}</h2>
         <p>{item.text}</p>{item.type === 'timer' && <CustomElementCountdown minutes={item.durationMinutes}/>} {item.type === 'progress' && <span className="public-custom-progress"><i style={{width:`${item.progress || 72}%`}}/></span>}

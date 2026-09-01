@@ -83,11 +83,11 @@
   border-radius: 0;
 }
 
-.public-custom-element.type-banner > div {
+.public-custom-element.type-banner > .public-custom-content {
   padding: 20px 24px 22px;
 }
 
-.ep-custom-element.type-banner > div {
+.ep-custom-element.type-banner > .ep-custom-content {
   padding: 14px 16px 16px;
 }
 
@@ -439,7 +439,7 @@
     padding: 0 !important;
   }
 
-  .public-custom-element.type-banner > div {
+  .public-custom-element.type-banner > .public-custom-content {
     padding: 18px;
   }
 
@@ -496,4 +496,133 @@
 .public-checkout textarea {
   border-color: var(--public-input-border, var(--public-border)) !important;
   border-radius: var(--public-input-radius, 10px) !important;
+}
+
+/* Shared custom-element layout: alignment moves the complete visual group. */
+.public-custom-element,
+.ep-custom-element {
+  position: relative;
+}
+
+.public-custom-content,
+.ep-custom-content {
+  min-width: 0;
+  width: 100%;
+}
+
+.public-custom-icon,
+.ep-custom-icon,
+.public-custom-media,
+.ep-custom-media {
+  flex: none;
+}
+
+/* The editor action cannot occupy a content column or distort alignment. */
+.ep-custom-element > button {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  right: 10px;
+}
+
+/* Standard left-aligned card. */
+.public-custom-element.content-align-left:not(.type-banner):not(.type-gallery):not(.type-video),
+.ep-custom-element.content-align-left:not(.type-banner):not(.type-gallery):not(.type-video) {
+  grid-template-columns: auto minmax(0, 1fr);
+  justify-items: start;
+}
+
+/* Centering stacks the icon or image above the complete copy block. */
+.public-custom-element.content-align-center:not(.type-banner):not(.type-gallery):not(.type-video),
+.ep-custom-element.content-align-center:not(.type-banner):not(.type-gallery):not(.type-video) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.public-custom-element.content-align-center > .public-custom-content,
+.ep-custom-element.content-align-center > .ep-custom-content {
+  text-align: center;
+}
+
+/* Right alignment mirrors the standard card. */
+.public-custom-element.content-align-right:not(.type-banner):not(.type-gallery):not(.type-video),
+.ep-custom-element.content-align-right:not(.type-banner):not(.type-gallery):not(.type-video) {
+  grid-template-columns: minmax(0, 1fr) auto;
+  justify-items: end;
+}
+
+.public-custom-element.content-align-right:not(.type-banner):not(.type-gallery):not(.type-video) > :is(.public-custom-icon, .public-custom-media),
+.ep-custom-element.content-align-right:not(.type-banner):not(.type-gallery):not(.type-video) > :is(.ep-custom-icon, .ep-custom-media) {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.public-custom-element.content-align-right > .public-custom-content,
+.ep-custom-element.content-align-right > .ep-custom-content {
+  grid-column: 1;
+  grid-row: 1;
+  text-align: right;
+}
+
+/* Media-led elements retain a stable wide canvas at every alignment. */
+.public-custom-element:is(.type-banner, .type-gallery, .type-video),
+.ep-custom-element:is(.type-banner, .type-gallery, .type-video) {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.public-custom-element:is(.type-banner, .type-gallery, .type-video) > :is(.public-custom-media, .public-custom-icon),
+.ep-custom-element:is(.type-banner, .type-gallery, .type-video) > :is(.ep-custom-media, .ep-custom-icon) {
+  grid-column: 1;
+  justify-self: stretch;
+}
+
+.public-custom-element:is(.type-banner, .type-gallery, .type-video) > .public-custom-content,
+.ep-custom-element:is(.type-banner, .type-gallery, .type-video) > .ep-custom-content {
+  grid-column: 1;
+}
+
+/* Regular uploaded images behave like polished visual marks, not mini banners. */
+.public-custom-element.has-media:not(.type-banner):not(.type-gallery):not(.type-video) > .public-custom-media,
+.ep-custom-element.has-media:not(.type-banner):not(.type-gallery):not(.type-video) > .ep-custom-media {
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  max-width: 56px;
+  max-height: 56px;
+  aspect-ratio: 1;
+  border-radius: clamp(
+    8px,
+    calc(var(--public-element-radius, var(--eelement-radius, 12px)) * 0.65),
+    16px
+  );
+}
+
+.public-custom-element.content-align-center.has-media:not(.type-banner):not(.type-gallery):not(.type-video) > .public-custom-media,
+.ep-custom-element.content-align-center.has-media:not(.type-banner):not(.type-gallery):not(.type-video) > .ep-custom-media {
+  margin-inline: auto;
+}
+
+@media (max-width: 700px) {
+  .public-custom-element.content-align-center:not(.type-banner):not(.type-gallery):not(.type-video),
+  .ep-custom-element.content-align-center:not(.type-banner):not(.type-gallery):not(.type-video) {
+    display: flex;
+  }
+
+  .public-custom-element.content-align-right:not(.type-banner):not(.type-gallery):not(.type-video),
+  .ep-custom-element.content-align-right:not(.type-banner):not(.type-gallery):not(.type-video) {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .public-custom-element.has-media:not(.type-banner):not(.type-gallery):not(.type-video) > .public-custom-media,
+  .ep-custom-element.has-media:not(.type-banner):not(.type-gallery):not(.type-video) > .ep-custom-media {
+    grid-column: auto;
+    width: 52px;
+    height: 52px;
+    min-width: 52px;
+    max-width: 52px;
+  }
 }

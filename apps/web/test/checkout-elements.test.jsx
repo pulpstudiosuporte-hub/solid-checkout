@@ -5,10 +5,18 @@ import {
   reorderCustomElements,
 } from "../src/CheckoutEditor.jsx";
 import { checkoutLayoutPositionMap } from "../src/checkout-layout.js";
+import { elementCatalog } from "../src/CheckoutElementsPanel.jsx";
+import { checkoutElementIconTypes } from "../src/CheckoutElementIcon.jsx";
 
 const element = (id, slot) => ({ id, slot, enabled: true });
 
 describe("ordenação dos elementos do checkout", () => {
+  it("mantém um ícone próprio para cada elemento disponível", () => {
+    expect([...checkoutElementIconTypes].sort()).toEqual(
+      Object.keys(elementCatalog).sort(),
+    );
+  });
+
   it("reposiciona elementos dentro do mesmo intervalo", () => {
     const result = reorderCustomElements(
       [element("a", 2), element("b", 2), element("c", 2)],

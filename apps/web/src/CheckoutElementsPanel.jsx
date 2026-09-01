@@ -598,7 +598,10 @@ export default function CheckoutElementsPanel({
               />
             </Field>
           </div>
-          <Field label="Alinhamento">
+          <Field
+            label="Alinhamento do conteúdo"
+            help="Move imagem ou ícone junto com o título e a mensagem."
+          >
             <select
               value={current.align || "left"}
               onChange={(event) => change("align", event.target.value)}

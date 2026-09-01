@@ -5,11 +5,9 @@ import {
   ArrowUp,
   Check,
   ChevronRight,
-  CircleHelp,
   Clock3,
   CreditCard,
   Eye,
-  GripVertical,
   ImagePlus,
   Laptop,
   LayoutTemplate,
@@ -34,6 +32,7 @@ import CheckoutElementsPanel, {
   elementCatalog,
   newElementDefaults,
 } from "./CheckoutElementsPanel";
+import CheckoutElementIcon from "./CheckoutElementIcon";
 import {
   buildCheckoutLayoutEntries,
   reorderCheckoutLayout,
@@ -1318,13 +1317,16 @@ function Settings({ group, c, u, replaceConfig }) {
 }
 
 function CustomElementPreview({ item, onRemove, readOnly = false }) {
+  const contentAlign = ["left", "center", "right"].includes(item.align)
+    ? item.align
+    : "left";
   const style = {
     color: item.textColor,
     background: item.backgroundColor,
     borderRadius: `${item.radius ?? 12}px`,
     padding: `${item.paddingY ?? 16}px ${item.paddingX ?? 18}px`,
     fontSize: `${item.fontSize || 14}px`,
-    textAlign: item.align || "left",
+    textAlign: contentAlign,
   };
   const iconStyle = {
     color: item.iconColor || "#7357e9",
@@ -1332,7 +1334,7 @@ function CustomElementPreview({ item, onRemove, readOnly = false }) {
   };
   return (
     <section
-      className={`ep-custom-element type-${item.type} device-${item.device || "all"} ${item.imageUrl ? "has-media" : ""}`}
+      className={`ep-custom-element type-${item.type} content-align-${contentAlign} device-${item.device || "all"} ${item.imageUrl || (item.type === "video" && item.mediaUrl) ? "has-media" : ""}`}
       style={style}
       draggable={!readOnly}
       onDragStart={
@@ -1357,16 +1359,10 @@ function CustomElementPreview({ item, onRemove, readOnly = false }) {
         />
       ) : (
         <div className="ep-custom-icon" style={iconStyle}>
-          {["testimonial", "reviews"].includes(item.type) ? (
-            <Star size={18} />
-          ) : item.type === "faq" ? (
-            <CircleHelp size={18} />
-          ) : (
-            <ShieldCheck size={18} />
-          )}
+          <CheckoutElementIcon type={item.type} size={18} />
         </div>
       )}
-      <div>
+      <div className="ep-custom-content">
         {["testimonial", "reviews"].includes(item.type) && (
           <span className="ep-custom-stars">
             {"★".repeat(item.rating || 5)}
