@@ -118,7 +118,8 @@
   font-size: 13px;
   white-space: nowrap;
 }
-.session-order-summary > .session-totals {
+.session-order-summary > .session-totals,
+.session-summary-content > .session-totals {
   display: grid !important;
   gap: 12px;
   border-top: 1px solid #e4e4e9 !important;
@@ -716,6 +717,36 @@
 
 /* Font scaling now reaches every nested text node, not only the container. */
 .public-custom-element h2{font-size:1em!important;line-height:1.3}
+.public-custom-element h2,.public-custom-element p{color:var(--public-custom-text,currentColor)!important}
+
+/* Mobile order summary accordion and icon-based checkout steps. */
+.session-mobile-summary-toggle{display:none}
+.session-summary-coupon{display:none}
+.checkout-progress.style-icons i{border-radius:5px;background:transparent}
+.checkout-progress.style-icons i svg{width:16px;height:16px;stroke-width:1.8}
+.public-checkout .checkout-progress.style-icons .active i{border-color:var(--public-progress-active);color:var(--public-progress-active)!important}
+.public-checkout .checkout-progress.style-icons span:not(.active) i{border-color:var(--public-progress-inactive-text);color:var(--public-progress-inactive-text)!important}
+@media(max-width:700px){
+  .session-checkout .session-summary-column{order:-2}
+  .session-checkout .session-order-summary{min-height:0}
+  .session-mobile-summary-toggle{width:100%;min-height:54px;display:grid;grid-template-columns:minmax(0,1fr) auto 20px;align-items:center;gap:9px;padding:0 16px;border:0;background:var(--public-card);color:var(--public-text);font:inherit;text-align:left;cursor:pointer}
+  .session-mobile-summary-toggle span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:750}
+  .session-mobile-summary-toggle strong{font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .session-mobile-summary-toggle svg{transition:transform .18s ease}
+  .session-mobile-summary-toggle:focus-visible{outline:3px solid color-mix(in srgb,var(--public-primary) 35%,transparent);outline-offset:-3px}
+  .session-order-summary.is-open .session-mobile-summary-toggle svg{transform:rotate(180deg)}
+  .session-order-summary.is-collapsed .session-summary-content{display:none}
+  .session-summary-content{border-top:1px solid var(--public-border)}
+  .session-summary-content .session-summary-title{display:none}
+  .session-checkout .checkout-inline-coupon{display:none}
+  .session-summary-coupon{display:grid;grid-template-columns:minmax(0,1fr) auto;padding:0 16px 14px}
+  .session-summary-coupon input{min-width:0;height:44px;border:1px solid var(--public-border);border-radius:calc(var(--public-radius) * .55) 0 0 calc(var(--public-radius) * .55);padding:0 12px;background:var(--public-input);color:var(--public-text);font:inherit}
+  .session-summary-coupon button{min-width:100px;min-height:44px;border:1px solid var(--public-border);border-left:0;border-radius:0 calc(var(--public-radius) * .55) calc(var(--public-radius) * .55) 0;background:var(--public-card);color:var(--public-text);font:inherit;font-weight:750;cursor:pointer}
+  .session-summary-coupon button:disabled{cursor:not-allowed;opacity:.55}
+  .session-summary-coupon small{grid-column:1/-1;margin-top:7px;font-size:10px}
+  .session-summary-coupon small.success{color:#078047}.session-summary-coupon small.error{color:#c83232}
+}
+@media(prefers-reduced-motion:reduce){.session-mobile-summary-toggle svg{transition:none}}
 .public-custom-element p{font-size:.82em!important}
 .public-custom-stars{font-size:.9em}
 .public-custom-countdown{font-size:1.25em}

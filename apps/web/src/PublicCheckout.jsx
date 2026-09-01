@@ -8,6 +8,7 @@ import {
   Copy,
   Clock3,
   CreditCard,
+  ChevronDown,
   LoaderCircle,
   MapPin,
   ShieldCheck,
@@ -218,7 +219,8 @@ function CustomElementCountdown({ minutes = 10 }) {
 }
 
 function PublicCustomElement({ item }) {
-  const style = { color: item.textColor, background: item.backgroundColor, borderRadius: `${item.radius ?? 12}px`, padding: `${item.paddingY ?? 16}px ${item.paddingX ?? 18}px`, fontSize: `${item.fontSize || 14}px`, textAlign: item.align || 'left' };
+  const textColor = item.textColor || '#17171a';
+  const style = { color: textColor, '--public-custom-text': textColor, background: item.backgroundColor, borderRadius: `${item.radius ?? 12}px`, padding: `${item.paddingY ?? 16}px ${item.paddingX ?? 18}px`, fontSize: `${item.fontSize || 14}px`, textAlign: item.align || 'left' };
   const iconStyle = { color: item.iconColor || '#7357e9', background: item.iconBackgroundColor || '#f0ebff' };
   const mediaStyle = { '--element-image-height': `${item.imageHeight || 220}px`, objectFit: item.imageFit || 'cover' };
   return (
@@ -447,6 +449,7 @@ function SessionContent({ session: initialSession, token }) {
   const [couponCode, setCouponCode] = useState(session.couponCode || "");
   const [couponMessage, setCouponMessage] = useState("");
   const [couponOpen, setCouponOpen] = useState(Boolean(session.couponCode));
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [postalStatus, setPostalStatus] = useState({
     type: "idle",
     message: "",
@@ -509,6 +512,9 @@ function SessionContent({ session: initialSession, token }) {
   const config = publicConfig(session.checkout?.publishedConfig);
   const copy = checkoutLanguage(config.language);
   const money = checkoutMoney(config);
+  const summaryTotal =
+    selectedShipping?.grandTotalCents ??
+    session.totalCents - (session.discountCents || 0);
   const layoutPositions = checkoutLayoutPositionMap(config);
   const layoutOrder = (kind, id) => layoutPositions.get(`${kind}:${id}`) ?? 1;
   const update = (field, value) =>
@@ -646,17 +652,17 @@ function SessionContent({ session: initialSession, token }) {
       )}
       {config.showProgress && <nav className={`checkout-progress style-${config.progressStyle || 'outline'} checkout-device-${config.progressDevice || 'all'}`} aria-label="Etapas do checkout" style={{order:layoutOrder('block','progress')}}>
         <span className="active">
-          <i>1</i>
+          <i>{config.progressStyle === 'icons' ? <UserRound size={16} aria-hidden="true" /> : 1}</i>
           {copy.identification}
         </span>
         <b />
         {requiresShipping && <><span className={step >= 2 ? "active" : ""}>
-          <i>2</i>
+          <i>{config.progressStyle === 'icons' ? <MapPin size={16} aria-hidden="true" /> : 2}</i>
           {copy.shipping}
         </span>
         <b /></>}
           <span className={step >= 4 ? "active" : ""}>
-            <i>{requiresShipping ? 3 : 2}</i>
+            <i>{config.progressStyle === 'icons' ? <CreditCard size={16} aria-hidden="true" /> : (requiresShipping ? 3 : 2)}</i>
           {copy.payment}
         </span>
       </nav>}
@@ -980,7 +986,19 @@ function SessionContent({ session: initialSession, token }) {
         {config.showSummary && (
           <div className={`session-summary-column checkout-device-${config.summaryDevice || 'all'}`}>
           {config.summaryBannerUrl && <img className={`session-summary-banner checkout-device-${config.summaryBannerDevice || 'desktop'}`} src={config.summaryBannerUrl} alt="Banner do resumo do pedido" style={{objectFit:config.summaryBannerFit || 'cover'}} loading="lazy" decoding="async" />}
-          <aside className="session-order-summary">
+          <aside className={`session-order-summary ${summaryOpen ? "is-open" : "is-collapsed"}`}>
+            <button
+              type="button"
+              className="session-mobile-summary-toggle"
+              aria-expanded={summaryOpen}
+              aria-controls="session-order-summary-content"
+              onClick={() => setSummaryOpen((current) => !current)}
+            >
+              <span>{config.summaryTitle || "Resumo do pedido"}</span>
+              <strong>{money.format(summaryTotal / 100)}</strong>
+              <ChevronDown size={18} aria-hidden="true" />
+            </button>
+            <div id="session-order-summary-content" className="session-summary-content">
             <div className="session-summary-title">
               <div>
                 <span>{copy.yourOrder}</span>
@@ -1015,6 +1033,25 @@ function SessionContent({ session: initialSession, token }) {
                 </article>
               ))}
             </div>
+            {config.showCoupon && (
+              <form className="session-summary-coupon" onSubmit={applyCoupon}>
+                <input
+                  aria-label={copy.coupon}
+                  value={couponCode}
+                  onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
+                  maxLength="40"
+                  placeholder={copy.coupon || "Código do cupom"}
+                />
+                <button type="submit" disabled={busy || couponCode.trim().length < 3}>
+                  {session.couponCode ? "↻" : copy.apply}
+                </button>
+                {couponMessage && (
+                  <small className={session.couponCode ? "success" : "error"}>
+                    {couponMessage}
+                  </small>
+                )}
+              </form>
+            )}
             <div className="session-totals">
               <div>
                 <span>{copy.subtotal}</span>
@@ -1034,6 +1071,7 @@ function SessionContent({ session: initialSession, token }) {
               <ShieldCheck size={16} /> Preços e estoque protegidos contra
               alterações no navegador.
             </p>
+            </div>
           </aside>
           </div>
         )}

@@ -14,6 +14,7 @@ import {
   Laptop,
   LayoutTemplate,
   LoaderCircle,
+  MapPin,
   Monitor,
   Palette,
   Plus,
@@ -26,6 +27,7 @@ import {
   Trash2,
   Type,
   Undo2,
+  UserRound,
   WalletCards,
 } from "lucide-react";
 import CheckoutElementsPanel, {
@@ -677,6 +679,7 @@ function Settings({ group, c, u }) {
           >
             <option value="outline">Somente contorno</option>
             <option value="solid">Cor sólida</option>
+            <option value="icons">Ícones com contorno</option>
           </select>
         </Field>
         <Color
@@ -685,7 +688,7 @@ function Settings({ group, c, u }) {
           onChange={(v) => u("progressActiveColor", v)}
         />
         <Color
-          label="Número da etapa ativa"
+          label="Número ou ícone da etapa ativa"
           value={c.progressActiveTextColor || "#ffffff"}
           onChange={(v) => u("progressActiveTextColor", v)}
         />
@@ -700,7 +703,7 @@ function Settings({ group, c, u }) {
           onChange={(v) => u("progressInactiveColor", v)}
         />
         <Color
-          label="Número das etapas inativas"
+          label="Número ou ícone das etapas inativas"
           value={c.progressInactiveTextColor || "#777780"}
           onChange={(v) => u("progressInactiveTextColor", v)}
         />
@@ -1411,15 +1414,15 @@ function Preview({
         <div key="progress" className="ep-body ep-body-block">
           <div className={`ep-steps style-${c.progressStyle || "outline"}`}>
             <span className="active">
-              <i>1</i>
+              <i>{c.progressStyle === "icons" ? <UserRound size={16} aria-hidden="true" /> : 1}</i>
               {copy.identification}
             </span>
             <span>
-              <i>2</i>
+              <i>{c.progressStyle === "icons" ? <MapPin size={16} aria-hidden="true" /> : 2}</i>
               {copy.delivery}
             </span>
             <span>
-              <i>3</i>
+              <i>{c.progressStyle === "icons" ? <CreditCard size={16} aria-hidden="true" /> : 3}</i>
               {copy.payment}
             </span>
           </div>
@@ -1516,7 +1519,16 @@ function Preview({
                   style={{ objectFit: c.summaryBannerFit || "cover" }}
                 />
               )}
-              <div className="ep-summary">
+              <details
+                className={`ep-mobile-summary ${device === "mobile" ? "" : "desktop"}`}
+                open={device === "mobile" ? undefined : true}
+              >
+                <summary>
+                  <b>{c.summaryTitle}</b>
+                  <strong>{previewMoney}</strong>
+                  <ChevronRight size={16} aria-hidden="true" />
+                </summary>
+                <div className="ep-summary">
                 <div>
                   <small>{copy.order}</small>
                   <b>{c.summaryTitle}</b>
@@ -1542,7 +1554,8 @@ function Preview({
                   <span>{copy.total}</span>
                   <strong>{previewMoney}</strong>
                 </footer>
-              </div>
+                </div>
+              </details>
             </div>
           )}
         </div>
