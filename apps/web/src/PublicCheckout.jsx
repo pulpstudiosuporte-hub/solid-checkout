@@ -668,7 +668,7 @@ function SessionContent({ session: initialSession, token }) {
       </nav>}
       {(Array.isArray(config.customElements) ? config.customElements : []).filter(item => item.enabled !== false).map((item) => {
         const placement = publicCustomWrapProps(config, item);
-        return <div className={`public-custom-wrap ${placement.className || ''}`} key={item.id} style={{ order: layoutOrder('custom',item.id), ...placement.style }}>
+        return <div className={`public-custom-wrap custom-type-${item.type} ${placement.className || ''}`} key={item.id} style={{ order: layoutOrder('custom',item.id), ...placement.style }}>
           <PublicCustomElement item={item} />
         </div>;
       })}

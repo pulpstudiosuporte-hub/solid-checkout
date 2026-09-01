@@ -1,6 +1,10 @@
 /* Final checkout polish: responsive proportions, media and accessible interactions. */
 .session-checkout {
   row-gap: var(--public-element-spacing, 12px);
+  --public-shell-width: min(
+    var(--public-content-width, 1120px),
+    calc(100% - 32px)
+  );
 }
 
 .session-checkout > .public-checkout-hero,
@@ -25,8 +29,21 @@
   border-radius: var(--eelement-radius, var(--eradius));
 }
 
-.public-checkout-hero {
-  width: min(var(--public-content-width, 1120px), calc(100% - 32px));
+.session-checkout > .public-checkout-hero,
+.session-checkout > .public-checkout-grid,
+.session-checkout > .session-expiry:not(.timer-pill),
+.session-checkout > .checkout-progress,
+.session-checkout > .public-custom-wrap.custom-type-banner {
+  width: var(--public-shell-width);
+  max-width: none;
+  margin-inline: auto;
+}
+
+.ep-page > .ep-hero,
+.ep-page > .ep-custom-wrap.custom-type-banner {
+  width: min(var(--econtent, 1120px), calc(100% - 40px));
+  max-width: none;
+  margin-inline: auto;
 }
 
 .public-checkout-footer {
@@ -315,6 +332,10 @@
 }
 
 @media (max-width: 700px) {
+  .session-checkout {
+    --public-shell-width: calc(100% - 24px);
+  }
+
   .session-checkout .public-checkout-grid,
   .session-checkout .public-custom-wrap,
   .session-checkout > .session-expiry {

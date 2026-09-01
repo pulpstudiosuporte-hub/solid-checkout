@@ -347,10 +347,10 @@ export function checkoutLayoutEntries(config) {
 }
 function customWrapProps(config, item, scope) {
   if (config.elementEditMode !== "free")
-    return { className: `${scope}-custom-wrap` };
+    return { className: `${scope}-custom-wrap custom-type-${item.type}` };
   const width = item.widthPercent || 100;
   return {
-    className: `${scope}-custom-wrap free align-${item.horizontalAlign || "center"}`,
+    className: `${scope}-custom-wrap custom-type-${item.type} free align-${item.horizontalAlign || "center"}`,
     style: {
       "--element-free-width": `${width}%`,
       "--element-free-max": `${Math.round(((config.contentWidth || 1120) * width) / 100)}px`,
