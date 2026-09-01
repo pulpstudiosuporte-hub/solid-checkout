@@ -254,7 +254,7 @@ export function registerChromaSenseRoutes(
     },
   );
 
-  app.get<{ Querystring: { period?: string; checkoutId?: string } }>(
+  app.get<{ Querystring: { period?: string; checkoutId?: string; device?: string } }>(
     "/chromasense",
     async (request, reply) => {
       const context = await dashboardContext(request);
@@ -266,10 +266,16 @@ export function registerChromaSenseRoutes(
           );
       const start = periodStart(request.query.period);
       const checkoutId = publicId(request.query.checkoutId);
+      const device = ["mobile", "tablet", "desktop"].includes(
+        request.query.device || "",
+      )
+        ? request.query.device
+        : null;
       const where: Prisma.ChromaSenseSessionWhereInput = {
         storeId: context.storeId,
         startedAt: { gte: start },
         ...(checkoutId ? { checkout: { publicId: checkoutId } } : {}),
+        ...(device ? { deviceType: device } : {}),
       };
       const [sessions, availableCheckouts] = await Promise.all([
         db.chromaSenseSession.findMany({

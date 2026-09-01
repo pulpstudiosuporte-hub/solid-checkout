@@ -84,35 +84,37 @@ function CheckoutSurface({ points, type, scroll, checkout }) {
       className={`chroma-surface view-${type}`}
       aria-label={`Visualização do mapa de ${views.find(([key]) => key === type)?.[1].toLowerCase()}`}
     >
-      {checkout?.preview?.config ? (
-        <div className="chroma-real-checkout">
-          <CheckoutAnalyticsPreview
-            config={checkout.preview.config}
-            product={checkout.preview.product}
-          />
-        </div>
-      ) : (
-        <div className="chroma-preview-empty">
-          <ScanSearch />
-          <b>Selecione um checkout publicado</b>
-          <span>O mapa sera aplicado sobre o layout real em uso.</span>
-        </div>
-      )}
-      {type === "scroll" ? (
-        <div className="chroma-scroll-overlay">
-          <div style={{ height: `${Math.max(4, scroll.average)}%` }} />
-          <span>Profundidade média: {scroll.average}%</span>
-        </div>
-      ) : (
-        points.map((point, index) => (
-          <HeatPoint
-            key={`${point.x}-${point.y}-${index}`}
-            point={point}
-            index={index}
-            type={type}
-          />
-        ))
-      )}
+      <div className="chroma-mobile-canvas">
+        {checkout?.preview?.config ? (
+          <div className="chroma-real-checkout">
+            <CheckoutAnalyticsPreview
+              config={checkout.preview.config}
+              product={checkout.preview.product}
+            />
+          </div>
+        ) : (
+          <div className="chroma-preview-empty">
+            <ScanSearch />
+            <b>Selecione um checkout publicado</b>
+            <span>O mapa sera aplicado sobre o layout real em uso.</span>
+          </div>
+        )}
+        {type === "scroll" ? (
+          <div className="chroma-scroll-overlay">
+            <div style={{ height: `${Math.max(4, scroll.average)}%` }} />
+            <span>Profundidade média: {scroll.average}%</span>
+          </div>
+        ) : (
+          points.map((point, index) => (
+            <HeatPoint
+              key={`${point.x}-${point.y}-${index}`}
+              point={point}
+              index={index}
+              type={type}
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -126,7 +128,7 @@ export default function ChromaSensePage({ storeKey }) {
   const load = () => {
     const controller = new AbortController();
     setState((current) => ({ ...current, loading: true, error: "" }));
-    getChromaSense({ period, checkoutId }, controller.signal)
+    getChromaSense({ period, checkoutId, device: "mobile" }, controller.signal)
       .then((result) => {
         setState({
           ...empty,

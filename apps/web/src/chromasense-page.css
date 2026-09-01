@@ -236,23 +236,35 @@
 }
 .chroma-surface {
   position: relative;
+  height: min(720px, 72vh);
   min-height: 570px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
   background: #e9e9ef;
 }
+.chroma-mobile-canvas {
+  position: relative;
+  width: min(520px, 100%);
+  min-height: 100%;
+  margin-inline: auto;
+  background: #f6f7f9;
+}
 .chroma-real-checkout {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
+  position: relative;
+  overflow: visible;
   background: #f6f7f9;
   pointer-events: none;
 }
 .checkout-analytics-render,
-.checkout-analytics-render .editor-device.desktop {
+.checkout-analytics-render .editor-device.mobile {
   width: 100%;
   min-height: 100%;
 }
-.checkout-analytics-render .editor-device.desktop {
+.checkout-analytics-render .editor-device.mobile {
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -261,8 +273,8 @@
   min-height: 720px;
 }
 .checkout-analytics-render .ep-product-image {
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   border-radius: calc(var(--eradius) * 0.65);
   object-fit: cover;
 }

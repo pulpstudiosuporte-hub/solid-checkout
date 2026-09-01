@@ -1655,7 +1655,7 @@ export function CheckoutAnalyticsPreview({ config, product }) {
     <div className="checkout-analytics-render" aria-hidden="true" inert="">
       <Preview
         c={{ ...defaultCheckoutConfig, ...config }}
-        device="desktop"
+        device="mobile"
         onAddElement={noop}
         onMoveElement={noop}
         onRemoveElement={noop}
