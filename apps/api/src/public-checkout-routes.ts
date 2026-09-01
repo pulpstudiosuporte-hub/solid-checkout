@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
+import type { PrismaClient } from '@solid/database';
 import type { CatalogRepository } from './catalog-repository.js';
 import { decryptSecret, encryptSecret } from './shopify-crypto.js';
 import type { PrismaGatewayRepository } from './gateway-repository.js';
@@ -12,6 +13,7 @@ import { lookupBrazilianPostalCode, PostalCodeLookupError } from './postal-code.
 import { syncUtmifyOrder } from './utmify-sync.js';
 import { syncMetaEvent } from './meta-sync.js';
 import { mapProviderPaymentStatus, providerAmountMatches } from './payment-rules.js';
+import { storeOnboardingComplete } from './store-onboarding.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const slug = (value: unknown): string | null => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) && value.length <= 80 ? value : null;
@@ -34,7 +36,7 @@ const validProxySignature = (query: Record<string, string | string[] | undefined
   return timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'));
 };
 
-export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: AppEnvironment, catalog: CatalogRepository, gateways?: PrismaGatewayRepository, shopify?: ShopifyRepository): void {
+export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: AppEnvironment, catalog: CatalogRepository, gateways?: PrismaGatewayRepository, shopify?: ShopifyRepository, database?: PrismaClient): void {
   app.get<{ Params: { postalCode: string } }>('/public/postal-codes/:postalCode', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
     const postalCode = digits(request.params.postalCode);
     if (postalCode.length !== 8) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'CEP inválido.'));
@@ -149,6 +151,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     if (!gateways || !environment.APP_ENCRYPTION_KEY || !environment.API_PUBLIC_URL) return reply.code(503).send(errorBody(request, 'PAYMENT_NOT_CONFIGURED', 'Pagamento ainda não configurado no servidor.'));
     const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization); if (!credentials) return reply.code(401).send(errorBody(request, 'INVALID_SESSION', 'Sessão inválida.'));
     const context = await gateways.paymentContext(credentials.sessionId, credentials.tokenHash, new Date()); if (!context) return reply.code(409).send(errorBody(request, 'CHECKOUT_INCOMPLETE', 'Confirme os dados necessários antes do pagamento.'));
+    if (database && !await storeOnboardingComplete(database, context.checkout.storeId)) return reply.code(403).send(errorBody(request, 'STORE_ONBOARDING_REQUIRED', 'Esta loja ainda não concluiu o cadastro obrigatório.'));
     if (!await gateways.billingAccessAllowed(context.checkout.storeId)) return reply.code(402).send(errorBody(request, 'STORE_BILLING_BLOCKED', 'Esta loja está temporariamente indisponível para novos pagamentos.'));
     const providers = await gateways.paymentProviders(context.checkout.storeId); if (!providers.length) return reply.code(409).send(errorBody(request, 'GATEWAY_UNAVAILABLE', 'A loja ainda não configurou um gateway Pix.'));
     const previous = await gateways.latestAttempt(context.id); if (previous?.pixCodeEncrypted && previous.status === 'PENDING') return reply.header('cache-control', 'no-store').send({ payment: { publicId: previous.publicId, status: 'pending', amountCents: previous.amountCents, pixCode: decryptSecret(previous.pixCodeEncrypted, environment.APP_ENCRYPTION_KEY), expiresAt: previous.expiresAt } });

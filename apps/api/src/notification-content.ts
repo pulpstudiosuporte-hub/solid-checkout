@@ -25,5 +25,6 @@ export function notificationContent(action: string, raw: unknown): NotificationP
   if (action === 'integration.shopify_reconnect_required') return { type: 'warning', title: 'Reconecte a Shopify', message: 'A autoriza\u00e7\u00e3o da loja expirou ou foi revogada.', destination: 'Integra\u00e7\u00f5es' };
   if (action === 'store_domain.not_verified') return { type: 'warning', title: 'DNS ainda n\u00e3o validado', message: 'O dom\u00ednio personalizado ainda n\u00e3o est\u00e1 apontando corretamente.', destination: 'Dom\u00ednios' };
   if (action === 'store_domain.activated') return { type: 'success', title: 'Dom\u00ednio ativado', message: 'O dom\u00ednio personalizado est\u00e1 ativo e protegido.', destination: 'Dom\u00ednios' };
+  if (action === 'store.onboarding_required') return { type: 'warning', title: 'Conclua o cadastro da loja', message: 'Preencha os dados da loja e do respons\u00e1vel para publicar checkouts e receber pagamentos.', destination: 'Configura\u00e7\u00f5es' };
   return { type: 'success', title: 'Shopify conectada', message: 'A integra\u00e7\u00e3o com a Shopify foi conectada com sucesso.', destination: 'Integra\u00e7\u00f5es' };
 }

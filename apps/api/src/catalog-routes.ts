@@ -1,8 +1,10 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
+import type { PrismaClient } from '@solid/database';
 import type { AuthRepository } from './auth-repository.js';
 import type { CatalogRepository, CheckoutConfigInput, CheckoutInput, ProductInput, ShippingMethodInput, StoreContext } from './catalog-repository.js';
+import { storeOnboardingComplete } from './store-onboarding.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const safeEqual = (left: string, right: string): boolean => timingSafeEqual(Buffer.from(sha256(left), 'hex'), Buffer.from(sha256(right), 'hex'));
@@ -108,7 +110,7 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   return result;
 };
 
-export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvironment, auth: AuthRepository, catalog: CatalogRepository): void {
+export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvironment, auth: AuthRepository, catalog: CatalogRepository, database?: PrismaClient): void {
   const secure = environment.NODE_ENV === 'production';
   const sessionCookie = secure ? '__Host-solid_session' : 'solid_session';
   const csrfCookie = secure ? '__Host-solid_csrf' : 'solid_csrf';
@@ -235,6 +237,7 @@ export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvi
   app.post<{ Params: { checkoutId: string } }>('/checkouts/:checkoutId/publish', async (request, reply) => {
     const context = await authenticate(request, true);
     if (!context || !canWrite(context)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    if (database && !await storeOnboardingComplete(database, context.storeId)) return reply.code(403).send(errorBody(request, 'STORE_ONBOARDING_REQUIRED', 'Complete os dados da loja e do responsável em Configurações antes de publicar o checkout.'));
     if (catalog.hasActiveDomain && !(await catalog.hasActiveDomain(context))) return reply.code(409).send(errorBody(request, 'DOMAIN_REQUIRED', 'Ative um domínio seguro para publicar o checkout.'));
     const checkoutId = text(request.params.checkoutId, 32);
     if (!checkoutId) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Checkout inválido.'));

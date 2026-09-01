@@ -9,7 +9,7 @@ import { encryptSecret } from './shopify-crypto.js';
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
 const same = (left: string, right: string) => { const a = Buffer.from(left); const b = Buffer.from(right); return a.length === b.length && timingSafeEqual(a, b); };
 const failure = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
-const actions = ['payment.pix_created', 'payment.webhook_verified', 'integration.event_failed', 'integration.shopify_reconnect_required', 'store_domain.not_verified', 'store_domain.activated', 'integration.shopify_connected', 'platform.announcement'] as const;
+const actions = ['payment.pix_created', 'payment.webhook_verified', 'integration.event_failed', 'integration.shopify_reconnect_required', 'store_domain.not_verified', 'store_domain.activated', 'store.onboarding_required', 'integration.shopify_connected', 'platform.announcement'] as const;
 
 type PushBody = { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } };
 const validPushBody = (body: PushBody): body is { endpoint: string; keys: { p256dh: string; auth: string } } => {
@@ -33,6 +33,11 @@ export function registerNotificationRoutes(app: FastifyInstance, environment: Ap
 
   app.get('/notifications', async (request, reply) => {
     const current = await context(request); if (!current) return reply.code(401).send(failure(request, 'UNAUTHENTICATED', 'Autentica\u00e7\u00e3o necess\u00e1ria.'));
+    const store = await db.store.findUnique({ where: { id: current.storeId }, select: { publicId: true, createdAt: true, onboardingCompletedAt: true } });
+    if (store && !store.onboardingCompletedAt && store.createdAt.getTime() <= Date.now() - 24 * 60 * 60_000) {
+      const reminded = await db.auditLog.count({ where: { storeId: current.storeId, action: 'store.onboarding_required' } });
+      if (!reminded) await db.auditLog.create({ data: { storeId: current.storeId, actorType: 'SYSTEM', action: 'store.onboarding_required', targetType: 'store', targetId: store.publicId, requestId: request.id } });
+    }
     const state = await db.notificationState.findUnique({ where: { userId_storeId: { userId: current.session.userId, storeId: current.storeId } }, select: { lastReadAt: true } });
     const lastReadAt = state?.lastReadAt ?? new Date(0);
     const [events, unread] = await Promise.all([

@@ -2,7 +2,7 @@ import type { PrismaClient } from '@solid/database';
 import { planLimits } from './plan-entitlements.js';
 import { effectiveBilling } from './billing-entitlements.js';
 
-export type StoreSummary = Readonly<{ publicId: string; name: string; slug: string; role: 'OWNER' | 'ADMIN' | 'ANALYST'; active: boolean }>;
+export type StoreSummary = Readonly<{ publicId: string; name: string; slug: string; role: 'OWNER' | 'ADMIN' | 'ANALYST'; active: boolean; onboardingCompleted?: boolean }>;
 export type StoreDomainSummary = Readonly<{ publicId: string; hostname: string; status: string; verifiedAt: Date | null; activatedAt: Date | null; lastCheckedAt: Date | null; dokployDomainId: string | null }>;
 
 export interface StoreRepository {
@@ -24,11 +24,11 @@ export class PrismaStoreRepository implements StoreRepository {
   async listForUser(userId: string, sessionId: string): Promise<readonly StoreSummary[]> {
     const [session, memberships] = await Promise.all([
       this.database.session.findFirst({ where: { id: sessionId, userId, revokedAt: null }, select: { activeStoreId: true } }),
-      this.database.storeMember.findMany({ where: { userId, store: { active: true } }, orderBy: { createdAt: 'asc' }, select: { role: true, store: { select: { id: true, publicId: true, name: true, slug: true } } } }),
+      this.database.storeMember.findMany({ where: { userId, store: { active: true } }, orderBy: { createdAt: 'asc' }, select: { role: true, store: { select: { id: true, publicId: true, name: true, slug: true, onboardingCompletedAt: true } } } }),
     ]);
     const fallbackStoreId = memberships[0]?.store.id;
     if (!session?.activeStoreId && fallbackStoreId) await this.database.session.updateMany({ where: { id: sessionId, userId, revokedAt: null, activeStoreId: null }, data: { activeStoreId: fallbackStoreId } });
-    return memberships.map(({ role, store }, index) => ({ publicId: store.publicId, name: store.name, slug: store.slug, role, active: session?.activeStoreId ? session.activeStoreId === store.id : index === 0 }));
+    return memberships.map(({ role, store }, index) => ({ publicId: store.publicId, name: store.name, slug: store.slug, role, active: session?.activeStoreId ? session.activeStoreId === store.id : index === 0, onboardingCompleted: Boolean(store.onboardingCompletedAt) }));
   }
 
   async createForUser(userId: string, sessionId: string, name: string, slug: string, requestId: string): Promise<StoreSummary | null> {
@@ -43,19 +43,19 @@ export class PrismaStoreRepository implements StoreRepository {
       const updated = await transaction.session.updateMany({ where: { id: sessionId, userId, revokedAt: null }, data: { activeStoreId: store.id } });
       if (updated.count !== 1) throw new Error('Sessão ativa não encontrada');
       await transaction.auditLog.create({ data: { storeId: store.id, actorUserId: userId, actorType: 'USER', action: 'store.created', targetType: 'store', targetId: store.publicId, requestId } });
-      return { publicId: store.publicId, name: store.name, slug: store.slug, role: 'OWNER', active: true };
+      return { publicId: store.publicId, name: store.name, slug: store.slug, role: 'OWNER', active: true, onboardingCompleted: false };
     }, { isolationLevel: 'Serializable' });
   }
 
   async selectForUser(userId: string, sessionId: string, storePublicId: string, requestId: string): Promise<StoreSummary | null> {
-    const membership = await this.database.storeMember.findFirst({ where: { userId, store: { publicId: storePublicId, active: true } }, select: { role: true, store: { select: { id: true, publicId: true, name: true, slug: true } } } });
+    const membership = await this.database.storeMember.findFirst({ where: { userId, store: { publicId: storePublicId, active: true } }, select: { role: true, store: { select: { id: true, publicId: true, name: true, slug: true, onboardingCompletedAt: true } } } });
     if (!membership) return null;
     const updated = await this.database.$transaction(async transaction => {
       const result = await transaction.session.updateMany({ where: { id: sessionId, userId, revokedAt: null }, data: { activeStoreId: membership.store.id } });
       if (result.count === 1) await transaction.auditLog.create({ data: { storeId: membership.store.id, actorUserId: userId, actorType: 'USER', action: 'store.selected', targetType: 'store', targetId: membership.store.publicId, requestId } });
       return result.count;
     });
-    return updated === 1 ? { publicId: membership.store.publicId, name: membership.store.name, slug: membership.store.slug, role: membership.role, active: true } : null;
+    return updated === 1 ? { publicId: membership.store.publicId, name: membership.store.name, slug: membership.store.slug, role: membership.role, active: true, onboardingCompleted: Boolean(membership.store.onboardingCompletedAt) } : null;
   }
   async archiveForUser(userId: string, sessionId: string, storePublicId: string, requestId: string): Promise<boolean> {
     return this.database.$transaction(async transaction => {

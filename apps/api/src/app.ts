@@ -106,7 +106,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
   const dokployClient = dependencies.dokployClient ?? (environment.DOKPLOY_URL && environment.DOKPLOY_API_KEY && environment.DOKPLOY_CHECKOUT_APPLICATION_ID ? new HttpDokployDomainClient(environment) : undefined);
   if (dependencies.authRepository && dependencies.storeRepository) registerStoreRoutes(app, environment, dependencies.authRepository, dependencies.storeRepository, dokployClient);
   if (dependencies.authRepository && dependencies.shopifyRepository) registerShopifyRoutes(app, environment, dependencies.authRepository, dependencies.shopifyRepository);
-  if (dependencies.authRepository && dependencies.catalogRepository) registerCatalogRoutes(app, environment, dependencies.authRepository, dependencies.catalogRepository);
+  if (dependencies.authRepository && dependencies.catalogRepository) registerCatalogRoutes(app, environment, dependencies.authRepository, dependencies.catalogRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.catalogRepository && dependencies.database) registerCouponRoutes(app, environment, dependencies.authRepository, dependencies.catalogRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.catalogRepository && dependencies.database) registerMediaRoutes(app, environment, dependencies.authRepository, dependencies.catalogRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.gatewayRepository) registerGatewayRoutes(app, environment, dependencies.authRepository, dependencies.gatewayRepository);
@@ -117,7 +117,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
   if (dependencies.authRepository && dependencies.database) registerAdminContentRoutes(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.database) registerChromaSenseRoutes(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.database) registerSettingsRoutes(app, environment, dependencies.authRepository, dependencies.database);
-  if (dependencies.catalogRepository) registerPublicCheckoutRoutes(app, environment, dependencies.catalogRepository, dependencies.gatewayRepository, dependencies.shopifyRepository);
+  if (dependencies.catalogRepository) registerPublicCheckoutRoutes(app, environment, dependencies.catalogRepository, dependencies.gatewayRepository, dependencies.shopifyRepository, dependencies.database);
 
   app.get<{ Reply: HealthResponse }>('/health/live', () => ({ status: 'ok', service: 'solid-api', version: '0.1.0', timestamp: new Date().toISOString() }));
   app.get('/health/ready', async (_request, reply) => {
