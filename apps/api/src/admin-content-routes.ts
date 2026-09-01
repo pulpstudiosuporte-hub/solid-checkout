@@ -19,8 +19,8 @@ const optionalUrl = (value: unknown): string | null | undefined => {
 const statuses = ['BACKLOG', 'PLANNED', 'IN_PROGRESS', 'DONE'] as const;
 const categories = ['NEWS', 'IMPROVEMENT', 'FIX', 'INTEGRATION', 'SECURITY'] as const;
 const automaticReleases = [
-  { publicId: 'auto-20260901-integrations-directory', category: 'IMPROVEMENT' as const, title: 'Novo diretório de integrações', description: 'A central de integrações ganhou busca, filtro por categoria, status de conexão e ações mais claras para configurar ou gerenciar cada serviço.', publishedAt: new Date('2026-09-01T19:15:00.000Z') },
-  { publicId: 'auto-20260901-onboarding-home-alert', category: 'IMPROVEMENT' as const, title: 'Pendências de ativação agora visíveis no Início', description: 'O aviso de cadastro pendente foi centralizado na tela principal, com contagem atualizada das informações necessárias para ativar a loja.', publishedAt: new Date('2026-09-01T18:45:00.000Z') },
+  { publicId: 'auto-20260901-integrations-ui', category: 'IMPROVEMENT' as const, title: 'Novo diretório de integrações', description: 'A central de integrações ganhou busca, filtro por categoria, status de conexão e ações mais claras para configurar ou gerenciar cada serviço.', publishedAt: new Date('2026-09-01T19:15:00.000Z') },
+  { publicId: 'auto-20260901-home-alert', category: 'IMPROVEMENT' as const, title: 'Pendências de ativação agora visíveis no Início', description: 'O aviso de cadastro pendente foi centralizado na tela principal, com contagem atualizada das informações necessárias para ativar a loja.', publishedAt: new Date('2026-09-01T18:45:00.000Z') },
   { publicId: 'auto-20260901-semgrep-review', category: 'SECURITY' as const, title: 'Nova revisão automatizada de segurança', description: 'Executamos uma nova análise estática completa com Semgrep e revalidamos as proteções de código e da cadeia de build do painel.', publishedAt: new Date('2026-09-01T18:15:00.000Z') },
   { publicId: 'auto-20260901-onboarding', category: 'IMPROVEMENT' as const, title: 'Ativação guiada da loja', description: 'Novas contas podem explorar o painel após verificar o e-mail e recebem um checklist para concluir o cadastro antes de publicar checkouts e processar pagamentos.', publishedAt: new Date('2026-09-01T17:30:00.000Z') },
   { publicId: 'auto-20260901-settings', category: 'IMPROVEMENT' as const, title: 'Central de configurações renovada', description: 'Dados da loja e do responsável, domínios, usuários, segurança e preferências de notificações agora ficam reunidos em uma central completa.', publishedAt: new Date('2026-09-01T12:45:00.000Z') },
@@ -52,11 +52,14 @@ export function registerAdminContentRoutes(app: FastifyInstance, environment: Ap
     return typeof origin === 'string' && environment.CORS_ORIGINS.includes(origin) && typeof header === 'string' && Boolean(cookie) && same(cookie!, header) && same(sha256(header), current.csrfTokenHash);
   };
   const ensureAutomaticReleases = async (): Promise<void> => {
-    await Promise.all(automaticReleases.map(release => db.productRelease.upsert({
+    const results = await Promise.allSettled(automaticReleases.map(release => db.productRelease.upsert({
       where: { publicId: release.publicId },
       create: { ...release, published: true },
       update: {},
     })));
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') app.log.error({ err: result.reason, publicId: automaticReleases[index]?.publicId }, 'automatic_release_upsert_failed');
+    });
   };
 
   app.get('/platform-content', async (request, reply) => {

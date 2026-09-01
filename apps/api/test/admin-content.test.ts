@@ -43,11 +43,25 @@ const unusedCatalog = {} as CatalogRepository;
 
 describe('conteúdo administrável da plataforma', () => {
   it('exige sessão e preserva uma lista realmente vazia', async () => {
-    const app = buildApp(env, { authRepository: new AdminAuth(), database: contentDatabase() });
+    const database = contentDatabase();
+    const app = buildApp(env, { authRepository: new AdminAuth(), database });
     expect((await app.inject({ method: 'GET', url: '/platform-content' })).statusCode).toBe(401);
     const response = await app.inject({ method: 'GET', url: '/platform-content', headers: authenticated });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ releases: [], integrationAssets: [] });
+    const releaseCalls = vi.mocked(database.productRelease.upsert).mock.calls as unknown as Array<[{ create: { publicId: string } }]>;
+    expect(releaseCalls.length).toBeGreaterThan(0);
+    expect(releaseCalls.every(([input]) => input.create.publicId.length <= 32)).toBe(true);
+    await app.close();
+  });
+
+  it('mantém o conteúdo disponível se uma novidade automática falhar ao ser registrada', async () => {
+    const database = contentDatabase();
+    vi.mocked(database.productRelease.upsert).mockRejectedValue(new Error('release seed failed'));
+    const app = buildApp(env, { authRepository: new AdminAuth(), database });
+    const response = await app.inject({ method: 'GET', url: '/admin/content', headers: authenticated });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ feedback: [], releases: [], integrationAssets: [] });
     await app.close();
   });
 
