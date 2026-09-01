@@ -2,6 +2,7 @@ import type { AppEnvironment } from '@solid/config';
 import { decryptSecret } from './shopify-crypto.js';
 import type { ShopifyRepository } from './shopify-repository.js';
 import { isShopifyAuthorizationFailure, ShopifyAuthorizationError } from './shopify-auth-error.js';
+import { getShopifyAccessToken } from './shopify-token.js';
 
 type Customer = { name?: string; email?: string; phone?: string };
 type Address = { postalCode?: string; street?: string; number?: string; complement?: string; neighborhood?: string; city?: string; state?: string; country?: string };
@@ -52,7 +53,8 @@ export async function syncPaidShopifyOrder(environment: AppEnvironment, reposito
       tags: ['solid-checkout', 'pix-westpay'],
       note: `Pagamento Pix confirmado pela WestPay. Sessão SOLID: ${context.publicId}`
     };
-    const data = await shopifyGraphql<ShopifyOrderResponse>(credentials.shopDomain, decryptSecret(credentials.accessTokenEncrypted, environment.APP_ENCRYPTION_KEY), CREATE_ORDER, { order });
+    const token = await getShopifyAccessToken(context.storeId, credentials, environment, repository);
+    const data = await shopifyGraphql<ShopifyOrderResponse>(credentials.shopDomain, token, CREATE_ORDER, { order });
     const errors = data.orderCreate.userErrors.map(error => error.message).filter(Boolean);
     if (!data.orderCreate.order || errors.length) throw new Error(errors.join('; ') || 'A Shopify não retornou o pedido criado.');
     await repository.markOrderSynced(context.checkoutSessionId, data.orderCreate.order, new Date());
@@ -77,7 +79,8 @@ async function markAsPaid(environment: AppEnvironment, repository: ShopifyReposi
   if (!environment.APP_ENCRYPTION_KEY) return;
   const credentials = await repository.credentials(storeId);
   if (!credentials) throw new Error('A loja não possui uma conexão Shopify ativa.');
-  const data = await shopifyGraphql<{ orderMarkAsPaid: { userErrors: readonly { message: string }[] } }>(credentials.shopDomain, decryptSecret(credentials.accessTokenEncrypted, environment.APP_ENCRYPTION_KEY), MARK_ORDER_PAID, { input: { id: orderId } });
+  const token = await getShopifyAccessToken(storeId, credentials, environment, repository);
+  const data = await shopifyGraphql<{ orderMarkAsPaid: { userErrors: readonly { message: string }[] } }>(credentials.shopDomain, token, MARK_ORDER_PAID, { input: { id: orderId } });
   const errors = data.orderMarkAsPaid.userErrors.map(error => error.message).filter(Boolean);
   if (errors.length && !errors.some(message => /already paid|já.*pag/i.test(message))) throw new Error(errors.join('; '));
 }

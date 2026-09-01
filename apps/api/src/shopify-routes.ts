@@ -2,9 +2,10 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
 import type { AuthRepository, SessionUser } from './auth-repository.js';
-import { decryptSecret, encryptSecret } from './shopify-crypto.js';
+import { encryptSecret } from './shopify-crypto.js';
 import { ShopifyDomainInUseError, type ShopifyCatalog, type ShopifyRepository } from './shopify-repository.js';
 import { isShopifyAuthorizationFailure, ShopifyAuthorizationError } from './shopify-auth-error.js';
+import { exchangeShopifyClientCredentials, getShopifyAccessToken, inspectShopifyConnection } from './shopify-token.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const equal = (left: string, right: string): boolean => { const a = Buffer.from(left); const b = Buffer.from(right); return a.length === b.length && timingSafeEqual(a, b); };
@@ -14,7 +15,8 @@ const errorBody = (request: FastifyRequest, code: string, message: string) => ({
 export function registerShopifyRoutes(app: FastifyInstance, environment: AppEnvironment, auth: AuthRepository, repository: ShopifyRepository): void {
   const secure = environment.NODE_ENV === 'production';
   const sessionCookie = secure ? '__Host-solid_session' : 'solid_session'; const csrfCookie = secure ? '__Host-solid_csrf' : 'solid_csrf'; const oauthCookie = secure ? '__Secure-solid_shopify_oauth' : 'solid_shopify_oauth';
-  const configured = Boolean(environment.APP_URL && environment.SHOPIFY_CLIENT_ID && environment.SHOPIFY_CLIENT_SECRET && environment.SHOPIFY_REDIRECT_URI && environment.APP_ENCRYPTION_KEY);
+  const oauthConfigured = Boolean(environment.APP_URL && environment.SHOPIFY_CLIENT_ID && environment.SHOPIFY_CLIENT_SECRET && environment.SHOPIFY_REDIRECT_URI && environment.APP_ENCRYPTION_KEY);
+  const configured = Boolean(environment.APP_ENCRYPTION_KEY);
   const scopes = environment.SHOPIFY_SCOPES ?? 'read_products';
   const session = async (request: FastifyRequest): Promise<SessionUser | null> => { const token = request.cookies[sessionCookie]; return token ? auth.findActiveSession(sha256(token), new Date()) : null; };
   const csrfValid = (request: FastifyRequest, current: SessionUser): boolean => {
@@ -26,12 +28,39 @@ export function registerShopifyRoutes(app: FastifyInstance, environment: AppEnvi
   app.get('/integrations/shopify/status', async (request, reply) => {
     const current = await session(request); if (!current) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     const context = await repository.context(current.userId, current.sessionId); if (!context) return reply.code(409).send(errorBody(request, 'STORE_REQUIRED', 'Selecione uma loja.'));
-    return reply.send({ configured, ...(await repository.status(context.storeId)) });
+    return reply.send({ configured, oauthConfigured, connectionMethod: 'CLIENT_CREDENTIALS', ...(await repository.status(context.storeId)) });
+  });
+
+  app.post<{ Body: { shop?: unknown; clientId?: unknown; clientSecret?: unknown } }>('/integrations/shopify/connect-credentials', { config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } }, async (request, reply) => {
+    const current = await session(request); if (!current || !csrfValid(request, current)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    if (!environment.APP_ENCRYPTION_KEY) return reply.code(503).send(errorBody(request, 'SHOPIFY_NOT_CONFIGURED', 'A criptografia da integração ainda não foi configurada no servidor.'));
+    const context = await repository.context(current.userId, current.sessionId); if (!context || context.role === 'ANALYST') return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Somente proprietários e administradores podem conectar integrações.'));
+    const rawShop = typeof request.body?.shop === 'string' ? request.body.shop.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '') : '';
+    const shop = rawShop.includes('.') ? rawShop : `${rawShop}.myshopify.com`;
+    const clientId = typeof request.body?.clientId === 'string' ? request.body.clientId.trim() : '';
+    const clientSecret = typeof request.body?.clientSecret === 'string' ? request.body.clientSecret.trim() : '';
+    if (!shopPattern.test(shop)) return reply.code(400).send(errorBody(request, 'INVALID_SHOP', 'Informe um domínio myshopify.com válido.'));
+    if (clientId.length < 16 || clientId.length > 128 || /\s/.test(clientId)) return reply.code(400).send(errorBody(request, 'INVALID_CLIENT_ID', 'Informe o Client ID exibido no Dev Dashboard da Shopify.'));
+    if (clientSecret.length < 24 || clientSecret.length > 256 || /\s/.test(clientSecret)) return reply.code(400).send(errorBody(request, 'INVALID_CLIENT_SECRET', 'Informe o Client secret exibido no Dev Dashboard da Shopify.'));
+    try {
+      const token = await exchangeShopifyClientCredentials(shop, clientId, clientSecret);
+      const inspection = await inspectShopifyConnection(shop, token.accessToken);
+      if (inspection.shopDomain !== shop) return reply.code(400).send(errorBody(request, 'SHOP_MISMATCH', 'As credenciais não pertencem ao domínio informado.'));
+      const scopes = new Set(inspection.scopes.length ? inspection.scopes : token.scope.split(',').map(value => value.trim()).filter(Boolean));
+      const missingScopes = ['read_products', 'write_orders'].filter(scope => !scopes.has(scope));
+      if (missingScopes.length) return reply.code(400).send(errorBody(request, 'MISSING_SCOPES', `Adicione estas permissões ao app e publique uma nova versão: ${missingScopes.join(', ')}.`));
+      await repository.connect({ storeId: context.storeId, userId: current.userId, shopDomain: shop, authMode: 'CLIENT_CREDENTIALS', accessTokenEncrypted: encryptSecret(token.accessToken, environment.APP_ENCRYPTION_KEY), clientIdEncrypted: encryptSecret(clientId, environment.APP_ENCRYPTION_KEY), clientSecretEncrypted: encryptSecret(clientSecret, environment.APP_ENCRYPTION_KEY), scopes: [...scopes].sort().join(','), accessTokenExpiresAt: token.expiresAt, requestId: request.id });
+      return reply.send({ connected: true, shopDomain: shop, shopName: inspection.shopName });
+    } catch (error) {
+      if (error instanceof ShopifyDomainInUseError) return reply.code(409).send(errorBody(request, 'SHOP_ALREADY_CONNECTED', 'Esta loja Shopify já está conectada a outra loja SOLID.'));
+      request.log.warn({ err: error, shopDomain: shop }, 'shopify_client_credentials_connection_failed');
+      return reply.code(400).send(errorBody(request, 'INVALID_SHOPIFY_CREDENTIALS', 'A Shopify recusou as credenciais. Confira a instalação, o Client ID e o Client secret.'));
+    }
   });
 
   app.post<{ Body: { shop?: unknown } }>('/integrations/shopify/connect', async (request, reply) => {
     const current = await session(request); if (!current || !csrfValid(request, current)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
-    if (!configured) return reply.code(503).send(errorBody(request, 'SHOPIFY_NOT_CONFIGURED', 'A integração Shopify ainda não foi configurada no servidor.'));
+    if (!oauthConfigured) return reply.code(503).send(errorBody(request, 'SHOPIFY_NOT_CONFIGURED', 'A conexão OAuth compartilhada ainda não foi configurada no servidor.'));
     const context = await repository.context(current.userId, current.sessionId); if (!context || context.role === 'ANALYST') return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Somente proprietários e administradores podem conectar integrações.'));
     const rawShop = typeof request.body?.shop === 'string' ? request.body.shop.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '') : '';
     const shop = rawShop.includes('.') ? rawShop : `${rawShop}.myshopify.com`;
@@ -44,7 +73,7 @@ export function registerShopifyRoutes(app: FastifyInstance, environment: AppEnvi
   });
 
   app.get<{ Querystring: Record<string, string | undefined> }>('/integrations/shopify/callback', async (request, reply) => {
-    if (!configured) return reply.code(503).send(errorBody(request, 'SHOPIFY_NOT_CONFIGURED', 'Integração indisponível.'));
+    if (!oauthConfigured) return reply.code(503).send(errorBody(request, 'SHOPIFY_NOT_CONFIGURED', 'Integração indisponível.'));
     const current = await session(request); const { code, hmac, shop, state, timestamp } = request.query;
     const cookie = request.cookies[oauthCookie]; const [cookieState, cookieSignature] = cookie?.split('.') ?? [];
     const expectedCookieSignature = cookieState ? createHmac('sha256', environment.SHOPIFY_CLIENT_SECRET!).update(cookieState).digest('base64url') : '';
@@ -77,12 +106,8 @@ export function registerShopifyRoutes(app: FastifyInstance, environment: AppEnvi
     const current = await session(request); if (!current || !csrfValid(request, current)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
     const context = await repository.context(current.userId, current.sessionId); if (!context || context.role === 'ANALYST') return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Somente proprietários e administradores podem sincronizar o catálogo.'));
     const credentials = await repository.credentials(context.storeId); if (!credentials) return reply.code(409).send(errorBody(request, 'SHOPIFY_NOT_CONNECTED', 'Conecte a Shopify antes de sincronizar.'));
-    if (credentials.accessTokenExpiresAt && credentials.accessTokenExpiresAt <= new Date()) {
-      await repository.markReconnectRequired(context.storeId, 'O token de acesso da Shopify expirou.');
-      return reply.code(409).send(errorBody(request, 'SHOPIFY_TOKEN_EXPIRED', 'A autorização da Shopify expirou. Reconecte a loja.'));
-    }
     try {
-      const token = decryptSecret(credentials.accessTokenEncrypted, environment.APP_ENCRYPTION_KEY!);
+      const token = await getShopifyAccessToken(context.storeId, credentials, environment, repository);
       const catalog = await fetchShopifyCatalog(credentials.shopDomain, token);
       return reply.send(await repository.syncCatalog(context.storeId, current.userId, request.id, catalog));
     } catch (error) {

@@ -403,6 +403,7 @@
 .editor-device.mobile .ep-content{display:flex;align-items:stretch;flex-direction:column}
 .editor-device.mobile .ep-summary-column{width:100%;align-self:stretch;order:-1}
 @media(prefers-reduced-motion:reduce){.ep-mobile-summary>summary svg{transition:none}}
+.shopify-credentials-form>input{width:100%;height:48px;border:1px solid #d8d6df;border-radius:10px;background:#fff;padding:0 13px;color:var(--text);outline:0}.shopify-credentials-form>input:focus{border-color:#7357e9;box-shadow:0 0 0 4px rgba(115,87,233,.11)}.shopify-credentials-form>small+label{margin-top:18px}.integration-security .integration-scope-note{margin-top:18px;padding:13px;border-radius:9px;background:#fff8e7;color:#705219;font-size:10px}.integration-scope-note strong{display:block;margin-bottom:3px}.shopify-extension-note{margin-bottom:16px!important;background:#fff8e7!important;border-color:#f0dca8!important}.shopify-extension-note strong{color:#765515!important}
 .ep-summary-banner{display:var(--esummary-banner-display,block)}
 .editor-device.mobile .ep-custom-element.device-desktop{display:none}
 .editor-device:not(.mobile) .ep-custom-element.device-mobile{display:none}

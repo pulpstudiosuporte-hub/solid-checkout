@@ -1,9 +1,9 @@
 import type { PrismaClient } from '@solid/database';
 
 export type ShopifyContext = Readonly<{ storeId: string; storePublicId: string; role: 'OWNER' | 'ADMIN' | 'ANALYST' }>;
-export type ShopifyStatus = Readonly<{ connected: boolean; reconnectRequired: boolean; shopDomain?: string; scopes?: string; connectedAt?: Date; lastSyncedAt?: Date; reconnectRequiredAt?: Date }>;
+export type ShopifyStatus = Readonly<{ connected: boolean; reconnectRequired: boolean; authMode?: 'OAUTH' | 'CLIENT_CREDENTIALS'; shopDomain?: string; scopes?: string; connectedAt?: Date; lastSyncedAt?: Date; reconnectRequiredAt?: Date }>;
 export type OAuthStateRecord = Readonly<{ id: string; storeId: string; userId: string; sessionId: string; shopDomain: string }>;
-export type ShopifyCredentials = Readonly<{ shopDomain: string; accessTokenEncrypted: string; refreshTokenEncrypted?: string; accessTokenExpiresAt?: Date; refreshTokenExpiresAt?: Date }>;
+export type ShopifyCredentials = Readonly<{ authMode: 'OAUTH' | 'CLIENT_CREDENTIALS'; shopDomain: string; accessTokenEncrypted: string; clientIdEncrypted?: string; clientSecretEncrypted?: string; refreshTokenEncrypted?: string; accessTokenExpiresAt?: Date; refreshTokenExpiresAt?: Date }>;
 export type ShopifyCatalog = Readonly<{
   products: readonly Readonly<{ id: string; title: string; handle: string; descriptionHtml: string; vendor: string; productType: string; tags: readonly string[]; status: string; updatedAt: string; featuredImage?: string | undefined; variants: readonly Readonly<{ id: string; title: string; sku?: string | undefined; barcode?: string | undefined; price: string; compareAtPrice?: string | undefined; inventoryQuantity?: number | undefined; availableForSale: boolean; imageUrl?: string | undefined; selectedOptions: readonly Readonly<{ name: string; value: string }>[] }>[]; images: readonly Readonly<{ id: string; url: string; altText?: string | undefined; width?: number | undefined; height?: number | undefined }>[]; collectionIds: readonly string[] }>[];
   collections: readonly Readonly<{ id: string; title: string; handle: string; descriptionHtml: string; imageUrl?: string | undefined; updatedAt: string }>[];
@@ -21,7 +21,8 @@ export interface ShopifyRepository {
   credentials(storeId: string): Promise<ShopifyCredentials | null>;
   createState(input: { stateHash: string; storeId: string; userId: string; sessionId: string; shopDomain: string; expiresAt: Date }): Promise<void>;
   consumeState(stateHash: string, userId: string, sessionId: string, now: Date): Promise<OAuthStateRecord | null>;
-  connect(input: { storeId: string; userId: string; shopDomain: string; accessTokenEncrypted: string; refreshTokenEncrypted?: string; scopes: string; accessTokenExpiresAt?: Date; refreshTokenExpiresAt?: Date; requestId: string }): Promise<void>;
+  connect(input: { storeId: string; userId: string; shopDomain: string; accessTokenEncrypted: string; authMode?: 'OAUTH' | 'CLIENT_CREDENTIALS'; clientIdEncrypted?: string; clientSecretEncrypted?: string; refreshTokenEncrypted?: string; scopes: string; accessTokenExpiresAt?: Date; refreshTokenExpiresAt?: Date; requestId: string }): Promise<void>;
+  updateAccessToken(storeId: string, accessTokenEncrypted: string, accessTokenExpiresAt: Date): Promise<void>;
   disconnect(storeId: string, userId: string, requestId: string): Promise<void>;
   markReconnectRequired(storeId: string, reason: string): Promise<void>;
   syncCatalog(storeId: string, userId: string, requestId: string, catalog: ShopifyCatalog): Promise<ShopifySyncResult>;
@@ -42,13 +43,13 @@ export class PrismaShopifyRepository implements ShopifyRepository {
     return membership?.store.active ? { storeId: membership.store.id, storePublicId: membership.store.publicId, role: membership.role } : null;
   }
   async status(storeId: string): Promise<ShopifyStatus> {
-    const connection = await this.database.shopifyConnection.findFirst({ where: { storeId, revokedAt: null }, select: { shopDomain: true, scopes: true, connectedAt: true, lastSyncedAt: true, reconnectRequiredAt: true } });
+    const connection = await this.database.shopifyConnection.findFirst({ where: { storeId, revokedAt: null }, select: { authMode: true, shopDomain: true, scopes: true, connectedAt: true, lastSyncedAt: true, reconnectRequiredAt: true } });
     if (!connection) return { connected: false, reconnectRequired: false };
-    return { connected: !connection.reconnectRequiredAt, reconnectRequired: Boolean(connection.reconnectRequiredAt), shopDomain: connection.shopDomain, scopes: connection.scopes, connectedAt: connection.connectedAt, ...(connection.lastSyncedAt ? { lastSyncedAt: connection.lastSyncedAt } : {}), ...(connection.reconnectRequiredAt ? { reconnectRequiredAt: connection.reconnectRequiredAt } : {}) };
+    return { connected: !connection.reconnectRequiredAt, reconnectRequired: Boolean(connection.reconnectRequiredAt), authMode: connection.authMode as 'OAUTH' | 'CLIENT_CREDENTIALS', shopDomain: connection.shopDomain, scopes: connection.scopes, connectedAt: connection.connectedAt, ...(connection.lastSyncedAt ? { lastSyncedAt: connection.lastSyncedAt } : {}), ...(connection.reconnectRequiredAt ? { reconnectRequiredAt: connection.reconnectRequiredAt } : {}) };
   }
   async credentials(storeId: string): Promise<ShopifyCredentials | null> {
-    const value = await this.database.shopifyConnection.findFirst({ where: { storeId, revokedAt: null, reconnectRequiredAt: null }, select: { shopDomain: true, accessTokenEncrypted: true, refreshTokenEncrypted: true, accessTokenExpiresAt: true, refreshTokenExpiresAt: true } });
-    return value ? { shopDomain: value.shopDomain, accessTokenEncrypted: value.accessTokenEncrypted, ...(value.refreshTokenEncrypted ? { refreshTokenEncrypted: value.refreshTokenEncrypted } : {}), ...(value.accessTokenExpiresAt ? { accessTokenExpiresAt: value.accessTokenExpiresAt } : {}), ...(value.refreshTokenExpiresAt ? { refreshTokenExpiresAt: value.refreshTokenExpiresAt } : {}) } : null;
+    const value = await this.database.shopifyConnection.findFirst({ where: { storeId, revokedAt: null, reconnectRequiredAt: null }, select: { authMode: true, shopDomain: true, accessTokenEncrypted: true, clientIdEncrypted: true, clientSecretEncrypted: true, refreshTokenEncrypted: true, accessTokenExpiresAt: true, refreshTokenExpiresAt: true } });
+    return value ? { authMode: value.authMode as 'OAUTH' | 'CLIENT_CREDENTIALS', shopDomain: value.shopDomain, accessTokenEncrypted: value.accessTokenEncrypted, ...(value.clientIdEncrypted ? { clientIdEncrypted: value.clientIdEncrypted } : {}), ...(value.clientSecretEncrypted ? { clientSecretEncrypted: value.clientSecretEncrypted } : {}), ...(value.refreshTokenEncrypted ? { refreshTokenEncrypted: value.refreshTokenEncrypted } : {}), ...(value.accessTokenExpiresAt ? { accessTokenExpiresAt: value.accessTokenExpiresAt } : {}), ...(value.refreshTokenExpiresAt ? { refreshTokenExpiresAt: value.refreshTokenExpiresAt } : {}) } : null;
   }
   async createState(input: { stateHash: string; storeId: string; userId: string; sessionId: string; shopDomain: string; expiresAt: Date }): Promise<void> {
     await this.database.$transaction([this.database.shopifyOAuthState.deleteMany({ where: { sessionId: input.sessionId } }), this.database.shopifyOAuthState.create({ data: input })]);
@@ -61,9 +62,9 @@ export class PrismaShopifyRepository implements ShopifyRepository {
       return consumed.count === 1 ? state : null;
     });
   }
-  async connect(input: { storeId: string; userId: string; shopDomain: string; accessTokenEncrypted: string; refreshTokenEncrypted?: string; scopes: string; accessTokenExpiresAt?: Date; refreshTokenExpiresAt?: Date; requestId: string }): Promise<void> {
+  async connect(input: { storeId: string; userId: string; shopDomain: string; accessTokenEncrypted: string; authMode?: 'OAUTH' | 'CLIENT_CREDENTIALS'; clientIdEncrypted?: string; clientSecretEncrypted?: string; refreshTokenEncrypted?: string; scopes: string; accessTokenExpiresAt?: Date; refreshTokenExpiresAt?: Date; requestId: string }): Promise<void> {
     await this.database.$transaction(async tx => {
-      const tokenData = { accessTokenEncrypted: input.accessTokenEncrypted, ...(input.refreshTokenEncrypted ? { refreshTokenEncrypted: input.refreshTokenEncrypted } : {}), scopes: input.scopes, ...(input.accessTokenExpiresAt ? { accessTokenExpiresAt: input.accessTokenExpiresAt } : {}), ...(input.refreshTokenExpiresAt ? { refreshTokenExpiresAt: input.refreshTokenExpiresAt } : {}) };
+      const tokenData = { accessTokenEncrypted: input.accessTokenEncrypted, authMode: input.authMode ?? 'OAUTH', clientIdEncrypted: input.clientIdEncrypted ?? null, clientSecretEncrypted: input.clientSecretEncrypted ?? null, refreshTokenEncrypted: input.refreshTokenEncrypted ?? null, scopes: input.scopes, accessTokenExpiresAt: input.accessTokenExpiresAt ?? null, refreshTokenExpiresAt: input.refreshTokenExpiresAt ?? null };
       const domainConnection = await tx.shopifyConnection.findUnique({ where: { shopDomain: input.shopDomain }, select: { id: true, storeId: true, revokedAt: true } });
       if (domainConnection && domainConnection.storeId !== input.storeId) {
         if (!domainConnection.revokedAt) throw new ShopifyDomainInUseError();
@@ -74,6 +75,9 @@ export class PrismaShopifyRepository implements ShopifyRepository {
       }
       await tx.auditLog.create({ data: { storeId: input.storeId, actorUserId: input.userId, actorType: 'USER', action: 'integration.shopify_connected', targetType: 'shopify_connection', targetId: input.shopDomain, requestId: input.requestId } });
     });
+  }
+  async updateAccessToken(storeId: string, accessTokenEncrypted: string, accessTokenExpiresAt: Date): Promise<void> {
+    await this.database.shopifyConnection.updateMany({ where: { storeId, revokedAt: null, reconnectRequiredAt: null }, data: { accessTokenEncrypted, accessTokenExpiresAt } });
   }
   async disconnect(storeId: string, userId: string, requestId: string): Promise<void> {
     await this.database.$transaction([this.database.shopifyConnection.updateMany({ where: { storeId, revokedAt: null }, data: { revokedAt: new Date() } }), this.database.auditLog.create({ data: { storeId, actorUserId: userId, actorType: 'USER', action: 'integration.shopify_disconnected', targetType: 'shopify_connection', requestId } })]);

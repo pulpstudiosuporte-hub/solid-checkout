@@ -855,6 +855,9 @@ model ShopifyConnection {
   storeId               String    @unique @map("store_id") @db.Uuid
   shopDomain            String    @unique @map("shop_domain") @db.VarChar(255)
   accessTokenEncrypted  String    @map("access_token_encrypted") @db.Text
+  authMode               String    @default("OAUTH") @map("auth_mode") @db.VarChar(24)
+  clientIdEncrypted      String?   @map("client_id_encrypted") @db.Text
+  clientSecretEncrypted  String?   @map("client_secret_encrypted") @db.Text
   refreshTokenEncrypted String?   @map("refresh_token_encrypted") @db.Text
   scopes                String    @db.Text
   accessTokenExpiresAt  DateTime? @map("access_token_expires_at") @db.Timestamptz(3)
