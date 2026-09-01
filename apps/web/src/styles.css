@@ -346,7 +346,7 @@
 /* Checkout controls: independent step tokens, professional trust cards and richer CTA motion. */
 .ep-steps i{color:var(--eprogress-inactive-text)!important}
 .ep-steps .active i,.ep-steps.style-outline .active i{color:var(--eprogress-active-text)!important}
-.ep-trust>div span{min-height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:9px;background:color-mix(in srgb,var(--ep) 3%,var(--ecard));border-color:color-mix(in srgb,var(--ep) 16%,var(--eborder));color:var(--etext)}
+.ep-trust>div span{min-height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:9px;background:color-mix(in srgb,var(--ep) 3%,var(--ecard));border-color:var(--eborder);color:var(--etext)}
 .ep-trust>div span>i{width:27px;height:27px;display:grid;place-items:center;border-radius:50%;background:color-mix(in srgb,var(--ep) 12%,var(--ecard));color:var(--ep);font-style:normal}
 .ep-trust>div span>b{font-size:8px;line-height:1.35}
 .ep-button{position:relative;isolation:isolate;overflow:hidden;transition:transform .22s ease,box-shadow .22s ease,filter .22s ease;background:var(--ebutton-bg,var(--ep));color:var(--ebutton-text,#fff)}

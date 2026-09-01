@@ -634,7 +634,7 @@ function Settings({ group, c, u }) {
           onChange={(v) => u("inputBorderColor", v)}
         />
         <Color
-          label="Bordas dos cards e seções"
+          label="Borda global dos cards e seções"
           value={c.borderColor}
           onChange={(v) => u("borderColor", v)}
         />
