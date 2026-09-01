@@ -17,6 +17,10 @@ const publicId = (value: unknown): string | null =>
   typeof value === "string" && /^[A-Za-z0-9_-]{8,32}$/.test(value)
     ? value
     : null;
+const visitId = (value: unknown): string | null =>
+  typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value
+    : null;
 const clamp = (
   value: unknown,
   min: number,
@@ -35,6 +39,11 @@ const cleanText = (value: unknown, max: number): string | null =>
         .replace(/[\u0000-\u001f\u007f]/g, "")
         .slice(0, max)
     : null;
+const analyticsLabel = (value: unknown): string | null => {
+  const label = cleanText(value, 120);
+  if (!label || /@|\b\d{7,}\b/.test(label)) return null;
+  return label;
+};
 const allowedTypes = new Set<ChromaSenseEventType>([
   "VIEW",
   "CLICK",
@@ -80,8 +89,7 @@ export function normalizeChromaSenseEvent(
         ? Math.round(clamp(input.durationMs, 0, 30_000, 0))
         : null,
     target: input.type === "CLICK" ? cleanText(input.target, 160) : null,
-    targetLabel:
-      input.type === "CLICK" ? cleanText(input.targetLabel, 120) : null,
+    targetLabel: input.type === "CLICK" ? analyticsLabel(input.targetLabel) : null,
     interactive:
       input.type === "CLICK" && typeof input.interactive === "boolean"
         ? input.interactive
@@ -140,6 +148,7 @@ export function registerChromaSenseRoutes(
       viewport?: unknown;
       device?: unknown;
       pageKey?: unknown;
+      visitId?: unknown;
     };
   }>(
     "/public/checkout-sessions/:sessionId/chromasense/events",
@@ -188,38 +197,47 @@ export function registerChromaSenseRoutes(
         ? String(request.body.device)
         : "desktop";
       const pageKey = cleanText(request.body?.pageKey, 100) || "checkout";
+      const currentVisitId = visitId(request.body?.visitId);
+      if (!currentVisitId)
+        return reply.code(400).send(errorBody(request, "INVALID_VISIT", "Identificador da visita inválido."));
       const width = Math.round(clamp(viewport.width, 240, 7680, 1280));
       const height = Math.round(clamp(viewport.height, 240, 4320, 720));
-      const maxScroll = events.reduce(
+      const previous = await db.chromaSenseSession.findUnique({
+        where: { visitId: currentVisitId },
+        select: { maxScrollPercent: true, eventCount: true },
+      });
+      if ((previous?.eventCount ?? 0) >= 10_000) return reply.code(204).send();
+      const acceptedEvents = events.slice(
+        0,
+        Math.max(0, 10_000 - (previous?.eventCount ?? 0)),
+      );
+      const maxScroll = acceptedEvents.reduce(
         (max, event) => Math.max(max, event.scrollPercent ?? 0),
         0,
       );
-      const attention = events
+      const attention = acceptedEvents
         .filter((event) => event.type === "ATTENTION")
         .reduce((sum, event) => sum + (event.durationMs ?? 0), 0);
-      const rageClicks = events.filter((event) => event.rage).length;
-      const deadClicks = events.filter(
+      const rageClicks = acceptedEvents.filter((event) => event.rage).length;
+      const deadClicks = acceptedEvents.filter(
         (event) => event.type === "CLICK" && event.interactive === false,
       ).length;
-      const previous = await db.chromaSenseSession.findUnique({
-        where: { checkoutSessionId: checkoutSession.id },
-        select: { maxScrollPercent: true },
-      });
       const retainedMaxScroll = Math.max(
         previous?.maxScrollPercent ?? 0,
         maxScroll,
       );
       const analyticsSession = await db.chromaSenseSession.upsert({
-        where: { checkoutSessionId: checkoutSession.id },
+        where: { visitId: currentVisitId },
         create: {
           storeId: checkoutSession.checkout.storeId,
           checkoutId: checkoutSession.checkoutId,
           checkoutSessionId: checkoutSession.id,
+          visitId: currentVisitId,
           pageKey,
           deviceType: device,
           viewportWidth: width,
           viewportHeight: height,
-          eventCount: events.length,
+          eventCount: acceptedEvents.length,
           activeMs: attention,
           visibleMs: attention,
           maxScrollPercent: maxScroll,
@@ -231,7 +249,7 @@ export function registerChromaSenseRoutes(
           deviceType: device,
           viewportWidth: width,
           viewportHeight: height,
-          eventCount: { increment: events.length },
+          eventCount: { increment: acceptedEvents.length },
           activeMs: { increment: attention },
           visibleMs: { increment: attention },
           maxScrollPercent: retainedMaxScroll,
@@ -242,7 +260,7 @@ export function registerChromaSenseRoutes(
         select: { id: true },
       });
       await db.chromaSenseEvent.createMany({
-        data: events.map((event) => ({
+        data: acceptedEvents.map((event) => ({
           ...event,
           sessionId: analyticsSession.id,
         })),
@@ -250,7 +268,7 @@ export function registerChromaSenseRoutes(
       return reply
         .header("cache-control", "no-store")
         .code(202)
-        .send({ accepted: events.length });
+        .send({ accepted: acceptedEvents.length });
     },
   );
 
@@ -470,6 +488,7 @@ export function registerChromaSenseRoutes(
             : 0,
           insightCount: insights.length,
         },
+        truncated: sessions.length === 500 || events.length === 25_000,
         checkouts,
         points: Object.fromEntries(
           ["CLICK", "MOVE", "ATTENTION"].map((type) => [

@@ -25,6 +25,9 @@ export default tseslint.config(
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
       ...accessibilityWarnings,
+      // The deprecated rule duplicates label-has-associated-control and reports false positives.
+      'jsx-a11y/label-has-for': 'off',
+      'jsx-a11y/label-has-associated-control': ['warn', { assert: 'either', depth: 3 }],
       'jsx-a11y/alt-text': 'error',
       'jsx-a11y/iframe-has-title': 'error',
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],

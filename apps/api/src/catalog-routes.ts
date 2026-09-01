@@ -237,7 +237,7 @@ export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvi
   app.post<{ Params: { checkoutId: string } }>('/checkouts/:checkoutId/publish', async (request, reply) => {
     const context = await authenticate(request, true);
     if (!context || !canWrite(context)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
-    if (database && !await storeOnboardingComplete(database, context.storeId)) return reply.code(403).send(errorBody(request, 'STORE_ONBOARDING_REQUIRED', 'Complete os dados da loja e do responsável em Configurações antes de publicar o checkout.'));
+    if (database && !await storeOnboardingComplete(database, context.storeId, environment.APP_ENCRYPTION_KEY)) return reply.code(403).send(errorBody(request, 'STORE_ONBOARDING_REQUIRED', 'Complete os dados da loja e do responsável em Configurações antes de publicar o checkout.'));
     if (catalog.hasActiveDomain && !(await catalog.hasActiveDomain(context))) return reply.code(409).send(errorBody(request, 'DOMAIN_REQUIRED', 'Ative um domínio seguro para publicar o checkout.'));
     const checkoutId = text(request.params.checkoutId, 32);
     if (!checkoutId) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Checkout inválido.'));

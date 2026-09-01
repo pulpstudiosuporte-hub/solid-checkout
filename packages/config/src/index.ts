@@ -8,6 +8,7 @@ const environmentSchema = z.object({
   CORS_ORIGINS: z.string().default('http://localhost:5173').transform(value => value.split(',').map(origin => origin.trim()).filter(Boolean)),
   TRUST_PROXY: z.enum(['true', 'false']).default('false'),
   DATABASE_URL: z.string().regex(/^postgres(?:ql)?:\/\//, 'deve ser uma URL PostgreSQL').optional(),
+  REDIS_URL: z.string().regex(/^rediss?:\/\//, 'deve ser uma URL Redis').optional(),
   APP_URL: z.string().url().transform(value => value.replace(/[\\/]+$/, '')).optional(),
   API_PUBLIC_URL: z.string().url().optional(),
   MEDIA_STORAGE_PATH: z.string().min(1).default('/app/uploads'),
@@ -41,7 +42,7 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): AppEnvironment {
   const known = {
     NODE_ENV: input.NODE_ENV, API_HOST: input.API_HOST, API_PORT: input.API_PORT,
     LOG_LEVEL: input.LOG_LEVEL, CORS_ORIGINS: input.CORS_ORIGINS, TRUST_PROXY: input.TRUST_PROXY,
-    DATABASE_URL: input.DATABASE_URL, APP_URL: input.APP_URL, API_PUBLIC_URL: input.API_PUBLIC_URL, MEDIA_STORAGE_PATH: input.MEDIA_STORAGE_PATH,
+    DATABASE_URL: input.DATABASE_URL, REDIS_URL: input.REDIS_URL, APP_URL: input.APP_URL, API_PUBLIC_URL: input.API_PUBLIC_URL, MEDIA_STORAGE_PATH: input.MEDIA_STORAGE_PATH,
     SHOPIFY_CLIENT_ID: input.SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET: input.SHOPIFY_CLIENT_SECRET,
     SHOPIFY_REDIRECT_URI: input.SHOPIFY_REDIRECT_URI, SHOPIFY_SCOPES: input.SHOPIFY_SCOPES,
     DOKPLOY_URL: input.DOKPLOY_URL, DOKPLOY_API_KEY: input.DOKPLOY_API_KEY, DOKPLOY_CHECKOUT_APPLICATION_ID: input.DOKPLOY_CHECKOUT_APPLICATION_ID,

@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 // deepmerge-ts 8 and npm currently proposes an incompatible Prisma downgrade.
 // This narrow exception keeps CI sensitive to every other high/critical issue.
 const temporaryAllowlist = new Set(['deepmerge-ts', '@prisma/config', 'prisma']);
+const exceptionExpiresAt = new Date('2026-12-31T23:59:59Z');
 const audit = process.platform === 'win32'
   ? spawnSync(process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', 'npm audit --omit=dev --json'], { encoding: 'utf8' })
   : spawnSync('npm', ['audit', '--omit=dev', '--json'], { encoding: 'utf8' });
@@ -15,7 +16,7 @@ const unexpected = vulnerabilities.filter(([name]) => !temporaryAllowlist.has(na
 const deepmerge = report.vulnerabilities?.['deepmerge-ts'];
 const expectedAdvisory = Array.isArray(deepmerge?.via) && deepmerge.via.some(item => typeof item === 'object' && item?.source === 1145093);
 
-if (unexpected.length || vulnerabilities.length && !expectedAdvisory) {
+if (unexpected.length || vulnerabilities.length && (!expectedAdvisory || new Date() > exceptionExpiresAt)) {
   console.error(JSON.stringify({ unexpected: unexpected.map(([name, value]) => ({ name, severity: value.severity, via: value.via })) }, null, 2));
   process.exit(1);
 }

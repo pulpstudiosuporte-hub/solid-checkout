@@ -82,7 +82,7 @@ export default function GatewaysPage({ csrfToken, storeKey }) {
     if (statusError?.status === 'rejected') setMessage(statusError.reason?.message || 'Não foi possível verificar os gateways.');
     setLoading(false);
   };
-  useEffect(() => { void load(); }, [storeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void load(); }, [storeKey]);
 
   const assetByKey = useMemo(() => gatewayAssetMap(assets), [assets]);
   const visible = useMemo(() => { const term = search.trim().toLocaleLowerCase('pt-BR'); return gatewayCatalog.filter(item => (scope === 'Todos' || item.scope === scope) && (!term || `${item.name} ${item.description}`.toLocaleLowerCase('pt-BR').includes(term))); }, [scope, search]);

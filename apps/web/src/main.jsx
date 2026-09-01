@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   ArrowRight, BarChart3, Box, Check, CheckCircle2, ChevronDown,
@@ -15,31 +15,32 @@ import { archiveStore, bindTabToUser, clearTabUser, completeMfaLogin, createStor
 import { currentWebPushSubscription, disableWebPushOnThisDevice } from './web-push';
 import Login, { SessionLoading } from './Auth';
 import DashboardPage from './DashboardPage';
-import AccountSettings from './SettingsHub';
 import StoreSwitcher from './StoreSwitcher';
-import ShopifyIntegration from './ShopifyIntegration';
-import ProductsPage from './ProductsPage';
 import CheckoutsPage from './CheckoutsPage';
 import LogisticsPage from './LogisticsPage';
-import GatewaysPage from './GatewaysPage';
 import PublicCheckout, { PublicCheckoutErrorBoundary, PublicSessionCheckout } from './PublicCheckout';
 import PageErrorBoundary from './PageErrorBoundary';
 import OrdersPage, { RecentOrders } from './OrdersPage';
-import OrderBumpsPage from './OrderBumpsPage';
-import DomainsPage from './DomainsPage';
 import AdminUsersPage from './AdminUsersPage';
-import CouponsPage from './CouponsPage';
 import NotificationCenter from './NotificationCenter';
-import AdminOperationsPage from './AdminOperationsPage';
 import InstallAppPrompt from './InstallAppPrompt';
-import BillingPage from './BillingPage';
-import AbandonedCartsPage from './AbandonedCartsPage';
-import AnalyticsPage from './AnalyticsPage';
-import WebhooksPage from './WebhooksPage';
 import CommandPalette from './CommandPalette';
-import NewsRoadmapPage from './NewsRoadmapPage';
-import AdminContentPage from './AdminContentPage';
-import ChromaSensePage from './ChromaSensePage';
+
+const AccountSettings = lazy(() => import('./SettingsHub'));
+const ShopifyIntegration = lazy(() => import('./ShopifyIntegration'));
+const ProductsPage = lazy(() => import('./ProductsPage'));
+const GatewaysPage = lazy(() => import('./GatewaysPage'));
+const OrderBumpsPage = lazy(() => import('./OrderBumpsPage'));
+const DomainsPage = lazy(() => import('./DomainsPage'));
+const CouponsPage = lazy(() => import('./CouponsPage'));
+const AdminOperationsPage = lazy(() => import('./AdminOperationsPage'));
+const BillingPage = lazy(() => import('./BillingPage'));
+const AbandonedCartsPage = lazy(() => import('./AbandonedCartsPage'));
+const AnalyticsPage = lazy(() => import('./AnalyticsPage'));
+const WebhooksPage = lazy(() => import('./WebhooksPage'));
+const NewsRoadmapPage = lazy(() => import('./NewsRoadmapPage'));
+const AdminContentPage = lazy(() => import('./AdminContentPage'));
+const ChromaSensePage = lazy(() => import('./ChromaSensePage'));
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -229,7 +230,7 @@ function App(){
   const activeStore=stores.find(store=>store.active);
   const pageContent=page==='Início'?<Dashboard setPage={setPage} storeKey={activeStore?.publicId}/>:page==='Novidades'?<NewsRoadmapPage csrfToken={auth.csrfToken}/>:page==='Análises'?<AnalyticsPage storeKey={activeStore?.publicId}/>:page==='Pedidos'?<OrdersPage storeKey={activeStore?.publicId}/>:page==='Carrinhos'?<AbandonedCartsPage storeKey={activeStore?.publicId} csrfToken={auth.csrfToken}/>:page==='ChromaSense'?<ChromaSensePage storeKey={activeStore?.publicId}/>:page==='Webhooks'?<WebhooksPage storeKey={activeStore?.publicId} csrfToken={auth.csrfToken}/>:page==='Meu plano'?<BillingPage csrfToken={auth.csrfToken}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Operações'?<AdminOperationsPage csrfToken={auth.csrfToken}/>:page==='Conteúdo'?<AdminContentPage csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Gateways'?<GatewaysPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Domínios'?<DomainsPage csrfToken={auth.csrfToken}/>:page==='Produtos'?<ProductsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onOpenIntegrations={()=>setPage('Integrações')}/>:page==='Order bumps'?<OrderBumpsPage csrfToken={auth.csrfToken}/>:page==='Cupons'?<CouponsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>;
   const pendingCount=activation?.missing?.length;
-  return <div className={`app ${sidebarCollapsed?'sidebar-collapsed':''}`}><InstallAppPrompt/><CommandPalette open={searchOpen} onClose={()=>setSearchOpen(false)} onNavigate={setPage} platformAdmin={auth.user?.platformAdmin}/><Sidebar open={sidebar} collapsed={sidebarCollapsed} onToggleCollapsed={()=>setSidebarCollapsed(value=>!value)} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout} stores={stores} storeBusy={storeBusy} onSelectStore={handleSelectStore} onCreateStore={handleCreateStore} onArchiveStore={handleArchiveStore}/><div className="main-shell"><Header page={page} toggleSidebar={()=>setSidebar(true)} apiStatus={apiStatus} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onNavigate={setPage} onOpenSearch={()=>setSearchOpen(true)}/>{activeStore&&!activeStore.onboardingCompleted&&page==='Início'&&<aside className="store-activation-banner" role="status"><ShieldCheck size={22}/><div><b>Conclua o cadastro para ativar a loja</b><span>{Number.isInteger(pendingCount)?`${pendingCount===1?'Falta 1 informação':`Faltam ${pendingCount} informações`}. `:'Existem informações pendentes. '}Você pode explorar o painel, mas publicar checkouts e receber pagamentos só será liberado após concluir os dados da loja e do responsável.</span></div><button type="button" onClick={()=>setPage('Configurações')}>Continuar cadastro <ArrowRight size={16}/></button></aside>}<PageErrorBoundary routeKey={`${activeStore?.publicId || 'store'}:${page}`} onHome={()=>setPage('Início')}>{pageContent}</PageErrorBoundary></div></div>
+  return <div className={`app ${sidebarCollapsed?'sidebar-collapsed':''}`}><InstallAppPrompt/><CommandPalette open={searchOpen} onClose={()=>setSearchOpen(false)} onNavigate={setPage} platformAdmin={auth.user?.platformAdmin}/><Sidebar open={sidebar} collapsed={sidebarCollapsed} onToggleCollapsed={()=>setSidebarCollapsed(value=>!value)} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout} stores={stores} storeBusy={storeBusy} onSelectStore={handleSelectStore} onCreateStore={handleCreateStore} onArchiveStore={handleArchiveStore}/><div className="main-shell"><Header page={page} toggleSidebar={()=>setSidebar(true)} apiStatus={apiStatus} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onNavigate={setPage} onOpenSearch={()=>setSearchOpen(true)}/>{activeStore&&!activeStore.onboardingCompleted&&page==='Início'&&<aside className="store-activation-banner" role="status"><ShieldCheck size={22}/><div><b>Conclua o cadastro para ativar a loja</b><span>{Number.isInteger(pendingCount)?`${pendingCount===1?'Falta 1 informação':`Faltam ${pendingCount} informações`}. `:'Existem informações pendentes. '}Você pode explorar o painel, mas publicar checkouts e receber pagamentos só será liberado após concluir os dados da loja e do responsável.</span></div><button type="button" onClick={()=>setPage('Configurações')}>Continuar cadastro <ArrowRight size={16}/></button></aside>}<PageErrorBoundary routeKey={`${activeStore?.publicId || 'store'}:${page}`} onHome={()=>setPage('Início')}><Suspense fallback={<SessionLoading/>}>{pageContent}</Suspense></PageErrorBoundary></div></div>
 }
 
 createRoot(document.getElementById('root')).render(<App/>);

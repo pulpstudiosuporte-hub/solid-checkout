@@ -1,4 +1,4 @@
-import { Component, useEffect, useRef, useState } from "react";
+import { Component, useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowRight,
@@ -225,7 +225,9 @@ function PublicCustomElement({ item }) {
   const mediaStyle = { '--element-image-height': `${item.imageHeight || 220}px`, objectFit: item.imageFit || 'cover' };
   return (
     <section className={`public-custom-element type-${item.type} device-${item.device || 'all'} ${item.imageUrl ? 'has-media' : ''}`} style={style}>
-      {item.mediaUrl && item.type === 'video' ? <video className="public-custom-media" src={item.mediaUrl} poster={item.imageUrl || undefined} controls preload="metadata"/> : item.imageUrl ? <img className="public-custom-media" src={item.imageUrl} alt={item.imageAlt || ''} width="1600" height={item.imageHeight || 220} style={mediaStyle} loading="lazy" decoding="async"/> : <div className="public-custom-icon" style={iconStyle}>
+      {/* Captions are rendered whenever the merchant supplies a captions URL. */}
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      {item.mediaUrl && item.type === 'video' ? <video aria-label={item.title || 'Vídeo do checkout'} className="public-custom-media" src={item.mediaUrl} poster={item.imageUrl || undefined} controls preload="metadata">{item.captionsUrl && <track kind="captions" src={item.captionsUrl} srcLang="pt-BR" label="Português" default/>}</video> : item.imageUrl ? <img className="public-custom-media" src={item.imageUrl} alt={item.imageAlt || ''} width="1600" height={item.imageHeight || 220} style={mediaStyle} loading="lazy" decoding="async"/> : <div className="public-custom-icon" style={iconStyle}>
         {["testimonial","reviews"].includes(item.type) ? <Star size={20} /> : item.type === "faq" ? <CircleHelp size={20} /> : item.type === 'timer' ? <Clock3 size={20}/> : <ShieldCheck size={20} />}
       </div>}
       <div>
@@ -296,7 +298,7 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
     error: "",
   });
   const [variantId, setVariantId] = useState("");
-  const [quantity, setQuantity] = useState(1);
+  const quantity = 1;
   const [session, setSession] = useState(null);
   const [sessionToken, setSessionToken] = useState("");
   const [busy, setBusy] = useState(false);
@@ -316,7 +318,7 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
     return () => controller.abort();
   }, [storeSlug, checkoutSlug]);
   const product = state.checkout?.product;
-  async function begin() {
+  const begin = useCallback(async () => {
     setBusy(true);
     setState((current) => ({ ...current, error: "" }));
     try {
@@ -346,13 +348,13 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
     } finally {
       setBusy(false);
     }
-  }
+  }, [checkoutSlug, quantity, storeSlug, variantId]);
   useEffect(() => {
     if (!product || session || autoStarted.current) return;
     if (product.variants?.length > 0 && !variantId) return;
     autoStarted.current = true;
     void begin();
-  }, [product, variantId, session]);
+  }, [begin, product, variantId, session]);
   if (state.loading)
     return (
       <div className="public-checkout-state">
@@ -381,16 +383,16 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
 }
 
 function useExpiry(expiresAt) {
-  const calculate = () =>
+  const calculate = useCallback(() =>
     Math.max(
       0,
       Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000),
-    );
+    ), [expiresAt]);
   const [remaining, setRemaining] = useState(calculate);
   useEffect(() => {
     const interval = window.setInterval(() => setRemaining(calculate()), 1000);
     return () => window.clearInterval(interval);
-  }, [expiresAt]);
+  }, [calculate]);
   return {
     remaining,
     label: `${String(Math.floor(remaining / 3600)).padStart(2, "0")} : ${String(Math.floor((remaining % 3600) / 60)).padStart(2, "0")} : ${String(remaining % 60).padStart(2, "0")}`,
@@ -590,8 +592,11 @@ function SessionContent({ session: initialSession, token }) {
     setBusy(true); setError("");
     getPublicShippingMethods(session.publicId, token).then(({ items: methods }) => setShippingOptions(methods)).catch(requestError => setError(requestError.message)).finally(() => setBusy(false));
   }, [requiresShipping, step, session.publicId, token]);
+  const paymentStatus = String(payment?.status || '').toUpperCase();
+  const paymentPublicId = payment?.publicId;
+  const fulfillmentType = session.checkout?.product?.fulfillmentType;
   useEffect(() => {
-    if (!payment || String(payment.status).toUpperCase() !== 'PENDING') return;
+    if (!paymentPublicId || paymentStatus !== 'PENDING') return;
     const controller = new AbortController();
     const checkStatus = () => getLatestPublicPayment(session.publicId, token, controller.signal).then(result => {
       setPayment(current => current ? { ...current, ...result.payment } : result.payment);
@@ -599,13 +604,13 @@ function SessionContent({ session: initialSession, token }) {
     const interval = window.setInterval(checkStatus, 5000);
     checkStatus();
     return () => { controller.abort(); window.clearInterval(interval); };
-  }, [payment?.publicId, payment?.status, session.publicId, token]);
+  }, [paymentPublicId, paymentStatus, session.publicId, token]);
   useEffect(() => {
-    if (String(payment?.status).toUpperCase() !== 'PAID' || !session.checkout?.product || session.checkout.product.fulfillmentType !== 'DIGITAL') return;
+    if (paymentStatus !== 'PAID' || fulfillmentType !== 'DIGITAL') return;
     const controller = new AbortController();
     getPaidDigitalDelivery(session.publicId, token, controller.signal).then(result => setDelivery(result.delivery)).catch(() => {});
     return () => controller.abort();
-  }, [payment?.status, session.checkout?.product?.fulfillmentType, session.publicId, token]);
+  }, [fulfillmentType, paymentStatus, session.publicId, token]);
   useEffect(() => { if (metaPixelId && String(payment?.status).toUpperCase() === 'PAID') trackMeta('Purchase', { ...metaData, value: payment.amountCents / 100, order_id: session.publicId }, `${session.publicId}:Purchase`); }, [metaPixelId, payment?.status]); // eslint-disable-line react-hooks/exhaustive-deps
   const chooseShipping = async (method) => {
     setBusy(true); setError("");
@@ -687,6 +692,7 @@ function SessionContent({ session: initialSession, token }) {
                   <label>
                     {copy.fullName}
                     <input
+                      aria-label={copy.fullName}
                       autoComplete="name"
                       value={form.name}
                       onChange={(event) => update("name", event.target.value)}
@@ -696,6 +702,7 @@ function SessionContent({ session: initialSession, token }) {
                   <label>
                     {copy.email}
                     <input
+                      aria-label={copy.email}
                       type="email"
                       autoComplete="email"
                       value={form.email}
@@ -707,6 +714,7 @@ function SessionContent({ session: initialSession, token }) {
                     <label>
                       {copy.document}
                       <input
+                        aria-label={copy.document}
                         inputMode="numeric"
                         value={form.document}
                         onChange={(event) => update("document", event.target.value)}
@@ -716,6 +724,7 @@ function SessionContent({ session: initialSession, token }) {
                     <label>
                       {copy.phone}
                       <input
+                        aria-label={copy.phone}
                         inputMode="tel"
                         autoComplete="tel"
                         value={form.phone}
@@ -736,6 +745,7 @@ function SessionContent({ session: initialSession, token }) {
                             {copy.coupon}
                             <span>
                               <input
+                                aria-label={copy.coupon}
                                 id="checkout-coupon-code"
                                 value={couponCode}
                                 onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
@@ -763,7 +773,7 @@ function SessionContent({ session: initialSession, token }) {
                 </div>
               </div>
               {config.showBump && (session.orderBumps || (session.orderBump ? [session.orderBump] : [])).map((bump) => <label className="public-order-bump" key={bump.publicId}>
-                <input type="checkbox" checked={Boolean(session.items?.some(item => item.isOrderBump && item.product?.publicId === bump.publicId))} disabled={busy} onChange={(event) => toggleOrderBump(bump.publicId, event.target.checked)} />
+                <input aria-label={`${copy.specialOffer}: ${bump.checkoutTitle}`} type="checkbox" checked={Boolean(session.items?.some(item => item.isOrderBump && item.product?.publicId === bump.publicId))} disabled={busy} onChange={(event) => toggleOrderBump(bump.publicId, event.target.checked)} />
                 <span className="public-order-bump-check"><Check size={14} /></span>
                 {bump.imageUrl ? <img src={bump.imageUrl} alt="" /> : <span className="public-order-bump-image"><ShoppingBag size={18}/></span>}
                 <span><b>{bump.offerTitle || config.orderBumpTitle || copy.specialOffer}</b><strong>{bump.checkoutTitle}</strong>{descriptionText(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription) && <small>{descriptionText(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription)}</small>}</span>
@@ -811,6 +821,7 @@ function SessionContent({ session: initialSession, token }) {
                 <label>
                   CEP
                   <input
+                    aria-label="CEP"
                     inputMode="numeric"
                     autoComplete="postal-code"
                     maxLength="9"
@@ -848,6 +859,7 @@ function SessionContent({ session: initialSession, token }) {
                 <label>
                   {copy.street}
                   <input
+                    aria-label={copy.street}
                     autoComplete="address-line1"
                     value={address.street}
                     onChange={(event) =>
@@ -863,6 +875,7 @@ function SessionContent({ session: initialSession, token }) {
                   <label>
                     {copy.number}
                     <input
+                      aria-label={copy.number}
                       ref={numberInput}
                       value={address.number}
                       onChange={(event) =>
@@ -877,6 +890,7 @@ function SessionContent({ session: initialSession, token }) {
                   <label>
                     {copy.complement} <small>{copy.optional}</small>
                     <input
+                      aria-label={copy.complement}
                       autoComplete="address-line2"
                       value={address.complement}
                       onChange={(event) =>
@@ -892,6 +906,7 @@ function SessionContent({ session: initialSession, token }) {
                 <label>
                   {copy.district}
                   <input
+                    aria-label={copy.district}
                     value={address.neighborhood}
                     onChange={(event) =>
                       setAddress((current) => ({
@@ -906,6 +921,7 @@ function SessionContent({ session: initialSession, token }) {
                   <label>
                     {copy.city}
                     <input
+                      aria-label={copy.city}
                       autoComplete="address-level2"
                       value={address.city}
                       onChange={(event) =>
@@ -920,6 +936,7 @@ function SessionContent({ session: initialSession, token }) {
                   <label>
                     {copy.state}
                     <input
+                      aria-label={copy.state}
                       autoComplete="address-level1"
                       maxLength="2"
                       value={address.state}
@@ -975,7 +992,7 @@ function SessionContent({ session: initialSession, token }) {
               <p className="eyebrow">{copy.payment.toUpperCase()}</p>
               {payment && String(payment.status).toUpperCase() !== "PAID" && <div className="pix-qr-code"><QRCodeSVG value={payment.pixCode} size={188} level="M" includeMargin aria-label="QR Code para pagamento Pix" /></div>}
               <h1>{String(payment?.status).toUpperCase() === 'PAID' ? copy.paymentConfirmed : payment ? copy.payPix : copy.readyPay}</h1>
-              {String(payment?.status).toUpperCase() === 'PAID' ? <div className="payment-confirmed" role="status"><CheckCircle2 size={38}/><p>{copy.paymentReceived}</p>{config.successUrl && config.successUrl !== '#' && <a className="customer-continue" href={config.successUrl}>{copy.continue} <ArrowRight size={19}/></a>}</div> : payment ? <><p>{copy.payInstructions}</p><strong className="real-pix-total">{money.format(payment.amountCents / 100)}</strong><textarea className="pix-copy-code" readOnly value={payment.pixCode}/><button type="button" className="customer-continue" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? copy.copied : copy.copyPix}</button>{payment.expiresAt && <small className="pix-expiration">{copy.validUntil} {new Intl.DateTimeFormat(config.language === 'es' ? 'es-ES' : config.language || 'pt-BR', { timeStyle: 'short' }).format(new Date(payment.expiresAt))}</small>}</> : <><p>{copy.readyHelp}</p><button type="button" className="customer-continue" onClick={generatePix} disabled={busy}>{busy ? <LoaderCircle className="spin" size={18}/> : copy.generatePix} <ArrowRight size={19}/></button></>}
+              {String(payment?.status).toUpperCase() === 'PAID' ? <div className="payment-confirmed" role="status"><CheckCircle2 size={38}/><p>{copy.paymentReceived}</p>{config.successUrl && config.successUrl !== '#' && <a className="customer-continue" href={config.successUrl}>{copy.continue} <ArrowRight size={19}/></a>}</div> : payment ? <><p>{copy.payInstructions}</p><strong className="real-pix-total">{money.format(payment.amountCents / 100)}</strong><textarea className="pix-copy-code" aria-label="Código Pix copia e cola" readOnly value={payment.pixCode}/><button type="button" className="customer-continue" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? copy.copied : copy.copyPix}</button>{payment.expiresAt && <small className="pix-expiration">{copy.validUntil} {new Intl.DateTimeFormat(config.language === 'es' ? 'es-ES' : config.language || 'pt-BR', { timeStyle: 'short' }).format(new Date(payment.expiresAt))}</small>}</> : <><p>{copy.readyHelp}</p><button type="button" className="customer-continue" onClick={generatePix} disabled={busy}>{busy ? <LoaderCircle className="spin" size={18}/> : copy.generatePix} <ArrowRight size={19}/></button></>}
               {error && <p className="public-error" role="alert">{error}</p>}
               {String(payment?.status).toUpperCase() !== 'PAID' && <button type="button" onClick={() => setStep(requiresShipping ? 3 : 1)}>
                 {requiresShipping ? copy.backShipping : copy.backData}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3, CreditCard, Globe2, Home, LayoutTemplate, Package, Plug,
   Search, ServerCog, Settings, ShoppingBag, ShoppingCart, Sparkles, Megaphone,
@@ -67,13 +67,15 @@ export default function CommandPalette({ open, onClose, onNavigate, platformAdmi
     if (event.key === 'Enter') { event.preventDefault(); choose(results[active]); }
   };
 
+  // Backdrop click is supplementary; Escape and the explicit close button provide keyboard access.
+  // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
   return <div className="command-overlay" role="presentation" onMouseDown={event => event.target === event.currentTarget && onClose()}>
-    <section className="command-palette" role="dialog" aria-modal="true" aria-labelledby="command-title" onKeyDown={onKeyDown}>
+    <dialog open className="command-palette" aria-modal="true" aria-labelledby="command-title" onKeyDown={onKeyDown}>
       <h2 id="command-title" className="sr-only">Busca avançada do painel</h2>
       <div className="command-input">
         <Search size={20} aria-hidden="true"/>
-        <input ref={inputRef} value={query} onChange={event => { setQuery(event.target.value); setActive(0); }} placeholder="Buscar páginas, recursos ou ações..." role="combobox" aria-expanded="true" aria-controls="command-results" aria-activedescendant={results[active] ? `command-option-${active}` : undefined}/>
-        {query && <button type="button" onClick={() => { setQuery(''); inputRef.current?.focus(); }} aria-label="Limpar busca"><X size={17}/></button>}
+        <input aria-label="Buscar páginas, recursos ou ações" ref={inputRef} value={query} onChange={event => { setQuery(event.target.value); setActive(0); }} placeholder="Buscar páginas, recursos ou ações..." role="combobox" aria-expanded="true" aria-controls="command-results" aria-activedescendant={results[active] ? `command-option-${active}` : undefined}/>
+        <button type="button" onClick={() => { if (query) { setQuery(''); inputRef.current?.focus(); } else onClose(); }} aria-label={query ? 'Limpar busca' : 'Fechar busca'}><X size={17}/></button>
         <kbd>Esc</kbd>
       </div>
       <div className="command-help"><span>{results.length} {results.length === 1 ? 'resultado' : 'resultados'}</span><span><kbd>↑</kbd><kbd>↓</kbd> navegar <kbd>Enter</kbd> abrir</span></div>
@@ -90,6 +92,6 @@ export default function CommandPalette({ open, onClose, onNavigate, platformAdmi
           onClick={() => choose(item)}
         ><span><item.icon size={19}/></span><div><b>{item.label}</b><small>{item.group}</small></div><kbd>↵</kbd></button>) : <div className="command-empty"><Search size={24}/><b>Nenhuma página encontrada</b><span>Tente buscar por “pedido”, “checkout”, “cupom” ou “configuração”.</span></div>}
       </div>
-    </section>
+    </dialog>
   </div>;
 }

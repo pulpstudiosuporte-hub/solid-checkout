@@ -262,9 +262,10 @@ export default function CheckoutElementsPanel({
   const [mode, setMode] = useState(config.elementEditMode || "guided");
   const [editing, setEditing] = useState(null);
   const [original, setOriginal] = useState(null);
-  const elements = Array.isArray(config.customElements)
-    ? config.customElements
-    : [];
+  const elements = useMemo(
+    () => Array.isArray(config.customElements) ? config.customElements : [],
+    [config.customElements],
+  );
   const byType = useMemo(
     () => new Map(elements.map((item) => [item.type, item])),
     [elements],

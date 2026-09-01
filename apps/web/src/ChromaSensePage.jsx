@@ -32,6 +32,7 @@ const empty = {
   topTargets: [],
   insights: [],
   sessions: [],
+  truncated: false,
 };
 const periods = [
   ["today", "Hoje"],
@@ -192,6 +193,12 @@ export default function ChromaSensePage({ storeKey }) {
             {state.error}
           </span>
           <button onClick={load}>Tentar novamente</button>
+        </div>
+      )}
+      {state.truncated && (
+        <div className="chroma-error" role="status">
+          <AlertTriangle size={18} />
+          <span><b>Período com alto volume.</b> O mapa exibe uma amostra recente; reduza o período para máxima precisão.</span>
         </div>
       )}
       <section className="chroma-kpis" aria-label="Resumo do ChromaSense">

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { BadgePercent, Check, LoaderCircle, RefreshCw, ShieldCheck, UserX, Users, X } from 'lucide-react';
 import { approveAdminUser, blockAdminUser, getAdminUsers, updateAdminBillingOverride } from './api';
 
@@ -35,8 +35,8 @@ function BillingOverrideModal({ user, csrfToken, onClose, onSaved }) {
 
 export default function AdminUsersPage({ csrfToken }) {
   const [status, setStatus] = useState('APPROVED'); const [data, setData] = useState(null); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(''); const [error, setError] = useState(''); const [benefitUser, setBenefitUser] = useState(null);
-  const load = async () => { setLoading(true); setError(''); try { setData(await getAdminUsers(status)); } catch (requestError) { setError(requestError.message); } finally { setLoading(false); } };
-  useEffect(() => { void load(); }, [status]);
+  const load = useCallback(async () => { setLoading(true); setError(''); try { setData(await getAdminUsers(status)); } catch (requestError) { setError(requestError.message); } finally { setLoading(false); } }, [status]);
+  useEffect(() => { void load(); }, [load]);
   const approve = async user => { setBusy(user.publicId); setError(''); try { await approveAdminUser(user.publicId, csrfToken); await load(); } catch (requestError) { setError(requestError.message); } finally { setBusy(''); } };
   const block = async user => { if (!window.confirm(`Bloquear a conta de ${user.name}? Todas as sessões serão encerradas.`)) return; setBusy(user.publicId); setError(''); try { await blockAdminUser(user.publicId, csrfToken); await load(); } catch (requestError) { setError(requestError.message); } finally { setBusy(''); } };
   return <main className="page admin-users-page">

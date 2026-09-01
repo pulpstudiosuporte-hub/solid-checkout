@@ -26,14 +26,15 @@ export function OrdersTable({ items, loading, error, onRetry, onOpen, showGatewa
 function useOrders(storeKey, page, pageSize, filters = {}) {
   const [state, setState] = useState({ loading: true, error: '', items: [], total: 0, pages: 1 });
   const [refresh, setRefresh] = useState(0);
+  const { search, status, from, to, sort } = filters;
   useEffect(() => {
     const controller = new AbortController();
     setState(current => ({ ...current, loading: true, error: '', ...(refresh === 0 ? { items: [] } : {}) }));
-    getOrders({ page, pageSize, ...filters }, controller.signal).then(result => setState({ loading: false, error: '', items: result.items, total: result.total, pages: result.pages })).catch(error => {
+    getOrders({ page, pageSize, search, status, from, to, sort }, controller.signal).then(result => setState({ loading: false, error: '', items: result.items, total: result.total, pages: result.pages })).catch(error => {
       if (error.name !== 'AbortError') setState({ loading: false, error: error.message, items: [], total: 0, pages: 1 });
     });
     return () => controller.abort();
-  }, [page, pageSize, storeKey, refresh, filters.search, filters.status, filters.from, filters.to, filters.sort]);
+  }, [page, pageSize, storeKey, refresh, search, status, from, to, sort]);
   return [state, () => setRefresh(value => value + 1)];
 }
 

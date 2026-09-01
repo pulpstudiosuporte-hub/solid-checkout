@@ -3,6 +3,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import rawBody from 'fastify-raw-body';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { Redis } from 'ioredis';
 import { createHash, randomUUID } from 'node:crypto';
 import type { AppEnvironment } from '@solid/config';
 import type { ErrorResponse, HealthResponse } from '@solid/contracts';
@@ -47,6 +48,11 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
           'req.body.password', 'req.body.currentPassword', 'req.body.newPassword',
           'req.body.token', 'req.body.code', 'req.body.accessToken', 'req.body.apiKey',
           'req.body.publicKey', 'req.body.secretKey', 'req.body.cpf',
+          'req.body.values.document', 'req.body.values.legalName',
+          'req.body.values.birthDate', 'req.body.values.zipCode',
+          'req.body.values.address', 'req.body.values.number',
+          'req.body.values.complement', 'req.body.values.district',
+          'req.body.values.city',
           '*.password', '*.token', '*.code', '*.accessToken', '*.apiKey', '*.publicKey',
           '*.secretKey', '*.cpf', '*.document', '*.documentNumber',
           '*.customerDataEncrypted', '*.shippingAddressEncrypted', 'err.details'
@@ -58,6 +64,13 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
     bodyLimit: 1_048_576,
     genReqId: () => randomUUID()
   });
+  const rateLimitRedis = environment.REDIS_URL ? new Redis(environment.REDIS_URL, { enableOfflineQueue: false, maxRetriesPerRequest: 1, retryStrategy: (times: number) => times < 4 ? Math.min(times * 250, 1_000) : null }) : undefined;
+  if (rateLimitRedis) {
+    rateLimitRedis.on('error', (error: Error) => app.log.warn({ err: error }, 'rate_limit_redis_error'));
+    app.addHook('onClose', () => { rateLimitRedis.disconnect(); });
+  } else if (environment.NODE_ENV === 'production') {
+    app.log.warn('REDIS_URL ausente: rate limiting opera apenas por réplica');
+  }
 
   void app.register(helmet, { global: true, contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], baseUri: ["'none'"], formAction: ["'none'"], frameAncestors: ["'none'"] } }, hsts: environment.NODE_ENV === 'production' ? { maxAge: 31_536_000, includeSubDomains: true, preload: true } : false });
   void app.register(cors, { origin: (origin, callback) => {
@@ -72,7 +85,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
       callback(null, allowed);
     }).catch(() => callback(null, false));
   }, credentials: true, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], allowedHeaders: ['authorization', 'content-type', 'x-csrf-token', 'x-request-id', 'x-solid-user-context'], maxAge: 600 });
-  void app.register(rateLimit, { max: 100, timeWindow: '1 minute', ban: 3, errorResponseBuilder: (_request, context) => ({ error: { code: 'RATE_LIMITED', message: `Muitas requisições. Tente novamente em ${context.after}.`, requestId: _request.id } }) });
+  void app.register(rateLimit, { max: 100, timeWindow: '1 minute', ban: 3, ...(rateLimitRedis ? { redis: rateLimitRedis } : {}), errorResponseBuilder: (_request, context) => ({ error: { code: 'RATE_LIMITED', message: `Muitas requisições. Tente novamente em ${context.after}.`, requestId: _request.id } }) });
   if (dependencies.authRepository) {
     const repository = dependencies.authRepository;
     const sessionCookie = environment.NODE_ENV === 'production' ? '__Host-solid_session' : 'solid_session';

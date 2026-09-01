@@ -3,6 +3,7 @@ import type { AppEnvironment } from '@solid/config';
 import type { Prisma, PrismaClient } from '@solid/database';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AuthRepository } from './auth-repository.js';
+import { protectStoreProfile, protectUserProfile, readStoreProfile, readUserProfile } from './profile-protection.js';
 import { refreshStoreOnboarding } from './store-onboarding.js';
 
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -11,7 +12,41 @@ const failure = (request: FastifyRequest, code: string, message: string) => ({ e
 const plainObject = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 const cleanText = (value: unknown, max: number) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const digits = (value: string) => value.replace(/\D/g, '');
-const validDocument = (value: string) => [11, 14].includes(digits(value).length);
+const repeatedDigits = (value: string) => /^(\d)\1+$/.test(value);
+const cpfValid = (value: string) => {
+  const input = digits(value);
+  if (input.length !== 11 || repeatedDigits(input)) return false;
+  const check = (length: number) => {
+    let sum = 0;
+    for (let index = 0; index < length; index += 1) sum += Number(input[index]) * (length + 1 - index);
+    const rest = (sum * 10) % 11;
+    return (rest === 10 ? 0 : rest) === Number(input[length]);
+  };
+  return check(9) && check(10);
+};
+const cnpjValid = (value: string) => {
+  const input = digits(value);
+  if (input.length !== 14 || repeatedDigits(input)) return false;
+  const calculate = (length: number) => {
+    const weights = length === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+    const sum = weights.reduce((total, weight, index) => total + Number(input[index]) * weight, 0);
+    const rest = sum % 11;
+    return rest < 2 ? 0 : 11 - rest;
+  };
+  return calculate(12) === Number(input[12]) && calculate(13) === Number(input[13]);
+};
+export const validDocument = (value: string) => cpfValid(value) || cnpjValid(value);
+const STATES = new Set(['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO']);
+export const validBirthDate = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T12:00:00Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) return false;
+  const now = new Date();
+  let age = now.getUTCFullYear() - date.getUTCFullYear();
+  const birthdayPassed = now.getUTCMonth() > date.getUTCMonth() || (now.getUTCMonth() === date.getUTCMonth() && now.getUTCDate() >= date.getUTCDate());
+  if (!birthdayPassed) age -= 1;
+  return age >= 18 && age <= 120;
+};
 
 export function registerSettingsRoutes(app: FastifyInstance, environment: AppEnvironment, auth: AuthRepository, db: PrismaClient): void {
   const sessionCookie = environment.NODE_ENV === 'production' ? '__Host-solid_session' : 'solid_session';
@@ -29,39 +64,42 @@ export function registerSettingsRoutes(app: FastifyInstance, environment: AppEnv
   app.get('/settings', async (request, reply) => {
     const current = await context(request); if (!current) return reply.code(401).send(failure(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     const [store, user, members, state] = await Promise.all([
-      db.store.findUnique({ where: { id: current.storeId }, select: { publicId: true, name: true, profile: true } }),
-      db.user.findUnique({ where: { id: current.session.userId }, select: { publicId: true, name: true, email: true, emailVerifiedAt: true, profile: true, mfaEnabledAt: true } }),
+      db.store.findUnique({ where: { id: current.storeId }, select: { publicId: true, name: true, profile: true, profileEncrypted: true } }),
+      db.user.findUnique({ where: { id: current.session.userId }, select: { publicId: true, name: true, email: true, emailVerifiedAt: true, profile: true, profileEncrypted: true, mfaEnabledAt: true } }),
       db.storeMember.findMany({ where: { storeId: current.storeId }, orderBy: { createdAt: 'asc' }, select: { role: true, createdAt: true, user: { select: { publicId: true, name: true, email: true, disabledAt: true } } } }),
       db.notificationState.findUnique({ where: { userId_storeId: { userId: current.session.userId, storeId: current.storeId } }, select: { preferences: true } }),
     ]);
-    const activation = store && user ? await refreshStoreOnboarding(db, current.storeId, current.session.userId) : { completed: false, completedAt: null, missing: ['store'] };
-    return reply.header('cache-control', 'private, no-store').send({ store, user, activation, members: members.map(item => ({ ...item.user, role: item.role, createdAt: item.createdAt, status: item.user.disabledAt ? 'DISABLED' : 'ACTIVE' })), preferences: state?.preferences ?? null, role: current.role });
+    const activation = store && user ? await refreshStoreOnboarding(db, current.storeId, current.session.userId, environment.APP_ENCRYPTION_KEY) : { completed: false, completedAt: null, missing: ['store'] };
+    const safeStore = store ? { publicId: store.publicId, name: store.name, profile: environment.APP_ENCRYPTION_KEY ? readStoreProfile(store.profile, store.profileEncrypted, environment.APP_ENCRYPTION_KEY) : store.profile } : null;
+    const safeUser = user ? { publicId: user.publicId, name: user.name, email: user.email, emailVerifiedAt: user.emailVerifiedAt, profile: environment.APP_ENCRYPTION_KEY ? readUserProfile(user.profile, user.profileEncrypted, environment.APP_ENCRYPTION_KEY) : user.profile, mfaEnabledAt: user.mfaEnabledAt } : null;
+    return reply.header('cache-control', 'private, no-store').send({ store: safeStore, user: safeUser, activation, members: members.map(item => ({ ...item.user, role: item.role, createdAt: item.createdAt, status: item.user.disabledAt ? 'DISABLED' : 'ACTIVE' })), preferences: state?.preferences ?? null, role: current.role });
   });
 
   app.patch<{ Body: { section?: unknown; values?: unknown } }>('/settings', async (request, reply) => {
     const current = await context(request, true); if (!current) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso negado.'));
     const section = request.body?.section; const values = request.body?.values;
     if (!plainObject(values)) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Dados inválidos.'));
+    if ((section === 'store' || section === 'user') && !environment.APP_ENCRYPTION_KEY) return reply.code(503).send(failure(request, 'SERVICE_UNAVAILABLE', 'Proteção dos dados pessoais indisponível.'));
     if (section === 'store') {
       if (!['OWNER', 'ADMIN'].includes(current.role)) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Sem permissão para alterar a loja.'));
       const name = cleanText(values.name, 120); if (name.length < 3) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Informe o nome da loja.'));
       const profile = { document: cleanText(values.document, 18), legalName: cleanText(values.legalName, 120), businessModel: cleanText(values.businessModel, 50), monthlyRevenue: cleanText(values.monthlyRevenue, 50), website: cleanText(values.website, 255), noWebsite: Boolean(values.noWebsite), instagram: cleanText(values.instagram, 80) };
       if (profile.document && !validDocument(profile.document)) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Informe um CPF ou CNPJ válido para a loja.'));
       if (profile.website && !profile.noWebsite) { try { if (new URL(profile.website).protocol !== 'https:') throw new Error(); } catch { return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Informe uma URL HTTPS válida para o site.')); } }
-      await db.store.update({ where: { id: current.storeId }, data: { name, profile: profile as Prisma.InputJsonValue } });
+      await db.store.update({ where: { id: current.storeId }, data: { name, ...protectStoreProfile(profile, environment.APP_ENCRYPTION_KEY!) } });
     } else if (section === 'user') {
       const name = cleanText(values.name, 120); if (name.length < 3) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Informe seu nome.'));
       const profile = { document: cleanText(values.document, 18), birthDate: cleanText(values.birthDate, 10), zipCode: cleanText(values.zipCode, 10), address: cleanText(values.address, 180), number: cleanText(values.number, 20), complement: cleanText(values.complement, 80), district: cleanText(values.district, 80), city: cleanText(values.city, 80), state: cleanText(values.state, 2).toUpperCase() };
       if (profile.document && !validDocument(profile.document)) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Informe um CPF ou CNPJ válido.'));
-      if (profile.birthDate && !/^\d{4}-\d{2}-\d{2}$/.test(profile.birthDate)) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Informe uma data de nascimento válida.'));
+      if (profile.birthDate && !validBirthDate(profile.birthDate)) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Informe uma data de nascimento válida (idade mínima de 18 anos).'));
       if (profile.zipCode && digits(profile.zipCode).length !== 8) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Informe um CEP válido.'));
-      if (profile.state && !/^[A-Z]{2}$/.test(profile.state)) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Informe uma UF válida.'));
-      await db.user.update({ where: { id: current.session.userId }, data: { name, profile: profile as Prisma.InputJsonValue } });
+      if (profile.state && !STATES.has(profile.state)) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Informe uma UF válida.'));
+      await db.user.update({ where: { id: current.session.userId }, data: { name, ...protectUserProfile(profile, environment.APP_ENCRYPTION_KEY!) } });
     } else if (section === 'notifications') {
       const preferences = { salesEnabled: values.salesEnabled !== false, newOrder: values.newOrder !== false, paymentConfirmed: values.paymentConfirmed !== false, includeStoreName: Boolean(values.includeStoreName), productEnabled: values.productEnabled !== false, releases: values.releases !== false, feedback: values.feedback !== false };
       await db.notificationState.upsert({ where: { userId_storeId: { userId: current.session.userId, storeId: current.storeId } }, create: { userId: current.session.userId, storeId: current.storeId, preferences: preferences as Prisma.InputJsonValue }, update: { preferences: preferences as Prisma.InputJsonValue } });
     } else return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Seção inválida.'));
-    const activation = section === 'store' || section === 'user' ? await refreshStoreOnboarding(db, current.storeId, current.session.userId) : undefined;
+    const activation = section === 'store' || section === 'user' ? await refreshStoreOnboarding(db, current.storeId, current.session.userId, environment.APP_ENCRYPTION_KEY) : undefined;
     return reply.send({ saved: true, ...(activation ? { activation } : {}) });
   });
 }

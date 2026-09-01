@@ -49,6 +49,8 @@ describe('conteúdo administrável da plataforma', () => {
     const response = await app.inject({ method: 'GET', url: '/platform-content', headers: authenticated });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ releases: [], integrationAssets: [] });
+    // The Prisma client exposes methods with a `this` type; the mock is intentionally detached for assertions.
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     const releaseCalls = vi.mocked(database.productRelease.upsert).mock.calls as unknown as Array<[{ create: { publicId: string } }]>;
     expect(releaseCalls.length).toBeGreaterThan(0);
     expect(releaseCalls.every(([input]) => input.create.publicId.length <= 32)).toBe(true);
@@ -57,6 +59,7 @@ describe('conteúdo administrável da plataforma', () => {
 
   it('mantém o conteúdo disponível se uma novidade automática falhar ao ser registrada', async () => {
     const database = contentDatabase();
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     vi.mocked(database.productRelease.upsert).mockRejectedValue(new Error('release seed failed'));
     const app = buildApp(env, { authRepository: new AdminAuth(), database });
     const response = await app.inject({ method: 'GET', url: '/admin/content', headers: authenticated });

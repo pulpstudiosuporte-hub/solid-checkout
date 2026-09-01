@@ -134,6 +134,7 @@ model User {
   accountStatus   AccountStatus @default(PENDING) @map("account_status")
   platformAdmin   Boolean       @default(false) @map("platform_admin")
   profile         Json?
+  profileEncrypted String?      @map("profile_encrypted") @db.Text
   mfaSecretEncrypted String?    @map("mfa_secret_encrypted") @db.Text
   mfaPendingSecretEncrypted String? @map("mfa_pending_secret_encrypted") @db.Text
   mfaEnabledAt    DateTime?     @map("mfa_enabled_at") @db.Timestamptz(3)
@@ -182,6 +183,7 @@ model Store {
   timezone  String        @default("America/Sao_Paulo") @db.VarChar(64)
   active    Boolean       @default(true)
   profile   Json?
+  profileEncrypted String? @map("profile_encrypted") @db.Text
   onboardingCompletedAt DateTime? @map("onboarding_completed_at") @db.Timestamptz(3)
   createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -545,7 +547,7 @@ model CheckoutSession {
   deliveryJobs      IntegrationDeliveryJob[]
   abandonedRecoveryDeliveries AbandonedRecoveryDelivery[]
   coupon            Coupon?               @relation(fields: [couponId], references: [id], onDelete: SetNull)
-  chromaSenseSession ChromaSenseSession?
+  chromaSenseSessions ChromaSenseSession[]
 
   @@index([checkoutId, status, expiresAt])
   @@index([checkoutId, createdAt(sort: Desc)])
@@ -563,7 +565,8 @@ model ChromaSenseSession {
   publicId          String          @unique @default(cuid()) @map("public_id") @db.VarChar(32)
   storeId           String          @map("store_id") @db.Uuid
   checkoutId        String          @map("checkout_id") @db.Uuid
-  checkoutSessionId String          @unique @map("checkout_session_id") @db.Uuid
+  checkoutSessionId String          @map("checkout_session_id") @db.Uuid
+  visitId           String          @unique @map("visit_id") @db.Uuid
   pageKey           String          @default("checkout") @map("page_key") @db.VarChar(100)
   deviceType        String          @default("desktop") @map("device_type") @db.VarChar(16)
   viewportWidth     Int             @map("viewport_width")
@@ -585,6 +588,7 @@ model ChromaSenseSession {
 
   @@index([storeId, startedAt(sort: Desc)])
   @@index([checkoutId, startedAt(sort: Desc)])
+  @@index([checkoutSessionId, startedAt(sort: Desc)])
   @@map("chromasense_sessions")
 }
 

@@ -14,6 +14,8 @@ describe('eventos do ChromaSense', () => {
   });
 
   it('limita duração e profundidade de rolagem', () => {
+    expect(normalizeChromaSenseEvent({ type: 'CLICK', targetLabel: 'cliente@example.com' })?.targetLabel).toBeNull();
+    expect(normalizeChromaSenseEvent({ type: 'CLICK', targetLabel: '11999998888' })?.targetLabel).toBeNull();
     expect(normalizeChromaSenseEvent({ type: 'ATTENTION', x: .5, y: .5, durationMs: 99_000 })).toMatchObject({ durationMs: 30_000 });
     expect(normalizeChromaSenseEvent({ type: 'SCROLL', scrollPercent: 140 })).toMatchObject({ scrollPercent: 100 });
   });

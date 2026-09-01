@@ -17,5 +17,5 @@
 
 - Use somente HTTPS, `TRUST_PROXY=true` atrás do Traefik e apenas origens reais em `CORS_ORIGINS`.
 - Monitore falhas de login, redefinição de senha, webhooks, reconciliações e respostas 5xx.
-- O limitador atual atende uma única instância. Antes de escalar a API horizontalmente, use um armazenamento compartilhado (Redis) para rate limiting.
+- Configure `REDIS_URL` na API para compartilhar o rate limiting entre todas as réplicas. Sem Redis, cada réplica limita apenas o próprio tráfego; com Redis configurado, uma falha do serviço bloqueia as rotas limitadas em vez de liberar tentativas sem controle.
 - A limpeza automática expira sessões de checkout, remove tokens temporários e anonimiza checkouts abandonados após 30 dias.
