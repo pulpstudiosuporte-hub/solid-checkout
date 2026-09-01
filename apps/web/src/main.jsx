@@ -15,7 +15,7 @@ import { archiveStore, bindTabToUser, clearTabUser, completeMfaLogin, createStor
 import { currentWebPushSubscription, disableWebPushOnThisDevice } from './web-push';
 import Login, { SessionLoading } from './Auth';
 import DashboardPage from './DashboardPage';
-import AccountSettings from './AccountSettings';
+import AccountSettings from './SettingsHub';
 import StoreSwitcher from './StoreSwitcher';
 import ShopifyIntegration from './ShopifyIntegration';
 import ProductsPage from './ProductsPage';
