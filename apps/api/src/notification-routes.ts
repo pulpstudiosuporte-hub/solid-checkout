@@ -34,7 +34,7 @@ export function registerNotificationRoutes(app: FastifyInstance, environment: Ap
   app.get('/notifications', async (request, reply) => {
     const current = await context(request); if (!current) return reply.code(401).send(failure(request, 'UNAUTHENTICATED', 'Autentica\u00e7\u00e3o necess\u00e1ria.'));
     const store = await db.store.findUnique({ where: { id: current.storeId }, select: { publicId: true, createdAt: true, onboardingCompletedAt: true } });
-    if (store && !store.onboardingCompletedAt && store.createdAt.getTime() <= Date.now() - 24 * 60 * 60_000) {
+    if (!current.session.user.platformAdmin && store && !store.onboardingCompletedAt && store.createdAt.getTime() <= Date.now() - 24 * 60 * 60_000) {
       const reminded = await db.auditLog.count({ where: { storeId: current.storeId, action: 'store.onboarding_required' } });
       if (!reminded) await db.auditLog.create({ data: { storeId: current.storeId, actorType: 'SYSTEM', action: 'store.onboarding_required', targetType: 'store', targetId: store.publicId, requestId: request.id } });
     }

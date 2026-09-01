@@ -38,13 +38,24 @@ export const onboardingMissingFields = (store: { name: string; profile: unknown 
 export async function refreshStoreOnboarding(database: PrismaClient, storeId: string, userId?: string, encryptionKey?: string) {
   const [store, ownerMember] = await Promise.all([
     database.store.findUnique({ where: { id: storeId }, select: { name: true, profile: true, profileEncrypted: true, onboardingCompletedAt: true } }),
-    database.storeMember.findFirst({ where: { storeId, role: 'OWNER' }, orderBy: { createdAt: 'asc' }, select: { user: { select: { id: true, name: true, profile: true, profileEncrypted: true } } } }),
+    database.storeMember.findFirst({ where: { storeId, role: 'OWNER' }, orderBy: { createdAt: 'asc' }, select: { user: { select: { id: true, name: true, platformAdmin: true, profile: true, profileEncrypted: true } } } }),
   ]);
   const fallbackOwner = !ownerMember?.user && userId
-    ? await database.user.findUnique({ where: { id: userId }, select: { id: true, name: true, profile: true, profileEncrypted: true } })
+    ? await database.user.findUnique({ where: { id: userId }, select: { id: true, name: true, platformAdmin: true, profile: true, profileEncrypted: true } })
     : null;
   const owner = ownerMember?.user ?? fallbackOwner;
   if (!store || !owner) return { completed: false, completedAt: null, missing: ['store'] };
+
+  // Platform administrators need disposable stores to exercise the complete
+  // checkout flow. Their own stores bypass merchant KYC/onboarding, while
+  // ordinary store owners and members keep the production requirements.
+  if (owner.platformAdmin) {
+    const completedAt = store.onboardingCompletedAt ?? new Date();
+    if (!store.onboardingCompletedAt) {
+      await database.store.update({ where: { id: storeId }, data: { onboardingCompletedAt: completedAt } });
+    }
+    return { completed: true, completedAt, missing: [], bypassed: true };
+  }
 
   let storeProfile = record(store.profile);
   let ownerProfile = record(owner.profile);

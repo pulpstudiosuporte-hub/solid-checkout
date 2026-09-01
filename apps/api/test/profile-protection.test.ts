@@ -40,6 +40,25 @@ describe('registration validation', () => {
 });
 
 describe('store activation', () => {
+  it('lets a platform administrator test their own store without merchant registration', async () => {
+    const update = vi.fn().mockResolvedValue({});
+    const database = {
+      store: {
+        findUnique: vi.fn().mockResolvedValue({ name: 'Loja de teste', profile: {}, profileEncrypted: null, onboardingCompletedAt: null }),
+        update,
+      },
+      storeMember: {
+        findFirst: vi.fn().mockResolvedValue({ user: { id: 'admin-id', name: 'Admin SOLID', platformAdmin: true, profile: {}, profileEncrypted: null } }),
+      },
+      user: { findUnique: vi.fn(), update: vi.fn() },
+    } as unknown as PrismaClient;
+
+    const result = await refreshStoreOnboarding(database, 'store-id', 'admin-id');
+
+    expect(result).toMatchObject({ completed: true, missing: [], bypassed: true });
+    expect(update).toHaveBeenCalledWith({ where: { id: 'store-id' }, data: { onboardingCompletedAt: result.completedAt } });
+  });
+
   it('revokes activation when a required field is no longer present', async () => {
     const completedAt = new Date('2026-08-30T12:00:00.000Z');
     const storeProfile = protectStoreProfile({ document: '04.252.011/0001-10', legalName: 'SOLID Ltda', businessModel: 'E-commerce', monthlyRevenue: 'Até R$ 100 mil' }, encryptionKey);
