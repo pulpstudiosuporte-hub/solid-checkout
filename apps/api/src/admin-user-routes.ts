@@ -30,7 +30,7 @@ export function registerAdminUserRoutes(app: FastifyInstance, environment: AppEn
     const session = await adminSession(request);
     if (!session) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso administrativo necessário.'));
     const allowed = ['PENDING', 'APPROVED', 'REJECTED'] as const;
-    const status = allowed.includes(request.query.status as typeof allowed[number]) ? request.query.status as typeof allowed[number] : 'PENDING';
+    const status = allowed.includes(request.query.status as typeof allowed[number]) ? request.query.status as typeof allowed[number] : 'APPROVED';
     const page = Math.max(1, Number.parseInt(request.query.page ?? '1', 10) || 1);
     const pageSize = 30;
     const where = { accountStatus: status };

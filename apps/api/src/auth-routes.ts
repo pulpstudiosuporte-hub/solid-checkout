@@ -103,7 +103,7 @@ export function registerAuthRoutes(app: FastifyInstance, environment: AppEnviron
     const user = await repository.findUserByEmail(email);
     const passwordValid = await verifyPassword(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
     if (!user || !passwordValid || user.disabledAt || user.accountStatus === 'REJECTED') return reply.code(401).send(errorBody(request, 'INVALID_CREDENTIALS', 'E-mail ou senha inválidos.'));
-    if (user.accountStatus === 'PENDING') return reply.code(403).send(errorBody(request, 'ACCOUNT_PENDING', 'Sua conta está aguardando aprovação.'));
+    if (user.accountStatus === 'PENDING') return reply.code(403).send(errorBody(request, 'ACCOUNT_PENDING', 'Confirme seu e-mail para liberar a conta.'));
     const activeToken = request.cookies[sessionCookie]; const activeSession = activeToken ? await repository.findActiveSession(sha256(activeToken), new Date()) : null;
     if (activeSession && activeSession.user.publicId !== user.publicId) return reply.code(409).send(errorBody(request, 'ACCOUNT_SWITCH_REQUIRES_LOGOUT', 'Já existe outra conta conectada neste navegador. Saia dela ou use uma janela anônima.'));
     if (user.mfaEnabledAt && user.mfaSecretEncrypted) {

@@ -117,7 +117,7 @@ async function authPost(path, body) {
   return readJson(await fetch(`${apiBaseUrl}${path}`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(body) }));
 }
 export function registerAccount(name, email, password, turnstileToken) { return authPost('/auth/register', { name, email, password, termsAccepted: true, turnstileToken }); }
-export function verifyAccount(token) { return authPost('/auth/verify-email', { token }); }
+export function verifyAccount(input) { return authPost('/auth/verify-email', typeof input === 'string' ? { token: input } : input); }
 
 export async function logout(csrfToken, pushEndpoint) {
   const response = await fetch(`${apiBaseUrl}/auth/logout`, {
@@ -232,7 +232,7 @@ export async function updateCoupon(couponId, input, csrfToken) { return readJson
 export async function deleteCoupon(couponId, csrfToken) { const response = await fetch(`${apiBaseUrl}/coupons/${encodeURIComponent(couponId)}`, { method: 'DELETE', credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken } }); if (!response.ok) return readJson(response); }
 export async function updateCheckoutDraft(checkoutId, config, csrfToken) { return readJson(await fetch(`${apiBaseUrl}/checkouts/${encodeURIComponent(checkoutId)}/draft`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify({ config }) })); }
 export async function publishCheckout(checkoutId, csrfToken) { return readJson(await fetch(`${apiBaseUrl}/checkouts/${encodeURIComponent(checkoutId)}/publish`, { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken } })); }
-export async function getAdminUsers(status = 'PENDING', page = 1) { return readJson(await fetch(`${apiBaseUrl}/admin/users?status=${encodeURIComponent(status)}&page=${page}`, { credentials: 'include', headers: { Accept: 'application/json' } })); }
+export async function getAdminUsers(status = 'APPROVED', page = 1) { return readJson(await fetch(`${apiBaseUrl}/admin/users?status=${encodeURIComponent(status)}&page=${page}`, { credentials: 'include', headers: { Accept: 'application/json' } })); }
 export async function approveAdminUser(userId, csrfToken) { return readJson(await fetch(`${apiBaseUrl}/admin/users/${encodeURIComponent(userId)}/approve`, { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken } })); }
 export async function blockAdminUser(userId, csrfToken) { return readJson(await fetch(`${apiBaseUrl}/admin/users/${encodeURIComponent(userId)}/block`, { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'x-csrf-token': csrfToken } })); }
 export async function updateAdminBillingOverride(userId, input, csrfToken) { return readJson(await fetch(`${apiBaseUrl}/admin/users/${encodeURIComponent(userId)}/billing-override`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(input) })); }

@@ -44,9 +44,9 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
         paths: [
           'req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie',
           'req.body.password', 'req.body.currentPassword', 'req.body.newPassword',
-          'req.body.token', 'req.body.accessToken', 'req.body.apiKey',
+          'req.body.token', 'req.body.code', 'req.body.accessToken', 'req.body.apiKey',
           'req.body.publicKey', 'req.body.secretKey', 'req.body.cpf',
-          '*.password', '*.token', '*.accessToken', '*.apiKey', '*.publicKey',
+          '*.password', '*.token', '*.code', '*.accessToken', '*.apiKey', '*.publicKey',
           '*.secretKey', '*.cpf', '*.document', '*.documentNumber',
           '*.customerDataEncrypted', '*.shippingAddressEncrypted', 'err.details'
         ],
