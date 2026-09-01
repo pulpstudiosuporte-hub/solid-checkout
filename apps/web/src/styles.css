@@ -369,7 +369,7 @@
 .ep-steps.style-icons i svg{width:16px;height:16px;stroke-width:1.8}
 .ep-steps.style-icons .active i{border-color:var(--eprogress-active);color:var(--eprogress-active)!important}
 .ep-steps.style-icons span:not(.active) i{border-color:var(--eprogress-inactive-text);color:var(--eprogress-inactive-text)!important}
-.ep-mobile-summary{min-width:0}
+.ep-mobile-summary{width:100%;min-width:0;box-sizing:border-box}
 .ep-mobile-summary.desktop>summary{display:none}
 .ep-mobile-summary.desktop>.ep-summary{display:block}
 .ep-mobile-summary>summary{min-height:50px;display:grid;grid-template-columns:minmax(0,1fr) auto 18px;align-items:center;gap:8px;padding:0 14px;border:1px solid var(--eborder);border-radius:var(--eradius);background:var(--ecard);color:var(--etext);font-size:10px;cursor:pointer;list-style:none}
@@ -379,8 +379,8 @@
 .ep-mobile-summary[open]>summary{border-radius:var(--eradius) var(--eradius) 0 0}
 .ep-mobile-summary[open]>summary svg{transform:rotate(90deg)}
 .ep-mobile-summary:not(.desktop)>.ep-summary{margin:0;border-top:0;border-radius:0 0 var(--eradius) var(--eradius)}
-.editor-device.mobile .ep-content{display:flex;flex-direction:column}
-.editor-device.mobile .ep-summary-column{order:-1}
+.editor-device.mobile .ep-content{display:flex;align-items:stretch;flex-direction:column}
+.editor-device.mobile .ep-summary-column{width:100%;align-self:stretch;order:-1}
 @media(prefers-reduced-motion:reduce){.ep-mobile-summary>summary svg{transition:none}}
 .ep-summary-banner{display:var(--esummary-banner-display,block)}
 .editor-device.mobile .ep-custom-element.device-desktop{display:none}
