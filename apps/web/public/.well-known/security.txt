@@ -1,0 +1,4 @@
+Contact: mailto:suporte@solidcheckout.xyz
+Expires: 2027-08-31T23:59:59Z
+Preferred-Languages: pt-BR, en
+Canonical: https://solidcheckout.xyz/.well-known/security.txt

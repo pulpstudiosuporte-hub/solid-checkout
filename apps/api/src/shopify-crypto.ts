@@ -7,7 +7,7 @@ const keyFromBase64 = (value: string): Buffer => {
 };
 
 export function encryptSecret(value: string, keyBase64: string): string {
-  const iv = randomBytes(12); const cipher = createCipheriv('aes-256-gcm', keyFromBase64(keyBase64), iv);
+  const iv = randomBytes(12); const cipher = createCipheriv('aes-256-gcm', keyFromBase64(keyBase64), iv, { authTagLength: 16 });
   const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
   return ['v1', iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), encrypted.toString('base64url')].join('.');
 }
@@ -15,7 +15,10 @@ export function encryptSecret(value: string, keyBase64: string): string {
 export function decryptSecret(value: string, keyBase64: string): string {
   const [version, iv, tag, payload] = value.split('.');
   if (version !== 'v1' || !iv || !tag || !payload) throw new Error('Segredo criptografado inválido');
-  const decipher = createDecipheriv('aes-256-gcm', keyFromBase64(keyBase64), Buffer.from(iv, 'base64url'));
-  decipher.setAuthTag(Buffer.from(tag, 'base64url'));
+  const ivBuffer = Buffer.from(iv, 'base64url');
+  const tagBuffer = Buffer.from(tag, 'base64url');
+  if (ivBuffer.length !== 12 || tagBuffer.length !== 16) throw new Error('Segredo criptografado inválido');
+  const decipher = createDecipheriv('aes-256-gcm', keyFromBase64(keyBase64), ivBuffer, { authTagLength: 16 });
+  decipher.setAuthTag(tagBuffer);
   return Buffer.concat([decipher.update(Buffer.from(payload, 'base64url')), decipher.final()]).toString('utf8');
 }

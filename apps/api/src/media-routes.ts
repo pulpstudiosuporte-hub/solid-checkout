@@ -84,6 +84,8 @@ export function registerMediaRoutes(app: FastifyInstance, environment: AppEnviro
     const asset = await database.mediaAsset.findUnique({ where: { filename }, select: { content: true } });
     if (!asset) return reply.code(404).send(error(request, 'NOT_FOUND', 'Imagem não encontrada.'));
     reply.header('Cache-Control', 'public, max-age=31536000, immutable').header('Cross-Origin-Resource-Policy', 'cross-origin').type('image/webp');
+    // The filename is UUID-only and this content can only be created by optimizedImage as WebP.
+    // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write
     return reply.send(asset.content);
   });
 }
