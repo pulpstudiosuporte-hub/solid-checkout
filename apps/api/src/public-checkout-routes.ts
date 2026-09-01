@@ -14,6 +14,7 @@ import { syncUtmifyOrder } from './utmify-sync.js';
 import { syncMetaEvent } from './meta-sync.js';
 import { mapProviderPaymentStatus, providerAmountMatches } from './payment-rules.js';
 import { storeOnboardingComplete } from './store-onboarding.js';
+import { anonymizeSocialProofLocation, anonymizeSocialProofName, sanitizeSocialProofProduct } from './social-proof-privacy.js';
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const slug = (value: unknown): string | null => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) && value.length <= 80 ? value : null;
@@ -114,24 +115,23 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     const decryptObject = (encrypted: string | null): Record<string, unknown> => {
       if (!encrypted) return {};
       try {
-        const parsed = JSON.parse(decryptSecret(encrypted, environment.APP_ENCRYPTION_KEY!));
+        const parsed = JSON.parse(decryptSecret(encrypted, environment.APP_ENCRYPTION_KEY!)) as unknown;
         return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
       } catch (error) {
         request.log.warn({ err: error }, 'social_proof_decrypt_failed');
         return {};
       }
     };
-    const safeText = (value: unknown, max: number): string => typeof value === 'string' ? value.trim().replace(/[\r\n\t]/g, ' ').slice(0, max) : '';
     const items = attempts.flatMap((attempt) => {
       const customer = decryptObject(attempt.session.customerDataEncrypted);
       const address = decryptObject(attempt.session.shippingAddressEncrypted);
       const tracking = typeof attempt.session.trackingParameters === 'object' && attempt.session.trackingParameters !== null && !Array.isArray(attempt.session.trackingParameters) ? attempt.session.trackingParameters as Record<string, unknown> : {};
-      const firstName = safeText(customer.name, 80).split(/\s+/)[0] || '';
-      if (!firstName || !attempt.paidAt) return [];
+      const anonymousName = anonymizeSocialProofName(customer.name);
+      if (!anonymousName || !attempt.paidAt) return [];
       return [{
-        name: firstName,
-        product: safeText(attempt.session.checkout.product.checkoutTitle, 120) || 'este item',
-        city: safeText(address.city, 80) || safeText(tracking.geo_city, 80),
+        name: anonymousName,
+        product: sanitizeSocialProofProduct(attempt.session.checkout.product.checkoutTitle),
+        city: anonymizeSocialProofLocation(address, tracking),
         occurredAt: attempt.paidAt.toISOString(),
       }];
     });

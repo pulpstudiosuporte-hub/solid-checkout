@@ -12,6 +12,7 @@ import {
   unlockNotificationSounds,
 } from './notification-sounds';
 import { ensureWebPushSubscription, setWebPushEnabled, webPushEnabled } from './web-push';
+import { notificationsEnabledForStore } from './notification-context';
 
 const icons = { success: CheckCircle2, warning: AlertTriangle, error: XCircle, info: Bell };
 const relative = value => {
@@ -56,6 +57,7 @@ export default function NotificationCenter({ csrfToken, storeKey, onNavigate }) 
   };
 
   const load = async (silent = false) => {
+    if (!notificationsEnabledForStore(storeKey)) return;
     if (!silent) setState(current => ({ ...current, loading: true, error: '' }));
     try {
       const data = await getNotifications();
@@ -69,6 +71,11 @@ export default function NotificationCenter({ csrfToken, storeKey, onNavigate }) 
   useEffect(() => {
     initialized.current = false;
     knownIds.current = new Set();
+    if (!notificationsEnabledForStore(storeKey)) {
+      setOpen(false);
+      setState({ loading: false, unread: 0, items: [], error: '' });
+      return undefined;
+    }
     void load();
     const timer = window.setInterval(() => void load(true), 15000);
     const resume = () => { if (document.visibilityState === 'visible') void load(true); };
@@ -108,7 +115,7 @@ export default function NotificationCenter({ csrfToken, storeKey, onNavigate }) 
     return true;
   };
   useEffect(() => {
-    if (!sounds || deviceNotificationPermission() !== 'granted') return;
+    if (!notificationsEnabledForStore(storeKey) || !sounds || deviceNotificationPermission() !== 'granted') return;
     void syncWebPush().catch(error => {
       setWebPushEnabled(false);
       setPushActive(false);
@@ -144,6 +151,8 @@ export default function NotificationCenter({ csrfToken, storeKey, onNavigate }) 
     if (permission === 'granted') await showDeviceNotification({ id: 'test', title: 'Teste de venda SOLID', message: '', destination: 'orders' }, true);
   };
   const navigate = item => { setOpen(false); onNavigate(item.destination); };
+
+  if (!notificationsEnabledForStore(storeKey)) return null;
 
   return <div className="notification-center" ref={root}>
     <button className={`icon-btn bell ${open ? 'active' : ''}`} aria-label={`Notificações${state.unread ? `, ${state.unread} não lidas` : ''}`} aria-expanded={open} onClick={toggle}><Bell size={19}/>{state.unread > 0 && <i>{state.unread > 99 ? '99+' : state.unread}</i>}</button>
