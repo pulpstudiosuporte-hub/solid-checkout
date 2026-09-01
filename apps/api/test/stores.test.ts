@@ -14,7 +14,7 @@ const sessionToken = 'store-session'; const csrfToken = 'store-csrf';
 class MemoryAuth implements AuthRepository {
   findUserByEmail(): Promise<LoginUser | null> { return Promise.resolve(null); }
   createSession(): Promise<void> { return Promise.resolve(); }
-  findActiveSession(tokenHash: string): Promise<SessionUser | null> { return Promise.resolve(tokenHash === sha256(sessionToken) ? { sessionId: 'session-a', userId: 'user-a', csrfTokenHash: sha256(csrfToken), expiresAt: new Date(Date.now() + 60_000), absoluteExpiresAt: new Date(Date.now() + 60_000), user: { publicId: 'user-public-a', name: 'Owner', email: 'owner@example.com' } } : null); }
+  findActiveSession(tokenHash: string): Promise<SessionUser | null> { return Promise.resolve(tokenHash === sha256(sessionToken) ? { sessionId: 'session-a', userId: 'user-a', csrfTokenHash: sha256(csrfToken), expiresAt: new Date(Date.now() + 60_000), absoluteExpiresAt: new Date(Date.now() + 60_000), user: { publicId: 'user-public-a', name: 'Owner', email: 'owner@example.com', mfaEnabled: false } } : null); }
   touchSession(): Promise<void> { return Promise.resolve(); } revokeSession(): Promise<void> { return Promise.resolve(); } updatePasswordAndRevokeOtherSessions(): Promise<void> { return Promise.resolve(); }
 }
 
@@ -58,6 +58,17 @@ describe('contexto de lojas', () => {
     expect((await app.inject({ method: 'POST', url: '/stores', headers: { cookie: `solid_session=${sessionToken}` }, payload: { name: 'Nova Loja' } })).statusCode).toBe(403);
     const response = await app.inject({ method: 'POST', url: '/stores', headers, payload: { name: 'Nova Loja' } });
     expect(response.statusCode).toBe(201); expect(response.json<{ store: StoreSummary }>().store).toMatchObject({ name: 'Nova Loja', active: true }); await app.close();
+  });
+
+  it('permite que uma conta sem lojas crie e ative sua primeira loja', async () => {
+    const stores = new MemoryStores(); stores.items = [];
+    const app = buildApp(env, { authRepository: new MemoryAuth(), storeRepository: stores });
+    const before = await app.inject({ method: 'GET', url: '/stores', headers: { cookie: `solid_session=${sessionToken}` } });
+    expect(before.json<{ items: StoreSummary[] }>().items).toEqual([]);
+    const created = await app.inject({ method: 'POST', url: '/stores', headers, payload: { name: 'Minha Primeira Loja' } });
+    expect(created.statusCode).toBe(201);
+    expect(created.json<{ store: StoreSummary }>().store).toMatchObject({ name: 'Minha Primeira Loja', role: 'OWNER', active: true });
+    await app.close();
   });
 
   it('não permite selecionar loja sem vínculo', async () => {

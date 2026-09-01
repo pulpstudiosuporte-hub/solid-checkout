@@ -27,8 +27,6 @@ const cookiePair = (setCookie: string | string[] | undefined, name: string): str
 function databaseDouble() {
   let pending: PendingSignup | null = null;
   const createdUser = vi.fn(({ data }: CreateArgs) => Promise.resolve({ id: 'user-id', ...data }));
-  const createdStore = vi.fn(({ data }: CreateArgs) => Promise.resolve({ id: 'store-id', ...data }));
-  const createdMembership = vi.fn(({ data }: CreateArgs) => Promise.resolve(data));
   const pendingSignup = {
     upsert: vi.fn(({ create, update }: PendingUpsertArgs) => {
       pending = { id: 'pending-id', ...create, ...(pending ? update : {}) };
@@ -44,18 +42,18 @@ function databaseDouble() {
     findFirst: vi.fn(() => Promise.resolve(null)),
     delete: vi.fn(() => { const current = pending; pending = null; return Promise.resolve(current); })
   };
-  const transaction = { pendingSignup, user: { create: createdUser }, store: { create: createdStore }, storeMember: { create: createdMembership } };
+  const transaction = { pendingSignup, user: { create: createdUser } };
   const database = {
-    user: { findUnique: vi.fn(() => Promise.resolve(null)), create: createdUser }, pendingSignup, store: transaction.store, storeMember: transaction.storeMember,
+    user: { findUnique: vi.fn(() => Promise.resolve(null)), create: createdUser }, pendingSignup,
     $transaction: vi.fn((input: (client: typeof transaction) => Promise<unknown>) => input(transaction)),
   } as unknown as PrismaClient;
-  return { database, createdUser, createdStore, createdMembership };
+  return { database, createdUser };
 }
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe('cadastro público', () => {
-  it('confirma o código recebido e ativa a conta sem aprovação manual', async () => {
+  it('confirma o código, ativa a conta e deixa a criação da primeira loja para o usuário', async () => {
     let sentEmail: { subject?: string } | undefined;
     vi.stubGlobal('fetch', vi.fn((_url: string | URL | Request, init?: RequestInit) => {
       const parsed: unknown = JSON.parse(typeof init?.body === 'string' ? init.body : '{}');
@@ -80,8 +78,7 @@ describe('cadastro público', () => {
     const userData = db.createdUser.mock.calls[0]?.[0].data;
     expect(userData).toMatchObject({ email: 'cliente@example.com', accountStatus: 'APPROVED' });
     expect(userData?.emailVerifiedAt).toBeInstanceOf(Date);
-    expect(db.createdStore).toHaveBeenCalledOnce();
-    expect(db.createdMembership).toHaveBeenCalledWith({ data: { userId: 'user-id', storeId: 'store-id', role: 'OWNER' } });
+    expect(db.createdUser).toHaveBeenCalledOnce();
     await app.close();
   });
 });

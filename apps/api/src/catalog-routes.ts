@@ -34,6 +34,27 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   const inputRadius = input.inputRadius === undefined ? Math.min(radius, 14) : integer(input.inputRadius, 0, 28); if (inputRadius === null) return null; result.inputRadius = inputRadius;
   const timerRadius = input.timerRadius === undefined ? 14 : integer(input.timerRadius, 0, 30); if (timerRadius === null) return null; result.timerRadius = timerRadius;
   const timerStyle = input.timerStyle ?? 'bar'; if (typeof timerStyle !== 'string' || !['bar', 'pill', 'outline'].includes(timerStyle)) return null; result.timerStyle = timerStyle;
+  const socialProofEnabled = input.socialProofEnabled ?? false; const socialProofCloseButton = input.socialProofCloseButton ?? true;
+  if (typeof socialProofEnabled !== 'boolean' || typeof socialProofCloseButton !== 'boolean') return null;
+  result.socialProofEnabled = socialProofEnabled; result.socialProofCloseButton = socialProofCloseButton;
+  const socialProofPosition = input.socialProofPosition ?? 'bottom-left';
+  const socialProofIcon = input.socialProofIcon ?? 'check'; const socialProofShadow = input.socialProofShadow ?? 'soft';
+  if (typeof socialProofPosition !== 'string' || !['bottom-left', 'bottom-right', 'top-left', 'top-right'].includes(socialProofPosition) || typeof socialProofIcon !== 'string' || !['check', 'cart', 'user', 'flame'].includes(socialProofIcon) || typeof socialProofShadow !== 'string' || !['none', 'soft', 'strong'].includes(socialProofShadow)) return null;
+  result.socialProofPosition = socialProofPosition; result.socialProofIcon = socialProofIcon; result.socialProofShadow = socialProofShadow;
+  const socialProofVisibleSeconds = input.socialProofVisibleSeconds === undefined ? 5 : integer(input.socialProofVisibleSeconds, 3, 15);
+  const socialProofIntervalSeconds = input.socialProofIntervalSeconds === undefined ? 9 : integer(input.socialProofIntervalSeconds, 4, 60);
+  const socialProofRadius = input.socialProofRadius === undefined ? 16 : integer(input.socialProofRadius, 0, 32);
+  if (socialProofVisibleSeconds === null || socialProofIntervalSeconds === null || socialProofRadius === null) return null;
+  result.socialProofVisibleSeconds = socialProofVisibleSeconds; result.socialProofIntervalSeconds = socialProofIntervalSeconds; result.socialProofRadius = socialProofRadius;
+  for (const [key, fallback, max] of [['socialProofHeadline', '{nome} acabou de comprar {produto}.', 180], ['socialProofSecondary', 'há {tempo}', 100]] as const) {
+    const value = input[key] ?? fallback; if (typeof value !== 'string' || value.trim().length < 1 || value.trim().length > max) return null; result[key] = value.trim();
+  }
+  const socialProofPreviewMessages = input.socialProofPreviewMessages ?? '';
+  if (typeof socialProofPreviewMessages !== 'string' || socialProofPreviewMessages.length > 2000) return null;
+  result.socialProofPreviewMessages = socialProofPreviewMessages.trim();
+  for (const [key, fallback] of [['socialProofBackgroundColor', '#ffffff'], ['socialProofTextColor', '#111827'], ['socialProofSecondaryColor', '#6b7280'], ['socialProofBorderColor', '#e5e7eb'], ['socialProofIconBackgroundColor', '#10b981'], ['socialProofIconColor', '#ffffff']] as const) {
+    const color = hexColor(input[key], fallback); if (color === null) return null; result[key] = color;
+  }
   for (const key of ['privacyUrl', 'termsUrl', 'successUrl']) { const url = input[key]; if (typeof url !== 'string' || url.length > 2048 || url && url !== '#' && !url.startsWith('https://')) return null; result[key] = url; }
   const layout = input.layout ?? 'split'; if (typeof layout !== 'string' || !['split', 'centered'].includes(layout)) return null; result.layout = layout;
   for (const [key, fallback, max] of [['secureText', 'Pagamento 100% seguro', 60], ['eyebrow', 'FINALIZE SEU PEDIDO', 60], ['summaryTitle', 'Resumo da compra', 80]] as const) { const value = input[key] ?? fallback; if (typeof value !== 'string' || value.trim().length < 1 || value.trim().length > max) return null; result[key] = value.trim(); }

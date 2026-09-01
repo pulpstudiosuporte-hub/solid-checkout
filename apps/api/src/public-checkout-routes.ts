@@ -80,6 +80,64 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     return reply.header('cache-control', 'no-store').send({ session });
   });
 
+  app.get<{ Params: { sessionId: string }; Headers: { authorization?: string } }>('/public/checkout-sessions/:sessionId/social-proof', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization);
+    if (!credentials) return reply.code(401).send(errorBody(request, 'INVALID_SESSION', 'Sessão inválida.'));
+    if (!database || !environment.APP_ENCRYPTION_KEY) return reply.header('cache-control', 'private, no-store').send({ items: [] });
+    const current = await database.checkoutSession.findFirst({
+      where: { publicId: credentials.sessionId, tokenHash: credentials.tokenHash, expiresAt: { gt: new Date() } },
+      select: { checkoutId: true, checkout: { select: { publishedConfig: true } } },
+    });
+    if (!current) return reply.code(404).send(errorBody(request, 'SESSION_NOT_FOUND', 'Sessão indisponível.'));
+    const publishedConfig = typeof current.checkout.publishedConfig === 'object' && current.checkout.publishedConfig !== null && !Array.isArray(current.checkout.publishedConfig) ? current.checkout.publishedConfig as Record<string, unknown> : {};
+    if (publishedConfig.socialProofEnabled !== true) return reply.header('cache-control', 'private, no-store').send({ items: [] });
+    const attempts = await database.paymentAttempt.findMany({
+      where: {
+        status: 'PAID',
+        paidAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60_000) },
+        session: { checkoutId: current.checkoutId, publicId: { not: credentials.sessionId }, customerDataEncrypted: { not: null } },
+      },
+      orderBy: { paidAt: 'desc' },
+      take: 12,
+      select: {
+        paidAt: true,
+        session: {
+          select: {
+            customerDataEncrypted: true,
+            shippingAddressEncrypted: true,
+            trackingParameters: true,
+            checkout: { select: { product: { select: { checkoutTitle: true } } } },
+          },
+        },
+      },
+    });
+    const decryptObject = (encrypted: string | null): Record<string, unknown> => {
+      if (!encrypted) return {};
+      try {
+        const parsed = JSON.parse(decryptSecret(encrypted, environment.APP_ENCRYPTION_KEY!));
+        return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+      } catch (error) {
+        request.log.warn({ err: error }, 'social_proof_decrypt_failed');
+        return {};
+      }
+    };
+    const safeText = (value: unknown, max: number): string => typeof value === 'string' ? value.trim().replace(/[\r\n\t]/g, ' ').slice(0, max) : '';
+    const items = attempts.flatMap((attempt) => {
+      const customer = decryptObject(attempt.session.customerDataEncrypted);
+      const address = decryptObject(attempt.session.shippingAddressEncrypted);
+      const tracking = typeof attempt.session.trackingParameters === 'object' && attempt.session.trackingParameters !== null && !Array.isArray(attempt.session.trackingParameters) ? attempt.session.trackingParameters as Record<string, unknown> : {};
+      const firstName = safeText(customer.name, 80).split(/\s+/)[0] || '';
+      if (!firstName || !attempt.paidAt) return [];
+      return [{
+        name: firstName,
+        product: safeText(attempt.session.checkout.product.checkoutTitle, 120) || 'este item',
+        city: safeText(address.city, 80) || safeText(tracking.geo_city, 80),
+        occurredAt: attempt.paidAt.toISOString(),
+      }];
+    });
+    return reply.header('cache-control', 'private, no-store').send({ items });
+  });
+
   app.put<{ Params: { sessionId: string }; Headers: { authorization?: string } }>('/public/checkout-sessions/:sessionId/presence', { config: { rateLimit: { max: 6, timeWindow: '1 minute' } } }, async (request, reply) => {
     const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization);
     if (!credentials) return reply.code(401).send(errorBody(request, 'INVALID_SESSION', 'Sessão inválida.'));

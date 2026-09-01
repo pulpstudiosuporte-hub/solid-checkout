@@ -33,6 +33,7 @@ import CheckoutElementsPanel, {
   newElementDefaults,
 } from "./CheckoutElementsPanel";
 import CheckoutElementIcon from "./CheckoutElementIcon";
+import SocialProofToast from "./SocialProofToast";
 import {
   buildCheckoutLayoutEntries,
   reorderCheckoutLayout,
@@ -78,6 +79,24 @@ export const defaultCheckoutConfig = {
   timerTextColor: "#ffffff",
   timerNumberColor: "#ff515a",
   timerRadius: 14,
+  socialProofEnabled: false,
+  socialProofPosition: "bottom-left",
+  socialProofVisibleSeconds: 5,
+  socialProofIntervalSeconds: 9,
+  socialProofHeadline: "{nome} acabou de comprar {produto}.",
+  socialProofSecondary: "há {tempo}",
+  socialProofPreviewMessages:
+    "Mariana | 5 minutos | este item | São Paulo\nGabriel | 8 minutos | este item | Curitiba",
+  socialProofIcon: "check",
+  socialProofCloseButton: true,
+  socialProofBackgroundColor: "#ffffff",
+  socialProofTextColor: "#111827",
+  socialProofSecondaryColor: "#6b7280",
+  socialProofBorderColor: "#e5e7eb",
+  socialProofIconBackgroundColor: "#10b981",
+  socialProofIconColor: "#ffffff",
+  socialProofRadius: 16,
+  socialProofShadow: "soft",
   eyebrow: "FINALIZE SEU PEDIDO",
   title: "Você está a um passo.",
   subtitle: "Preencha seus dados para gerar o Pix. Leva menos de um minuto.",
@@ -491,7 +510,7 @@ function ImageDropzone({
   );
 }
 
-function Settings({ group, c, u, replaceConfig }) {
+function Settings({ group, c, u, replaceConfig, scarcityView, setScarcityView }) {
   applyTemplate = (id) => {
     const preset = templatePresets[id] || {};
     Object.entries(preset).forEach(([key, value]) => u(key, value));
@@ -1142,68 +1161,48 @@ function Settings({ group, c, u, replaceConfig }) {
         {c.showTrust && visibility("Exibição dos selos", "trustDevice")}
       </>
     );
-  if (group === "Escassez")
+  if (group === "Escassez") {
+    if (!scarcityView)
+      return (
+        <>
+          <h3>Escassez</h3>
+          <p className="panel-help">Recursos para destacar urgência e atividade real no checkout.</p>
+          <div className="scarcity-menu">
+            <button type="button" onClick={() => setScarcityView("timer")}><span><Clock3 size={18} /><b>Cronômetro</b></span><ChevronRight size={17} /></button>
+            <button type="button" onClick={() => setScarcityView("social-proof")}><span><UserRound size={18} /><b>Prova social</b></span><small>{c.socialProofEnabled ? "Ativa" : "Inativa"}</small><ChevronRight size={17} /></button>
+            <button type="button" disabled title="Disponível em breve"><span><Star size={18} /><b>Roleta da sorte</b></span><small>Em breve</small></button>
+          </div>
+        </>
+      );
+    if (scarcityView === "social-proof")
+      return (
+        <>
+          <h3>Prova social</h3>
+          <p className="panel-help">Na loja publicada, somente compras pagas e anonimizadas serão exibidas.</p>
+          {line("Elemento ativo", "socialProofEnabled")}
+          <Field label="Posição na tela"><select value={c.socialProofPosition} onChange={(e) => u("socialProofPosition", e.target.value)}><option value="bottom-left">Inferior esquerdo</option><option value="bottom-right">Inferior direito</option><option value="top-left">Superior esquerdo</option><option value="top-right">Superior direito</option></select></Field>
+          <div className="field-pair"><Field label="Tempo visível (s)"><input type="number" min="3" max="15" value={c.socialProofVisibleSeconds} onChange={(e) => u("socialProofVisibleSeconds", +e.target.value)} /></Field><Field label="Intervalo (s)"><input type="number" min="4" max="60" value={c.socialProofIntervalSeconds} onChange={(e) => u("socialProofIntervalSeconds", +e.target.value)} /></Field></div>
+          <h4>Conteúdo</h4>
+          <Field label="Frase principal" help="Variáveis: {nome}, {produto}, {cidade} e {tempo}."><textarea rows="3" maxLength="180" value={c.socialProofHeadline} onChange={(e) => u("socialProofHeadline", e.target.value)} /></Field>
+          <Field label="Texto secundário"><input maxLength="100" value={c.socialProofSecondary} onChange={(e) => u("socialProofSecondary", e.target.value)} /></Field>
+          <Field label="Mensagens de prévia" help="Uma por linha: Nome | tempo | produto | cidade. Estes exemplos nunca são mostrados aos compradores."><textarea rows="6" maxLength="2000" value={c.socialProofPreviewMessages} onChange={(e) => u("socialProofPreviewMessages", e.target.value)} /></Field>
+          <h4>Exibição</h4>
+          <Field label="Ícone"><select value={c.socialProofIcon} onChange={(e) => u("socialProofIcon", e.target.value)}><option value="check">Check</option><option value="cart">Carrinho</option><option value="user">Pessoa</option><option value="flame">Chama</option></select></Field>
+          {line("Botão de fechar", "socialProofCloseButton")}
+          <h4>Aparência</h4>
+          <div className="field-pair"><Color label="Fundo" value={c.socialProofBackgroundColor} onChange={(v) => u("socialProofBackgroundColor", v)} /><Color label="Texto" value={c.socialProofTextColor} onChange={(v) => u("socialProofTextColor", v)} /><Color label="Texto secundário" value={c.socialProofSecondaryColor} onChange={(v) => u("socialProofSecondaryColor", v)} /><Color label="Borda" value={c.socialProofBorderColor} onChange={(v) => u("socialProofBorderColor", v)} /><Color label="Fundo do ícone" value={c.socialProofIconBackgroundColor} onChange={(v) => u("socialProofIconBackgroundColor", v)} /><Color label="Cor do ícone" value={c.socialProofIconColor} onChange={(v) => u("socialProofIconColor", v)} /></div>
+          <Field label={`Arredondamento — ${c.socialProofRadius}px`}><input type="range" min="0" max="32" value={c.socialProofRadius} onChange={(e) => u("socialProofRadius", +e.target.value)} /></Field>
+          <Field label="Sombra"><select value={c.socialProofShadow} onChange={(e) => u("socialProofShadow", e.target.value)}><option value="none">Sem sombra</option><option value="soft">Suave</option><option value="strong">Forte</option></select></Field>
+        </>
+      );
     return (
       <>
         <h3>Cronômetro da oferta</h3>
         {line("Ativar cronômetro", "timer")}
-        {c.timer && (
-          <>
-            {visibility("Exibição do cronômetro", "timerDevice")}
-            <Field label="Texto">
-              <input
-                value={c.timerText}
-                maxLength="80"
-                onChange={(e) => u("timerText", e.target.value)}
-              />
-            </Field>
-            <Field label="Duração em minutos">
-              <input
-                type="number"
-                min="1"
-                max="60"
-                value={c.timerMinutes}
-                onChange={(e) => u("timerMinutes", +e.target.value)}
-              />
-            </Field>
-            <Field label="Formato visual">
-              <select
-                value={c.timerStyle}
-                onChange={(e) => u("timerStyle", e.target.value)}
-              >
-                <option value="bar">Barra</option>
-                <option value="pill">Cápsula</option>
-                <option value="outline">Somente contorno</option>
-              </select>
-            </Field>
-            <Color
-              label="Fundo"
-              value={c.timerBgColor}
-              onChange={(v) => u("timerBgColor", v)}
-            />
-            <Color
-              label="Texto"
-              value={c.timerTextColor}
-              onChange={(v) => u("timerTextColor", v)}
-            />
-            <Color
-              label="Números"
-              value={c.timerNumberColor}
-              onChange={(v) => u("timerNumberColor", v)}
-            />
-            <Field label={`Arredondamento — ${c.timerRadius}px`}>
-              <input
-                type="range"
-                min="0"
-                max="30"
-                value={c.timerRadius}
-                onChange={(e) => u("timerRadius", +e.target.value)}
-              />
-            </Field>
-          </>
-        )}
+        {c.timer && <>{visibility("Exibição do cronômetro", "timerDevice")}<Field label="Texto"><input value={c.timerText} maxLength="80" onChange={(e) => u("timerText", e.target.value)} /></Field><Field label="Duração em minutos"><input type="number" min="1" max="60" value={c.timerMinutes} onChange={(e) => u("timerMinutes", +e.target.value)} /></Field><Field label="Formato visual"><select value={c.timerStyle} onChange={(e) => u("timerStyle", e.target.value)}><option value="bar">Barra</option><option value="pill">Cápsula</option><option value="outline">Somente contorno</option></select></Field><Color label="Fundo" value={c.timerBgColor} onChange={(v) => u("timerBgColor", v)} /><Color label="Texto" value={c.timerTextColor} onChange={(v) => u("timerTextColor", v)} /><Color label="Números" value={c.timerNumberColor} onChange={(v) => u("timerNumberColor", v)} /><Field label={`Arredondamento — ${c.timerRadius}px`}><input type="range" min="0" max="30" value={c.timerRadius} onChange={(e) => u("timerRadius", +e.target.value)} /></Field></>}
       </>
     );
+  }
   if (group === "Rodapé")
     return (
       <>
@@ -1790,6 +1789,7 @@ function Preview({
           </span>
         </div>
       </div>
+      <SocialProofToast config={c} preview />
     </div>
   );
 }
@@ -1893,6 +1893,7 @@ export default function CheckoutEditor({
     [saved, setSaved] = useState(load),
     [history, setHistory] = useState([load()]),
     [group, setGroup] = useState(null),
+    [scarcityView, setScarcityView] = useState(null),
     [device, setDevice] = useState("mobile"),
     [toast, setToast] = useState(""),
     [busy, setBusy] = useState(false);
@@ -2081,14 +2082,17 @@ export default function CheckoutEditor({
       <div className="editor-layout">
         <aside className="editor-panel">
           {group && (
-            <button className="panel-back" onClick={() => setGroup(null)}>
+            <button className="panel-back" onClick={() => {
+              if (group === "Escassez" && scarcityView) setScarcityView(null);
+              else setGroup(null);
+            }}>
               <ArrowLeft size={16} /> Voltar
             </button>
           )}
           {!group ? (
             <nav>
               {groups.map(([n, I]) => (
-                <button key={n} onClick={() => setGroup(n)}>
+                <button key={n} onClick={() => { setGroup(n); setScarcityView(null); }}>
                   <I size={17} />
                   <span>{n}</span>
                   <ChevronRight size={16} />
@@ -2102,6 +2106,8 @@ export default function CheckoutEditor({
                 c={c}
                 u={u}
                 replaceConfig={replaceConfig}
+                scarcityView={scarcityView}
+                setScarcityView={setScarcityView}
               />
             </div>
           )}

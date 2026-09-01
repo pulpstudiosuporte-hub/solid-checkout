@@ -21,6 +21,7 @@ import {
   getPaidDigitalDelivery,
   getPublicCheckout,
   getPublicCheckoutSession,
+  getPublicSocialProof,
   getPublicMetaConfig,
   getLatestPublicPayment,
   getPublicShippingMethods,
@@ -38,6 +39,7 @@ import {
   checkoutLayoutPositionMap,
 } from "./checkout-layout";
 import CheckoutElementIcon from "./CheckoutElementIcon";
+import SocialProofToast from "./SocialProofToast";
 import { useChromaSense } from "./useChromaSense";
 import "./public-session.css";
 import "./checkout-polish.css";
@@ -137,6 +139,22 @@ const publicConfig = (value) => ({
   timerTextColor: "#ffffff",
   timerNumberColor: "#ff515a",
   timerRadius: 14,
+  socialProofEnabled: false,
+  socialProofPosition: "bottom-left",
+  socialProofVisibleSeconds: 5,
+  socialProofIntervalSeconds: 9,
+  socialProofHeadline: "{nome} acabou de comprar {produto}.",
+  socialProofSecondary: "há {tempo}",
+  socialProofIcon: "check",
+  socialProofCloseButton: true,
+  socialProofBackgroundColor: "#ffffff",
+  socialProofTextColor: "#111827",
+  socialProofSecondaryColor: "#6b7280",
+  socialProofBorderColor: "#e5e7eb",
+  socialProofIconBackgroundColor: "#10b981",
+  socialProofIconColor: "#ffffff",
+  socialProofRadius: 16,
+  socialProofShadow: "soft",
   eyebrow: "FINALIZE SEU PEDIDO",
   title: "Você está a um passo.",
   subtitle: "Preencha seus dados para continuar. Leva menos de um minuto.",
@@ -492,6 +510,7 @@ function SessionContent({ session: initialSession, token }) {
   const [couponMessage, setCouponMessage] = useState("");
   const [couponOpen, setCouponOpen] = useState(Boolean(session.couponCode));
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [socialProofMessages, setSocialProofMessages] = useState([]);
   const [postalStatus, setPostalStatus] = useState({
     type: "idle",
     message: "",
@@ -552,6 +571,33 @@ function SessionContent({ session: initialSession, token }) {
   const metaData = { value: session.totalCents / 100, currency: session.currency || 'BRL', content_type: 'product', content_ids: items.map(item => item.product?.publicId || item.productId).filter(Boolean), contents: items.map(item => ({ id: item.product?.publicId || item.productId || item.titleSnapshot, quantity: item.quantity, item_price: item.unitPriceCents / 100 })), num_items: itemCount };
   useEffect(() => { const controller = new AbortController(); getPublicMetaConfig(session.publicId, token, controller.signal).then(({ pixelId }) => { if (!pixelId) return; setMetaPixelId(pixelId); loadMetaPixel(pixelId); trackMeta('PageView', {}, `${session.publicId}:PageView`); trackMeta('ViewContent', metaData, `${session.publicId}:ViewContent`); trackMeta('InitiateCheckout', metaData, `${session.publicId}:InitiateCheckout`); }).catch(() => {}); return () => controller.abort(); }, [session.publicId, token]); // eslint-disable-line react-hooks/exhaustive-deps
   const config = publicConfig(session.checkout?.publishedConfig);
+  useEffect(() => {
+    if (!config.socialProofEnabled) {
+      setSocialProofMessages([]);
+      return undefined;
+    }
+    let controller = new AbortController();
+    const relativeTime = (occurredAt) => {
+      const seconds = Math.max(0, Math.floor((Date.now() - new Date(occurredAt).getTime()) / 1000));
+      if (!Number.isFinite(seconds) || seconds < 60) return "menos de 1 minuto";
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes} ${minutes === 1 ? "minuto" : "minutos"}`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours} ${hours === 1 ? "hora" : "horas"}`;
+      const days = Math.floor(hours / 24);
+      return `${days} ${days === 1 ? "dia" : "dias"}`;
+    };
+    const load = () => {
+      controller.abort();
+      controller = new AbortController();
+      getPublicSocialProof(session.publicId, token, controller.signal)
+        .then(({ items = [] }) => setSocialProofMessages(items.map((item) => ({ ...item, time: relativeTime(item.occurredAt) }))))
+        .catch((requestError) => { if (requestError.name !== "AbortError") setSocialProofMessages([]); });
+    };
+    load();
+    const interval = window.setInterval(load, 60_000);
+    return () => { controller.abort(); window.clearInterval(interval); };
+  }, [config.socialProofEnabled, session.publicId, token]);
   const copy = checkoutLanguage(config.language);
   const money = checkoutMoney(config);
   const summaryTotal =
@@ -1154,6 +1200,7 @@ function SessionContent({ session: initialSession, token }) {
           {config.termsUrl && <a href={config.termsUrl}>Termos de uso</a>}
         </div>
       </footer>
+      <SocialProofToast config={config} messages={socialProofMessages} />
     </main>
   );
 }

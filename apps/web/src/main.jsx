@@ -99,6 +99,39 @@ function Header({ toggleSidebar, apiStatus, csrfToken, storeKey, onNavigate, onO
   </header>;
 }
 
+function FirstStoreSetup({ onCreate, busy }) {
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const submit = async event => {
+    event.preventDefault();
+    const cleanName = name.trim();
+    if (cleanName.length < 3) return setError('Informe um nome com pelo menos 3 caracteres.');
+    setError('');
+    try { await onCreate(cleanName); }
+    catch (cause) { setError(cause?.code === 'STORE_LIMIT_REACHED' ? 'O limite de lojas do plano foi atingido.' : 'Não foi possível criar sua loja agora. Tente novamente.'); }
+  };
+  return <main className="first-store-page">
+    <section className="first-store-card" aria-labelledby="first-store-title">
+      <div className="first-store-icon"><Store size={27}/></div>
+      <p className="eyebrow">PRIMEIROS PASSOS</p>
+      <h1 id="first-store-title">Crie sua primeira loja</h1>
+      <p className="first-store-lead">Sua conta está pronta. Agora escolha o nome da operação que você quer administrar na SOLID.</p>
+      <form onSubmit={submit}>
+        <label htmlFor="first-store-name">Nome da loja</label>
+        <div className="first-store-input"><Store size={18}/><input id="first-store-name" value={name} onChange={event => setName(event.target.value)} placeholder="Ex.: Loja Pedro" minLength={3} maxLength={120} autoFocus disabled={busy}/></div>
+        <small>Esse nome aparecerá no painel e poderá ser alterado depois.</small>
+        {error && <p className="store-form-error" role="alert">{error}</p>}
+        <button className="primary" type="submit" disabled={busy || name.trim().length < 3}>{busy ? 'Criando sua loja...' : <>Criar minha loja <ArrowRight size={17}/></>}</button>
+      </form>
+      <div className="first-store-benefits" aria-label="Próximas etapas"><span><CheckCircle2 size={16}/> Configure no seu ritmo</span><span><CheckCircle2 size={16}/> Importe ou crie produtos</span><span><CheckCircle2 size={16}/> Publique quando estiver pronto</span></div>
+    </section>
+  </main>;
+}
+
+function StoresUnavailable() {
+  return <main className="first-store-page"><section className="first-store-card" role="alert"><div className="first-store-icon"><Store size={27}/></div><h1>Não foi possível carregar suas lojas</h1><p className="first-store-lead">A conexão com o cadastro da conta falhou. Nenhuma alteração foi feita.</p><button className="secondary" type="button" onClick={() => window.location.reload()}>Tentar novamente</button></section></main>;
+}
+
 function Metric({ icon: Icon, label, value, delta, tone }) {
   return <div className="metric card"><div className={`metric-icon ${tone}`}><Icon size={20}/></div><div className="metric-copy"><span>{label}</span><strong>{value}</strong><small><TrendingUp size={13}/> {delta} <i>vs. período anterior</i></small></div></div>;
 }
@@ -188,11 +221,11 @@ function App(){
   const [sidebar,setSidebar]=useState(false); const [sidebarCollapsed,setSidebarCollapsed]=useState(()=>localStorage.getItem('solid-sidebar-collapsed-v1')==='true'); const [page,setPage]=useState(()=>window.location.hash.startsWith('#/integrations')?'Integrações':'Início'); const [checkout,setCheckout]=useState(false); const [editor,setEditor]=useState(false); const [previewConfig,setPreviewConfig]=useState(null); const [apiStatus,setApiStatus]=useState('checking'); const [searchOpen,setSearchOpen]=useState(false);
   const [auth,setAuth]=useState({status:'checking',user:null,csrfToken:null});
   const [sessionConflict,setSessionConflict]=useState(false);
-  const [stores,setStores]=useState([]); const [storeBusy,setStoreBusy]=useState(false);
+  const [stores,setStores]=useState([]); const [storesStatus,setStoresStatus]=useState('idle'); const [storeBusy,setStoreBusy]=useState(false);
   const [activation,setActivation]=useState(null);
   useEffect(()=>{let active=true; getApiHealth().then(()=>active&&setApiStatus('online')).catch(()=>active&&setApiStatus('offline')); getSession().then(result=>{if(!active)return;bindTabToUser(result.user.publicId || result.user.id);setAuth({status:'authenticated',user:result.user,csrfToken:result.csrfToken})}).catch(error=>{if(!active)return;if(error?.code==='SESSION_CONTEXT_CHANGED')setSessionConflict(true);else setAuth({status:'anonymous',user:null,csrfToken:null})}); return()=>{active=false}},[]);
   useEffect(()=>{const conflict=()=>setSessionConflict(true);window.addEventListener('solid:session-conflict',conflict);const channel=typeof BroadcastChannel!=='undefined'?new BroadcastChannel('solid-auth'):null;channel?.addEventListener('message',event=>{const current=auth.user?.publicId||auth.user?.id;if(event.data?.type==='auth-logged-out'){clearTabUser();setSessionConflict(false);setAuth({status:'anonymous',user:null,csrfToken:null});setStores([]);setCheckout(false);setEditor(false);window.history.replaceState({},'', '/#/login');return}if(auth.status==='authenticated'&&event.data?.type==='auth-changed'&&event.data.userId&&event.data.userId!==current)setSessionConflict(true)});const verify=()=>{if(document.visibilityState==='visible'&&auth.status==='authenticated')getSession().catch(()=>{})};window.addEventListener('focus',verify);document.addEventListener('visibilitychange',verify);return()=>{window.removeEventListener('solid:session-conflict',conflict);window.removeEventListener('focus',verify);document.removeEventListener('visibilitychange',verify);channel?.close()}},[auth.status,auth.user]);
-  useEffect(()=>{if(auth.status!=='authenticated')return;let active=true;getStores().then(result=>active&&setStores(result.items)).catch(()=>active&&setApiStatus('offline'));return()=>{active=false}},[auth.status]);
+  useEffect(()=>{if(auth.status!=='authenticated'){setStoresStatus('idle');return}let active=true;setStoresStatus('loading');getStores().then(result=>{if(!active)return;setStores(result.items);setStoresStatus('ready')}).catch(()=>{if(!active)return;setApiStatus('offline');setStoresStatus('error')});return()=>{active=false}},[auth.status]);
   useEffect(()=>{const refresh=event=>{if(event?.detail)setActivation(event.detail);getStores().then(result=>setStores(result.items)).catch(()=>{})};window.addEventListener('solid:onboarding-updated',refresh);return()=>window.removeEventListener('solid:onboarding-updated',refresh)},[]);
   useEffect(()=>{if(auth.status!=='authenticated'){setActivation(null);return}const store=stores.find(item=>item.active);if(!store){setActivation(null);return}if(store.onboardingCompleted){setActivation({completed:true,missing:[]});return}let current=true;setActivation(null);getSettings().then(result=>current&&setActivation(result.activation||null)).catch(()=>current&&setActivation(null));return()=>{current=false}},[auth.status,stores]);
   useEffect(()=>{const navigate=event=>typeof event.detail==='string'&&setPage(event.detail);window.addEventListener('solid:navigate',navigate);return()=>window.removeEventListener('solid:navigate',navigate)},[]);
@@ -228,7 +261,7 @@ function App(){
   if(editor) return <CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/>;
   if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>;
   const activeStore=stores.find(store=>store.active);
-  const pageContent=page==='Início'?<Dashboard setPage={setPage} storeKey={activeStore?.publicId}/>:page==='Novidades'?<NewsRoadmapPage csrfToken={auth.csrfToken}/>:page==='Análises'?<AnalyticsPage storeKey={activeStore?.publicId}/>:page==='Pedidos'?<OrdersPage storeKey={activeStore?.publicId}/>:page==='Carrinhos'?<AbandonedCartsPage storeKey={activeStore?.publicId} csrfToken={auth.csrfToken}/>:page==='ChromaSense'?<ChromaSensePage storeKey={activeStore?.publicId}/>:page==='Webhooks'?<WebhooksPage storeKey={activeStore?.publicId} csrfToken={auth.csrfToken}/>:page==='Meu plano'?<BillingPage csrfToken={auth.csrfToken}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Operações'?<AdminOperationsPage csrfToken={auth.csrfToken}/>:page==='Conteúdo'?<AdminContentPage csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Gateways'?<GatewaysPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Domínios'?<DomainsPage csrfToken={auth.csrfToken}/>:page==='Produtos'?<ProductsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onOpenIntegrations={()=>setPage('Integrações')}/>:page==='Order bumps'?<OrderBumpsPage csrfToken={auth.csrfToken}/>:page==='Cupons'?<CouponsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>;
+  const pageContent=storesStatus==='loading'||storesStatus==='idle'?<SessionLoading/>:storesStatus==='error'?<StoresUnavailable/>:storesStatus==='ready'&&!activeStore?<FirstStoreSetup onCreate={handleCreateStore} busy={storeBusy}/>:page==='Início'?<Dashboard setPage={setPage} storeKey={activeStore?.publicId}/>:page==='Novidades'?<NewsRoadmapPage csrfToken={auth.csrfToken}/>:page==='Análises'?<AnalyticsPage storeKey={activeStore?.publicId}/>:page==='Pedidos'?<OrdersPage storeKey={activeStore?.publicId}/>:page==='Carrinhos'?<AbandonedCartsPage storeKey={activeStore?.publicId} csrfToken={auth.csrfToken}/>:page==='ChromaSense'?<ChromaSensePage storeKey={activeStore?.publicId}/>:page==='Webhooks'?<WebhooksPage storeKey={activeStore?.publicId} csrfToken={auth.csrfToken}/>:page==='Meu plano'?<BillingPage csrfToken={auth.csrfToken}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Operações'?<AdminOperationsPage csrfToken={auth.csrfToken}/>:page==='Conteúdo'?<AdminContentPage csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Gateways'?<GatewaysPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Domínios'?<DomainsPage csrfToken={auth.csrfToken}/>:page==='Produtos'?<ProductsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onOpenIntegrations={()=>setPage('Integrações')}/>:page==='Order bumps'?<OrderBumpsPage csrfToken={auth.csrfToken}/>:page==='Cupons'?<CouponsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>;
   const pendingCount=activation?.missing?.length;
   return <div className={`app ${sidebarCollapsed?'sidebar-collapsed':''}`}><InstallAppPrompt/><CommandPalette open={searchOpen} onClose={()=>setSearchOpen(false)} onNavigate={setPage} platformAdmin={auth.user?.platformAdmin}/><Sidebar open={sidebar} collapsed={sidebarCollapsed} onToggleCollapsed={()=>setSidebarCollapsed(value=>!value)} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout} stores={stores} storeBusy={storeBusy} onSelectStore={handleSelectStore} onCreateStore={handleCreateStore} onArchiveStore={handleArchiveStore}/><div className="main-shell"><Header page={page} toggleSidebar={()=>setSidebar(true)} apiStatus={apiStatus} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onNavigate={setPage} onOpenSearch={()=>setSearchOpen(true)}/>{!auth.user?.platformAdmin&&activeStore&&!activeStore.onboardingCompleted&&page==='Início'&&<aside className="store-activation-banner" role="status"><ShieldCheck size={22}/><div><b>Conclua o cadastro para ativar a loja</b><span>{Number.isInteger(pendingCount)?`${pendingCount===1?'Falta 1 informação':`Faltam ${pendingCount} informações`}. `:'Existem informações pendentes. '}Você pode explorar o painel, mas publicar checkouts e receber pagamentos só será liberado após concluir os dados da loja e do responsável.</span></div><button type="button" onClick={()=>setPage('Configurações')}>Continuar cadastro <ArrowRight size={16}/></button></aside>}<PageErrorBoundary routeKey={`${activeStore?.publicId || 'store'}:${page}`} onHome={()=>setPage('Início')}><Suspense fallback={<SessionLoading/>}>{pageContent}</Suspense></PageErrorBoundary></div></div>
 }
