@@ -134,9 +134,9 @@ describe('catálogo isolado por loja', () => {
   it('valida e salva personalização somente na loja autenticada', async () => {
     const catalog = new MemoryCatalog(); catalog.checkouts.push({ publicId: 'checkout-a', storeId: 'store-a', draftConfig: {} });
     const app = buildApp(env, { authRepository: new MemoryAuth(), catalogRepository: catalog });
-    const config = { template: 'minimal', font: 'Inter', language: 'pt-BR', currency: 'BRL', buttonEffect: 'lift', logoText: 'SOLID', timerText: 'Oferta reservada por', title: 'Finalize seu pedido', subtitle: 'Preencha seus dados.', buttonText: 'Continuar', footerText: 'Todos os direitos reservados.', secureHeader: true, timer: true, showCoupon: false, showBump: false, showSummary: true, primary: '#7357e9', pageBg: '#f6f7f9', cardBg: '#ffffff', textColor: '#17171a', borderColor: '#e5e5e9', inputBg: '#ffffff', radius: 14, timerMinutes: 10, privacyUrl: '#', termsUrl: '#', successUrl: '' };
+    const config = { template: 'minimal', font: 'Inter', language: 'pt-BR', currency: 'BRL', buttonEffect: 'lift', logoText: 'SOLID', timerText: 'Oferta reservada por', title: 'Finalize seu pedido', subtitle: 'Preencha seus dados.', buttonText: 'Continuar', footerText: 'Todos os direitos reservados.', secureHeader: true, timer: true, showCoupon: false, showBump: false, showSummary: true, primary: '#7357e9', pageBg: '#f6f7f9', cardBg: '#ffffff', textColor: '#17171a', borderColor: '#e5e5e9', inputBg: '#ffffff', radius: 14, timerMinutes: 10, progressStyle: 'icons', privacyUrl: '#', termsUrl: '#', successUrl: '' };
     const response = await app.inject({ method: 'PATCH', url: '/checkouts/checkout-a/draft', headers: authenticatedHeaders, payload: { config } });
-    expect(response.statusCode).toBe(200); expect(catalog.checkouts[0]?.draftConfig).toMatchObject({ primary: '#7357e9', title: 'Finalize seu pedido' });
+    expect(response.statusCode).toBe(200); expect(catalog.checkouts[0]?.draftConfig).toMatchObject({ primary: '#7357e9', title: 'Finalize seu pedido', progressStyle: 'icons' });
     expect((await app.inject({ method: 'PATCH', url: '/checkouts/checkout-a/draft', headers: authenticatedHeaders, payload: { config: { ...config, primary: 'url(javascript:1)' } } })).statusCode).toBe(400);
     await app.close();
   });
