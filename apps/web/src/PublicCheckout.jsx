@@ -118,6 +118,9 @@ const publicConfig = (value) => ({
   font: "Plus Jakarta Sans",
   logoText: "SOLID",
   logoUrl: "",
+  seoTitle: "",
+  seoDescription: "",
+  faviconUrl: "",
   heroImageUrl: "",
   heroMobileImageUrl: "",
   heroEnabled: false,
@@ -206,6 +209,50 @@ const publicConfig = (value) => ({
   blockOrder: ["hero", "timer", "progress", "content"],
   ...(value || {}),
 });
+export const checkoutSeoMetadata = (config, checkout) => ({
+  title:
+    config.seoTitle?.trim() ||
+    checkout?.name?.trim() ||
+    checkout?.product?.checkoutTitle?.trim() ||
+    "Finalizar compra",
+  description:
+    config.seoDescription?.trim() || "Finalize sua compra com segurança.",
+  favicon:
+    config.faviconUrl?.trim() ||
+    `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="${config.primary || "#7357e9"}"/><path d="M20 25h24l-2 24H22l-2-24Zm7 0v-3a5 5 0 0 1 10 0v3" fill="none" stroke="white" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/></svg>`)}`,
+});
+function useCheckoutSeo(config, checkout) {
+  const metadata = checkoutSeoMetadata(config, checkout);
+  useEffect(() => {
+    const originalTitle = document.title;
+    const existingDescription = document.querySelector('meta[name="description"]');
+    const originalDescription = existingDescription?.getAttribute("content");
+    const description = existingDescription || document.createElement("meta");
+    if (!existingDescription) {
+      description.setAttribute("name", "description");
+      document.head.appendChild(description);
+    }
+    const existingIcon = document.querySelector('link[rel~="icon"]');
+    const originalIcon = existingIcon?.getAttribute("href");
+    const icon = existingIcon || document.createElement("link");
+    if (!existingIcon) {
+      icon.setAttribute("rel", "icon");
+      document.head.appendChild(icon);
+    }
+    document.title = metadata.title;
+    description.setAttribute("content", metadata.description);
+    icon.setAttribute("href", metadata.favicon);
+    return () => {
+      document.title = originalTitle;
+      if (existingDescription && originalDescription !== null)
+        existingDescription.setAttribute("content", originalDescription);
+      else description.remove();
+      if (existingIcon && originalIcon !== null)
+        existingIcon.setAttribute("href", originalIcon);
+      else icon.remove();
+    };
+  }, [metadata.description, metadata.favicon, metadata.title]);
+}
 const configStyle = (config) => ({
   "--public-primary": config.primary,
   "--public-button-bg": config.buttonBgColor || config.primary,
@@ -590,6 +637,7 @@ function SessionContent({ session: initialSession, token }) {
   const metaData = { value: session.totalCents / 100, currency: session.currency || 'BRL', content_type: 'product', content_ids: items.map(item => item.product?.publicId || item.productId).filter(Boolean), contents: items.map(item => ({ id: item.product?.publicId || item.productId || item.titleSnapshot, quantity: item.quantity, item_price: item.unitPriceCents / 100 })), num_items: itemCount };
   useEffect(() => { const controller = new AbortController(); getPublicMetaConfig(session.publicId, token, controller.signal).then(({ pixelId }) => { if (!pixelId) return; setMetaPixelId(pixelId); loadMetaPixel(pixelId); trackMeta('PageView', {}, `${session.publicId}:PageView`); trackMeta('ViewContent', metaData, `${session.publicId}:ViewContent`); trackMeta('InitiateCheckout', metaData, `${session.publicId}:InitiateCheckout`); }).catch(() => {}); return () => controller.abort(); }, [session.publicId, token]); // eslint-disable-line react-hooks/exhaustive-deps
   const config = publicConfig(session.checkout?.publishedConfig);
+  useCheckoutSeo(config, session.checkout);
   useEffect(() => {
     if (!config.socialProofEnabled) {
       setSocialProofMessages([]);

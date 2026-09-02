@@ -64,6 +64,9 @@ export const defaultCheckoutConfig = {
   font: "Plus Jakarta Sans",
   logoText: "SOLID",
   logoUrl: "",
+  seoTitle: "",
+  seoDescription: "",
+  faviconUrl: "",
   heroImageUrl: "",
   heroMobileImageUrl: "",
   heroEnabled: false,
@@ -1400,6 +1403,60 @@ function Settings({ group, c, u, replaceConfig, scarcityView, setScarcityView })
         </Field>
       </>
     );
+  if (group === "SEO") {
+    const previewTitle = c.seoTitle || "Nome do checkout";
+    const previewDescription =
+      c.seoDescription || "Finalize sua compra com segurança.";
+    return (
+      <>
+        <h3>SEO e identidade da página</h3>
+        <p className="panel-help">
+          Personalize a aba do navegador e como o checkout pode aparecer nos buscadores.
+        </p>
+        <Field
+          label="Título da página"
+          help={`${(c.seoTitle || "").length}/70 caracteres. Se ficar vazio, usaremos o nome do checkout.`}
+        >
+          <input
+            value={c.seoTitle || ""}
+            maxLength={70}
+            placeholder="Ex.: Finalize sua compra | Minha loja"
+            onChange={(event) => u("seoTitle", event.target.value)}
+          />
+        </Field>
+        <Field
+          label="Descrição para buscadores"
+          help={`${(c.seoDescription || "").length}/180 caracteres.`}
+        >
+          <textarea
+            rows={4}
+            value={c.seoDescription || ""}
+            maxLength={180}
+            placeholder="Descreva esta oferta de forma clara e objetiva."
+            onChange={(event) => u("seoDescription", event.target.value)}
+          />
+        </Field>
+        <Field
+          label="Favicon"
+          help="Use uma imagem quadrada. Ela será otimizada e exibida na aba do navegador."
+        >
+          <ImageDropzone
+            id="checkout-favicon"
+            value={c.faviconUrl || ""}
+            onChange={(value) => u("faviconUrl", value)}
+            label="Enviar favicon"
+            alt="Prévia do favicon"
+          />
+        </Field>
+        <div className="seo-preview" aria-label="Prévia do resultado no Google">
+          <small>Prévia no Google</small>
+          <strong>{previewTitle}</strong>
+          <span>checkout.sualoja.com</span>
+          <p>{previewDescription}</p>
+        </div>
+      </>
+    );
+  }
   return (
     <>
       <h3>{group}</h3>
