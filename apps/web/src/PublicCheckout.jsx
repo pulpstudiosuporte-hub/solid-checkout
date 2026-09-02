@@ -39,6 +39,7 @@ import {
   checkoutLayoutPositionMap,
 } from "./checkout-layout";
 import CheckoutElementIcon from "./CheckoutElementIcon";
+import CheckoutFooter, { defaultCheckoutFooterMethods } from "./CheckoutFooter";
 import SocialProofToast from "./SocialProofToast";
 import { useChromaSense } from "./useChromaSense";
 import "./public-session.css";
@@ -183,6 +184,21 @@ const publicConfig = (value) => ({
   testimonials: null,
   elementEditMode: "guided",
   elementGlobalStyle: { radius: 12, spacing: 12, fontScale: 100 },
+  footerEnabled: true,
+  footerBackgroundColor: "#000000",
+  footerTextColor: "#ffffff",
+  footerAlignment: "center",
+  footerLayout: "centered",
+  footerPadding: 48,
+  footerPaymentMethodsEnabled: true,
+  footerPaymentTitle: "Formas de pagamento",
+  footerPaymentMethods: defaultCheckoutFooterMethods,
+  footerCompanyName: "Solid Commerce",
+  footerCompanyDocument: "",
+  footerCompanyAddress: "",
+  footerSecureBadgeEnabled: true,
+  footerSecureText: "Pagamento 100% seguro",
+  footerShowPolicies: true,
   footerText: "© 2026 Solid Commerce. Todos os direitos reservados.",
   privacyUrl: "#",
   termsUrl: "#",
@@ -1196,13 +1212,7 @@ function SessionContent({ session: initialSession, token }) {
           </div>
         )}
       </div>
-      <footer className="public-checkout-footer">
-        <span>{config.footerText}</span>
-        <div>
-          {config.privacyUrl && <a href={config.privacyUrl}>Privacidade</a>}
-          {config.termsUrl && <a href={config.termsUrl}>Termos de uso</a>}
-        </div>
-      </footer>
+      <CheckoutFooter config={config} />
       <SocialProofToast config={config} messages={socialProofMessages} />
     </main>
   );
@@ -1241,7 +1251,7 @@ function ThankYouPage({ session, items, itemCount, selectedShipping, payment, co
         {config.successUrl && config.successUrl !== "#" && <a className="customer-continue thank-you-cta" href={config.successUrl}>Continuar para a loja <ArrowRight size={19} aria-hidden="true" /></a>}
         <p className="thank-you-help">Dúvidas sobre seu pedido? Entre em contato diretamente com a loja.</p>
       </section>
-      <footer className="public-checkout-footer"><span>{config.footerText}</span><div>{config.privacyUrl && <a href={config.privacyUrl}>Privacidade</a>}{config.termsUrl && <a href={config.termsUrl}>Termos de uso</a>}</div></footer>
+      <CheckoutFooter config={config} />
     </main>
   );
 }

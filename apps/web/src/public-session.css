@@ -1,6 +1,7 @@
 .session-checkout { display: flex; flex-direction: column; }
 .session-checkout > header { order: 0; flex: none; width: 100%; }
-.session-checkout > .public-checkout-footer { order: 99; width: 100%; }
+.session-checkout > .public-checkout-footer,
+.session-checkout > .checkout-rich-footer { order: 99; width: 100%; }
 .session-checkout .public-checkout-grid {
   align-items: start;
 }
@@ -184,7 +185,8 @@
 .thank-you-totals .paid { margin-top: 5px; padding-top: 13px; border-top: 1px solid var(--public-border); color: var(--public-text); font-size: 16px; font-weight: 700; }
 .thank-you-cta { display: inline-flex !important; width: auto !important; margin-top: 28px !important; color: #fff; text-decoration: none; }
 .thank-you-help { margin: 22px 0 0; color: #70707a; font-size: 13px; line-height: 1.5; }
-.thank-you-page .public-checkout-footer { margin-top: auto; }
+.thank-you-page .public-checkout-footer,
+.thank-you-page .checkout-rich-footer { margin-top: auto; }
 @media (max-width: 560px) { .thank-you-card { width: min(100% - 24px, 620px); margin-top: 36px; padding: 30px 22px; } .thank-you-order { grid-template-columns: 1fr; gap: 14px; padding: 14px; } .thank-you-order div { padding: 0 2px 14px; border-right: 0; border-bottom: 1px solid var(--public-border); } .thank-you-order div:last-child { padding-bottom: 0; border-bottom: 0; } }
 .session-security {
   display: flex;

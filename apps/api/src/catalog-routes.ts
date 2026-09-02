@@ -55,6 +55,23 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   for (const [key, fallback] of [['socialProofBackgroundColor', '#ffffff'], ['socialProofTextColor', '#111827'], ['socialProofSecondaryColor', '#6b7280'], ['socialProofBorderColor', '#e5e7eb'], ['socialProofIconBackgroundColor', '#10b981'], ['socialProofIconColor', '#ffffff']] as const) {
     const color = hexColor(input[key], fallback); if (color === null) return null; result[key] = color;
   }
+  for (const [key, fallback] of [['footerEnabled', true], ['footerPaymentMethodsEnabled', true], ['footerSecureBadgeEnabled', true], ['footerShowPolicies', true]] as const) {
+    const value = input[key] ?? fallback; if (typeof value !== 'boolean') return null; result[key] = value;
+  }
+  for (const [key, fallback] of [['footerBackgroundColor', '#000000'], ['footerTextColor', '#ffffff']] as const) {
+    const color = hexColor(input[key], fallback); if (color === null) return null; result[key] = color;
+  }
+  const footerAlignment = input.footerAlignment ?? 'center'; const footerLayout = input.footerLayout ?? 'centered';
+  if (typeof footerAlignment !== 'string' || !['left', 'center'].includes(footerAlignment) || typeof footerLayout !== 'string' || !['centered', 'split'].includes(footerLayout)) return null;
+  result.footerAlignment = footerAlignment; result.footerLayout = footerLayout;
+  const footerPadding = input.footerPadding === undefined ? 48 : integer(input.footerPadding, 24, 96); if (footerPadding === null) return null; result.footerPadding = footerPadding;
+  for (const [key, fallback, max] of [['footerPaymentTitle', 'Formas de pagamento', 80], ['footerCompanyName', 'Solid Commerce', 120], ['footerCompanyDocument', '', 80], ['footerCompanyAddress', '', 240], ['footerSecureText', 'Pagamento 100% seguro', 80]] as const) {
+    const value = input[key] ?? fallback; if (typeof value !== 'string' || value.length > max) return null; result[key] = value.trim();
+  }
+  const footerPaymentMethods = input.footerPaymentMethods ?? ['amex', 'visa', 'diners', 'mastercard', 'discover', 'aura', 'elo', 'boleto', 'hipercard', 'pix'];
+  const allowedFooterMethods = ['amex', 'visa', 'diners', 'mastercard', 'discover', 'aura', 'elo', 'boleto', 'hipercard', 'pix'];
+  if (!Array.isArray(footerPaymentMethods) || footerPaymentMethods.length > allowedFooterMethods.length || new Set(footerPaymentMethods).size !== footerPaymentMethods.length || footerPaymentMethods.some(method => typeof method !== 'string' || !allowedFooterMethods.includes(method))) return null;
+  result.footerPaymentMethods = footerPaymentMethods;
   for (const key of ['privacyUrl', 'termsUrl', 'successUrl']) { const url = input[key]; if (typeof url !== 'string' || url.length > 2048 || url && url !== '#' && !url.startsWith('https://')) return null; result[key] = url; }
   const layout = input.layout ?? 'split'; if (typeof layout !== 'string' || !['split', 'centered'].includes(layout)) return null; result.layout = layout;
   for (const [key, fallback, max] of [['secureText', 'Pagamento 100% seguro', 60], ['eyebrow', 'FINALIZE SEU PEDIDO', 60], ['summaryTitle', 'Resumo da compra', 80]] as const) { const value = input[key] ?? fallback; if (typeof value !== 'string' || value.trim().length < 1 || value.trim().length > max) return null; result[key] = value.trim(); }

@@ -33,6 +33,10 @@ import CheckoutElementsPanel, {
   newElementDefaults,
 } from "./CheckoutElementsPanel";
 import CheckoutElementIcon from "./CheckoutElementIcon";
+import CheckoutFooter, {
+  checkoutFooterPaymentOptions,
+  defaultCheckoutFooterMethods,
+} from "./CheckoutFooter";
 import SocialProofToast from "./SocialProofToast";
 import {
   buildCheckoutLayoutEntries,
@@ -123,6 +127,21 @@ export const defaultCheckoutConfig = {
     },
   ],
   customElements: [],
+  footerEnabled: true,
+  footerBackgroundColor: "#000000",
+  footerTextColor: "#ffffff",
+  footerAlignment: "center",
+  footerLayout: "centered",
+  footerPadding: 48,
+  footerPaymentMethodsEnabled: true,
+  footerPaymentTitle: "Formas de pagamento",
+  footerPaymentMethods: defaultCheckoutFooterMethods,
+  footerCompanyName: "Solid Commerce",
+  footerCompanyDocument: "",
+  footerCompanyAddress: "",
+  footerSecureBadgeEnabled: true,
+  footerSecureText: "Pagamento 100% seguro",
+  footerShowPolicies: true,
   footerText: "© 2026 Solid Commerce. Todos os direitos reservados.",
   privacyUrl: "#",
   termsUrl: "#",
@@ -1203,19 +1222,97 @@ function Settings({ group, c, u, replaceConfig, scarcityView, setScarcityView })
       </>
     );
   }
-  if (group === "Rodapé")
+  if (group === "Rodapé") {
+    const selectedMethods = Array.isArray(c.footerPaymentMethods)
+      ? c.footerPaymentMethods
+      : defaultCheckoutFooterMethods;
+    const togglePaymentMethod = (method) =>
+      u(
+        "footerPaymentMethods",
+        selectedMethods.includes(method)
+          ? selectedMethods.filter((item) => item !== method)
+          : [...selectedMethods, method],
+      );
     return (
       <>
         <h3>Rodapé</h3>
-        <Field label="Texto legal">
-          <textarea
-            rows="3"
-            value={c.footerText}
-            onChange={(e) => u("footerText", e.target.value)}
-          />
-        </Field>
+        <p className="panel-help">
+          Personalize pagamentos, dados comerciais, segurança e links legais.
+        </p>
+        {line("Exibir rodapé", "footerEnabled")}
+        {c.footerEnabled !== false && (
+          <>
+            <div className="field-pair">
+              <Color label="Fundo" value={c.footerBackgroundColor} onChange={(value) => u("footerBackgroundColor", value)} />
+              <Color label="Texto" value={c.footerTextColor} onChange={(value) => u("footerTextColor", value)} />
+            </div>
+            <div className="field-pair">
+              <Field label="Alinhamento">
+                <select value={c.footerAlignment} onChange={(event) => u("footerAlignment", event.target.value)}>
+                  <option value="center">Centralizado</option>
+                  <option value="left">Alinhado à esquerda</option>
+                </select>
+              </Field>
+              <Field label="Organização">
+                <select value={c.footerLayout} onChange={(event) => u("footerLayout", event.target.value)}>
+                  <option value="centered">Uma coluna</option>
+                  <option value="split">Duas colunas</option>
+                </select>
+              </Field>
+            </div>
+            <Field label={`Espaçamento vertical — ${c.footerPadding}px`}>
+              <input type="range" min="24" max="96" step="4" value={c.footerPadding} onChange={(event) => u("footerPadding", +event.target.value)} />
+            </Field>
+
+            <h4>Formas de pagamento</h4>
+            {line("Exibir formas de pagamento", "footerPaymentMethodsEnabled")}
+            {c.footerPaymentMethodsEnabled !== false && (
+              <>
+                <Field label="Título">
+                  <input maxLength="80" value={c.footerPaymentTitle} onChange={(event) => u("footerPaymentTitle", event.target.value)} />
+                </Field>
+                <div className="footer-method-selector" aria-label="Formas de pagamento">
+                  {checkoutFooterPaymentOptions.map((method) => (
+                    <label key={method.id}>
+                      <input type="checkbox" checked={selectedMethods.includes(method.id)} onChange={() => togglePaymentMethod(method.id)} />
+                      <span>{method.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <h4>Dados da empresa</h4>
+            <Field label="Nome ou razão social">
+              <input maxLength="120" value={c.footerCompanyName} onChange={(event) => u("footerCompanyName", event.target.value)} />
+            </Field>
+            <Field label="Endereço">
+              <textarea rows="2" maxLength="240" value={c.footerCompanyAddress} onChange={(event) => u("footerCompanyAddress", event.target.value)} />
+            </Field>
+            <Field label="CNPJ ou documento fiscal">
+              <input maxLength="80" value={c.footerCompanyDocument} onChange={(event) => u("footerCompanyDocument", event.target.value)} />
+            </Field>
+            <Field label="Texto legal">
+              <textarea
+                rows="3"
+                maxLength="300"
+                value={c.footerText}
+                onChange={(e) => u("footerText", e.target.value)}
+              />
+            </Field>
+            <h4>Confiança e políticas</h4>
+            {line("Exibir selo de segurança", "footerSecureBadgeEnabled")}
+            {c.footerSecureBadgeEnabled !== false && (
+              <Field label="Texto do selo">
+                <input maxLength="80" value={c.footerSecureText} onChange={(event) => u("footerSecureText", event.target.value)} />
+              </Field>
+            )}
+            {line("Exibir links de políticas", "footerShowPolicies")}
+          </>
+        )}
       </>
     );
+  }
   if (group === "Políticas")
     return (
       <>
@@ -1781,13 +1878,7 @@ function Preview({
           ),
         )}
         {blocks.content}
-        <div className="ep-footer">
-          {c.footerText}
-          <span>
-            <a href={c.privacyUrl}>Privacidade</a> ·{" "}
-            <a href={c.termsUrl}>Termos</a>
-          </span>
-        </div>
+        <CheckoutFooter config={c} preview />
       </div>
       <SocialProofToast config={c} preview />
     </div>
