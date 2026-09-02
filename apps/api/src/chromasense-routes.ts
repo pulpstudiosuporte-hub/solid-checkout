@@ -329,6 +329,7 @@ export function registerChromaSenseRoutes(
             publicId: true,
             name: true,
             slug: true,
+            mode: true,
             publishedConfig: true,
             product: {
               select: { checkoutTitle: true, priceCents: true, imageUrl: true },
@@ -460,10 +461,14 @@ export function registerChromaSenseRoutes(
           sessions: checkoutCounts.get(checkout.publicId) || 0,
           preview: {
             config: checkout.publishedConfig,
-            product: {
+            product: checkout.product ? {
               title: checkout.product.checkoutTitle,
               priceCents: checkout.product.priceCents,
               imageUrl: checkout.product.imageUrl,
+            } : {
+              title: checkout.mode === 'SHOPIFY_CART' ? 'Carrinho Shopify' : 'Produto indisponível',
+              priceCents: 0,
+              imageUrl: null,
             },
           },
         }))

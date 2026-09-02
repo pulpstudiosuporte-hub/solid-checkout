@@ -130,7 +130,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       if (!anonymousName || !attempt.paidAt) return [];
       return [{
         name: anonymousName,
-        product: sanitizeSocialProofProduct(attempt.session.checkout.product.checkoutTitle),
+        product: sanitizeSocialProofProduct(attempt.session.checkout.product?.checkoutTitle || 'um produto'),
         city: anonymizeSocialProofLocation(address, tracking),
         occurredAt: attempt.paidAt.toISOString(),
       }];
@@ -214,7 +214,9 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     const providers = await gateways.paymentProviders(context.checkout.storeId); if (!providers.length) return reply.code(409).send(errorBody(request, 'GATEWAY_UNAVAILABLE', 'A loja ainda não configurou um gateway Pix.'));
     const previous = await gateways.latestAttempt(context.id); if (previous?.pixCodeEncrypted && previous.status === 'PENDING') return reply.header('cache-control', 'no-store').send({ payment: { publicId: previous.publicId, status: 'pending', amountCents: previous.amountCents, pixCode: decryptSecret(previous.pixCodeEncrypted, environment.APP_ENCRYPTION_KEY), expiresAt: previous.expiresAt } });
     const amountCents = context.totalCents - context.discountCents + context.shippingPriceCents;
-    const paymentItems = context.items.length ? context.items : [{ productId: context.checkout.product.id, titleSnapshot: context.checkout.product.checkoutTitle, unitPriceCents: context.unitPriceCents, quantity: context.quantity }];
+    const fallbackProduct = context.checkout.product;
+    const paymentItems = context.items.length ? context.items : fallbackProduct ? [{ productId: fallbackProduct.id, titleSnapshot: fallbackProduct.checkoutTitle, unitPriceCents: context.unitPriceCents, quantity: context.quantity, product: { fulfillmentType: fallbackProduct.fulfillmentType } }] : [];
+    if (!paymentItems.length) return reply.code(409).send(errorBody(request, 'CHECKOUT_EMPTY', 'O carrinho não possui itens válidos.'));
     const customer = JSON.parse(decryptSecret(context.customerDataEncrypted!, environment.APP_ENCRYPTION_KEY)) as Record<string, string>; const address = context.shippingAddressEncrypted ? JSON.parse(decryptSecret(context.shippingAddressEncrypted, environment.APP_ENCRYPTION_KEY)) as Record<string, string> : null;
     for (const provider of providers) {
       const encryptedCredentials = await gateways.credentials(context.checkout.storeId, provider); if (!encryptedCredentials) continue;
@@ -237,7 +239,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
         amount: amountCents,
         paymentMethod: 'pix',
         customer: { name: customer.name, email: customer.email, phone: digits(customer.phone), document: { number: digits(customer.document), type: digits(customer.document).length === 14 ? 'cnpj' : 'cpf' }, externalRef: context.publicId },
-        items: paymentItems.map(item => ({ title: item.titleSnapshot, unitPrice: item.unitPriceCents, quantity: item.quantity, tangible: context.checkout.product.fulfillmentType !== 'DIGITAL', externalRef: item.productId })),
+        items: paymentItems.map(item => ({ title: item.titleSnapshot, unitPrice: item.unitPriceCents, quantity: item.quantity, tangible: (item.product?.fulfillmentType ?? fallbackProduct?.fulfillmentType ?? 'PHYSICAL') !== 'DIGITAL', externalRef: item.productId })),
         ...(address ? { shipping: { fee: context.shippingPriceCents, address: { street: address.street, streetNumber: address.number, complement: address.complement || undefined, zipCode: digits(address.postalCode), neighborhood: address.neighborhood, city: address.city, state: address.state, country: 'br' } } } : {}),
         pix: { expiresInSeconds: Math.max(30, Math.min(1800, Math.floor((context.expiresAt.getTime() - Date.now()) / 1000))) },
         externalRef,
@@ -373,14 +375,20 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
   });
 
   app.post<{ Querystring: Record<string, string | string[] | undefined>; Body: Record<string, unknown> }>('/integrations/shopify/proxy/checkout-session', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
-    if (!environment.SHOPIFY_CLIENT_SECRET || !validProxySignature(request.query, environment.SHOPIFY_CLIENT_SECRET)) return reply.code(401).send(errorBody(request, 'INVALID_PROXY_SIGNATURE', 'Solicitação Shopify inválida.'));
     const timestamp = typeof request.query.timestamp === 'string' ? Number(request.query.timestamp) : 0;
     const shopDomain = typeof request.query.shop === 'string' && /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(request.query.shop) ? request.query.shop : null;
     const checkoutSlug = slug(request.body?.checkoutSlug); const rawLines = Array.isArray(request.body?.lines) ? request.body.lines : [];
     const lines = rawLines.flatMap(value => { if (typeof value !== 'object' || value === null) return []; const line = value as Record<string, unknown>; return typeof line.variantId === 'string' && /^\d{1,20}$/.test(line.variantId) && typeof line.quantity === 'number' && Number.isInteger(line.quantity) && line.quantity >= 1 && line.quantity <= 1000 ? [{ variantId: line.variantId, quantity: line.quantity }] : []; });
-    if (!shopDomain || !checkoutSlug || rawLines.length < 1 || rawLines.length > 50 || lines.length !== rawLines.length || !Number.isFinite(timestamp) || Math.abs(Date.now() / 1000 - timestamp) > 300) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Carrinho Shopify inválido.'));
+    if (!shopDomain || rawLines.length < 1 || rawLines.length > 50 || lines.length !== rawLines.length || !Number.isFinite(timestamp) || Math.abs(Date.now() / 1000 - timestamp) > 300) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Carrinho Shopify inválido.'));
+    let proxySecret: string | null = null;
+    if (database && environment.APP_ENCRYPTION_KEY) {
+      const connection = await database.shopifyConnection.findFirst({ where: { shopDomain, revokedAt: null, reconnectRequiredAt: null }, select: { authMode: true, clientSecretEncrypted: true } });
+      try { if (connection?.authMode === 'CLIENT_CREDENTIALS' && connection.clientSecretEncrypted) proxySecret = decryptSecret(connection.clientSecretEncrypted, environment.APP_ENCRYPTION_KEY); } catch (error) { request.log.warn({ err: error, shopDomain }, 'shopify_proxy_secret_decryption_failed'); }
+    }
+    proxySecret ??= environment.SHOPIFY_CLIENT_SECRET ?? null;
+    if (!proxySecret || !validProxySignature(request.query, proxySecret)) return reply.code(401).send(errorBody(request, 'INVALID_PROXY_SIGNATURE', 'Solicitação Shopify inválida.'));
     const token = randomBytes(32).toString('base64url');
-    const session = await catalog.createShopifyCartSession({ shopDomain, checkoutSlug, lines, tokenHash: sha256(token), expiresAt: new Date(Date.now() + 30 * 60_000) });
+    const session = await catalog.createShopifyCartSession({ shopDomain, lines, tokenHash: sha256(token), expiresAt: new Date(Date.now() + 30 * 60_000), ...(checkoutSlug ? { checkoutSlug } : {}) });
     if (!session) return reply.code(409).send(errorBody(request, 'CHECKOUT_UNAVAILABLE', 'Checkout, produto ou estoque indisponível.'));
     return reply.header('cache-control', 'no-store').code(201).send({ session, token });
   });

@@ -38,7 +38,7 @@ class MemoryCatalog implements CatalogRepository {
   createProduct(context: StoreContext, input: ProductInput): Promise<object> { const product = { publicId: 'new-product', storeId: context.storeId, checkoutTitle: input.title, ...input }; this.products.push(product); return Promise.resolve(product); }
   deleteManualProduct(context: StoreContext, publicId: string): Promise<'deleted' | 'archived' | 'not_found'> { const index = this.products.findIndex(product => product.storeId === context.storeId && product.publicId === publicId); if (index < 0) return Promise.resolve('not_found'); this.products.splice(index, 1); return Promise.resolve('deleted'); }
   listCheckouts(context: StoreContext): Promise<readonly object[]> { return Promise.resolve(this.checkouts.filter(checkout => checkout.storeId === context.storeId)); }
-  createCheckout(context: StoreContext, input: CheckoutInput): Promise<object | 'limit_reached' | null> { if (!this.products.some(product => product.publicId === input.productPublicId && product.storeId === context.storeId)) return Promise.resolve(null); const checkout = { publicId: 'new-checkout', storeId: context.storeId, ...input }; this.checkouts.push(checkout); return Promise.resolve(checkout); }
+  createCheckout(context: StoreContext, input: CheckoutInput): Promise<object | 'limit_reached' | null> { if (input.mode === 'DIRECT_LINK' && !this.products.some(product => product.publicId === input.productPublicId && product.storeId === context.storeId)) return Promise.resolve(null); const checkout = { publicId: `new-checkout-${this.checkouts.length + 1}`, storeId: context.storeId, ...input }; this.checkouts.push(checkout); return Promise.resolve(checkout); }
   deleteCheckout(context: StoreContext, publicId: string): Promise<'deleted' | 'archived' | 'not_found'> { const index = this.checkouts.findIndex(checkout => checkout.storeId === context.storeId && checkout.publicId === publicId); if (index < 0) return Promise.resolve('not_found'); this.checkouts.splice(index, 1); return Promise.resolve('deleted'); }
   updateCheckoutDraft(context: StoreContext, publicId: string, config: Record<string, unknown>): Promise<object | null> { const checkout = this.checkouts.find(item => item.storeId === context.storeId && item.publicId === publicId); if (checkout) checkout.draftConfig = config; return Promise.resolve(checkout ?? null); }
   publishCheckout(context: StoreContext, publicId: string): Promise<object | null> { const checkout = this.checkouts.find(item => item.storeId === context.storeId && item.publicId === publicId); if (checkout) checkout.status = 'PUBLISHED'; return Promise.resolve(checkout ?? null); }
@@ -90,6 +90,22 @@ describe('catálogo isolado por loja', () => {
     catalog.role = 'ANALYST';
     const forbidden = await app.inject({ method: 'POST', url: '/products', headers: authenticatedHeaders, payload: { title: 'Produto', priceCents: 1000 } });
     expect(forbidden.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it('separa o modelo automático Shopify do link de infoproduto', async () => {
+    const catalog = new MemoryCatalog(); const app = buildApp(env, { authRepository: new MemoryAuth(), catalogRepository: catalog });
+    const shopify = await app.inject({ method: 'POST', url: '/checkouts', headers: authenticatedHeaders, payload: { mode: 'SHOPIFY_CART', name: 'Modelo Shopify', slug: 'shopify-principal' } });
+    expect(shopify.statusCode).toBe(201);
+    expect(shopify.json<{ checkout: { mode: string; productPublicId?: string } }>().checkout).toMatchObject({ mode: 'SHOPIFY_CART' });
+    expect(shopify.json<{ checkout: { productPublicId?: string } }>().checkout.productPublicId).toBeUndefined();
+
+    const direct = await app.inject({ method: 'POST', url: '/checkouts', headers: authenticatedHeaders, payload: { mode: 'DIRECT_LINK', name: 'Curso SOLID', slug: 'curso-solid', productId: 'product-a' } });
+    expect(direct.statusCode).toBe(201);
+    expect(direct.json<{ checkout: { mode: string; productPublicId: string } }>().checkout).toMatchObject({ mode: 'DIRECT_LINK', productPublicId: 'product-a' });
+
+    const missingProduct = await app.inject({ method: 'POST', url: '/checkouts', headers: authenticatedHeaders, payload: { mode: 'DIRECT_LINK', name: 'Sem produto', slug: 'sem-produto' } });
+    expect(missingProduct.statusCode).toBe(400);
     await app.close();
   });
 

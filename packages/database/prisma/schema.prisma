@@ -35,6 +35,11 @@ enum CheckoutStatus {
   ARCHIVED
 }
 
+enum CheckoutMode {
+  DIRECT_LINK
+  SHOPIFY_CART
+}
+
 enum CheckoutSessionStatus {
   OPEN
   EXPIRED
@@ -470,9 +475,11 @@ model Checkout {
   id          String         @id @default(uuid()) @db.Uuid
   publicId    String         @unique @default(cuid()) @map("public_id") @db.VarChar(32)
   storeId     String         @map("store_id") @db.Uuid
-  productId   String         @map("product_id") @db.Uuid
+  productId   String?        @map("product_id") @db.Uuid
   name        String         @db.VarChar(120)
   slug        String         @db.VarChar(80)
+  mode        CheckoutMode   @default(DIRECT_LINK)
+  isDefault   Boolean        @default(false) @map("is_default")
   status      CheckoutStatus @default(DRAFT)
   draftConfig Json           @default("{}") @map("draft_config")
   publishedConfig Json       @default("{}") @map("published_config")
@@ -481,7 +488,7 @@ model Checkout {
   createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
   store       Store          @relation(fields: [storeId], references: [id], onDelete: Restrict)
-  product     Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  product     Product?       @relation(fields: [productId], references: [id], onDelete: Restrict)
   sessions    CheckoutSession[]
   chromaSenseSessions ChromaSenseSession[]
 

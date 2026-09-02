@@ -11,7 +11,9 @@ export async function syncUtmifyOrder(environment: AppEnvironment, repository: P
   try {
     const customer = JSON.parse(decryptSecret(context.customerDataEncrypted, environment.APP_ENCRYPTION_KEY)) as Record<string, string>;
     const total = context.totalCents - context.discountCents + context.shippingPriceCents;
-    const items = context.items.length ? context.items : [{ productId: context.checkout.product.publicId, titleSnapshot: context.checkout.product.checkoutTitle, unitPriceCents: context.totalCents, quantity: 1, product: { publicId: context.checkout.product.publicId } }];
+    const fallbackProduct = context.checkout.product;
+    const items = context.items.length ? context.items : fallbackProduct ? [{ productId: fallbackProduct.publicId, titleSnapshot: fallbackProduct.checkoutTitle, unitPriceCents: context.totalCents, quantity: 1, product: { publicId: fallbackProduct.publicId } }] : [];
+    if (!items.length) throw new Error('Sessão sem itens para sincronizar');
     await sendUtmifyOrder(decryptSecret(credentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), {
       orderId: context.publicId, platform: 'SOLID Checkout', paymentMethod: 'pix', status, createdAt: utcDate(context.createdAt), approvedDate: status === 'paid' ? utcDate(context.completedAt ?? new Date()) : null, refundedAt: status === 'refunded' ? utcDate(new Date()) : null,
       customer: { name: customer.name, email: customer.email, phone: customer.phone || null, document: customer.document || null, country: 'BR', ip: null },
