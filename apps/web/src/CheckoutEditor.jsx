@@ -33,6 +33,10 @@ import CheckoutElementsPanel, {
   newElementDefaults,
 } from "./CheckoutElementsPanel";
 import CheckoutElementIcon from "./CheckoutElementIcon";
+import {
+  elementMediaAlt,
+  elementMediaClassName,
+} from "./checkout-element-presentation";
 import CheckoutFooter, {
   checkoutFooterPaymentOptions,
   defaultCheckoutFooterMethods,
@@ -1469,7 +1473,7 @@ function Settings({ group, c, u, replaceConfig, scarcityView, setScarcityView })
   );
 }
 
-function CustomElementPreview({ item, onRemove, readOnly = false }) {
+export function CustomElementPreview({ item, onRemove, readOnly = false }) {
   const contentAlign = ["left", "center", "right"].includes(item.align)
     ? item.align
     : "left";
@@ -1508,9 +1512,11 @@ function CustomElementPreview({ item, onRemove, readOnly = false }) {
     >
       {item.type === "text" ? null : item.imageUrl ? (
         <img
-          className="ep-custom-media"
+          className={elementMediaClassName("ep-custom-media", item.type)}
           src={item.imageUrl}
-          alt={item.imageAlt || ""}
+          alt={elementMediaAlt(item)}
+          width="160"
+          height="160"
           style={{
             "--element-image-height": `${item.imageHeight || 220}px`,
             objectFit: item.imageFit || "cover",

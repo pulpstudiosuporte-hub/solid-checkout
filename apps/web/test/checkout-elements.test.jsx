@@ -10,10 +10,33 @@ import {
   newElementDefaults,
 } from "../src/CheckoutElementsPanel.jsx";
 import { checkoutElementIconTypes } from "../src/CheckoutElementIcon.jsx";
+import {
+  elementMediaAlt,
+  elementMediaClassName,
+  isReviewElement,
+} from "../src/checkout-element-presentation.js";
 
 const element = (id, slot) => ({ id, slot, enabled: true });
 
 describe("ordenação dos elementos do checkout", () => {
+  it("apresenta imagens de depoimentos como avatares acessíveis", () => {
+    expect(isReviewElement("testimonial")).toBe(true);
+    expect(isReviewElement("reviews")).toBe(true);
+    expect(elementMediaClassName("ep-custom-media", "testimonial")).toBe(
+      "ep-custom-media testimonial-avatar",
+    );
+    expect(elementMediaAlt({ type: "testimonial", title: "Mariana" })).toBe(
+      "Foto de Mariana",
+    );
+    expect(
+      elementMediaAlt({
+        type: "testimonial",
+        title: "Mariana",
+        imageAlt: "Cliente sorrindo",
+      }),
+    ).toBe("Cliente sorrindo");
+  });
+
   it("mantém um ícone próprio para cada elemento disponível", () => {
     expect([...checkoutElementIconTypes].sort()).toEqual(
       Object.keys(elementCatalog).sort(),

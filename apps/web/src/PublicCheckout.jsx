@@ -39,6 +39,10 @@ import {
   checkoutLayoutPositionMap,
 } from "./checkout-layout";
 import CheckoutElementIcon from "./CheckoutElementIcon";
+import {
+  elementMediaAlt,
+  elementMediaClassName,
+} from "./checkout-element-presentation";
 import CheckoutFooter, { defaultCheckoutFooterMethods } from "./CheckoutFooter";
 import SocialProofToast from "./SocialProofToast";
 import { useChromaSense } from "./useChromaSense";
@@ -301,7 +305,7 @@ function CustomElementCountdown({ minutes = 10 }) {
   return <strong className="public-custom-countdown">{hours} : {mins} : {seconds}</strong>;
 }
 
-function PublicCustomElement({ item }) {
+export function PublicCustomElement({ item }) {
   const textColor = item.textColor || '#17171a';
   const contentAlign = ["left", "center", "right"].includes(item.align) ? item.align : "left";
   const style = { color: textColor, '--public-custom-text': textColor, background: item.backgroundColor, borderRadius: `${item.radius ?? 12}px`, padding: `${item.paddingY ?? 16}px ${item.paddingX ?? 18}px`, fontSize: `${item.fontSize || 14}px`, textAlign: contentAlign, '--element-title-color': item.titleColor || textColor, '--element-body-color': item.bodyColor || textColor, '--element-title-size': `${item.titleFontSize || 26}px`, '--element-body-size': `${item.bodyFontSize || 15}px`, '--element-title-weight': item.titleWeight || 700, '--element-body-line-height': (item.lineHeight || 160) / 100 };
@@ -311,7 +315,7 @@ function PublicCustomElement({ item }) {
     <section className={`public-custom-element type-${item.type} content-align-${contentAlign} device-${item.device || 'all'} ${item.type !== 'text' && (item.imageUrl || (item.type === 'video' && item.mediaUrl)) ? 'has-media' : ''}`} style={style}>
       {/* Captions are rendered whenever the merchant supplies a captions URL. */}
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-      {item.type === 'text' ? null : item.mediaUrl && item.type === 'video' ? <video aria-label={item.title || 'Vídeo do checkout'} className="public-custom-media" src={item.mediaUrl} poster={item.imageUrl || undefined} controls preload="metadata">{item.captionsUrl && <track kind="captions" src={item.captionsUrl} srcLang="pt-BR" label="Português" default/>}</video> : item.imageUrl ? <img className="public-custom-media" src={item.imageUrl} alt={item.imageAlt || ''} width="1600" height={item.imageHeight || 220} style={mediaStyle} loading="lazy" decoding="async"/> : <div className="public-custom-icon" style={iconStyle}>
+      {item.type === 'text' ? null : item.mediaUrl && item.type === 'video' ? <video aria-label={item.title || 'Vídeo do checkout'} className="public-custom-media" src={item.mediaUrl} poster={item.imageUrl || undefined} controls preload="metadata">{item.captionsUrl && <track kind="captions" src={item.captionsUrl} srcLang="pt-BR" label="Português" default/>}</video> : item.imageUrl ? <img className={elementMediaClassName("public-custom-media", item.type)} src={item.imageUrl} alt={elementMediaAlt(item)} width="160" height="160" style={mediaStyle} loading="lazy" decoding="async"/> : <div className="public-custom-icon" style={iconStyle}>
         <CheckoutElementIcon type={item.type} size={20} />
       </div>}
       <div className="public-custom-content">

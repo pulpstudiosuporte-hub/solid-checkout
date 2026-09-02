@@ -457,7 +457,17 @@ export default function CheckoutElementsPanel({
           )}
           {current.type !== "text" && (
             <div className="element-media-settings">
-              <span className="element-media-label">Imagem do elemento</span>
+              <span className="element-media-label">
+                {["testimonial", "reviews"].includes(current.type)
+                  ? "Foto do cliente"
+                  : "Imagem do elemento"}
+              </span>
+              {["testimonial", "reviews"].includes(current.type) && (
+                <small className="element-media-help">
+                  Use uma foto quadrada e nítida. Ela será otimizada e exibida
+                  como um avatar circular.
+                </small>
+              )}
               <ElementImageDropzone
                 id={`element-image-${current.id}`}
                 value={current.imageUrl || ""}
