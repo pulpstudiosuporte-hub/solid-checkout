@@ -1,9 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  ArrowRight, BarChart3, Box, Check, CheckCircle2, ChevronDown,
+  ArrowRight, BarChart3, Box, Check, CheckCircle2,
   CircleDollarSign, Clock3, Copy, CreditCard, Eye, FileText,
-  Globe2, Home, LayoutTemplate, Link2, Menu, Package, PanelLeftClose, PanelLeftOpen, Plug, Plus,
+  Globe2, Home, LayoutTemplate, Menu, Package, PanelLeftClose, PanelLeftOpen, Plug, Plus,
   Search, Settings, ShieldCheck, ShoppingBag, ShoppingCart, Sparkles, Store,
   Tag, TrendingUp, Truck, Users, X, Zap, LogOut, ServerCog, Webhook, Megaphone, ScanSearch
 } from 'lucide-react';
@@ -46,15 +46,15 @@ const ChromaSensePage = lazy(() => import('./ChromaSensePage'));
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const navGroups = [
-  { label: 'Gestão', items: [
+  { label: 'Gestão', icon: Box, description: 'Operação e catálogo', items: [
     { label: 'Início', icon: Home }, { label: 'Análises', icon: BarChart3 }, { label: 'Pedidos', icon: ShoppingBag },
     { label: 'Carrinhos', icon: ShoppingCart }, { label: 'ChromaSense', icon: ScanSearch }, { label: 'Produtos', icon: Package }, { label: 'Webhooks', icon: Webhook },
   ]},
-  { label: 'Checkout', items: [
+  { label: 'Checkout', icon: LayoutTemplate, description: 'Venda e entrega', items: [
     { label: 'Checkouts', icon: LayoutTemplate }, { label: 'Domínios', icon: Globe2 },
     { label: 'Logística', icon: Truck }, { label: 'Gateways', icon: CreditCard },
   ]},
-  { label: 'Marketing', items: [
+  { label: 'Marketing', icon: Megaphone, description: 'Conversão e canais', items: [
     { label: 'Order bumps', icon: Sparkles }, { label: 'Cupons', icon: Tag },
     { label: 'Marketing', icon: BarChart3 }, { label: 'Integrações', icon: Plug },
   ]},
@@ -70,7 +70,12 @@ const roleLabels = { OWNER: 'Proprietário', ADMIN: 'Administrador', ANALYST: 'A
 
 function Sidebar({ open, collapsed, onClose, onToggleCollapsed, page, setPage, user, onLogout, stores, storeBusy, onSelectStore, onCreateStore, onArchiveStore }) {
   const activeRole = stores.find(store => store.active)?.role;
-  const groups = user?.platformAdmin ? [...navGroups, { label: 'Administração', items: [{ label: 'Usuários', icon: Users }, { label: 'Operações', icon: ServerCog }, { label: 'Conteúdo', icon: Megaphone }] }] : navGroups;
+  const pageGroup = navGroups.find(group => group.items.some(item => item.label === page));
+  const pageGroupLabel = pageGroup?.label;
+  const [activeModule, setActiveModule] = useState(pageGroupLabel || 'Gestão');
+  useEffect(() => { if (pageGroupLabel) setActiveModule(pageGroupLabel); }, [pageGroupLabel]);
+  const activeGroup = navGroups.find(group => group.label === activeModule) || navGroups[0];
+  const adminItems = [{ label: 'Usuários', icon: Users }, { label: 'Operações', icon: ServerCog }, { label: 'Conteúdo', icon: Megaphone }];
   const navigate = label => { setPage(label); onClose(); };
   return <>
     {open && <button className="backdrop" onClick={onClose} aria-label="Fechar menu" />}
@@ -78,7 +83,16 @@ function Sidebar({ open, collapsed, onClose, onToggleCollapsed, page, setPage, u
       <div className="side-head"><Logo compact={collapsed}/><button className="icon-btn sidebar-collapse" onClick={onToggleCollapsed} aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'} title={collapsed ? 'Expandir menu' : 'Recolher menu'}>{collapsed ? <PanelLeftOpen size={18}/> : <PanelLeftClose size={18}/>}</button><button className="icon-btn mobile-only" onClick={onClose}><X size={19}/></button></div>
       <StoreSwitcher stores={stores} busy={storeBusy} onSelect={onSelectStore} onCreate={onCreateStore} onArchive={onArchiveStore}/>
       <nav aria-label="Menu principal">
-        {groups.map(group => <section className="nav-group" key={group.label}><small className="nav-title">{group.label}</small>{group.items.map(item => <button key={item.label} title={collapsed ? item.label : undefined} className={page === item.label ? 'nav-item active' : 'nav-item'} onClick={() => navigate(item.label)}><item.icon size={18}/><span>{item.label}</span>{item.count && <em>{item.count}</em>}</button>)}</section>)}
+        <section className="sidebar-navigation">
+          <div className="module-tabs" role="tablist" aria-label="Áreas do painel">
+            {navGroups.map(group => <button key={group.label} type="button" role="tab" aria-selected={activeGroup.label === group.label} aria-controls="sidebar-resources" className={`module-tab ${activeGroup.label === group.label ? 'active' : ''}`} title={collapsed ? group.label : undefined} onClick={() => setActiveModule(group.label)}><group.icon size={18} aria-hidden="true"/><span>{group.label}</span></button>)}
+          </div>
+          <div className="resource-panel" id="sidebar-resources" role="tabpanel">
+            <div className="resource-head"><small>RECURSOS</small><strong>{activeGroup.label}</strong><span>{activeGroup.description}</span></div>
+            <div className="resource-list">{activeGroup.items.map(item => <button key={item.label} title={collapsed ? item.label : undefined} className={page === item.label ? 'nav-item active' : 'nav-item'} onClick={() => navigate(item.label)}><item.icon size={18} aria-hidden="true"/><span>{item.label}</span>{item.count && <em>{item.count}</em>}</button>)}</div>
+          </div>
+        </section>
+        {user?.platformAdmin && <section className="platform-nav" aria-label="Administração da plataforma"><small className="nav-title">Administração</small>{adminItems.map(item => <button key={item.label} title={collapsed ? item.label : undefined} className={page === item.label ? 'nav-item active' : 'nav-item'} onClick={() => navigate(item.label)}><item.icon size={18} aria-hidden="true"/><span>{item.label}</span></button>)}</section>}
       </nav>
       <div className="side-bottom">
         <small className="nav-title">Conta</small>

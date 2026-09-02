@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, CheckCircle2, Globe2, Images, Layers3, LoaderCircle, MessageCircle, Plug, RefreshCw, Search, ShieldCheck, ShoppingBag, Truck, Unplug, Webhook, Workflow } from 'lucide-react';
-import { connectShopifyCredentials, disconnectShopify, getMetaStatus, getPlatformContent, getShopifyStatus, getUtmifyStatus, syncShopifyCatalog } from './api';
+import { connectShopifyCredentials, disconnectShopify, getMetaStatus, getPlatformContent, getSettings, getShopifyStatus, getStoreDomain, getUtmifyStatus, syncShopifyCatalog } from './api';
 import ShopifyOnboarding from './ShopifyOnboarding';
 import UtmifyIntegration from './UtmifyIntegration';
 import MetaIntegration from './MetaIntegration';
@@ -11,8 +11,24 @@ const shopHandle = domain => domain?.replace(/\.myshopify\.com$/i, '') ?? '';
 
 function ShopifyIntegrationDetails({ csrfToken, storeKey, onBack }) {
   const [status, setStatus] = useState({ loading: true, configured: true, connected: false, reconnectRequired: false });
+  const [prerequisites, setPrerequisites] = useState({ activationCompleted: false, checkoutHost: '' });
   const [shop, setShop] = useState(''); const [clientId, setClientId] = useState(''); const [clientSecret, setClientSecret] = useState(''); const [busy, setBusy] = useState(false); const [syncing, setSyncing] = useState(false); const [message, setMessage] = useState(''); const [result, setResult] = useState(null);
-  const load = () => { setStatus(current => ({ ...current, loading: true })); getShopifyStatus().then(value => { setStatus({ ...value, loading: false }); if (value.shopDomain) setShop(shopHandle(value.shopDomain)); }).catch(error => { setStatus(current => ({ ...current, loading: false })); setMessage(error.message); }); };
+  const load = async () => {
+    setStatus(current => ({ ...current, loading: true }));
+    setMessage('');
+    const [shopifyResult, domainResult, settingsResult] = await Promise.allSettled([getShopifyStatus(), getStoreDomain(), getSettings()]);
+    if (shopifyResult.status === 'rejected') {
+      setStatus(current => ({ ...current, loading: false }));
+      setMessage(shopifyResult.reason instanceof Error ? shopifyResult.reason.message : 'Não foi possível consultar a conexão Shopify.');
+      return;
+    }
+    const value = shopifyResult.value;
+    setStatus({ ...value, loading: false });
+    if (value.shopDomain) setShop(shopHandle(value.shopDomain));
+    const domain = domainResult.status === 'fulfilled' ? domainResult.value : null;
+    const settings = settingsResult.status === 'fulfilled' ? settingsResult.value : null;
+    setPrerequisites({ activationCompleted: Boolean(settings?.activation?.completed), checkoutHost: domain?.domain?.status === 'ACTIVE' ? domain.domain.hostname : '' });
+  };
   useEffect(() => { void load(); }, [storeKey]);
   useEffect(() => { const value = new URLSearchParams(window.location.hash.split('?')[1] || '').get('shopify'); if (value === 'connected') setMessage('Shopify conectada com sucesso. Agora sincronize o catálogo.'); else if (value === 'already_connected') setMessage('Esta loja Shopify já está ativa em outra loja SOLID. Desconecte-a da loja anterior antes de transferir.'); else if (value) setMessage('Não foi possível concluir a conexão. Tente novamente.'); if (value) window.history.replaceState({}, '', '/#/integrations'); }, []);
   const connect = async event => { event.preventDefault(); setBusy(true); setMessage(''); try { const value = await connectShopifyCredentials(shop, clientId, clientSecret, csrfToken); setClientSecret(''); setMessage(`Loja ${value.shopName || value.shopDomain} conectada com sucesso. Agora sincronize o catálogo.`); load(); } catch (error) { setMessage(error.message); } finally { setBusy(false); } };
@@ -22,6 +38,14 @@ function ShopifyIntegrationDetails({ csrfToken, storeKey, onBack }) {
   const tutorialAction = action => {
     if (action === 'checkout') {
       window.dispatchEvent(new CustomEvent('solid:navigate', { detail: 'Checkouts' }));
+      return;
+    }
+    if (action === 'domains') {
+      window.dispatchEvent(new CustomEvent('solid:navigate', { detail: 'Domínios' }));
+      return;
+    }
+    if (action === 'prerequisites') {
+      window.dispatchEvent(new CustomEvent('solid:navigate', { detail: prerequisites.checkoutHost ? 'Configurações' : 'Domínios' }));
       return;
     }
     if (action === 'dashboard') {
@@ -37,7 +61,7 @@ function ShopifyIntegrationDetails({ csrfToken, storeKey, onBack }) {
     {status.reconnectRequired && <div className="integration-alert reconnect-alert" role="alert"><AlertTriangle size={18}/><div><strong>Reconecte sua loja Shopify</strong><span>A autorização expirou ou foi revogada. Seus produtos e personalizações continuam salvos, mas novas sincronizações estão pausadas.</span></div></div>}
     {message && <div className="integration-alert" role="status" aria-live="polite">{message}</div>}
     <IntegrationDiagnostics storeKey={storeKey}/>
-    <ShopifyOnboarding key={storeKey} connected={status.connected} synced={Boolean(status.lastSyncedAt)} enteredShop={shop} storeKey={storeKey} onAction={tutorialAction}/>
+    <ShopifyOnboarding key={storeKey} connected={status.connected} synced={Boolean(status.lastSyncedAt)} enteredShop={shop} storeKey={storeKey} checkoutHost={prerequisites.checkoutHost} activationCompleted={prerequisites.activationCompleted} onAction={tutorialAction}/>
     <section className="integration-layout"><div className="card shopify-card" id="shopify-connection-panel"><div className="integration-heading"><span className="shopify-brand"><ShoppingBag size={25}/></span><div><h2>Shopify Admin</h2><p>Produtos, variantes, imagens e coleções serão importados para esta loja SOLID.</p></div></div>
       {status.loading ? <div className="integration-loading"><LoaderCircle className="spin"/> Verificando conexão...</div> : status.connected ? <div className="connected-content"><div className="connected-panel"><div><span>Loja conectada</span><strong>{status.shopDomain}</strong><small>{status.authMode === 'CLIENT_CREDENTIALS' ? 'App próprio · renovação automática' : 'App SOLID · OAuth'} · Última sincronização: {formatDate(status.lastSyncedAt)}</small></div><button className="secondary danger-outline" disabled={busy || syncing} onClick={disconnect}>{busy ? <LoaderCircle className="spin" size={17}/> : <Unplug size={17}/>} Desconectar</button></div><div className="catalog-sync"><div><h3>Catálogo Shopify</h3><p>Atualiza dados de origem sem substituir os textos personalizados no checkout.</p></div><button className="primary sync-button" id="shopify-sync-button" disabled={syncing || busy} onClick={synchronize}>{syncing ? <LoaderCircle className="spin" size={17}/> : <RefreshCw size={17}/>} {syncing ? 'Sincronizando...' : 'Sincronizar catálogo'}</button></div>{result && <div className="sync-result"><span><ShoppingBag size={16}/><strong>{result.products}</strong> produtos</span><span><Layers3 size={16}/><strong>{result.collections}</strong> coleções</span><span><Images size={16}/><strong>{result.images}</strong> imagens</span><span><RefreshCw size={16}/><strong>{result.variants}</strong> variantes</span></div>}</div> : <form onSubmit={connect} className="shopify-credentials-form"><label htmlFor="shopify-shop">Domínio MyShopify</label><div className="shop-domain-field"><input id="shopify-shop" aria-label="Domínio MyShopify" value={shop} onChange={event => setShop(event.target.value)} placeholder="minha-loja" autoComplete="off" required/><span>.myshopify.com</span></div><small>Use o domínio original da loja, sem https:// ou www.</small><label htmlFor="shopify-client-id">Client ID</label><input id="shopify-client-id" value={clientId} onChange={event => setClientId(event.target.value)} placeholder="Cole o Client ID do Dev Dashboard" autoComplete="off" minLength={16} required/><label htmlFor="shopify-client-secret">Client secret</label><input id="shopify-client-secret" type="password" value={clientSecret} onChange={event => setClientSecret(event.target.value)} placeholder="Cole o Client secret" autoComplete="new-password" minLength={24} required/><small>O segredo é enviado somente à API da SOLID, criptografado e nunca volta a ser exibido.</small><button className="primary connect-button" disabled={busy || !status.configured || clientId.trim().length < 16 || clientSecret.trim().length < 24}>{busy ? <LoaderCircle className="spin" size={17}/> : <Plug size={17}/>} {busy ? 'Validando na Shopify...' : status.reconnectRequired ? 'Atualizar credenciais' : 'Conectar app próprio'}</button>{!status.configured && <p className="configuration-warning">A criptografia da integração precisa ser configurada no servidor.</p>}{status.reconnectRequired && <p className="reconnect-preserved">O catálogo importado permanecerá salvo durante a reconexão.</p>}</form>}
     </div><aside className="card integration-security"><span><ShieldCheck size={23}/></span><h2>Credenciais protegidas</h2><p>A SOLID usa o app criado por você somente para esta loja.</p><ul><li>Client secret criptografado no banco</li><li>Token temporário renovado automaticamente</li><li>Escopos mínimos: produtos, pedidos e proxy</li><li>Senha da Shopify nunca solicitada</li></ul><p className="integration-scope-note"><strong>Depois de sincronizar:</strong> crie e publique um modelo do tipo Loja Shopify e conclua a etapa de ativação no tema mostrada no tutorial.</p></aside></section></main>;

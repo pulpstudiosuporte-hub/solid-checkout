@@ -1,70 +1,107 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronDown, Circle, Clipboard, ExternalLink, HelpCircle, KeyRound, PackageCheck, Palette, RefreshCw, Settings2, ShoppingBag } from 'lucide-react';
+import { Check, ChevronDown, Circle, Clipboard, ExternalLink, Globe2, HelpCircle, KeyRound, PackageCheck, Palette, RefreshCw, Settings2, ShoppingBag, TestTube2, UserCheck } from 'lucide-react';
 import './shopify-onboarding.css';
 
-const themeSnippet = `<script
-  src="https://app.solidcheckout.xyz/shopify/solid-checkout.js"
+const appUrl = 'https://app.solidcheckout.xyz';
+const apiUrl = 'https://api.solidcheckout.xyz';
+
+function buildThemeSnippet(checkoutHost) {
+  const payUrl = checkoutHost ? `https://${checkoutHost}` : appUrl;
+  return `<script
+  src="${appUrl}/shopify/solid-checkout.js"
   defer
   data-solid-checkout
   data-proxy-path="/apps/solid-checkout/checkout-session"
-  data-pay-url="https://app.solidcheckout.xyz"
+  data-pay-url="${payUrl}"
   data-fallback="true">
 </script>`;
+}
 
-const guide = [
-  {
-    key: 'create', title: 'Crie seu app no Dev Dashboard', icon: ShoppingBag, description: 'O app pertencerá à sua organização Shopify.', path: 'Dev Dashboard → Apps → Criar app', action: 'dashboard', actionLabel: 'Abrir Dev Dashboard', manual: true,
-    instructions: ['Abra o Dev Dashboard com a mesma conta proprietária da loja.', 'Clique em Apps e depois em Criar app.', 'Escolha Começar a partir do Dev Dashboard.', 'Use um nome fácil de reconhecer, como “SOLID Checkout — Minha Loja”.', 'Este app pertence à sua loja; não compartilhe as credenciais.'],
-  },
-  {
-    key: 'permissions', title: 'Crie uma versão com as permissões', icon: Settings2, description: 'Os escopos ficam em Versões, não em Credenciais.', path: 'Seu app → Versões → Criar uma versão', action: 'dashboard', actionLabel: 'Abrir versões do app', manual: true,
-    instructions: ['No menu lateral do app, abra Versões e clique em Criar uma versão.', 'Em URL do app, use https://app.solidcheckout.xyz e desmarque Incorporar app ao admin da Shopify.', 'Em Escopos, cole exatamente: read_products,write_orders,write_app_proxy', 'Não marque Usar fluxo de instalação legado.', 'Abra Proxy do app: prefixo apps, subcaminho solid-checkout e URL https://api.solidcheckout.xyz/integrations/shopify/proxy', 'Clique em Lançar, informe um nome opcional para a versão e confirme. Isso ativa a configuração; não publica o app na App Store.'],
-  },
-  {
-    key: 'install', title: 'Instale o app na sua loja', icon: PackageCheck, description: 'Associe a versão publicada à loja que será conectada.', path: 'Seu app → Início → Instalar app', action: 'dashboard', actionLabel: 'Abrir página do app', manual: true,
-    instructions: ['Depois de lançar a versão, abra Início no menu lateral do app.', 'Clique em Instalar app e selecione a loja correta.', 'Revise produtos, pedidos e proxy do app na tela da Shopify e confirme.', 'Ao terminar, o app aparece em Configurações → Apps e canais de vendas da loja.'],
-  },
-  {
-    key: 'credentials', title: 'Copie as credenciais e conecte', icon: KeyRound, description: 'ID do cliente e chave secreta ficam em Credenciais.', path: 'Seu app → Credenciais', action: 'credentials', actionLabel: 'Preencher credenciais na SOLID',
-    instructions: ['No menu lateral do app, abra Credenciais.', 'Copie o ID do cliente e a Chave secreta.', 'Na SOLID, informe também o domínio original nomedaloja.myshopify.com.', 'Clique em Conectar app próprio. A SOLID validará a instalação e as permissões.', 'Nunca envie a chave secreta por mensagem ou captura de tela.'],
-  },
-  {
-    key: 'sync', title: 'Sincronize o catálogo', icon: RefreshCw, description: 'Importe produtos, variantes, imagens e coleções.', path: 'SOLID → Integrações → Shopify', action: 'sync', actionLabel: 'Ir para sincronização',
-    instructions: ['Com a conexão ativa, clique em Sincronizar catálogo.', 'Confira as quantidades importadas.', 'As credenciais geram tokens de 24 horas, mas a SOLID os renova automaticamente.', 'Execute uma nova sincronização quando quiser refletir alterações imediatamente.'],
-  },
-  {
-    key: 'checkout', title: 'Crie o modelo automático da Shopify', icon: Palette, description: 'Personalize uma vez; o carrinho real preenche os produtos.', path: 'SOLID → Checkouts → Criar checkout → Loja Shopify', action: 'checkout', actionLabel: 'Criar modelo Shopify', manual: true,
-    instructions: ['Escolha Loja Shopify — não selecione um produto.', 'Personalize o checkout com as cores, elementos e ordem desejados.', 'Publique o modelo. O último modelo Shopify publicado se torna o padrão da loja.', 'O comprador verá exatamente os produtos, variantes, quantidades e preços que escolheu no carrinho da Shopify.'],
-  },
-  {
-    key: 'theme', title: 'Ative pelo código do tema', icon: ShoppingBag, description: 'Não use “Incorporações de apps”: o app próprio é ativado em theme.liquid.', path: 'Shopify Admin → Loja virtual → Temas → … → Editar código → layout/theme.liquid', code: themeSnippet, manual: true,
-    instructions: ['Não procure a SOLID em Incorporações de apps. Apps próprios criados no Dev Dashboard não aparecem nessa lista sem uma extensão publicada pela Shopify CLI.', 'Volte para Loja virtual → Temas, localize o tema publicado, abra o menu de três pontos (…) e clique em Editar código.', 'Na coluna de arquivos, abra a pasta layout e selecione theme.liquid.', 'Use Ctrl+F para localizar </body> perto do final do arquivo.', 'Cole o código abaixo imediatamente antes de </body>, clique em Salvar e aguarde a confirmação da Shopify.', 'Abra sua loja em uma janela anônima, adicione produtos ao carrinho e clique em Finalizar compra.', 'A SOLID recebe o carrinho assinado pela Shopify. Se a SOLID estiver indisponível, o checkout nativo será usado automaticamente.'],
-  },
-];
+function buildGuide(checkoutHost) {
+  return [
+    {
+      key: 'prerequisites', title: 'Conclua os pré-requisitos da SOLID', icon: UserCheck, description: 'Ative o cadastro e o domínio antes de publicar.', path: 'SOLID → Configurações e Domínios', action: 'prerequisites', actionLabel: 'Revisar pré-requisitos', automatic: true,
+      instructions: ['Conclua os dados obrigatórios da loja e do responsável.', 'Adicione um domínio de checkout e aguarde o status Ativo.', 'O modelo pode ser editado antes disso, mas a publicação e o redirecionamento dependem desses dois itens.'],
+    },
+    {
+      key: 'create', title: 'Crie seu app no Dev Dashboard', icon: ShoppingBag, description: 'O app deve pertencer à mesma organização da loja.', path: 'Dev Dashboard → Apps → Criar app', action: 'dashboard', actionLabel: 'Abrir Dev Dashboard', manual: true,
+      instructions: ['Entre no Dev Dashboard com a conta proprietária da mesma organização Shopify da loja.', 'Clique em Apps, Criar app e Começar a partir do Dev Dashboard.', 'Use um nome reconhecível, como “SOLID Checkout — Minha Loja”.', 'Não compartilhe o Client secret: esse app e as credenciais pertencem à sua operação.'],
+    },
+    {
+      key: 'permissions', title: 'Crie e lance uma versão', icon: Settings2, description: 'Configure URLs, escopos e App Proxy na mesma versão.', path: 'Seu app → Versões → Criar uma versão', action: 'dashboard', actionLabel: 'Abrir Dev Dashboard', manual: true,
+      instructions: [`Em URL do app, use ${appUrl} e desmarque “Incorporar app ao admin da Shopify”.`, 'Em Escopos, cole exatamente: read_products,write_orders,write_app_proxy', 'Não marque “Usar fluxo de instalação legado”.', `Em Proxy do app, escolha prefixo apps, subcaminho solid-checkout e URL ${apiUrl}/integrations/shopify/proxy.`, 'Clique em Lançar. A propagação da versão pode levar alguns minutos.', 'Se alterar escopos ou o proxy depois, lance outra versão e aprove as novas permissões; em instalações antigas, pode ser necessário reinstalar o app.'],
+    },
+    {
+      key: 'install', title: 'Instale o app na loja correta', icon: PackageCheck, description: 'A instalação concede as permissões da versão lançada.', path: 'Seu app → Início → Instalar app', action: 'dashboard', actionLabel: 'Abrir Dev Dashboard', manual: true,
+      instructions: ['Clique em Instalar app e selecione a loja correta.', 'Revise produtos, pedidos e proxy e confirme a instalação.', 'Confirme em Shopify Admin → Configurações → Apps e canais de vendas.', 'Se a instalação continuar em zero, aguarde a versão propagar, atualize a página e tente novamente.'],
+    },
+    {
+      key: 'credentials', title: 'Conecte as credenciais na SOLID', icon: KeyRound, description: 'A API valida loja, instalação e todos os escopos.', path: 'Seu app → Configurações → Credenciais; depois SOLID → Integrações → Shopify', action: 'credentials', actionLabel: 'Preencher credenciais',
+      instructions: ['Abra Configurações no menu do app e copie o ID do cliente e a Chave secreta na seção Credenciais.', 'Informe também o domínio original nomedaloja.myshopify.com.', 'Clique em Conectar app próprio.', 'Se faltar uma permissão, volte à versão do app, corrija os escopos, lance novamente e aprove a alteração.', 'Nunca envie a chave secreta por mensagem ou captura de tela.'],
+    },
+    {
+      key: 'sync', title: 'Sincronize e confira o catálogo', icon: RefreshCw, description: 'Valide produtos, variantes, imagens e coleções.', path: 'SOLID → Integrações → Shopify', action: 'sync', actionLabel: 'Ir para sincronização',
+      instructions: ['Clique em Sincronizar catálogo.', 'Confira se os totais importados correspondem à loja.', 'A SOLID renova automaticamente os tokens temporários.', 'Sincronize novamente quando precisar refletir uma alteração imediatamente.'],
+    },
+    {
+      key: 'checkout', title: 'Crie e publique o modelo Shopify', icon: Palette, description: 'Um modelo automático atende qualquer carrinho da loja.', path: 'SOLID → Checkouts → Criar checkout → Loja Shopify', action: 'checkout', actionLabel: 'Abrir Checkouts', manual: true,
+      instructions: ['Escolha Loja Shopify; não selecione um produto fixo.', 'Personalize o visual e publique o modelo.', 'O modelo Shopify publicado recebe os produtos, variantes, quantidades e preços do carrinho real.', 'Para infoprodutos, crie separadamente um Link para infoproduto com produto fixo.'],
+    },
+    {
+      key: 'theme', title: 'Ative a ponte no tema com segurança', icon: Globe2, description: 'Faça backup do tema e adicione um único snippet.', path: 'Shopify Admin → Loja virtual → Temas → … → Duplicar; depois Editar código → layout/theme.liquid', code: buildThemeSnippet(checkoutHost), manual: true, requiresDomain: true,
+      instructions: ['Duplique o tema antes de editar; o tema duplicado é o seu ponto de restauração.', 'No tema publicado, abra Editar código e o arquivo layout/theme.liquid.', 'Procure </body> e confirme que ainda não existe “data-solid-checkout”.', 'Cole o código imediatamente antes de </body> e salve.', 'Este app não possui extensão de tema, portanto não aparecerá em “Incorporações de apps”.', 'Para desfazer, remova somente esse bloco <script> ou restaure a cópia do tema.'],
+    },
+    {
+      key: 'test', title: 'Faça o teste final de ponta a ponta', icon: TestTube2, description: 'Confirme redirecionamento, carrinho e fallback.', path: 'Loja publicada → janela anônima → produto → carrinho → Finalizar compra', manual: true,
+      instructions: ['Teste em janela anônima no celular e no desktop.', 'Adicione dois produtos, altere quantidades e finalize pelo carrinho e pelo botão Comprar agora.', 'Confirme se a URL abre no seu domínio ativo e se itens, variantes, quantidades e valores estão corretos.', 'Gere o Pix e confira o pedido na SOLID; não faça um pagamento real se estiver apenas validando.', 'Se a SOLID não puder criar a sessão, o fallback deve levar ao checkout nativo da Shopify.'],
+    },
+  ];
+}
 
 function readProgress(storageKey) {
   try { const value = JSON.parse(localStorage.getItem(storageKey) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; } catch { return {}; }
 }
 
-export default function ShopifyOnboarding({ connected, synced, enteredShop, storeKey, onAction }) {
+export default function ShopifyOnboarding({ connected, synced, enteredShop, storeKey, checkoutHost, activationCompleted, onAction }) {
   const storageKey = `solid-shopify-own-app-guide-${storeKey || 'store'}`;
+  const guide = useMemo(() => buildGuide(checkoutHost), [checkoutHost]);
   const [manual, setManual] = useState(() => readProgress(storageKey));
   const [copied, setCopied] = useState(false);
-  const firstPendingStep = !connected ? 0 : !synced ? 4 : !manual.checkout ? 5 : !manual.theme ? 6 : null;
-  const [expanded, setExpanded] = useState(firstPendingStep);
-  const [open, setOpen] = useState(firstPendingStep !== null);
+  const prerequisitesReady = Boolean(activationCompleted && checkoutHost);
+  const completed = { prerequisites: prerequisitesReady, create: Boolean(manual.create), permissions: Boolean(manual.permissions), install: Boolean(manual.install), credentials: connected || Boolean(enteredShop?.trim() && manual.credentials), sync: synced, checkout: Boolean(manual.checkout), theme: Boolean(manual.theme && checkoutHost), test: Boolean(manual.test) };
+  const firstPendingStep = guide.findIndex(step => !completed[step.key]);
+  const [expanded, setExpanded] = useState(firstPendingStep >= 0 ? firstPendingStep : 0);
+  const [open, setOpen] = useState(firstPendingStep >= 0);
   useEffect(() => { try { localStorage.setItem(storageKey, JSON.stringify(manual)); } catch { /* armazenamento pode estar bloqueado */ } }, [manual, storageKey]);
-  const completed = { create: Boolean(manual.create), permissions: Boolean(manual.permissions), install: Boolean(manual.install), credentials: connected || Boolean(enteredShop?.trim() && manual.credentials), sync: synced, checkout: Boolean(manual.checkout), theme: Boolean(manual.theme) };
   const total = Object.values(completed).filter(Boolean).length;
-  const progress = useMemo(() => `${Math.round((total / guide.length) * 100)}%`, [total]);
+  const progress = `${Math.round((total / guide.length) * 100)}%`;
+  const themeIndex = guide.findIndex(step => step.key === 'theme');
+  const activeStep = guide[expanded] || guide[0];
+  const ActiveIcon = activeStep.icon;
+  const activeDone = completed[activeStep.key];
+  const activeBlocked = Boolean(activeStep.requiresDomain && !checkoutHost);
+  const selectStep = index => { setExpanded(index); setOpen(true); };
+  const copyCode = () => navigator.clipboard.writeText(activeStep.code).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1600); });
+
   return <section className="card shopify-onboarding">
-    <button className="onboarding-summary" type="button" onClick={() => setOpen(value => !value)} aria-expanded={open}><span className="onboarding-help"><HelpCircle size={21}/></span><div><span>TUTORIAL SHOPIFY 2026</span><h2>Crie e conecte seu próprio app</h2><p>{total} de {guide.length} etapas concluídas</p></div><div className="onboarding-progress" aria-label={`${total} de ${guide.length} etapas concluídas`}><i style={{ '--progress': progress }}/><strong>{progress}</strong></div><ChevronDown className={open ? 'rotated' : ''} size={20}/></button>
+    <button className="onboarding-summary" type="button" onClick={() => setOpen(value => !value)} aria-expanded={open}><span className="onboarding-help"><HelpCircle size={21}/></span><div><span>GUIA ASSISTIDO · SHOPIFY</span><h2>Configure sua loja para vender com a SOLID</h2><p>{total} de {guide.length} etapas concluídas</p></div><div className="onboarding-progress" aria-label={`${total} de ${guide.length} etapas concluídas`}><i style={{ '--progress': progress }}/><strong>{progress}</strong></div><ChevronDown className={open ? 'rotated' : ''} size={20}/></button>
     {open && <div className="onboarding-body">
-      <div className="onboarding-intro" role="note"><strong>Este é o processo atual da Shopify para apps novos.</strong><span>Desde janeiro de 2026, o token permanente criado no Admin é um fluxo legado. Use Client ID e Client secret do Dev Dashboard.</span></div>
-      {!manual.theme && <div className="onboarding-theme-warning" role="alert"><div><strong>O app não aparecerá em “Incorporações de apps”.</strong><span>Para concluir, adicione a ponte da SOLID diretamente no arquivo <code>layout/theme.liquid</code>.</span></div><button type="button" onClick={() => setExpanded(6)}>Ver ativação no tema</button></div>}
-      <div className="onboarding-steps">{guide.map((step, index) => { const Icon = step.icon; const done = completed[step.key]; return <article className={`${done ? 'done ' : ''}${step.key === 'theme' ? 'theme-required' : ''}`} key={step.key}><button className="guide-step-main" type="button" onClick={() => setExpanded(value => value === index ? null : index)} aria-expanded={expanded === index}><span className="guide-status">{done ? <Check size={16}/> : <b>{index + 1}</b>}</span><span className="guide-icon"><Icon size={18}/></span><div><span className="guide-kind">{step.manual ? 'CONFIRMAÇÃO MANUAL' : 'VERIFICAÇÃO AUTOMÁTICA'}</span><h3>{step.title}</h3><p>{step.description}</p></div><ChevronDown className={expanded === index ? 'rotated' : ''} size={18}/></button>{expanded === index && <div className="guide-detail"><div className="guide-path"><strong>Caminho</strong><span>{step.path}</span></div><ol>{step.instructions.map(instruction => <li key={instruction}>{instruction}</li>)}</ol>{step.code && <div className="guide-code"><pre><code>{step.code}</code></pre><button type="button" onClick={() => navigator.clipboard.writeText(step.code).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1600); })}><Clipboard size={14}/>{copied ? 'Código copiado' : 'Copiar código'}</button></div>}<div className="guide-actions">{step.action && <button type="button" className="guide-action" disabled={step.action === 'sync' && !connected} onClick={() => onAction?.(step.action)}>{step.actionLabel}{step.action === 'dashboard' && <ExternalLink size={14}/>}</button>}{step.manual && <label><input type="checkbox" aria-label={`Marcar ${step.title} como concluída`} checked={Boolean(manual[step.key])} onChange={event => setManual(current => ({ ...current, [step.key]: event.target.checked }))}/> Marcar como concluída</label>}</div></div>}</article>; })}</div>
-      <div className="onboarding-intro shopify-extension-note" role="note"><strong>Dois modelos, dois usos.</strong><span>O modelo Shopify recebe o carrinho real automaticamente. Para infoprodutos, crie um Link para infoproduto e escolha um produto fixo para compartilhar.</span></div>
-      <footer className="onboarding-footer"><span><Circle size={13}/> O progresso do tutorial fica salvo somente nesta loja.</span><button className="skip-guide" type="button" onClick={() => setOpen(false)}>Ocultar por enquanto</button></footer>
+      <div className="onboarding-intro" role="note"><strong>Jornada para app próprio da sua organização Shopify.</strong><span>A instalação por Client ID e Client secret funciona quando o app e a loja pertencem à mesma organização. Você pode ocultar o tutorial e continuar depois.</span></div>
+      {!checkoutHost && <div className="onboarding-theme-warning" role="alert"><div><strong>O domínio do checkout ainda não está ativo.</strong><span>Configure o domínio antes de publicar o modelo ou copiar o código do tema.</span></div><button type="button" onClick={() => onAction?.('domains')}>Configurar domínio</button></div>}
+      {checkoutHost && !manual.theme && <div className="onboarding-theme-warning" role="alert"><div><strong>Falta ativar a ponte no tema.</strong><span>O código já usa o domínio ativo <code>{checkoutHost}</code>.</span></div><button type="button" onClick={() => selectStep(themeIndex)}>Ver ativação no tema</button></div>}
+      <div className="onboarding-workspace">
+        <nav className="onboarding-step-list" aria-label="Etapas do tutorial">{guide.map((step, index) => { const Icon = step.icon; const done = completed[step.key]; const blocked = Boolean(step.requiresDomain && !checkoutHost); return <button type="button" key={step.key} className={`${expanded === index ? 'active ' : ''}${done ? 'done ' : ''}${blocked ? 'blocked' : ''}`} aria-current={expanded === index ? 'step' : undefined} onClick={() => selectStep(index)}><span className="guide-status">{done ? <Check size={15}/> : <b>{index + 1}</b>}</span><span className="guide-icon"><Icon size={17}/></span><span className="guide-step-copy"><small>{step.automatic ? 'VERIFICAÇÃO AUTOMÁTICA' : step.manual ? 'CONFIRMAÇÃO MANUAL' : 'AÇÃO NA SOLID'}</small><strong>{step.title}</strong></span><ChevronDown size={16} aria-hidden="true"/></button>; })}</nav>
+        <article className={`guide-panel ${activeDone ? 'done ' : ''}${activeBlocked ? 'blocked' : ''}`} aria-labelledby={`guide-title-${activeStep.key}`}>
+          <header><span className="guide-panel-icon"><ActiveIcon size={20}/></span><div><small>{expanded + 1} DE {guide.length}</small><h3 id={`guide-title-${activeStep.key}`}>{activeStep.title}</h3><p>{activeStep.description}</p></div>{activeDone && <span className="guide-complete"><Check size={14}/> Concluída</span>}</header>
+          {activeBlocked && <p className="guide-blocked-message" role="status">Ative o domínio para liberar esta etapa.</p>}
+          <div className="guide-path"><strong>Caminho</strong><span>{activeStep.path}</span></div>
+          <ol>{activeStep.instructions.map(instruction => <li key={instruction}>{instruction}</li>)}</ol>
+          {activeStep.code && !activeBlocked && <div className="guide-code"><pre><code>{activeStep.code}</code></pre><button type="button" onClick={copyCode}><Clipboard size={14}/>{copied ? 'Código copiado' : 'Copiar código'}</button></div>}
+          <div className="guide-actions">{activeStep.action && <button type="button" className="guide-action" disabled={(activeStep.action === 'sync' && !connected) || activeBlocked} onClick={() => onAction?.(activeStep.action)}>{activeStep.actionLabel}{activeStep.action === 'dashboard' && <ExternalLink size={14}/>}</button>}{activeStep.manual && <label><input type="checkbox" aria-label={`Marcar ${activeStep.title} como concluída`} checked={Boolean(manual[activeStep.key])} disabled={activeBlocked} onChange={event => setManual(current => ({ ...current, [activeStep.key]: event.target.checked }))}/> Marcar como concluída</label>}</div>
+          <footer className="guide-pagination"><button type="button" disabled={expanded === 0} onClick={() => selectStep(expanded - 1)}>Anterior</button><span>Etapa {expanded + 1} de {guide.length}</span><button type="button" disabled={expanded === guide.length - 1} onClick={() => selectStep(expanded + 1)}>Próxima</button></footer>
+        </article>
+      </div>
+      <footer className="onboarding-footer"><span><Circle size={13}/> O progresso fica salvo somente nesta loja e pode ser retomado depois.</span><button className="skip-guide" type="button" onClick={() => setOpen(false)}>Ocultar por enquanto</button></footer>
     </div>}
   </section>;
 }

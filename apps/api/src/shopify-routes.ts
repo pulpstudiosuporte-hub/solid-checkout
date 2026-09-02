@@ -17,7 +17,7 @@ export function registerShopifyRoutes(app: FastifyInstance, environment: AppEnvi
   const sessionCookie = secure ? '__Host-solid_session' : 'solid_session'; const csrfCookie = secure ? '__Host-solid_csrf' : 'solid_csrf'; const oauthCookie = secure ? '__Secure-solid_shopify_oauth' : 'solid_shopify_oauth';
   const oauthConfigured = Boolean(environment.APP_URL && environment.SHOPIFY_CLIENT_ID && environment.SHOPIFY_CLIENT_SECRET && environment.SHOPIFY_REDIRECT_URI && environment.APP_ENCRYPTION_KEY);
   const configured = Boolean(environment.APP_ENCRYPTION_KEY);
-  const scopes = environment.SHOPIFY_SCOPES ?? 'read_products';
+  const scopes = environment.SHOPIFY_SCOPES ?? 'read_products,write_orders,write_app_proxy';
   const session = async (request: FastifyRequest): Promise<SessionUser | null> => { const token = request.cookies[sessionCookie]; return token ? auth.findActiveSession(sha256(token), new Date()) : null; };
   const csrfValid = (request: FastifyRequest, current: SessionUser): boolean => {
     const origin = request.headers.origin; const cookie = request.cookies[csrfCookie]; const header = request.headers['x-csrf-token'];
@@ -47,7 +47,7 @@ export function registerShopifyRoutes(app: FastifyInstance, environment: AppEnvi
       const inspection = await inspectShopifyConnection(shop, token.accessToken);
       if (inspection.shopDomain !== shop) return reply.code(400).send(errorBody(request, 'SHOP_MISMATCH', 'As credenciais não pertencem ao domínio informado.'));
       const scopes = new Set(inspection.scopes.length ? inspection.scopes : token.scope.split(',').map(value => value.trim()).filter(Boolean));
-      const missingScopes = ['read_products', 'write_orders'].filter(scope => !scopes.has(scope));
+      const missingScopes = ['read_products', 'write_orders', 'write_app_proxy'].filter(scope => !scopes.has(scope));
       if (missingScopes.length) return reply.code(400).send(errorBody(request, 'MISSING_SCOPES', `Adicione estas permissões ao app e publique uma nova versão: ${missingScopes.join(', ')}.`));
       await repository.connect({ storeId: context.storeId, userId: current.userId, shopDomain: shop, authMode: 'CLIENT_CREDENTIALS', accessTokenEncrypted: encryptSecret(token.accessToken, environment.APP_ENCRYPTION_KEY), clientIdEncrypted: encryptSecret(clientId, environment.APP_ENCRYPTION_KEY), clientSecretEncrypted: encryptSecret(clientSecret, environment.APP_ENCRYPTION_KEY), scopes: [...scopes].sort().join(','), accessTokenExpiresAt: token.expiresAt, requestId: request.id });
       return reply.send({ connected: true, shopDomain: shop, shopName: inspection.shopName });

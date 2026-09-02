@@ -17,6 +17,37 @@
 @media(prefers-reduced-motion:reduce){.app *,.app *::before,.app *::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
 .app :focus-visible{outline:3px solid rgba(111,75,242,.32);outline-offset:2px}
 
+/* Navegação modular: três áreas principais e recursos por contexto */
+.app .sidebar nav{display:flex;flex-direction:column;gap:10px;padding:6px 9px 12px}
+.sidebar-navigation,.platform-nav{border:1px solid var(--solid-line);border-radius:14px;background:#fff;box-shadow:0 5px 18px rgba(30,22,52,.035)}
+.sidebar-navigation{padding:6px}
+.module-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:3px;border-radius:10px;background:#f6f5f8}
+.module-tab{display:grid;min-width:0;min-height:52px;place-items:center;align-content:center;gap:4px;padding:5px 2px;border:0;border-radius:8px;background:transparent;color:#817a8a;cursor:pointer;transition:background .16s ease,color .16s ease,box-shadow .16s ease}
+.module-tab span{max-width:100%;overflow:hidden;font-size:9px;font-weight:750;text-overflow:ellipsis;white-space:nowrap}
+.module-tab:hover{background:rgba(255,255,255,.7);color:#3f3748}
+.module-tab.active{background:#fff;color:var(--solid-purple-strong);box-shadow:0 2px 7px rgba(35,25,62,.08)}
+.module-tab.active svg{color:var(--solid-purple)}
+.resource-panel{padding:11px 3px 3px}
+.resource-head{display:grid;gap:2px;padding:0 8px 8px}
+.resource-head small{color:#aaa4b1;font-size:8px;font-weight:800;letter-spacing:.1em}
+.resource-head strong{font-size:12px;letter-spacing:-.01em}
+.resource-head span{color:#8a8390;font-size:9px}
+.resource-list{display:grid;gap:2px}
+.app .resource-list .nav-item,.app .platform-nav .nav-item{margin:0;transform:none}
+.app .resource-list .nav-item:hover,.app .platform-nav .nav-item:hover{transform:none}
+.platform-nav{padding:10px 6px 6px}
+.platform-nav .nav-title{margin-bottom:5px}
+.app .side-bottom{margin:0 9px 10px;padding:9px 6px;border:1px solid var(--solid-line);border-radius:14px;background:#fff;box-shadow:0 5px 18px rgba(30,22,52,.035)}
+.app .side-bottom .nav-title{margin-top:2px}
+.app .side-bottom .profile{margin-top:7px}
+.app.sidebar-collapsed .sidebar-navigation,.app.sidebar-collapsed .platform-nav{margin:0;padding:5px;border-radius:12px}
+.app.sidebar-collapsed .sidebar .module-tabs{grid-template-columns:1fr;background:transparent;padding:0}
+.app.sidebar-collapsed .sidebar .module-tab{min-height:42px}
+.app.sidebar-collapsed .sidebar .module-tab span,.app.sidebar-collapsed .sidebar .resource-head{display:none}
+.app.sidebar-collapsed .sidebar .resource-panel{padding:5px 0 0;border-top:1px solid var(--solid-line)}
+.app.sidebar-collapsed .sidebar .side-bottom{margin-inline:9px;padding-inline:5px}
+@media(max-width:900px){.app.sidebar-collapsed .sidebar .module-tabs{grid-template-columns:repeat(3,minmax(0,1fr));background:#f6f5f8;padding:3px}.app.sidebar-collapsed .sidebar .module-tab span{display:block}.app.sidebar-collapsed .sidebar .resource-head{display:grid}.app.sidebar-collapsed .sidebar .resource-panel{padding:11px 3px 3px;border-top:0}.app.sidebar-collapsed .sidebar-navigation,.app.sidebar-collapsed .platform-nav{margin:0;padding:6px}.app.sidebar-collapsed .sidebar .side-bottom{margin-inline:9px;padding-inline:6px}}
+
 /* Readability and breakpoint alignment with the legacy shell. */
 .app .nav-item{min-height:40px;font-size:13px}
 .solid-command-bar b{font-size:14px}.solid-command-bar p{font-size:12px;color:rgba(255,255,255,.82)}.solid-command-bar button{min-height:38px;font-size:12px}
