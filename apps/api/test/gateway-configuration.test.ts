@@ -12,7 +12,7 @@ const env: AppEnvironment = { NODE_ENV: 'test', API_HOST: '127.0.0.1', API_PORT:
 class GatewayAuth implements AuthRepository {
   findUserByEmail(): Promise<LoginUser | null> { return Promise.resolve(null); }
   createSession(): Promise<void> { return Promise.resolve(); }
-  findActiveSession(tokenHash: string): Promise<SessionUser | null> { return Promise.resolve(tokenHash === hash(sessionToken) ? { sessionId: 'session-a', userId: 'user-a', csrfTokenHash: hash(csrfToken), expiresAt: new Date(Date.now() + 60_000), absoluteExpiresAt: new Date(Date.now() + 60_000), user: { publicId: 'user-a', name: 'Owner', email: 'owner@example.com' } } : null); }
+  findActiveSession(tokenHash: string): Promise<SessionUser | null> { return Promise.resolve(tokenHash === hash(sessionToken) ? { sessionId: 'session-a', userId: 'user-a', csrfTokenHash: hash(csrfToken), expiresAt: new Date(Date.now() + 60_000), absoluteExpiresAt: new Date(Date.now() + 60_000), user: { publicId: 'user-a', name: 'Owner', email: 'owner@example.com', mfaEnabled: false } } : null); }
   touchSession(): Promise<void> { return Promise.resolve(); }
   revokeSession(): Promise<void> { return Promise.resolve(); }
   updatePasswordAndRevokeOtherSessions(): Promise<void> { return Promise.resolve(); }

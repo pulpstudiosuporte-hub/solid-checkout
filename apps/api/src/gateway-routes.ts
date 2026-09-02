@@ -18,7 +18,6 @@ export function registerGatewayRoutes(app: FastifyInstance, environment: AppEnvi
   const session = async (request: FastifyRequest): Promise<SessionUser | null> => { const token = request.cookies[sessionCookie]; return token ? auth.findActiveSession(sha256(token), new Date()) : null; };
   const csrfValid = (request: FastifyRequest, current: SessionUser) => { const origin = request.headers.origin; const cookie = request.cookies[csrfCookie]; const header = request.headers['x-csrf-token']; return typeof origin === 'string' && environment.CORS_ORIGINS.includes(origin) && Boolean(cookie) && typeof header === 'string' && equal(sha256(cookie!), sha256(header)) && equal(sha256(header), current.csrfTokenHash); };
   const mfaRequired = (request: FastifyRequest, reply: FastifyReply, current: SessionUser) => {
-    if (current.user.mfaEnabled === false) return reply.code(403).send(errorBody(request, 'MFA_SETUP_REQUIRED', 'Ative o aplicativo autenticador em Configurações para administrar credenciais.'));
     if (current.user.mfaEnabled === true && !current.mfaVerifiedAt) return reply.code(403).send(errorBody(request, 'MFA_VERIFICATION_REQUIRED', 'Entre novamente e confirme o segundo fator.'));
     return null;
   };
