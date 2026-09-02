@@ -318,11 +318,18 @@ export class PrismaCatalogRepository implements CatalogRepository {
       // checkout. Assim que um modelo Shopify for publicado, ele sempre vence.
       if (!checkout && input.checkoutSlug) checkout = await transaction.checkout.findFirst({ where: { storeId: connection.storeId, slug: input.checkoutSlug, status: 'PUBLISHED', archivedAt: null }, select: { id: true, publishedConfig: true } });
       if (!checkout) return null;
-      const requestedIds = input.lines.map(line => `gid://shopify/ProductVariant/${line.variantId}`);
-      const variants = await transaction.productVariant.findMany({ where: { sourceExternalId: { in: requestedIds }, availableForSale: true, product: { storeId: connection.storeId, source: 'SHOPIFY', active: true } }, select: { id: true, sourceExternalId: true, title: true, priceCents: true, inventoryQuantity: true, imageUrl: true, product: { select: { id: true, checkoutTitle: true, imageUrl: true, maxPerOrder: true, trackInventory: true } } } });
+      const quantitiesByVariant = new Map<string, number>();
+      for (const line of input.lines) quantitiesByVariant.set(line.variantId, (quantitiesByVariant.get(line.variantId) ?? 0) + line.quantity);
+      const normalizedLines = [...quantitiesByVariant].map(([variantId, quantity]) => ({ variantId, quantity }));
+      const requestedIds = normalizedLines.map(line => `gid://shopify/ProductVariant/${line.variantId}`);
+      const variants = await transaction.productVariant.findMany({ where: { sourceExternalId: { in: requestedIds }, availableForSale: true, product: { storeId: connection.storeId, source: 'SHOPIFY', active: true } }, select: { id: true, sourceExternalId: true, title: true, priceCents: true, imageUrl: true, product: { select: { id: true, checkoutTitle: true, imageUrl: true, maxPerOrder: true } } } });
       const byExternalId = new Map(variants.map(variant => [variant.sourceExternalId, variant]));
-      const items = input.lines.map(line => ({ line, variant: byExternalId.get(`gid://shopify/ProductVariant/${line.variantId}`) })).filter((item): item is { line: { variantId: string; quantity: number }; variant: NonNullable<typeof item.variant> } => Boolean(item.variant));
-      if (items.length !== input.lines.length || items.some(({ line, variant }) => line.quantity > variant.product.maxPerOrder || variant.product.trackInventory && (variant.inventoryQuantity ?? 0) < line.quantity)) return null;
+      const items = normalizedLines.map(line => ({ line, variant: byExternalId.get(`gid://shopify/ProductVariant/${line.variantId}`) })).filter((item): item is { line: { variantId: string; quantity: number }; variant: NonNullable<typeof item.variant> } => Boolean(item.variant));
+      // `availableForSale` is the authoritative Shopify storefront signal. A
+      // variant can legitimately have inventoryQuantity=0 and remain for sale
+      // when "continue selling when out of stock" is enabled. Rejecting those
+      // variants here made valid Shopify carts return CHECKOUT_UNAVAILABLE.
+      if (items.length !== normalizedLines.length || items.some(({ line, variant }) => line.quantity > variant.product.maxPerOrder)) return null;
       const totalCents = items.reduce((total, { line, variant }) => total + variant.priceCents * line.quantity, 0);
       const first = items[0]; if (!first) return null;
       const session = await transaction.checkoutSession.create({ data: { checkoutId: checkout.id, variantId: first.variant.id, quantity: items.reduce((total, item) => total + item.line.quantity, 0), unitPriceCents: first.variant.priceCents, totalCents, tokenHash: input.tokenHash, source: 'SHOPIFY', expiresAt: checkoutSessionExpiry(checkout.publishedConfig, input.expiresAt), ...(input.sourceCartId ? { sourceCartId: input.sourceCartId } : {}), items: { create: items.map(({ line, variant }) => ({ productId: variant.product.id, variantId: variant.id, quantity: line.quantity, unitPriceCents: variant.priceCents, totalCents: variant.priceCents * line.quantity, titleSnapshot: variant.product.checkoutTitle, variantSnapshot: variant.title, imageUrlSnapshot: variant.imageUrl ?? variant.product.imageUrl })) } }, select: { publicId: true, totalCents: true, currency: true, expiresAt: true, checkout: { select: { slug: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true } } } });
