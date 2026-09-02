@@ -1,4 +1,4 @@
-const CACHE = 'solid-shell-v3';
+const CACHE = 'solid-shell-v4';
 const STATIC_ASSETS = ['/', '/manifest.webmanifest', '/brand/solid-symbol.png'];
 
 self.addEventListener('install', event => {
@@ -25,7 +25,7 @@ self.addEventListener('fetch', event => {
   // an outdated index.html. The cached shell is only an offline fallback.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: 'no-store' })
         .then(response => {
           if (response.ok) {
             const copy = response.clone();
