@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   Star,
+  Type,
 } from "lucide-react";
 
 const elementIcons = {
@@ -19,6 +20,7 @@ const elementIcons = {
   timer: Clock3,
   video: PlaySquare,
   gallery: GalleryHorizontal,
+  text: Type,
   reviews: Star,
   guarantee: ShieldCheck,
   faq: CircleHelp,

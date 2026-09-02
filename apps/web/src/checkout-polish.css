@@ -789,6 +789,37 @@
   width: 100%;
 }
 
+/* Text blocks are intentionally typographic: no decorative icon or media. */
+.public-custom-element.type-text,
+.ep-custom-element.type-text {
+  display: block;
+}
+
+.public-custom-element.type-text .public-custom-content,
+.ep-custom-element.type-text .ep-custom-content {
+  display: grid;
+  gap: 8px;
+}
+
+.public-custom-element.type-text h2,
+.ep-custom-element.type-text h3 {
+  margin: 0;
+  color: var(--element-title-color, currentColor) !important;
+  font-size: var(--element-title-size, 26px) !important;
+  font-weight: var(--element-title-weight, 700);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.public-custom-element.type-text p,
+.ep-custom-element.type-text p {
+  margin: 0;
+  color: var(--element-body-color, currentColor) !important;
+  font-size: var(--element-body-size, 15px) !important;
+  line-height: var(--element-body-line-height, 1.6);
+  white-space: pre-line;
+}
+
 .public-custom-icon,
 .ep-custom-icon,
 .public-custom-media,

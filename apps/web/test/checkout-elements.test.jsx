@@ -5,7 +5,10 @@ import {
   reorderCustomElements,
 } from "../src/CheckoutEditor.jsx";
 import { checkoutLayoutPositionMap } from "../src/checkout-layout.js";
-import { elementCatalog } from "../src/CheckoutElementsPanel.jsx";
+import {
+  elementCatalog,
+  newElementDefaults,
+} from "../src/CheckoutElementsPanel.jsx";
 import { checkoutElementIconTypes } from "../src/CheckoutElementIcon.jsx";
 
 const element = (id, slot) => ({ id, slot, enabled: true });
@@ -15,6 +18,21 @@ describe("ordenação dos elementos do checkout", () => {
     expect([...checkoutElementIconTypes].sort()).toEqual(
       Object.keys(elementCatalog).sort(),
     );
+  });
+
+  it("cria um bloco de texto com hierarquia visual editável", () => {
+    expect(newElementDefaults("text", 1, "top")).toMatchObject({
+      type: "text",
+      slot: 1,
+      region: "top",
+      title: "Conteúdo em destaque",
+      titleColor: "#17171a",
+      bodyColor: "#5f5b66",
+      titleFontSize: 26,
+      bodyFontSize: 15,
+      titleWeight: 700,
+      lineHeight: 160,
+    });
   });
 
   it("reposiciona elementos dentro do mesmo intervalo", () => {

@@ -1423,6 +1423,12 @@ function CustomElementPreview({ item, onRemove, readOnly = false }) {
     padding: `${item.paddingY ?? 16}px ${item.paddingX ?? 18}px`,
     fontSize: `${item.fontSize || 14}px`,
     textAlign: contentAlign,
+    "--element-title-color": item.titleColor || item.textColor || "#17171a",
+    "--element-body-color": item.bodyColor || item.textColor || "#5f5b66",
+    "--element-title-size": `${item.titleFontSize || 26}px`,
+    "--element-body-size": `${item.bodyFontSize || 15}px`,
+    "--element-title-weight": item.titleWeight || 700,
+    "--element-body-line-height": (item.lineHeight || 160) / 100,
   };
   const iconStyle = {
     color: item.iconColor || "#7357e9",
@@ -1430,7 +1436,7 @@ function CustomElementPreview({ item, onRemove, readOnly = false }) {
   };
   return (
     <section
-      className={`ep-custom-element type-${item.type} content-align-${contentAlign} device-${item.device || "all"} ${item.imageUrl || (item.type === "video" && item.mediaUrl) ? "has-media" : ""}`}
+      className={`ep-custom-element type-${item.type} content-align-${contentAlign} device-${item.device || "all"} ${item.type !== "text" && (item.imageUrl || (item.type === "video" && item.mediaUrl)) ? "has-media" : ""}`}
       style={style}
       draggable={!readOnly}
       onDragStart={
@@ -1443,7 +1449,7 @@ function CustomElementPreview({ item, onRemove, readOnly = false }) {
               )
       }
     >
-      {item.imageUrl ? (
+      {item.type === "text" ? null : item.imageUrl ? (
         <img
           className="ep-custom-media"
           src={item.imageUrl}

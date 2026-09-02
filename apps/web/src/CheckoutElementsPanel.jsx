@@ -16,6 +16,7 @@ import {
   ShoppingBag,
   Star,
   Trash2,
+  Type,
   Upload,
 } from "lucide-react";
 
@@ -61,6 +62,13 @@ export const elementCatalog = {
     icon: GalleryHorizontal,
     title: "Galeria do produto",
     text: "Conheça os detalhes do produto.",
+  },
+  text: {
+    label: "Texto",
+    category: "Elementos básicos",
+    icon: Type,
+    title: "Conteúdo em destaque",
+    text: "Adicione uma descrição para orientar seu cliente.",
   },
   reviews: {
     label: "Avaliações",
@@ -138,6 +146,12 @@ const defaults = {
   linkUrl: "",
   durationMinutes: 10,
   progress: 72,
+  titleColor: "#17171a",
+  bodyColor: "#5f5b66",
+  titleFontSize: 26,
+  bodyFontSize: 15,
+  titleWeight: 700,
+  lineHeight: 160,
 };
 const categories = [
   "Mais utilizados",
@@ -366,6 +380,70 @@ export default function CheckoutElementsPanel({
               onChange={(event) => change("text", event.target.value)}
             />
           </Field>
+          {current.type === "text" && (
+            <>
+              <h3>Tipografia do texto</h3>
+              <div className="element-color-grid">
+                <Field label="Cor do título">
+                  <input
+                    type="color"
+                    value={current.titleColor || current.textColor || "#17171a"}
+                    onChange={(event) => change("titleColor", event.target.value)}
+                  />
+                </Field>
+                <Field label="Cor da descrição">
+                  <input
+                    type="color"
+                    value={current.bodyColor || current.textColor || "#5f5b66"}
+                    onChange={(event) => change("bodyColor", event.target.value)}
+                  />
+                </Field>
+              </div>
+              <div className="element-number-grid">
+                <Field label="Tamanho do título (px)">
+                  <input
+                    type="number"
+                    min="12"
+                    max="64"
+                    value={current.titleFontSize || 26}
+                    onChange={(event) => change("titleFontSize", Number(event.target.value))}
+                  />
+                </Field>
+                <Field label="Tamanho da descrição (px)">
+                  <input
+                    type="number"
+                    min="10"
+                    max="32"
+                    value={current.bodyFontSize || 15}
+                    onChange={(event) => change("bodyFontSize", Number(event.target.value))}
+                  />
+                </Field>
+                <Field label="Peso do título">
+                  <select
+                    value={current.titleWeight || 700}
+                    onChange={(event) => change("titleWeight", Number(event.target.value))}
+                  >
+                    <option value="400">Regular</option>
+                    <option value="500">Médio</option>
+                    <option value="600">Seminegrito</option>
+                    <option value="700">Negrito</option>
+                    <option value="800">Extra negrito</option>
+                    <option value="900">Black</option>
+                  </select>
+                </Field>
+                <Field label="Altura da linha (%)">
+                  <input
+                    type="number"
+                    min="100"
+                    max="220"
+                    step="5"
+                    value={current.lineHeight || 160}
+                    onChange={(event) => change("lineHeight", Number(event.target.value))}
+                  />
+                </Field>
+              </div>
+            </>
+          )}
           {current.type === "announcement" && (
             <Field label="Tipo de exibição">
               <select
@@ -377,7 +455,7 @@ export default function CheckoutElementsPanel({
               </select>
             </Field>
           )}
-          {(
+          {current.type !== "text" && (
             <div className="element-media-settings">
               <span className="element-media-label">Imagem do elemento</span>
               <ElementImageDropzone
@@ -519,13 +597,15 @@ export default function CheckoutElementsPanel({
           )}
           <h3>Estilo do elemento</h3>
           <div className="element-color-grid">
-            <Field label="Texto">
-              <input
-                type="color"
-                value={current.textColor || "#17171a"}
-                onChange={(event) => change("textColor", event.target.value)}
-              />
-            </Field>
+            {current.type !== "text" && (
+              <Field label="Texto">
+                <input
+                  type="color"
+                  value={current.textColor || "#17171a"}
+                  onChange={(event) => change("textColor", event.target.value)}
+                />
+              </Field>
+            )}
             <Field label="Fundo">
               <input
                 type="color"
@@ -535,35 +615,37 @@ export default function CheckoutElementsPanel({
                 }
               />
             </Field>
-            <Field label="Ícone">
-              <input
-                type="color"
-                value={current.iconColor || "#7357e9"}
-                onChange={(event) => change("iconColor", event.target.value)}
-              />
-            </Field>
-            <Field label="Fundo do ícone">
-              <input
-                type="color"
-                value={current.iconBackgroundColor || "#f0ebff"}
-                onChange={(event) =>
-                  change("iconBackgroundColor", event.target.value)
-                }
-              />
-            </Field>
+            {current.type !== "text" && (
+              <>
+                <Field label="Ícone">
+                  <input
+                    type="color"
+                    value={current.iconColor || "#7357e9"}
+                    onChange={(event) => change("iconColor", event.target.value)}
+                  />
+                </Field>
+                <Field label="Fundo do ícone">
+                  <input
+                    type="color"
+                    value={current.iconBackgroundColor || "#f0ebff"}
+                    onChange={(event) => change("iconBackgroundColor", event.target.value)}
+                  />
+                </Field>
+              </>
+            )}
           </div>
           <div className="element-number-grid">
-            <Field label="Fonte (px)">
-              <input
-                type="number"
-                min="10"
-                max="32"
-                value={current.fontSize || 14}
-                onChange={(event) =>
-                  change("fontSize", Number(event.target.value))
-                }
-              />
-            </Field>
+            {current.type !== "text" && (
+              <Field label="Fonte (px)">
+                <input
+                  type="number"
+                  min="10"
+                  max="32"
+                  value={current.fontSize || 14}
+                  onChange={(event) => change("fontSize", Number(event.target.value))}
+                />
+              </Field>
+            )}
             <Field label="Raio (px)">
               <input
                 type="number"
@@ -712,7 +794,7 @@ export default function CheckoutElementsPanel({
                     }
                   >
                     <b>{item.label}</b>
-                    {["testimonial", "reviews", "faq", "list"].includes(
+                    {["text", "testimonial", "reviews", "faq", "list"].includes(
                       type,
                     ) && (
                       <small>

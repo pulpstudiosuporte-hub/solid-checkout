@@ -257,14 +257,14 @@ function CustomElementCountdown({ minutes = 10 }) {
 function PublicCustomElement({ item }) {
   const textColor = item.textColor || '#17171a';
   const contentAlign = ["left", "center", "right"].includes(item.align) ? item.align : "left";
-  const style = { color: textColor, '--public-custom-text': textColor, background: item.backgroundColor, borderRadius: `${item.radius ?? 12}px`, padding: `${item.paddingY ?? 16}px ${item.paddingX ?? 18}px`, fontSize: `${item.fontSize || 14}px`, textAlign: contentAlign };
+  const style = { color: textColor, '--public-custom-text': textColor, background: item.backgroundColor, borderRadius: `${item.radius ?? 12}px`, padding: `${item.paddingY ?? 16}px ${item.paddingX ?? 18}px`, fontSize: `${item.fontSize || 14}px`, textAlign: contentAlign, '--element-title-color': item.titleColor || textColor, '--element-body-color': item.bodyColor || textColor, '--element-title-size': `${item.titleFontSize || 26}px`, '--element-body-size': `${item.bodyFontSize || 15}px`, '--element-title-weight': item.titleWeight || 700, '--element-body-line-height': (item.lineHeight || 160) / 100 };
   const iconStyle = { color: item.iconColor || '#7357e9', background: item.iconBackgroundColor || '#f0ebff' };
   const mediaStyle = { '--element-image-height': `${item.imageHeight || 220}px`, objectFit: item.imageFit || 'cover' };
   return (
-    <section className={`public-custom-element type-${item.type} content-align-${contentAlign} device-${item.device || 'all'} ${item.imageUrl || (item.type === 'video' && item.mediaUrl) ? 'has-media' : ''}`} style={style}>
+    <section className={`public-custom-element type-${item.type} content-align-${contentAlign} device-${item.device || 'all'} ${item.type !== 'text' && (item.imageUrl || (item.type === 'video' && item.mediaUrl)) ? 'has-media' : ''}`} style={style}>
       {/* Captions are rendered whenever the merchant supplies a captions URL. */}
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-      {item.mediaUrl && item.type === 'video' ? <video aria-label={item.title || 'Vídeo do checkout'} className="public-custom-media" src={item.mediaUrl} poster={item.imageUrl || undefined} controls preload="metadata">{item.captionsUrl && <track kind="captions" src={item.captionsUrl} srcLang="pt-BR" label="Português" default/>}</video> : item.imageUrl ? <img className="public-custom-media" src={item.imageUrl} alt={item.imageAlt || ''} width="1600" height={item.imageHeight || 220} style={mediaStyle} loading="lazy" decoding="async"/> : <div className="public-custom-icon" style={iconStyle}>
+      {item.type === 'text' ? null : item.mediaUrl && item.type === 'video' ? <video aria-label={item.title || 'Vídeo do checkout'} className="public-custom-media" src={item.mediaUrl} poster={item.imageUrl || undefined} controls preload="metadata">{item.captionsUrl && <track kind="captions" src={item.captionsUrl} srcLang="pt-BR" label="Português" default/>}</video> : item.imageUrl ? <img className="public-custom-media" src={item.imageUrl} alt={item.imageAlt || ''} width="1600" height={item.imageHeight || 220} style={mediaStyle} loading="lazy" decoding="async"/> : <div className="public-custom-icon" style={iconStyle}>
         <CheckoutElementIcon type={item.type} size={20} />
       </div>}
       <div className="public-custom-content">
