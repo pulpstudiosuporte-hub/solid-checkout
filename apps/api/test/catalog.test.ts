@@ -20,6 +20,8 @@ class MemoryAuth implements AuthRepository {
 }
 
 class MemoryCatalog implements CatalogRepository {
+  domainActive = true;
+  hasActiveDomain(): Promise<boolean> { return Promise.resolve(this.domainActive); }
   paidDigitalDelivery: { title: string; url: string } | null = null;
   shippingMethods = [{ publicId: 'shipping-a', name: 'Entrega padrão', priceCents: 1290, minDays: 3, maxDays: 5, active: true, position: 0 }];
   listShippingMethods(): Promise<readonly object[]> { return Promise.resolve(this.shippingMethods); }
@@ -106,6 +108,16 @@ describe('catálogo isolado por loja', () => {
 
     const missingProduct = await app.inject({ method: 'POST', url: '/checkouts', headers: authenticatedHeaders, payload: { mode: 'DIRECT_LINK', name: 'Sem produto', slug: 'sem-produto' } });
     expect(missingProduct.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it('impede criar checkout antes de ativar um dominio seguro', async () => {
+    const catalog = new MemoryCatalog(); catalog.domainActive = false;
+    const app = buildApp(env, { authRepository: new MemoryAuth(), catalogRepository: catalog });
+    const response = await app.inject({ method: 'POST', url: '/checkouts', headers: authenticatedHeaders, payload: { mode: 'SHOPIFY_CART', name: 'Modelo Shopify', slug: 'shopify-principal' } });
+    expect(response.statusCode).toBe(409);
+    expect(response.json<{ error: { code: string } }>().error.code).toBe('DOMAIN_REQUIRED');
+    expect(catalog.checkouts).toHaveLength(0);
     await app.close();
   });
 

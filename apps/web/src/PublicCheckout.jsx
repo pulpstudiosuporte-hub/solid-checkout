@@ -555,18 +555,21 @@ function SessionContent({ session: initialSession, token }) {
       controller.abort();
     };
   }, [address.postalCode]);
-  const primaryItem = {
+  const checkoutProduct = session.checkout?.product;
+  const primaryItem = checkoutProduct ? {
           quantity: session.quantity,
           unitPriceCents: session.unitPriceCents,
           totalCents: session.unitPriceCents * session.quantity,
-          titleSnapshot: session.checkout.product.checkoutTitle,
+          titleSnapshot: checkoutProduct.checkoutTitle,
           variantSnapshot: session.variant?.title,
           imageUrlSnapshot:
-            session.variant?.imageUrl || session.checkout.product.imageUrl,
+            session.variant?.imageUrl || checkoutProduct.imageUrl,
           isOrderBump: false,
-        };
-  const storedItems = session.items || [];
-  const items = storedItems.some(item => !item.isOrderBump) ? storedItems : [primaryItem, ...storedItems];
+        } : null;
+  const storedItems = Array.isArray(session.items) ? session.items : [];
+  const items = storedItems.some(item => !item.isOrderBump)
+    ? storedItems
+    : primaryItem ? [primaryItem, ...storedItems] : storedItems;
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const metaData = { value: session.totalCents / 100, currency: session.currency || 'BRL', content_type: 'product', content_ids: items.map(item => item.product?.publicId || item.productId).filter(Boolean), contents: items.map(item => ({ id: item.product?.publicId || item.productId || item.titleSnapshot, quantity: item.quantity, item_price: item.unitPriceCents / 100 })), num_items: itemCount };
   useEffect(() => { const controller = new AbortController(); getPublicMetaConfig(session.publicId, token, controller.signal).then(({ pixelId }) => { if (!pixelId) return; setMetaPixelId(pixelId); loadMetaPixel(pixelId); trackMeta('PageView', {}, `${session.publicId}:PageView`); trackMeta('ViewContent', metaData, `${session.publicId}:ViewContent`); trackMeta('InitiateCheckout', metaData, `${session.publicId}:InitiateCheckout`); }).catch(() => {}); return () => controller.abort(); }, [session.publicId, token]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -621,7 +624,7 @@ function SessionContent({ session: initialSession, token }) {
     }
   };
   const changeQuantity = async (quantity) => {
-    if (quantity < 1 || quantity > (session.checkout.product.maxPerOrder || 1000) || busy || payment) return;
+    if (quantity < 1 || quantity > (checkoutProduct?.maxPerOrder || 1000) || busy || payment) return;
     setBusy(true); setError('');
     try { const result = await setPublicCheckoutQuantity(session.publicId, token, quantity); setSession(result.session); if (selectedShipping) setSelectedShipping(current => current ? { ...current, subtotalCents: result.update.totalCents, discountCents: result.update.discountCents, grandTotalCents: result.update.grandTotalCents } : current); }
     catch (requestError) { setError(requestError.message); }
@@ -1139,7 +1142,7 @@ function SessionContent({ session: initialSession, token }) {
                       item.variantSnapshot !== "Default Title" && (
                         <span>{item.variantSnapshot}</span>
                       )}
-                    {!item.isOrderBump && session.source === 'DIRECT' ? <div className="public-quantity" aria-label={copy.quantity}><button type="button" onClick={()=>changeQuantity(item.quantity-1)} disabled={busy||Boolean(payment)||item.quantity<=1} aria-label="−">−</button><b>{item.quantity}</b><button type="button" onClick={()=>changeQuantity(item.quantity+1)} disabled={busy||Boolean(payment)||item.quantity>=(session.checkout.product.maxPerOrder||1000)} aria-label="+">+</button></div> : <small>{copy.quantity}: {item.quantity}</small>}
+                    {!item.isOrderBump && session.source === 'DIRECT' ? <div className="public-quantity" aria-label={copy.quantity}><button type="button" onClick={()=>changeQuantity(item.quantity-1)} disabled={busy||Boolean(payment)||item.quantity<=1} aria-label="−">−</button><b>{item.quantity}</b><button type="button" onClick={()=>changeQuantity(item.quantity+1)} disabled={busy||Boolean(payment)||item.quantity>=(checkoutProduct?.maxPerOrder||1000)} aria-label="+">+</button></div> : <small>{copy.quantity}: {item.quantity}</small>}
                     <small>
                       {money.format(item.unitPriceCents / 100)} {copy.perUnit}
                     </small>

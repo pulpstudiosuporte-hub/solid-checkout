@@ -214,7 +214,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
   }
 
   async getPublicCheckoutSession(publicId: string, tokenHash: string, now: Date): Promise<object | null> {
-    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { publicId: true, source: true, quantity: true, unitPriceCents: true, totalCents: true, discountCents: true, couponCode: true, shippingPriceCents: true, currency: true, status: true, expiresAt: true, customerCapturedAt: true, shippingCapturedAt: true, checkout: { select: { storeId: true, slug: true, name: true, publishedConfig: true, store: { select: { name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, fulfillmentType: true, imageUrl: true, maxPerOrder: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true, isOrderBump: true, product: { select: { publicId: true } } } } } });
+    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, checkout: { store: { customDomain: { is: { status: 'ACTIVE' } } } } }, select: { publicId: true, source: true, quantity: true, unitPriceCents: true, totalCents: true, discountCents: true, couponCode: true, shippingPriceCents: true, currency: true, status: true, expiresAt: true, customerCapturedAt: true, shippingCapturedAt: true, checkout: { select: { storeId: true, slug: true, name: true, publishedConfig: true, store: { select: { name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, fulfillmentType: true, imageUrl: true, maxPerOrder: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true, isOrderBump: true, product: { select: { publicId: true } } } } } });
     if (!session) return null;
     const config = session.checkout.publishedConfig as Record<string, unknown>;
     const configured = configuredOrderBumps(config);
@@ -311,7 +311,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
 
   async createShopifyCartSession(input: ShopifyCartSessionInput): Promise<object | null> {
     return this.database.$transaction(async transaction => {
-      const connection = await transaction.shopifyConnection.findFirst({ where: { shopDomain: input.shopDomain, revokedAt: null, store: { active: true } }, select: { storeId: true, store: { select: { slug: true } } } });
+      const connection = await transaction.shopifyConnection.findFirst({ where: { shopDomain: input.shopDomain, revokedAt: null, store: { active: true, customDomain: { is: { status: 'ACTIVE' } } } }, select: { storeId: true, store: { select: { slug: true } } } });
       if (!connection) return null;
       let checkout = await transaction.checkout.findFirst({ where: { storeId: connection.storeId, mode: 'SHOPIFY_CART', isDefault: true, status: 'PUBLISHED', archivedAt: null }, select: { id: true, publishedConfig: true } });
       // Compatibilidade temporária: instalações antigas ainda enviam o slug do

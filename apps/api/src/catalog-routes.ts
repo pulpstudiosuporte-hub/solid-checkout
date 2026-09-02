@@ -234,6 +234,7 @@ export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvi
   app.post<{ Body: Record<string, unknown> }>('/checkouts', async (request, reply) => {
     const context = await authenticate(request, true);
     if (!context || !canWrite(context)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    if (catalog.hasActiveDomain && !(await catalog.hasActiveDomain(context))) return reply.code(409).send(errorBody(request, 'DOMAIN_REQUIRED', 'Ative um domínio seguro antes de criar um checkout.'));
     const name = text(request.body?.name, 120); const slug = text(request.body?.slug, 80); const mode = request.body?.mode === 'SHOPIFY_CART' ? 'SHOPIFY_CART' : 'DIRECT_LINK'; const productPublicId = text(request.body?.productId, 32);
     const draftConfig = request.body?.draftConfig === undefined ? {} : request.body.draftConfig;
     if (!name || !slug || mode === 'DIRECT_LINK' && !productPublicId || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || typeof draftConfig !== 'object' || draftConfig === null || Array.isArray(draftConfig) || JSON.stringify(draftConfig).length > 100_000) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Dados do checkout inválidos.'));
@@ -264,7 +265,7 @@ export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvi
     if (database && !await storeOnboardingComplete(database, context.storeId, environment.APP_ENCRYPTION_KEY)) return reply.code(403).send(errorBody(request, 'STORE_ONBOARDING_REQUIRED', 'Complete os dados da loja e do responsável em Configurações antes de publicar o checkout.'));
     const selected = (await catalog.listCheckouts(context) as readonly { publicId?: string; mode?: string }[]).find(item => item.publicId === checkoutId);
     if (!selected) return reply.code(404).send(errorBody(request, 'CHECKOUT_NOT_FOUND', 'Checkout não encontrado.'));
-    if (selected.mode !== 'SHOPIFY_CART' && catalog.hasActiveDomain && !(await catalog.hasActiveDomain(context))) return reply.code(409).send(errorBody(request, 'DOMAIN_REQUIRED', 'Ative um domínio seguro para publicar o link do infoproduto.'));
+    if (catalog.hasActiveDomain && !(await catalog.hasActiveDomain(context))) return reply.code(409).send(errorBody(request, 'DOMAIN_REQUIRED', 'Ative um domínio seguro antes de publicar o checkout.'));
     const checkout = await catalog.publishCheckout(context, checkoutId, request.id);
     if (!checkout) return reply.code(404).send(errorBody(request, 'CHECKOUT_NOT_FOUND', 'Checkout não encontrado ou produto indisponível.'));
     return reply.send({ checkout });

@@ -6,9 +6,9 @@ const csp = [
   "img-src 'self' data: blob:", "font-src 'self' https://fonts.gstatic.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   // Vite React Refresh injects a small inline preamble in development.
-  "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
+  "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com",
   "frame-src https://challenges.cloudflare.com",
-  "connect-src 'self' https://challenges.cloudflare.com http://127.0.0.1:3333 ws://127.0.0.1:5173 ws://localhost:5173"
+  "connect-src 'self' https://challenges.cloudflare.com https://cloudflareinsights.com http://127.0.0.1:3333 ws://127.0.0.1:5173 ws://localhost:5173"
 ].join('; ');
 
 export default defineConfig({
