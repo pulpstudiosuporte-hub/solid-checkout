@@ -19,6 +19,7 @@ const optionalUrl = (value: unknown): string | null | undefined => {
 const statuses = ['BACKLOG', 'PLANNED', 'IN_PROGRESS', 'DONE'] as const;
 const categories = ['NEWS', 'IMPROVEMENT', 'FIX', 'INTEGRATION', 'SECURITY'] as const;
 const automaticReleases = [
+  { publicId: 'auto-20260902-full-audit', category: 'SECURITY' as const, title: 'Revisão completa de estabilidade e segurança', description: 'Revalidamos a plataforma com análise estática, auditoria de dependências, 144 testes e build completo. Corrigimos respostas HTTP inválidas, preservamos os cabeçalhos de segurança junto ao cache e tornamos a publicação automática das novidades mais resiliente.', publishedAt: new Date('2026-09-02T04:15:00.000Z') },
   { publicId: 'auto-20260902-domain-checkout-guard', category: 'SECURITY' as const, title: 'Domínio obrigatório e checkout Shopify mais estável', description: 'A SOLID agora exige um domínio ativo antes de criar, publicar ou abrir sessões de checkout. A configuração de domínio ganhou instruções mais claras e verificação automática do CNAME a cada 15 segundos. Também corrigimos carrinhos Shopify com vários produtos, removemos a autenticação administrativa da página pública e liberamos o beacon oficial de métricas da Cloudflare na política de segurança.', publishedAt: new Date('2026-09-02T03:20:00.000Z') },
   { publicId: 'auto-20260902-shopify-theme-code', category: 'FIX' as const, title: 'Ativação da Shopify explicada no tutorial', description: 'O tutorial agora destaca que apps próprios não aparecem em Incorporações de apps e mostra, com o código pronto para copiar, como ativar a ponte da SOLID em layout/theme.liquid.', publishedAt: new Date('2026-09-02T01:15:00.000Z') },
   { publicId: 'auto-20260902-checkout-modes', category: 'IMPROVEMENT' as const, title: 'Checkout automático da Shopify e links para infoprodutos', description: 'Agora você escolhe entre um modelo único que recebe o carrinho real da Shopify ou um link independente vinculado a um infoproduto. O tutorial também ganhou a jornada completa de criação do app, proxy, sincronização, personalização e ativação no tema.', publishedAt: new Date('2026-09-02T00:30:00.000Z') },
@@ -62,11 +63,16 @@ export function registerAdminContentRoutes(app: FastifyInstance, environment: Ap
     return typeof origin === 'string' && environment.CORS_ORIGINS.includes(origin) && typeof header === 'string' && Boolean(cookie) && same(cookie!, header) && same(sha256(header), current.csrfTokenHash);
   };
   const ensureAutomaticReleases = async (): Promise<void> => {
-    const results = await Promise.allSettled(automaticReleases.map(release => db.productRelease.upsert({
-      where: { publicId: release.publicId },
-      create: { ...release, published: true },
-      update: {},
-    })));
+    const results = await Promise.allSettled(automaticReleases.map(release => {
+      const publicId = release.publicId.length <= 32
+        ? release.publicId
+        : `${release.publicId.slice(0, 23)}-${sha256(release.publicId).slice(0, 8)}`;
+      return db.productRelease.upsert({
+        where: { publicId },
+        create: { ...release, publicId, published: true },
+        update: {},
+      });
+    }));
     results.forEach((result, index) => {
       if (result.status === 'rejected') app.log.error({ err: result.reason, publicId: automaticReleases[index]?.publicId }, 'automatic_release_upsert_failed');
     });

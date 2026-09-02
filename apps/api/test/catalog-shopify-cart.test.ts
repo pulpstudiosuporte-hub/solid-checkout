@@ -34,7 +34,8 @@ describe('sessão de carrinho Shopify', () => {
 
     expect(result).toMatchObject({ publicId: 'session-shopify', storeSlug: 'loja' });
     expect(create).toHaveBeenCalledOnce();
-    expect(create.mock.calls[0]?.[0].data).toMatchObject({
+    const [createInput] = create.mock.calls[0] as [{ data: Record<string, unknown> }];
+    expect(createInput.data).toMatchObject({
       quantity: 3,
       totalCents: 16_800,
       items: { create: [{ variantId: 'variant-id', quantity: 3, totalCents: 16_800 }] }

@@ -23,6 +23,27 @@ describe('API foundation', () => {
     const body = errorResponseSchema.parse(response.json());
     expect(response.statusCode).toBe(404); expect(body.error).toMatchObject({ code: 'NOT_FOUND' }); expect(body.error.requestId).toBeTruthy();
   });
+  it('preserva erros de requisicao sem transforma-los em falha interna', async () => {
+    const app = buildApp(env);
+    const malformed = await app.inject({
+      method: 'POST',
+      url: '/missing',
+      headers: { 'content-type': 'application/json' },
+      payload: '{',
+    });
+    const oversized = await app.inject({
+      method: 'POST',
+      url: '/missing',
+      headers: { 'content-type': 'application/json' },
+      payload: JSON.stringify({ value: 'x'.repeat(1_048_576) }),
+    });
+    await app.close();
+
+    expect(malformed.statusCode).toBe(400);
+    expect(malformed.json()).toMatchObject({ error: { code: 'BAD_REQUEST' } });
+    expect(oversized.statusCode).toBe(413);
+    expect(oversized.json()).toMatchObject({ error: { code: 'PAYLOAD_TOO_LARGE' } });
+  });
   it('gera request id no servidor e ignora valores enviados pelo cliente', async () => {
     const app = buildApp(env);
     const accepted = await app.inject({ method: 'GET', url: '/missing', headers: { 'x-request-id': 'checkout:request-123' } });

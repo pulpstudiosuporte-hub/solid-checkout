@@ -150,6 +150,43 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
     await reply.code(404).send(body);
   });
   app.setErrorHandler(async (error, request, reply) => {
+    const candidate = error as Error & { statusCode?: unknown };
+    const errorStatusCode = candidate.statusCode;
+    const statusCode = typeof errorStatusCode === 'number' && errorStatusCode >= 400 && errorStatusCode < 500
+      ? errorStatusCode
+      : 500;
+    if (statusCode < 500) {
+      request.log.warn({ err: error, requestId: request.id }, 'request_rejected');
+      const codes: Record<number, string> = {
+        400: 'BAD_REQUEST',
+        401: 'UNAUTHORIZED',
+        403: 'FORBIDDEN',
+        404: 'NOT_FOUND',
+        409: 'CONFLICT',
+        413: 'PAYLOAD_TOO_LARGE',
+        415: 'UNSUPPORTED_MEDIA_TYPE',
+        422: 'VALIDATION_ERROR',
+        429: 'RATE_LIMITED',
+      };
+      const messages: Record<number, string> = {
+        400: 'A requisição enviada é inválida.',
+        401: 'Autenticação necessária.',
+        403: 'Acesso negado.',
+        404: 'Recurso não encontrado.',
+        409: 'A solicitação conflita com o estado atual.',
+        413: 'O conteúdo enviado excede o limite permitido.',
+        415: 'Formato de conteúdo não suportado.',
+        422: 'Revise os dados enviados.',
+        429: 'Muitas requisições. Tente novamente mais tarde.',
+      };
+      return reply.code(statusCode).send({
+        error: {
+          code: codes[statusCode] ?? 'REQUEST_REJECTED',
+          message: messages[statusCode] ?? 'Não foi possível aceitar a solicitação.',
+          requestId: request.id,
+        },
+      });
+    }
     request.log.error({ err: error, requestId: request.id }, 'request_failed');
     const body: ErrorResponse = { error: { code: 'INTERNAL_ERROR', message: 'Não foi possível concluir a solicitação.', requestId: request.id } };
     await reply.code(500).send(body);
