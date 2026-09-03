@@ -10,9 +10,11 @@ import {
   ChevronDown,
   LoaderCircle,
   MapPin,
+  QrCode,
   ShieldCheck,
   ShoppingBag,
   Truck,
+  Upload,
   UserRound,
 } from "lucide-react";
 import {
@@ -356,8 +358,22 @@ const formatBrazilianMobile = (value) => {
 const validBrazilianMobile = (value) => /^\d{2}9\d{8}$/.test(onlyDigits(value).replace(/^55(?=\d{11}$)/, ""));
 const formatCpf = (value) => onlyDigits(value).slice(0, 11).replace(/^(\d{3})(\d)/, "$1.$2").replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d)/, ".$1-$2");
 const validCpf = (value) => { const cpf = onlyDigits(value); if (!/^\d{11}$/.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false; const digit = (length) => { let sum = 0; for (let index = 0; index < length; index += 1) sum += Number(cpf[index]) * (length + 1 - index); const mod = sum % 11; return mod < 2 ? 0 : 11 - mod; }; return digit(9) === Number(cpf[9]) && digit(10) === Number(cpf[10]); };
-const emailSuggestions = (value) => { const [local = ""] = String(value || "").split("@"); if (!local.trim()) return []; return ["gmail.com", "hotmail.com", "outlook.com", "icloud.com", "yahoo.com.br"].map((domain) => `${local.trim()}@${domain}`); };
+const emailSuggestions = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  const separator = normalized.indexOf("@");
+  const local = (separator >= 0 ? normalized.slice(0, separator) : normalized).trim();
+  const typedDomain = separator >= 0 ? normalized.slice(separator + 1) : "";
+  if (!local || /\s/.test(local)) return [];
+  return ["gmail.com", "hotmail.com", "outlook.com", "icloud.com", "yahoo.com.br"]
+    .filter((domain) => !typedDomain || domain.startsWith(typedDomain))
+    .map((domain) => `${local}@${domain}`)
+    .filter((suggestion) => suggestion !== normalized);
+};
 const shippingLogo = (name) => { const normalized = String(name || "").toLowerCase(); if (normalized.includes("sedex")) return "/shipping/sedex.webp"; if (normalized.includes("pac")) return "/shipping/pac.png"; if (normalized.includes("full")) return "/shipping/full.webp"; return ""; };
+
+function BrazilFlag() {
+  return <svg className="brazil-flag" viewBox="0 0 28 20" role="img" aria-label="Brasil"><rect width="28" height="20" rx="3" fill="#159447"/><path d="M14 3 24 10 14 17 4 10Z" fill="#f7d117"/><circle cx="14" cy="10" r="4" fill="#2455a4"/></svg>;
+}
 
 function PublicRegionElements({ config, region, elementId, style }) {
   const elements = (
@@ -590,6 +606,8 @@ function SessionContent({ session: initialSession, token }) {
   const [couponMessage, setCouponMessage] = useState("");
   const [couponOpen, setCouponOpen] = useState(Boolean(session.couponCode));
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [emailSuggestionOpen, setEmailSuggestionOpen] = useState(false);
+  const [receiptName, setReceiptName] = useState("");
   const [socialProofMessages, setSocialProofMessages] = useState([]);
   const [postalStatus, setPostalStatus] = useState({
     type: "idle",
@@ -597,7 +615,6 @@ function SessionContent({ session: initialSession, token }) {
   });
   const lastPostalCode = useRef("");
   const numberInput = useRef(null);
-  const automaticPixCpf = useRef("");
   useEffect(() => {
     const postalCode = address.postalCode.replace(/\D/g, "");
     if (postalCode.length !== 8 || postalCode === lastPostalCode.current)
@@ -655,6 +672,9 @@ function SessionContent({ session: initialSession, token }) {
   const metaData = { value: session.totalCents / 100, currency: session.currency || 'BRL', content_type: 'product', content_ids: items.map(item => item.product?.publicId || item.productId).filter(Boolean), contents: items.map(item => ({ id: item.product?.publicId || item.productId || item.titleSnapshot, quantity: item.quantity, item_price: item.unitPriceCents / 100 })), num_items: itemCount };
   useEffect(() => { const controller = new AbortController(); getPublicMetaConfig(session.publicId, token, controller.signal).then(({ pixelId }) => { if (!pixelId) return; setMetaPixelId(pixelId); loadMetaPixel(pixelId); trackMeta('PageView', {}, `${session.publicId}:PageView`); trackMeta('ViewContent', metaData, `${session.publicId}:ViewContent`); trackMeta('InitiateCheckout', metaData, `${session.publicId}:InitiateCheckout`); }).catch(() => {}); return () => controller.abort(); }, [session.publicId, token]); // eslint-disable-line react-hooks/exhaustive-deps
   const config = publicConfig(session.checkout?.publishedConfig);
+  const availableOrderBumps = config.showBump
+    ? (session.orderBumps || (session.orderBump ? [session.orderBump] : []))
+    : [];
   useCheckoutSeo(config, session.checkout);
   useEffect(() => {
     if (!config.socialProofEnabled) {
@@ -685,6 +705,7 @@ function SessionContent({ session: initialSession, token }) {
   }, [config.socialProofEnabled, session.publicId, token]);
   const copy = checkoutLanguage(config.language);
   const money = checkoutMoney(config);
+  const paymentExpiry = useExpiry(payment?.expiresAt || session.expiresAt);
   const summaryTotal =
     selectedShipping?.grandTotalCents ??
     session.totalCents - (session.discountCents || 0);
@@ -795,15 +816,9 @@ function SessionContent({ session: initialSession, token }) {
     }
     setBusy(true); setError("");
     try { await savePublicCheckoutCustomer(session.publicId, token, form); const result = await createWestPayPix(session.publicId, token); setPayment(result.payment); if (metaPixelId) trackMeta('AddPaymentInfo', { ...metaData, value: result.payment.amountCents / 100 }, `${session.publicId}:AddPaymentInfo`); }
-    catch (requestError) { automaticPixCpf.current = ""; setError(requestError.message); }
+    catch (requestError) { setError(requestError.message); }
     finally { setBusy(false); }
   };
-  useEffect(() => {
-    const cpf = onlyDigits(form.document);
-    if (step !== 4 || payment || busy || !validCpf(cpf) || automaticPixCpf.current === cpf) return undefined;
-    const timeout = window.setTimeout(() => { automaticPixCpf.current = cpf; generatePix(); }, 450);
-    return () => window.clearTimeout(timeout);
-  }, [form.document, step, payment, busy]); // eslint-disable-line react-hooks/exhaustive-deps
   const copyPix = async () => { await navigator.clipboard.writeText(payment.pixCode); setCopied(true); window.setTimeout(() => setCopied(false), 1800); };
   if (String(payment?.status).toUpperCase() === "PAID") {
     return <ThankYouPage session={session} items={items} itemCount={itemCount} selectedShipping={selectedShipping} payment={payment} config={config} delivery={delivery} />;
@@ -884,24 +899,29 @@ function SessionContent({ session: initialSession, token }) {
                       placeholder="Ex.: Maria da Silva"
                     />
                   </label>
-                  <label>
+                  <label className="email-autocomplete">
                     {copy.email}
                     <input
                       aria-label={copy.email}
                       type="email"
                       autoComplete="email"
                       value={form.email}
-                      onChange={(event) => update("email", event.target.value)}
-                      list="checkout-email-suggestions"
+                      onChange={(event) => { update("email", event.target.value); setEmailSuggestionOpen(true); }}
+                      onFocus={() => setEmailSuggestionOpen(true)}
+                      onBlur={() => window.setTimeout(() => setEmailSuggestionOpen(false), 120)}
+                      onKeyDown={(event) => { if (event.key === "Escape") setEmailSuggestionOpen(false); }}
+                      aria-autocomplete="list"
+                      aria-expanded={emailSuggestionOpen && emailSuggestions(form.email).length > 0}
+                      aria-controls="checkout-email-suggestions"
                       placeholder="Ex.: maria@email.com"
                     />
-                    <datalist id="checkout-email-suggestions">{emailSuggestions(form.email).map((email) => <option value={email} key={email}/>)}</datalist>
+                    {emailSuggestionOpen && emailSuggestions(form.email).length > 0 && <span className="email-suggestion-list" id="checkout-email-suggestions" role="listbox" aria-label="Sugestões de e-mail">{emailSuggestions(form.email).map((email) => <button type="button" role="option" aria-selected="false" key={email} onMouseDown={(event) => event.preventDefault()} onClick={() => { update("email", email); setEmailSuggestionOpen(false); }}>{email}</button>)}</span>}
                   </label>
                   <div className="customer-field-grid single-phone-field">
                     <label>
                       {copy.phone}
-                      <span className="phone-input-shell"><b>+55</b><input aria-label={copy.phone} inputMode="tel" autoComplete="tel-national" value={form.phone} onChange={(event) => update("phone", formatBrazilianMobile(event.target.value))} placeholder="(00) 90000-0000" /></span>
-                      {form.phone && !validBrazilianMobile(form.phone) && <small className="field-hint error">Informe DDD e celular com 9 dígitos.</small>}
+                      <span className="phone-input-shell"><span className="phone-country"><BrazilFlag/><b>+55</b></span><input aria-label={copy.phone} inputMode="tel" autoComplete="tel-national" value={form.phone} onChange={(event) => update("phone", formatBrazilianMobile(event.target.value))} placeholder="(11) 92222-2222" /></span>
+                      {form.phone && !validBrazilianMobile(form.phone) && <small className="field-hint error">Informe o DDD e um celular começando com 9.</small>}
                     </label>
                   </div>
                   {config.showCoupon && (
@@ -943,13 +963,6 @@ function SessionContent({ session: initialSession, token }) {
                   )}
                 </div>
               </div>
-              {config.showBump && (session.orderBumps || (session.orderBump ? [session.orderBump] : [])).map((bump) => <label className="public-order-bump" key={bump.publicId}>
-                <input aria-label={`${copy.specialOffer}: ${bump.checkoutTitle}`} type="checkbox" checked={Boolean(session.items?.some(item => item.isOrderBump && item.product?.publicId === bump.publicId))} disabled={busy} onChange={(event) => toggleOrderBump(bump.publicId, event.target.checked)} />
-                <span className="public-order-bump-check"><Check size={14} /></span>
-                {bump.imageUrl ? <img src={bump.imageUrl} alt="" /> : <span className="public-order-bump-image"><ShoppingBag size={18}/></span>}
-                <span><b>{bump.offerTitle || config.orderBumpTitle || copy.specialOffer}</b><strong>{bump.checkoutTitle}</strong>{descriptionText(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription) && <small>{descriptionText(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription)}</small>}</span>
-                <em>+ {money.format(bump.priceCents / 100)}</em>
-              </label>)}
               {error && (
                 <p className="public-error" role="alert">
                   {error}
@@ -1157,14 +1170,36 @@ function SessionContent({ session: initialSession, token }) {
             </div>
           ) : (
             <div className="next-step-placeholder payment-step">
-              <span>
+              <span className="payment-step-icon">
                 <CreditCard size={25} />
               </span>
               <p className="eyebrow">{copy.payment.toUpperCase()}</p>
-              {!payment && <div className="payment-cpf-card"><label htmlFor="checkout-payment-cpf">CPF do pagador</label><input id="checkout-payment-cpf" aria-label="CPF do pagador" inputMode="numeric" autoComplete="off" value={form.document} onChange={(event) => { automaticPixCpf.current = ""; update("document", formatCpf(event.target.value)); }} placeholder="000.000.000-00" maxLength="14"/><small className={form.document ? (validCpf(form.document) ? "success" : "error") : ""}>{form.document ? (validCpf(form.document) ? "CPF válido. Gerando o Pix automaticamente…" : "Digite os 11 números do CPF.") : "O Pix será gerado ao informar o último dígito."}</small></div>}
-              {payment && String(payment.status).toUpperCase() !== "PAID" && <div className="pix-qr-code"><QRCodeSVG value={payment.pixCode} size={188} level="M" includeMargin aria-label="QR Code para pagamento Pix" /></div>}
-              <h1>{String(payment?.status).toUpperCase() === 'PAID' ? copy.paymentConfirmed : payment ? copy.payPix : copy.readyPay}</h1>
-              {String(payment?.status).toUpperCase() === 'PAID' ? <div className="payment-confirmed" role="status"><CheckCircle2 size={38}/><p>{copy.paymentReceived}</p>{config.successUrl && config.successUrl !== '#' && <a className="customer-continue" href={config.successUrl}>{copy.continue} <ArrowRight size={19}/></a>}</div> : payment ? <><p>{copy.payInstructions}</p><strong className="real-pix-total">{money.format(payment.amountCents / 100)}</strong><textarea className="pix-copy-code" aria-label="Código Pix copia e cola" readOnly value={payment.pixCode}/><button type="button" className="customer-continue" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? copy.copied : copy.copyPix}</button>{payment.expiresAt && <small className="pix-expiration">{copy.validUntil} {new Intl.DateTimeFormat(config.language === 'es' ? 'es-ES' : config.language || 'pt-BR', { timeStyle: 'short' }).format(new Date(payment.expiresAt))}</small>}</> : <><p>{copy.readyHelp}</p><button type="button" className="customer-continue" onClick={generatePix} disabled={busy || !validCpf(form.document)}>{busy ? <LoaderCircle className="spin" size={18}/> : copy.generatePix} <ArrowRight size={19}/></button></>}
+              {String(payment?.status).toUpperCase() === 'PAID' ? <><h1>{copy.paymentConfirmed}</h1><div className="payment-confirmed" role="status"><CheckCircle2 size={38}/><p>{copy.paymentReceived}</p>{config.successUrl && config.successUrl !== '#' && <a className="customer-continue" href={config.successUrl}>{copy.continue} <ArrowRight size={19}/></a>}</div></> : payment ? <div className="pix-payment-panel">
+                <h1>Quase lá...</h1>
+                <p>Pague seu Pix dentro de <strong>{paymentExpiry.label}</strong><br/>para garantir sua compra.</p>
+                <span className="pix-status-pill">Aguardando pagamento <i/><i/><i/></span>
+                <section className="pix-payment-card">
+                  <p>Valor do Pix: <strong>{money.format(payment.amountCents / 100)}</strong></p>
+                  <button type="button" className="customer-continue pix-copy-button" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? copy.copied : copy.copyPix}</button>
+                  <p className="pix-bank-warning">Alguns bancos podem exibir alertas de segurança ao pagar via Pix para novos recebedores. Essa é uma medida preventiva e não indica problema na transação.</p>
+                  <div className="pix-how-to"><h2>Como pagar o Pix:</h2><ol><li><b>1</b> Copie o código Pix</li><li><b>2</b> Abra seu banco e escolha Pix Copia e Cola</li><li><b>3</b> Cole o código e confirme o pagamento de {money.format(payment.amountCents / 100)}</li></ol></div>
+                  <details className="pix-qr-details"><summary><QrCode size={17}/> Pagar com QR Code</summary><div className="pix-qr-code"><QRCodeSVG value={payment.pixCode} size={188} level="M" includeMargin aria-label="QR Code para pagamento Pix" /></div></details>
+                  <div className="pix-processor"><small>Pix processado por</small><strong>Pagamento seguro</strong></div>
+                  <details className="pix-receipt"><summary>Já pagou o Pix? <span><Upload size={16}/> Enviar comprovante</span></summary><label><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(event) => setReceiptName(event.target.files?.[0]?.name || "")}/><span>{receiptName || "Selecionar comprovante"}</span><small>O pagamento continua sendo confirmado automaticamente.</small></label></details>
+                </section>
+              </div> : <>
+                <h1>{copy.readyPay}</h1>
+                <p>{copy.readyHelp}</p>
+                {availableOrderBumps.length > 0 && <section className="payment-order-bumps" aria-labelledby="payment-order-bumps-title"><div className="payment-order-bumps-title"><span>OFERTAS EXCLUSIVAS</span><h2 id="payment-order-bumps-title">Complete seu pedido</h2><p>Você pode adicionar mais de uma oferta antes de gerar o Pix.</p></div>{availableOrderBumps.map((bump) => <label className="public-order-bump" key={bump.publicId}>
+                  <input aria-label={`${copy.specialOffer}: ${bump.checkoutTitle}`} type="checkbox" checked={Boolean(session.items?.some(item => item.isOrderBump && item.product?.publicId === bump.publicId))} disabled={busy} onChange={(event) => toggleOrderBump(bump.publicId, event.target.checked)} />
+                  <span className="public-order-bump-check"><Check size={14} /></span>
+                  {bump.imageUrl ? <img src={bump.imageUrl} alt="" /> : <span className="public-order-bump-image"><ShoppingBag size={18}/></span>}
+                  <span><b>{bump.offerTitle || config.orderBumpTitle || copy.specialOffer}</b><strong>{bump.checkoutTitle}</strong>{descriptionText(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription) && <small>{descriptionText(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription)}</small>}</span>
+                  <em>+ {money.format(bump.priceCents / 100)}</em>
+                </label>)}</section>}
+                <div className="payment-cpf-card"><label htmlFor="checkout-payment-cpf">CPF do pagador</label><input id="checkout-payment-cpf" aria-label="CPF do pagador" inputMode="numeric" autoComplete="off" value={form.document} onChange={(event) => update("document", formatCpf(event.target.value))} placeholder="000.000.000-00" maxLength="14"/><small className={form.document ? (validCpf(form.document) ? "success" : "error") : ""}>{form.document ? (validCpf(form.document) ? "CPF válido. Você já pode gerar o Pix." : "Digite um CPF válido com 11 números.") : "O CPF é coletado somente agora, antes de finalizar."}</small></div>
+                <button type="button" className={`customer-continue effect-${config.buttonEffect}`} onClick={generatePix} disabled={busy || !validCpf(form.document)}>{busy ? <LoaderCircle className="spin" size={18}/> : copy.generatePix} <ArrowRight size={19}/></button>
+              </>}
               {error && <p className="public-error" role="alert">{error}</p>}
               {String(payment?.status).toUpperCase() !== 'PAID' && <button type="button" onClick={() => setStep(requiresShipping ? 3 : 1)}>
                 {requiresShipping ? copy.backShipping : copy.backData}

@@ -805,3 +805,68 @@
 .public-checkout-grid.summary-device-mobile{grid-template-columns:1fr}
 @media(max-width:700px){.checkout-device-desktop{display:none!important}.checkout-device-mobile{display:revert!important}.session-summary-column.checkout-device-mobile{display:grid!important}}
 .single-phone-field{grid-template-columns:minmax(0,1fr)!important}.phone-input-shell{display:grid!important;grid-template-columns:auto minmax(0,1fr);align-items:center;border:1px solid var(--public-input-border);border-radius:var(--public-input-radius);background:var(--public-input-bg);overflow:hidden}.phone-input-shell>b{padding:0 12px;border-right:1px solid var(--public-input-border);color:var(--public-text);font-size:13px}.phone-input-shell>input{border:0!important;border-radius:0!important;box-shadow:none!important}.field-hint{display:block;margin-top:6px;font-weight:500}.field-hint.error,.payment-cpf-card small.error{color:#c62828!important}.payment-cpf-card{width:min(100%,440px);display:grid;gap:7px;text-align:left;margin:12px auto 18px;padding:16px;border:1px solid var(--public-border);border-radius:var(--public-radius);background:var(--public-card)}.payment-cpf-card label{font-weight:700}.payment-cpf-card input{width:100%}.payment-cpf-card small{color:var(--public-muted)}.payment-cpf-card small.success{color:#078653!important}.public-shipping-logo{display:block;width:34px;height:26px;object-fit:contain}.public-shipping-options>button>span:has(.public-shipping-logo){background:#fff;border:1px solid var(--public-border)}
+
+/* Checkout completion: e-mail suggestions, Brazilian phone and a guided Pix payment. */
+.email-autocomplete{position:relative;z-index:3}
+.email-suggestion-list{position:absolute;z-index:20;top:calc(100% + 5px);right:0;left:0;display:grid;overflow:hidden;border:1px solid var(--public-border);border-radius:calc(var(--public-input-radius) * .85);background:var(--public-card);box-shadow:0 14px 34px rgba(25,20,48,.14)}
+.email-suggestion-list button{min-height:44px;border:0;border-bottom:1px solid var(--public-border);background:transparent;padding:0 14px;color:var(--public-text);font:inherit;font-size:12px;text-align:left;cursor:pointer}
+.email-suggestion-list button:last-child{border-bottom:0}
+.email-suggestion-list button:hover,.email-suggestion-list button:focus-visible{outline:0;background:color-mix(in srgb,var(--public-primary) 9%,var(--public-card));color:var(--public-primary)}
+.phone-input-shell{min-height:48px}
+.phone-country{height:100%;display:flex;align-items:center;gap:7px;padding:0 11px;border-right:1px solid var(--public-input-border);white-space:nowrap}
+.phone-country b{color:var(--public-text);font-size:12px}
+.brazil-flag{width:22px;height:auto;flex:none;box-shadow:0 0 0 1px rgba(0,0,0,.08)}
+
+.payment-step{width:100%;max-width:720px;margin-inline:auto;padding-inline:clamp(0px,2vw,18px)}
+.payment-step>.payment-step-icon{display:grid;width:58px;height:58px;margin:0 auto 10px;border-radius:50%;place-items:center;background:color-mix(in srgb,var(--public-primary) 12%,var(--public-card));color:var(--public-primary)}
+.payment-step>h1{margin:10px 0 7px;font-size:clamp(24px,4vw,34px)}
+.payment-step>p{margin:0 auto 18px;max-width:500px;line-height:1.55}
+.payment-order-bumps{width:100%;margin:24px auto 20px;text-align:left}
+.payment-order-bumps-title{margin-bottom:13px;text-align:center}
+.payment-order-bumps-title>span{color:var(--public-primary);font-size:9px;font-weight:850;letter-spacing:.12em}
+.payment-order-bumps-title h2{margin:5px 0 3px;font-size:19px}
+.payment-order-bumps-title p{margin:0!important;font-size:11px}
+.payment-order-bumps .public-order-bump{grid-template-columns:22px 68px minmax(0,1fr) auto;min-height:104px;margin:10px 0;border-style:dashed;background:var(--public-card);text-align:left}
+.payment-order-bumps .public-order-bump img,.payment-order-bumps .public-order-bump-image{width:68px;height:68px}
+.payment-order-bumps .public-order-bump small{white-space:normal}
+
+.payment-cpf-card{max-width:520px;margin-top:22px;padding:18px}
+.payment-cpf-card input{min-height:48px;font-size:16px}
+.payment-step>.customer-continue{width:min(100%,520px)}
+.pix-payment-panel{width:100%;max-width:500px;margin-inline:auto;text-align:center}
+.pix-payment-panel>h1{margin:8px 0 6px;font-size:clamp(26px,5vw,36px)}
+.pix-payment-panel>p{margin:0 0 14px;color:var(--public-muted);font-size:14px;line-height:1.5}
+.pix-payment-panel>p strong{color:var(--public-text);font-variant-numeric:tabular-nums}
+.pix-status-pill{display:inline-flex;align-items:center;gap:5px;min-height:36px;margin:0 auto 18px;border-radius:999px;background:color-mix(in srgb,#f5c542 14%,var(--public-card));padding:0 18px;color:color-mix(in srgb,#8b5d00 86%,var(--public-text));font-size:12px;font-weight:750}
+.pix-status-pill i{width:5px;height:5px;border-radius:50%;background:currentColor;animation:pix-dot 1.2s ease-in-out infinite}
+.pix-status-pill i:nth-child(2){animation-delay:.16s}.pix-status-pill i:nth-child(3){animation-delay:.32s}
+.pix-payment-card{overflow:hidden;border:1px solid var(--public-border);border-radius:var(--public-radius);background:var(--public-card);padding:22px;box-shadow:0 14px 34px rgba(25,20,48,.08);text-align:left}
+.pix-payment-card>p:first-child{text-align:center;font-size:13px}.pix-payment-card>p:first-child strong{color:#078653}
+.pix-copy-button{width:100%!important;max-width:none!important;margin:13px 0 17px!important}
+.pix-bank-warning{margin:0!important;border-bottom:1px dashed var(--public-border);padding:0 6px 18px 28px!important;color:var(--public-muted)!important;font-size:11px!important;line-height:1.5!important;position:relative}
+.pix-bank-warning:before{content:"i";position:absolute;left:4px;top:1px;width:15px;height:15px;display:grid;place-items:center;border:1px solid var(--public-primary);border-radius:50%;color:var(--public-primary);font-size:9px;font-weight:800}
+.pix-how-to{padding:18px 5px;border-bottom:1px dashed var(--public-border)}
+.pix-how-to h2{margin:0 0 12px;font-size:13px}
+.pix-how-to ol{display:grid;gap:9px;margin:0;padding:0;list-style:none}
+.pix-how-to li{display:flex;align-items:center;gap:9px;color:var(--public-muted);font-size:11px}
+.pix-how-to li b{width:20px;height:20px;display:grid;flex:none;place-items:center;border-radius:50%;background:color-mix(in srgb,var(--public-primary) 14%,var(--public-card));color:var(--public-primary);font-size:10px}
+.pix-qr-details{border-bottom:1px dashed var(--public-border);padding:13px 5px}
+.pix-qr-details summary{min-height:38px;display:flex;align-items:center;justify-content:center;gap:7px;color:var(--public-text);font-size:12px;font-weight:750;cursor:pointer}
+.pix-processor{display:grid;gap:4px;padding:16px 0;text-align:center}.pix-processor small{color:var(--public-muted);font-size:9px}.pix-processor strong{font-size:11px}
+.pix-receipt{border:1px solid var(--public-border);border-radius:calc(var(--public-radius) * .8);background:color-mix(in srgb,var(--public-text) 2%,var(--public-card));padding:12px}
+.pix-receipt>summary{display:grid;gap:8px;text-align:center;color:var(--public-text);font-size:11px;font-weight:750;cursor:pointer}
+.pix-receipt>summary span{min-height:44px;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--public-border);border-radius:9px;background:var(--public-card);font-size:12px}
+.pix-receipt>label{display:grid;gap:6px;margin-top:10px;text-align:center}.pix-receipt input{position:absolute;width:1px;height:1px;overflow:hidden;opacity:0}.pix-receipt label>span{min-height:44px;display:grid;place-items:center;border:1px dashed var(--public-primary);border-radius:9px;color:var(--public-primary);font-size:11px;cursor:pointer}.pix-receipt label>small{color:var(--public-muted);font-size:9px}
+@keyframes pix-dot{0%,100%{opacity:.3;transform:translateY(0)}50%{opacity:1;transform:translateY(-2px)}}
+
+@media(max-width:560px){
+  .payment-step{padding-inline:0}
+  .payment-step>.payment-step-icon{width:50px;height:50px}
+  .payment-step>h1{font-size:25px}
+  .payment-order-bumps .public-order-bump{grid-template-columns:20px 56px minmax(0,1fr);padding:12px}
+  .payment-order-bumps .public-order-bump img,.payment-order-bumps .public-order-bump-image{width:56px;height:56px}
+  .payment-order-bumps .public-order-bump em{grid-column:3;margin-top:4px}
+  .pix-payment-card{padding:17px 14px}
+  .phone-country{padding-inline:9px}
+}
+@media(prefers-reduced-motion:reduce){.pix-status-pill i{animation:none}}
