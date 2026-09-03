@@ -597,6 +597,7 @@ function SessionContent({ session: initialSession, token }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [shippingOptions, setShippingOptions] = useState([]);
+  const [shippingQuoted, setShippingQuoted] = useState(false);
   const [selectedShipping, setSelectedShipping] = useState(null);
   const [payment, setPayment] = useState(null);
   const [metaPixelId, setMetaPixelId] = useState('');
@@ -713,6 +714,12 @@ function SessionContent({ session: initialSession, token }) {
   const layoutOrder = (kind, id) => layoutPositions.get(`${kind}:${id}`) ?? 1;
   const update = (field, value) =>
     setForm((current) => ({ ...current, [field]: value }));
+  const updateAddress = (field, value) => {
+    setAddress((current) => ({ ...current, [field]: value }));
+    setShippingQuoted(false);
+    setShippingOptions([]);
+    setSelectedShipping(null);
+  };
   const toggleOrderBump = async (productId, enabled) => {
     setBusy(true);
     setError("");
@@ -771,7 +778,12 @@ function SessionContent({ session: initialSession, token }) {
     setError("");
     try {
       await savePublicCheckoutShipping(session.publicId, token, address);
-      setStep(3);
+      const { items: methods } = await getPublicShippingMethods(
+        session.publicId,
+        token,
+      );
+      setShippingOptions(methods);
+      setShippingQuoted(true);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -878,7 +890,7 @@ function SessionContent({ session: initialSession, token }) {
           />
         ))}
       <div
-        className={`public-checkout-grid summary-device-${config.summaryDevice || 'all'} ${config.showSummary ? "" : "without-summary"}`}
+        className={`public-checkout-grid summary-device-${config.summaryDevice || 'all'} ${config.showSummary ? "" : "without-summary"} ${payment ? "pix-generated-grid" : ""}`}
         style={{order:layoutOrder('block','content')}}
       >
         <section className="customer-step">
@@ -1016,13 +1028,12 @@ function SessionContent({ session: initialSession, token }) {
                         .slice(0, 8);
                       if (value.length < 8) lastPostalCode.current = "";
                       setPostalStatus({ type: "idle", message: "" });
-                      setAddress((current) => ({
-                        ...current,
-                        postalCode:
-                          value.length > 5
-                            ? `${value.slice(0, 5)}-${value.slice(5)}`
-                            : value,
-                      }));
+                      updateAddress(
+                        "postalCode",
+                        value.length > 5
+                          ? `${value.slice(0, 5)}-${value.slice(5)}`
+                          : value,
+                      );
                     }}
                     placeholder="00000-000"
                     aria-describedby="postal-code-status"
@@ -1046,12 +1057,7 @@ function SessionContent({ session: initialSession, token }) {
                     aria-label={copy.street}
                     autoComplete="address-line1"
                     value={address.street}
-                    onChange={(event) =>
-                      setAddress((current) => ({
-                        ...current,
-                        street: event.target.value,
-                      }))
-                    }
+                    onChange={(event) => updateAddress("street", event.target.value)}
                     placeholder="Nome da rua"
                   />
                 </label>
@@ -1062,12 +1068,7 @@ function SessionContent({ session: initialSession, token }) {
                       aria-label={copy.number}
                       ref={numberInput}
                       value={address.number}
-                      onChange={(event) =>
-                        setAddress((current) => ({
-                          ...current,
-                          number: event.target.value,
-                        }))
-                      }
+                      onChange={(event) => updateAddress("number", event.target.value)}
                       placeholder="123"
                     />
                   </label>
@@ -1077,12 +1078,7 @@ function SessionContent({ session: initialSession, token }) {
                       aria-label={copy.complement}
                       autoComplete="address-line2"
                       value={address.complement}
-                      onChange={(event) =>
-                        setAddress((current) => ({
-                          ...current,
-                          complement: event.target.value,
-                        }))
-                      }
+                      onChange={(event) => updateAddress("complement", event.target.value)}
                       placeholder="Apto, bloco..."
                     />
                   </label>
@@ -1092,12 +1088,7 @@ function SessionContent({ session: initialSession, token }) {
                   <input
                     aria-label={copy.district}
                     value={address.neighborhood}
-                    onChange={(event) =>
-                      setAddress((current) => ({
-                        ...current,
-                        neighborhood: event.target.value,
-                      }))
-                    }
+                    onChange={(event) => updateAddress("neighborhood", event.target.value)}
                     placeholder="Bairro"
                   />
                 </label>
@@ -1108,12 +1099,7 @@ function SessionContent({ session: initialSession, token }) {
                       aria-label={copy.city}
                       autoComplete="address-level2"
                       value={address.city}
-                      onChange={(event) =>
-                        setAddress((current) => ({
-                          ...current,
-                          city: event.target.value,
-                        }))
-                      }
+                      onChange={(event) => updateAddress("city", event.target.value)}
                       placeholder="Cidade"
                     />
                   </label>
@@ -1124,41 +1110,94 @@ function SessionContent({ session: initialSession, token }) {
                       autoComplete="address-level1"
                       maxLength="2"
                       value={address.state}
-                      onChange={(event) =>
-                        setAddress((current) => ({
-                          ...current,
-                          state: event.target.value.toUpperCase(),
-                        }))
-                      }
+                      onChange={(event) => updateAddress("state", event.target.value.toUpperCase())}
                       placeholder="SP"
                     />
                   </label>
                 </div>
               </div>
+              {shippingQuoted && (
+                <section className="inline-shipping-methods" aria-labelledby="shipping-methods-title">
+                  <div className="inline-shipping-heading">
+                    <div>
+                      <h2 id="shipping-methods-title">Formas de entrega</h2>
+                      <p>Escolha a melhor opção para o seu endereço.</p>
+                    </div>
+                    <button type="submit" disabled={busy}>Recalcular</button>
+                  </div>
+                  {shippingOptions.length === 0 ? (
+                    <div className="shipping-loading">
+                      <ShoppingBag />
+                      <b>{copy.unavailable}</b>
+                    </div>
+                  ) : (
+                    <div className="public-shipping-options">
+                      {shippingOptions.map((method) => {
+                        const logo = shippingLogo(method.name);
+                        return (
+                          <button
+                            type="button"
+                            key={method.publicId}
+                            onClick={() => chooseShipping(method)}
+                            disabled={busy}
+                          >
+                            <span>
+                              {logo ? (
+                                <img className="public-shipping-logo" src={logo} alt="" />
+                              ) : (
+                                <Truck size={20} />
+                              )}
+                            </span>
+                            <div>
+                              <b>{method.name}</b>
+                              <small>
+                                <Clock3 size={13} />{" "}
+                                {method.minDays === method.maxDays
+                                  ? `${method.minDays} ${copy.businessDays}`
+                                  : `${method.minDays}–${method.maxDays} ${copy.businessDays}`}
+                              </small>
+                            </div>
+                            <strong>
+                              {method.priceCents === 0
+                                ? copy.free
+                                : money.format(method.priceCents / 100)}
+                            </strong>
+                            <ArrowRight size={18} />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+              )}
               {error && (
                 <p className="public-error" role="alert">
                   {error}
                 </p>
               )}
-              <button
-                className={`customer-continue effect-${config.buttonEffect}`}
-                type="submit"
-                disabled={!addressValid || !expiry.remaining || busy}
-              >
-                {busy ? (
-                  <LoaderCircle className="spin" size={18} />
-                ) : (
-                  copy.continueShipping
+              <div className="delivery-form-actions">
+                <button
+                  className="customer-back"
+                  type="button"
+                  onClick={() => setStep(1)}
+                >
+                  {copy.backIdentification}
+                </button>
+                {!shippingQuoted && (
+                  <button
+                    className={`customer-continue effect-${config.buttonEffect}`}
+                    type="submit"
+                    disabled={!addressValid || !expiry.remaining || busy}
+                  >
+                    {busy ? (
+                      <LoaderCircle className="spin" size={18} />
+                    ) : (
+                      "Calcular entrega"
+                    )}
+                    <ArrowRight size={19} />
+                  </button>
                 )}
-                <ArrowRight size={19} />
-              </button>
-              <button
-                className="customer-back"
-                type="button"
-                onClick={() => setStep(1)}
-              >
-                {copy.backIdentification}
-              </button>
+              </div>
             </form>
           ) : step === 3 ? (
             <div className="shipping-step">
@@ -1170,27 +1209,45 @@ function SessionContent({ session: initialSession, token }) {
             </div>
           ) : (
             <div className="next-step-placeholder payment-step">
-              <span className="payment-step-icon">
-                <CreditCard size={25} />
-              </span>
-              <p className="eyebrow">{copy.payment.toUpperCase()}</p>
               {String(payment?.status).toUpperCase() === 'PAID' ? <><h1>{copy.paymentConfirmed}</h1><div className="payment-confirmed" role="status"><CheckCircle2 size={38}/><p>{copy.paymentReceived}</p>{config.successUrl && config.successUrl !== '#' && <a className="customer-continue" href={config.successUrl}>{copy.continue} <ArrowRight size={19}/></a>}</div></> : payment ? <div className="pix-payment-panel">
-                <h1>Quase lá...</h1>
-                <p>Pague seu Pix dentro de <strong>{paymentExpiry.label}</strong><br/>para garantir sua compra.</p>
-                <span className="pix-status-pill">Aguardando pagamento <i/><i/><i/></span>
+                <section className="pix-payment-intro">
+                  <h1>Quase lá...</h1>
+                  <p>Pague seu Pix dentro de <strong>{paymentExpiry.label}</strong><br/>para garantir sua compra.</p>
+                  <span className="pix-status-pill">Aguardando pagamento <i/><i/><i/></span>
+                </section>
                 <section className="pix-payment-card">
-                  <p>Valor do Pix: <strong>{money.format(payment.amountCents / 100)}</strong></p>
-                  <button type="button" className="customer-continue pix-copy-button" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? copy.copied : copy.copyPix}</button>
-                  <p className="pix-bank-warning">Alguns bancos podem exibir alertas de segurança ao pagar via Pix para novos recebedores. Essa é uma medida preventiva e não indica problema na transação.</p>
-                  <div className="pix-how-to"><h2>Como pagar o Pix:</h2><ol><li><b>1</b> Copie o código Pix</li><li><b>2</b> Abra seu banco e escolha Pix Copia e Cola</li><li><b>3</b> Cole o código e confirme o pagamento de {money.format(payment.amountCents / 100)}</li></ol></div>
-                  <details className="pix-qr-details"><summary><QrCode size={17}/> Pagar com QR Code</summary><div className="pix-qr-code"><QRCodeSVG value={payment.pixCode} size={188} level="M" includeMargin aria-label="QR Code para pagamento Pix" /></div></details>
+                  <div className="pix-desktop-qr">
+                    <p>Abra seu aplicativo de pagamento e escolha <b>Ler QR Code</b></p>
+                    <span><QrCode size={16}/> Aponte a câmera do seu celular</span>
+                    <div className="pix-qr-code"><QRCodeSVG value={payment.pixCode} size={226} level="M" includeMargin aria-label="QR Code para pagamento Pix" /></div>
+                  </div>
+                  <p className="pix-payment-value">Valor do Pix: <strong>{money.format(payment.amountCents / 100)}</strong></p>
+                  <div className="pix-mobile-instructions">
+                    <button type="button" className="customer-continue pix-copy-button" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? copy.copied : copy.copyPix}</button>
+                    <p className="pix-bank-warning">Alguns bancos podem exibir alertas de segurança ao pagar via Pix para novos recebedores. Essa é uma medida preventiva e não indica problema na transação.</p>
+                    <div className="pix-how-to"><h2>Como pagar o Pix:</h2><ol><li><b>1</b> Copie o código Pix</li><li><b>2</b> Abra seu banco e escolha Pix Copia e Cola</li><li><b>3</b> Cole o código e confirme o pagamento de {money.format(payment.amountCents / 100)}</li></ol></div>
+                  </div>
                   <div className="pix-processor"><small>Pix processado por</small><strong>Pagamento seguro</strong></div>
-                  <details className="pix-receipt"><summary>Já pagou o Pix? <span><Upload size={16}/> Enviar comprovante</span></summary><label><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(event) => setReceiptName(event.target.files?.[0]?.name || "")}/><span>{receiptName || "Selecionar comprovante"}</span><small>O pagamento continua sendo confirmado automaticamente.</small></label></details>
+                  <details className="pix-receipt"><summary>Já pagou o Pix? <span><Upload size={16}/> Enviar comprovante <ChevronDown size={15}/></span></summary><label><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(event) => setReceiptName(event.target.files?.[0]?.name || "")}/><span>{receiptName || "Selecionar comprovante"}</span><small>O pagamento continua sendo confirmado automaticamente.</small></label></details>
+                </section>
+                <section className="pix-copy-alternative">
+                  <p>Você também pode pagar escolhendo a opção <b>Pix Copia e Cola</b> no seu aplicativo de pagamento ou Internet Banking. Copie o código no botão abaixo:</p>
+                  <button type="button" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? copy.copied : "Copiar código"}</button>
                 </section>
               </div> : <>
-                <h1>{copy.readyPay}</h1>
-                <p>{copy.readyHelp}</p>
-                {availableOrderBumps.length > 0 && <section className="payment-order-bumps" aria-labelledby="payment-order-bumps-title"><div className="payment-order-bumps-title"><span>OFERTAS EXCLUSIVAS</span><h2 id="payment-order-bumps-title">Complete seu pedido</h2><p>Escolha as ofertas que deseja adicionar antes de gerar o Pix.</p></div><div className="payment-order-bump-list">{availableOrderBumps.map((bump) => {
+                <header className="payment-section-heading">
+                  <div>
+                    <h1>{copy.payment}</h1>
+                    <p>Escolha a forma de pagamento.</p>
+                  </div>
+                </header>
+                <section className="pix-method-card" aria-label="Pix selecionado">
+                  <span className="pix-method-icon"><QrCode size={22}/></span>
+                  <div><b>PIX</b><small>Pagamento instantâneo</small></div>
+                  <span className="pix-method-benefits"><em><Check size={12}/> Aprovação imediata</em><em>Pagamento seguro</em></span>
+                  <CheckCircle2 size={20}/>
+                </section>
+                {availableOrderBumps.length > 0 && <section className="payment-order-bumps" aria-labelledby="payment-order-bumps-title"><div className="payment-order-bumps-title"><span>OFERTAS EXCLUSIVAS</span><h2 id="payment-order-bumps-title">Complete seu pedido</h2><p>Você pode adicionar mais de uma oferta antes de gerar o Pix.</p><em>Você tem {availableOrderBumps.length} {availableOrderBumps.length === 1 ? "oferta" : "ofertas"}</em></div><div className="payment-order-bump-list">{availableOrderBumps.map((bump) => {
                   const selected = Boolean(session.items?.some(item => item.isOrderBump && item.product?.publicId === bump.publicId));
                   const hasDiscount = Number(bump.compareAtCents) > Number(bump.priceCents);
                   const discount = hasDiscount ? Math.round((1 - Number(bump.priceCents) / Number(bump.compareAtCents)) * 100) : 0;
@@ -1205,12 +1262,12 @@ function SessionContent({ session: initialSession, token }) {
                   </label>;
                 })}</div></section>}
                 <div className="payment-cpf-card"><label htmlFor="checkout-payment-cpf">CPF do pagador</label><input id="checkout-payment-cpf" aria-label="CPF do pagador" inputMode="numeric" autoComplete="off" value={form.document} onChange={(event) => update("document", formatCpf(event.target.value))} placeholder="000.000.000-00" maxLength="14"/><small className={form.document ? (validCpf(form.document) ? "success" : "error") : ""}>{form.document ? (validCpf(form.document) ? "CPF válido. Você já pode gerar o Pix." : "Digite um CPF válido com 11 números.") : "O CPF é coletado somente agora, antes de finalizar."}</small></div>
-                <button type="button" className={`customer-continue effect-${config.buttonEffect}`} onClick={generatePix} disabled={busy || !validCpf(form.document)}>{busy ? <LoaderCircle className="spin" size={18}/> : copy.generatePix} <ArrowRight size={19}/></button>
+                <div className="payment-final-actions">
+                  <button className="customer-back" type="button" onClick={() => setStep(requiresShipping ? 2 : 1)}>Voltar</button>
+                  <button type="button" className={`customer-continue effect-${config.buttonEffect}`} onClick={generatePix} disabled={busy || !validCpf(form.document)}>{busy ? <LoaderCircle className="spin" size={18}/> : <><QrCode size={17}/> Gerar Pix</>} </button>
+                </div>
               </>}
               {error && <p className="public-error" role="alert">{error}</p>}
-              {String(payment?.status).toUpperCase() !== 'PAID' && <button type="button" onClick={() => setStep(requiresShipping ? 3 : 1)}>
-                {requiresShipping ? copy.backShipping : copy.backData}
-              </button>}
             </div>
           )}
           <PublicRegionElements config={config} region="main" />

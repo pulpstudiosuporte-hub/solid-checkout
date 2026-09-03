@@ -39,6 +39,14 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: "auto-20260903-premium-checkout-flow",
+    category: "IMPROVEMENT" as const,
+    title: "Entrega e pagamento com uma jornada mais clara",
+    description:
+      "O checkout agora revela as formas de entrega somente depois da validação do endereço, mantém o resumo do pedido visível durante a rolagem no desktop e apresenta o Pix em experiências próprias para computador e celular. A etapa de pagamento também ganhou ofertas mais completas e coleta limpa do CPF apenas antes de gerar o Pix.",
+    publishedAt: new Date("2026-09-03T17:30:00.000Z"),
+  },
+  {
     publicId: "auto-20260903-checkout-flow",
     category: "IMPROVEMENT" as const,
     title: "Checkout mais rápido e logística pronta",
