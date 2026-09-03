@@ -25,9 +25,9 @@ const env: AppEnvironment = { NODE_ENV: 'test', API_HOST: '127.0.0.1', API_PORT:
 const token = 't'.repeat(43);
 beforeEach(() => vi.clearAllMocks());
 
-function fixture() {
+function fixture(document = '49257810810') {
   let paymentState: PaymentState = 'PENDING'; let completedAttempt: Record<string, unknown> | null = null; let confirmations = 0;
-  const customer = encryptSecret(JSON.stringify({ name: 'Cliente Teste', email: 'cliente@example.com', phone: '11999999999', document: '49257810810' }), key);
+  const customer = encryptSecret(JSON.stringify({ name: 'Cliente Teste', email: 'cliente@example.com', phone: '11999999999', document }), key);
   const credentials = { apiKeyEncrypted: encryptSecret('secret-key', key), publicKeyEncrypted: encryptSecret('public-key', key) };
   const context = { id: 'internal-session', publicId: 'session-public', totalCents: 500, discountCents: 0, shippingPriceCents: 0, customerDataEncrypted: customer, shippingAddressEncrypted: null, expiresAt: new Date(Date.now() + 600_000), quantity: 1, unitPriceCents: 500, checkout: { storeId: 'store-a', store: { name: 'Loja' }, product: { id: 'product-internal', checkoutTitle: 'Produto teste', fulfillmentType: 'DIGITAL' } }, items: [{ productId: 'product-internal', titleSnapshot: 'Produto teste', unitPriceCents: 500, quantity: 1 }] };
   const gateway = {
@@ -47,6 +47,16 @@ function fixture() {
 }
 
 describe('fluxo Pix integrado com Roas simulada', () => {
+  it('exige CPF válido somente ao gerar a cobrança', async () => {
+    const test = fixture('');
+    const app = buildApp(env, { catalogRepository: test.catalog, gatewayRepository: test.gateway });
+    const response = await app.inject({ method: 'POST', url: '/public/checkout-sessions/session-public/payments/westpay/pix', headers: { authorization: `Bearer ${token}` } });
+    await app.close();
+    expect(response.statusCode).toBe(409);
+    expect(response.json<{ error: { code: string } }>().error.code).toBe('CPF_REQUIRED');
+    expect(createRoasPix).not.toHaveBeenCalled();
+  });
+
   it('reutiliza a cobrança pendente em chamadas repetidas', async () => {
     createRoasPix.mockResolvedValue({ id: 'roas-transaction', status: 'PENDING', amount: 500, pixCode: 'pix-copia-e-cola' });
     const test = fixture(); const app = buildApp(env, { catalogRepository: test.catalog, gatewayRepository: test.gateway });

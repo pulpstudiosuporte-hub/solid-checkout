@@ -179,6 +179,8 @@ describe('catálogo isolado por loja', () => {
     const headers = { authorization: `Bearer ${'a'.repeat(43)}`, origin };
     const customer = await app.inject({ method: 'PUT', url: '/public/checkout-sessions/session-a/customer', headers, payload: { name: 'Maria da Silva', email: 'maria@example.com', phone: '(11) 99999-9999', document: '529.982.247-25' } });
     expect(customer.statusCode).toBe(200); expect(customer.body).not.toContain('52998224725'); expect(customer.json()).toEqual({ customerCaptured: true, shippingCaptured: false });
+    const customerWithoutCpf = await app.inject({ method: 'PUT', url: '/public/checkout-sessions/session-a/customer', headers, payload: { name: 'Maria da Silva', email: 'maria@example.com', phone: '(11) 99999-9999' } });
+    expect(customerWithoutCpf.statusCode).toBe(200);
     const shipping = await app.inject({ method: 'PUT', url: '/public/checkout-sessions/session-a/shipping', headers, payload: { postalCode: '01310-100', street: 'Avenida Paulista', number: '1000', complement: '', neighborhood: 'Bela Vista', city: 'São Paulo', state: 'SP' } });
     expect(shipping.statusCode).toBe(200); expect(shipping.json()).toEqual({ customerCaptured: true, shippingCaptured: true });
     expect((await app.inject({ method: 'PUT', url: '/public/checkout-sessions/session-a/customer', headers, payload: { name: 'Teste', email: 'x@example.com', phone: '11999999999', document: '111.111.111-11' } })).statusCode).toBe(400);

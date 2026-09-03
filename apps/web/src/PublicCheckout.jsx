@@ -346,6 +346,19 @@ const publicCustomElementRegion = (item) => {
   return "main";
 };
 
+const onlyDigits = (value) => String(value || "").replace(/\D/g, "");
+const formatBrazilianMobile = (value) => {
+  const raw = onlyDigits(value).replace(/^55(?=\d{11}$)/, "").slice(0, 11);
+  if (raw.length <= 2) return raw;
+  if (raw.length <= 7) return `(${raw.slice(0, 2)}) ${raw.slice(2)}`;
+  return `(${raw.slice(0, 2)}) ${raw.slice(2, 7)}-${raw.slice(7)}`;
+};
+const validBrazilianMobile = (value) => /^\d{2}9\d{8}$/.test(onlyDigits(value).replace(/^55(?=\d{11}$)/, ""));
+const formatCpf = (value) => onlyDigits(value).slice(0, 11).replace(/^(\d{3})(\d)/, "$1.$2").replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d)/, ".$1-$2");
+const validCpf = (value) => { const cpf = onlyDigits(value); if (!/^\d{11}$/.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false; const digit = (length) => { let sum = 0; for (let index = 0; index < length; index += 1) sum += Number(cpf[index]) * (length + 1 - index); const mod = sum % 11; return mod < 2 ? 0 : 11 - mod; }; return digit(9) === Number(cpf[9]) && digit(10) === Number(cpf[10]); };
+const emailSuggestions = (value) => { const [local = ""] = String(value || "").split("@"); if (!local.trim()) return []; return ["gmail.com", "hotmail.com", "outlook.com", "icloud.com", "yahoo.com.br"].map((domain) => `${local.trim()}@${domain}`); };
+const shippingLogo = (name) => { const normalized = String(name || "").toLowerCase(); if (normalized.includes("sedex")) return "/shipping/sedex.webp"; if (normalized.includes("pac")) return "/shipping/pac.png"; if (normalized.includes("full")) return "/shipping/full.webp"; return ""; };
+
 function PublicRegionElements({ config, region, elementId, style }) {
   const elements = (
     Array.isArray(config.customElements) ? config.customElements : []
@@ -584,6 +597,7 @@ function SessionContent({ session: initialSession, token }) {
   });
   const lastPostalCode = useRef("");
   const numberInput = useRef(null);
+  const automaticPixCpf = useRef("");
   useEffect(() => {
     const postalCode = address.postalCode.replace(/\D/g, "");
     if (postalCode.length !== 8 || postalCode === lastPostalCode.current)
@@ -707,8 +721,7 @@ function SessionContent({ session: initialSession, token }) {
   const valid =
     form.name.trim().length >= 3 &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) &&
-    form.document.replace(/\D/g, "").length >= 11 &&
-    form.phone.replace(/\D/g, "").length >= 10;
+    validBrazilianMobile(form.phone);
   const addressValid =
     address.postalCode.replace(/\D/g, "").length === 8 &&
     address.street.trim().length >= 3 &&
@@ -776,11 +789,21 @@ function SessionContent({ session: initialSession, token }) {
     finally { setBusy(false); }
   };
   const generatePix = async () => {
+    if (!validCpf(form.document)) {
+      setError("Informe um CPF válido para gerar o Pix.");
+      return;
+    }
     setBusy(true); setError("");
-    try { const result = await createWestPayPix(session.publicId, token); setPayment(result.payment); if (metaPixelId) trackMeta('AddPaymentInfo', { ...metaData, value: result.payment.amountCents / 100 }, `${session.publicId}:AddPaymentInfo`); }
-    catch (requestError) { setError(requestError.message); }
+    try { await savePublicCheckoutCustomer(session.publicId, token, form); const result = await createWestPayPix(session.publicId, token); setPayment(result.payment); if (metaPixelId) trackMeta('AddPaymentInfo', { ...metaData, value: result.payment.amountCents / 100 }, `${session.publicId}:AddPaymentInfo`); }
+    catch (requestError) { automaticPixCpf.current = ""; setError(requestError.message); }
     finally { setBusy(false); }
   };
+  useEffect(() => {
+    const cpf = onlyDigits(form.document);
+    if (step !== 4 || payment || busy || !validCpf(cpf) || automaticPixCpf.current === cpf) return undefined;
+    const timeout = window.setTimeout(() => { automaticPixCpf.current = cpf; generatePix(); }, 450);
+    return () => window.clearTimeout(timeout);
+  }, [form.document, step, payment, busy]); // eslint-disable-line react-hooks/exhaustive-deps
   const copyPix = async () => { await navigator.clipboard.writeText(payment.pixCode); setCopied(true); window.setTimeout(() => setCopied(false), 1800); };
   if (String(payment?.status).toUpperCase() === "PAID") {
     return <ThankYouPage session={session} items={items} itemCount={itemCount} selectedShipping={selectedShipping} payment={payment} config={config} delivery={delivery} />;
@@ -869,30 +892,16 @@ function SessionContent({ session: initialSession, token }) {
                       autoComplete="email"
                       value={form.email}
                       onChange={(event) => update("email", event.target.value)}
+                      list="checkout-email-suggestions"
                       placeholder="Ex.: maria@email.com"
                     />
+                    <datalist id="checkout-email-suggestions">{emailSuggestions(form.email).map((email) => <option value={email} key={email}/>)}</datalist>
                   </label>
-                  <div className="customer-field-grid">
-                    <label>
-                      {copy.document}
-                      <input
-                        aria-label={copy.document}
-                        inputMode="numeric"
-                        value={form.document}
-                        onChange={(event) => update("document", event.target.value)}
-                        placeholder="000.000.000-00"
-                      />
-                    </label>
+                  <div className="customer-field-grid single-phone-field">
                     <label>
                       {copy.phone}
-                      <input
-                        aria-label={copy.phone}
-                        inputMode="tel"
-                        autoComplete="tel"
-                        value={form.phone}
-                        onChange={(event) => update("phone", event.target.value)}
-                        placeholder="(00) 00000-0000"
-                      />
+                      <span className="phone-input-shell"><b>+55</b><input aria-label={copy.phone} inputMode="tel" autoComplete="tel-national" value={form.phone} onChange={(event) => update("phone", formatBrazilianMobile(event.target.value))} placeholder="(00) 90000-0000" /></span>
+                      {form.phone && !validBrazilianMobile(form.phone) && <small className="field-hint error">Informe DDD e celular com 9 dígitos.</small>}
                     </label>
                   </div>
                   {config.showCoupon && (
@@ -1142,7 +1151,7 @@ function SessionContent({ session: initialSession, token }) {
             <div className="shipping-step">
               <p className="eyebrow">{copy.shipping.toUpperCase()}</p><h1>{copy.chooseDelivery}</h1>
               <p className="customer-subtitle">{copy.chooseDeliveryHelp}</p>
-              {busy && shippingOptions.length === 0 ? <div className="shipping-loading"><LoaderCircle className="spin"/> {copy.searching}</div> : shippingOptions.length === 0 ? <div className="shipping-loading"><ShoppingBag/><b>{copy.unavailable}</b></div> : <div className="public-shipping-options">{shippingOptions.map(method => <button type="button" key={method.publicId} onClick={() => chooseShipping(method)} disabled={busy}><span><Truck size={20}/></span><div><b>{method.name}</b><small><Clock3 size={13}/> {method.minDays === method.maxDays ? `${method.minDays} ${copy.businessDays}` : `${method.minDays}–${method.maxDays} ${copy.businessDays}`}</small></div><strong>{method.priceCents === 0 ? copy.free : money.format(method.priceCents / 100)}</strong><ArrowRight size={18}/></button>)}</div>}
+              {busy && shippingOptions.length === 0 ? <div className="shipping-loading"><LoaderCircle className="spin"/> {copy.searching}</div> : shippingOptions.length === 0 ? <div className="shipping-loading"><ShoppingBag/><b>{copy.unavailable}</b></div> : <div className="public-shipping-options">{shippingOptions.map(method => { const logo = shippingLogo(method.name); return <button type="button" key={method.publicId} onClick={() => chooseShipping(method)} disabled={busy}><span>{logo ? <img className="public-shipping-logo" src={logo} alt=""/> : <Truck size={20}/>}</span><div><b>{method.name}</b><small><Clock3 size={13}/> {method.minDays === method.maxDays ? `${method.minDays} ${copy.businessDays}` : `${method.minDays}–${method.maxDays} ${copy.businessDays}`}</small></div><strong>{method.priceCents === 0 ? copy.free : money.format(method.priceCents / 100)}</strong><ArrowRight size={18}/></button>; })}</div>}
               {error && <p className="public-error" role="alert">{error}</p>}
               <button className="customer-back" type="button" onClick={() => setStep(2)}>{copy.backAddress}</button>
             </div>
@@ -1152,9 +1161,10 @@ function SessionContent({ session: initialSession, token }) {
                 <CreditCard size={25} />
               </span>
               <p className="eyebrow">{copy.payment.toUpperCase()}</p>
+              {!payment && <div className="payment-cpf-card"><label htmlFor="checkout-payment-cpf">CPF do pagador</label><input id="checkout-payment-cpf" aria-label="CPF do pagador" inputMode="numeric" autoComplete="off" value={form.document} onChange={(event) => { automaticPixCpf.current = ""; update("document", formatCpf(event.target.value)); }} placeholder="000.000.000-00" maxLength="14"/><small className={form.document ? (validCpf(form.document) ? "success" : "error") : ""}>{form.document ? (validCpf(form.document) ? "CPF válido. Gerando o Pix automaticamente…" : "Digite os 11 números do CPF.") : "O Pix será gerado ao informar o último dígito."}</small></div>}
               {payment && String(payment.status).toUpperCase() !== "PAID" && <div className="pix-qr-code"><QRCodeSVG value={payment.pixCode} size={188} level="M" includeMargin aria-label="QR Code para pagamento Pix" /></div>}
               <h1>{String(payment?.status).toUpperCase() === 'PAID' ? copy.paymentConfirmed : payment ? copy.payPix : copy.readyPay}</h1>
-              {String(payment?.status).toUpperCase() === 'PAID' ? <div className="payment-confirmed" role="status"><CheckCircle2 size={38}/><p>{copy.paymentReceived}</p>{config.successUrl && config.successUrl !== '#' && <a className="customer-continue" href={config.successUrl}>{copy.continue} <ArrowRight size={19}/></a>}</div> : payment ? <><p>{copy.payInstructions}</p><strong className="real-pix-total">{money.format(payment.amountCents / 100)}</strong><textarea className="pix-copy-code" aria-label="Código Pix copia e cola" readOnly value={payment.pixCode}/><button type="button" className="customer-continue" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? copy.copied : copy.copyPix}</button>{payment.expiresAt && <small className="pix-expiration">{copy.validUntil} {new Intl.DateTimeFormat(config.language === 'es' ? 'es-ES' : config.language || 'pt-BR', { timeStyle: 'short' }).format(new Date(payment.expiresAt))}</small>}</> : <><p>{copy.readyHelp}</p><button type="button" className="customer-continue" onClick={generatePix} disabled={busy}>{busy ? <LoaderCircle className="spin" size={18}/> : copy.generatePix} <ArrowRight size={19}/></button></>}
+              {String(payment?.status).toUpperCase() === 'PAID' ? <div className="payment-confirmed" role="status"><CheckCircle2 size={38}/><p>{copy.paymentReceived}</p>{config.successUrl && config.successUrl !== '#' && <a className="customer-continue" href={config.successUrl}>{copy.continue} <ArrowRight size={19}/></a>}</div> : payment ? <><p>{copy.payInstructions}</p><strong className="real-pix-total">{money.format(payment.amountCents / 100)}</strong><textarea className="pix-copy-code" aria-label="Código Pix copia e cola" readOnly value={payment.pixCode}/><button type="button" className="customer-continue" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? copy.copied : copy.copyPix}</button>{payment.expiresAt && <small className="pix-expiration">{copy.validUntil} {new Intl.DateTimeFormat(config.language === 'es' ? 'es-ES' : config.language || 'pt-BR', { timeStyle: 'short' }).format(new Date(payment.expiresAt))}</small>}</> : <><p>{copy.readyHelp}</p><button type="button" className="customer-continue" onClick={generatePix} disabled={busy || !validCpf(form.document)}>{busy ? <LoaderCircle className="spin" size={18}/> : copy.generatePix} <ArrowRight size={19}/></button></>}
               {error && <p className="public-error" role="alert">{error}</p>}
               {String(payment?.status).toUpperCase() !== 'PAID' && <button type="button" onClick={() => setStep(requiresShipping ? 3 : 1)}>
                 {requiresShipping ? copy.backShipping : copy.backData}

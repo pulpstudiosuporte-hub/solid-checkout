@@ -18,7 +18,7 @@ export type OrderRecord = Readonly<{
   completedAt: Date | null;
   trackingParameters?: unknown;
   items: readonly Readonly<{ titleSnapshot: string; variantSnapshot: string | null; quantity: number; imageUrlSnapshot: string | null }>[];
-  paymentAttempts: readonly Readonly<{ publicId: string; provider: string; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; createdAt: Date; paidAt: Date | null; expiresAt: Date | null }>[];
+  paymentAttempts: readonly Readonly<{ publicId: string; provider: string; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; pixCodeEncrypted?: string | null; createdAt: Date; paidAt: Date | null; expiresAt: Date | null }>[];
 }>;
 export interface OrderRepository {
   context(userId: string, sessionId: string): Promise<OrderStoreContext | null>;
@@ -46,7 +46,7 @@ export class PrismaOrderRepository implements OrderRepository {
     publicId: true, status: true, totalCents: true, discountCents: true, couponCode: true, shippingPriceCents: true, currency: true,
     customerDataEncrypted: true, shippingAddressEncrypted: true, shippingMethodName: true, trackingParameters: true, createdAt: true, completedAt: true,
     items: { select: { titleSnapshot: true, variantSnapshot: true, quantity: true, imageUrlSnapshot: true } },
-    paymentAttempts: { where: { providerTransactionId: { not: null } }, orderBy: { createdAt: 'desc' as const }, select: { publicId: true, provider: true, status: true, createdAt: true, paidAt: true, expiresAt: true } }
+    paymentAttempts: { where: { providerTransactionId: { not: null } }, orderBy: { createdAt: 'desc' as const }, select: { publicId: true, provider: true, status: true, pixCodeEncrypted: true, createdAt: true, paidAt: true, expiresAt: true } }
   };
 
   async list(storeId: string, page: number, pageSize: number, filters: OrderListFilters = {}) {

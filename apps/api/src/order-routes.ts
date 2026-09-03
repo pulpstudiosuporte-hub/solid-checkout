@@ -89,6 +89,11 @@ export function registerOrderRoutes(app: FastifyInstance, environment: AppEnviro
     const order = await orders.find(context.storeId, request.params.orderId);
     if (!order) return reply.code(404).send(errorBody(request, 'ORDER_NOT_FOUND', 'Pedido não encontrado.'));
     const attempt = preferredAttempt(order.paymentAttempts);
-    return reply.header('cache-control', 'private, no-store').send({ publicId: order.publicId, status: attempt?.status ?? 'PENDING', sessionStatus: order.status, paymentProvider: attempt?.provider ?? null, paymentPublicId: attempt?.publicId ?? null, totalCents: order.totalCents - (order.discountCents ?? 0) + order.shippingPriceCents, subtotalCents: order.totalCents, discountCents: order.discountCents ?? 0, couponCode: order.couponCode ?? null, shippingPriceCents: order.shippingPriceCents, shippingMethodName: order.shippingMethodName, currency: order.currency, customer: customerForPanel(order.customerDataEncrypted, environment.APP_ENCRYPTION_KEY, request, order.publicId), shippingAddress: addressForPanel(order.shippingAddressEncrypted, environment.APP_ENCRYPTION_KEY, request, order.publicId), items: order.items, createdAt: order.createdAt, paidAt: attempt?.paidAt ?? order.completedAt, expiresAt: attempt?.expiresAt ?? null });
+    let pixCode: string | null = null;
+    if (attempt?.status === 'PENDING' && attempt.pixCodeEncrypted) {
+      try { pixCode = decryptSecret(attempt.pixCodeEncrypted, environment.APP_ENCRYPTION_KEY); }
+      catch (error) { request.log.error({ err: error, orderId: order.publicId }, 'order_pix_decryption_failed'); }
+    }
+    return reply.header('cache-control', 'private, no-store').send({ publicId: order.publicId, status: attempt?.status ?? 'PENDING', sessionStatus: order.status, paymentProvider: attempt?.provider ?? null, paymentPublicId: attempt?.publicId ?? null, pixCode, totalCents: order.totalCents - (order.discountCents ?? 0) + order.shippingPriceCents, subtotalCents: order.totalCents, discountCents: order.discountCents ?? 0, couponCode: order.couponCode ?? null, shippingPriceCents: order.shippingPriceCents, shippingMethodName: order.shippingMethodName, currency: order.currency, customer: customerForPanel(order.customerDataEncrypted, environment.APP_ENCRYPTION_KEY, request, order.publicId), shippingAddress: addressForPanel(order.shippingAddressEncrypted, environment.APP_ENCRYPTION_KEY, request, order.publicId), items: order.items, createdAt: order.createdAt, paidAt: attempt?.paidAt ?? order.completedAt, expiresAt: attempt?.expiresAt ?? null });
   });
 }

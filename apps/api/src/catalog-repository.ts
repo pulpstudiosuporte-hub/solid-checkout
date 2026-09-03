@@ -8,7 +8,7 @@ export type CheckoutInput = Readonly<{ name: string; slug: string; draftConfig: 
 export type CheckoutConfigInput = Readonly<Record<string, unknown>>;
 export type CheckoutSessionInput = Readonly<{ storeSlug: string; checkoutSlug: string; variantPublicId?: string; quantity: number; tokenHash: string; source: 'DIRECT' | 'SHOPIFY'; sourceCartId?: string; trackingParameters?: Record<string, string | null>; expiresAt: Date }>;
 export type ShopifyCartSessionInput = Readonly<{ shopDomain: string; checkoutSlug?: string; lines: readonly Readonly<{ variantId: string; quantity: number }>[]; tokenHash: string; sourceCartId?: string; expiresAt: Date }>;
-export type CheckoutCustomerInput = Readonly<{ encryptedData: string; emailHash: string; documentHash: string }>;
+export type CheckoutCustomerInput = Readonly<{ encryptedData: string; emailHash: string; documentHash: string | null }>;
 export type CheckoutShippingInput = Readonly<{ encryptedData: string }>;
 export type ShippingMethodInput = Readonly<{ name: string; priceCents: number; minDays: number; maxDays: number; active: boolean }>;
 export type ProductListQuery = Readonly<{ search?: string; status?: 'active' | 'inactive'; source?: 'MANUAL' | 'SHOPIFY'; page: number; pageSize: number }>;
@@ -66,7 +66,8 @@ const checkoutSessionExpiry = (publishedConfig: unknown, fallback: Date): Date =
   if (typeof publishedConfig !== 'object' || publishedConfig === null || Array.isArray(publishedConfig)) return fallback;
   const minutes = (publishedConfig as Record<string, unknown>).timerMinutes;
   if (typeof minutes !== 'number' || !Number.isInteger(minutes) || minutes < 1 || minutes > 60) return fallback;
-  return new Date(Date.now() + minutes * 60_000);
+  // The scarcity timer is visual and must never shorten the secure session.
+  return new Date(Date.now() + Math.max(30, minutes) * 60_000);
 };
 
 export class PrismaCatalogRepository implements CatalogRepository {
