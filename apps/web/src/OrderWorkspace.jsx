@@ -116,7 +116,7 @@ function useOrderWorkspace(orderId) {
   return { ...state, refresh: () => setRevision((value) => value + 1) };
 }
 
-function CopyButton({ value, label = "Copiar" }) {
+function CopyButton({ value, label = "Copiar", compact = false }) {
   const [copied, setCopied] = useState(false);
   if (!value) return null;
   const copy = async () => {
@@ -125,9 +125,15 @@ function CopyButton({ value, label = "Copiar" }) {
     window.setTimeout(() => setCopied(false), 1600);
   };
   return (
-    <button type="button" className="ow-copy" onClick={copy}>
+    <button
+      type="button"
+      className={`ow-copy${compact ? " is-compact" : ""}`}
+      onClick={copy}
+      aria-label={copied ? "Copiado" : label}
+      title={copied ? "Copiado" : label}
+    >
       {copied ? <Check size={15} /> : <Copy size={15} />}
-      {copied ? "Copiado" : label}
+      {!compact ? <span>{copied ? "Copiado" : label}</span> : null}
     </button>
   );
 }
@@ -288,7 +294,7 @@ function TransactionsTab({ order }) {
             <span>Referências técnicas do pedido</span>
           </div>
         </header>
-        <div className="ow-facts">
+        <div className="ow-facts ow-facts-transaction">
           <div>
             <span>ID do pedido</span>
             <strong>{order.publicId}</strong>
@@ -376,8 +382,10 @@ function TransactionsTab({ order }) {
           )}
         </section>
         <aside className="card ow-payment-aside">
-          <CreditCard />
-          <span>Pagamento</span>
+          <div className="ow-payment-heading">
+            <CreditCard />
+            <span>Pagamento</span>
+          </div>
           <h3>{order.paymentProvider || "Pix"}</h3>
           <StatusPill value={order.status} />
           {order.pixCode && (
@@ -936,7 +944,7 @@ export default function OrderWorkspace({ orderId, onBack, csrfToken }) {
             <div>
               <div className="ow-title-line">
                 <h1>Pedido {orderCode(order.publicId)}</h1>
-                <CopyButton value={order.publicId} />
+                <CopyButton value={order.publicId} compact />
                 <StatusPill value={order.status} />
                 <span className="ow-mini-pill">
                   {order.source === "SHOPIFY" ? "Shopify" : "Link direto"}
