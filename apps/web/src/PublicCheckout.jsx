@@ -914,6 +914,7 @@ function SessionContent({ session: initialSession, token }) {
                   <label className="email-autocomplete">
                     {copy.email}
                     <input
+                      role="combobox"
                       aria-label={copy.email}
                       type="email"
                       autoComplete="email"
@@ -1000,20 +1001,13 @@ function SessionContent({ session: initialSession, token }) {
               </section>}
             </form>
           ) : step === 2 ? (
-            <form onSubmit={saveShipping} noValidate>
-              <p className="eyebrow">{copy.shipping.toUpperCase()}</p>
-              <h1>{copy.whereDeliver}</h1>
-              <p className="customer-subtitle">{copy.addressHelp}</p>
+            <form className="delivery-step-form" onSubmit={saveShipping} noValidate>
+              <header className="delivery-step-heading">
+                <p className="eyebrow">{copy.shipping.toUpperCase()}</p>
+                <h1>{copy.deliveryAddress}</h1>
+                <p className="customer-subtitle">{copy.addressHelp}</p>
+              </header>
               <div className="customer-form-card">
-                <div className="customer-section-title">
-                  <span>
-                    <MapPin size={19} />
-                  </span>
-                  <div>
-                    <h2>{copy.deliveryAddress}</h2>
-                    <p>{copy.reviewData}</p>
-                  </div>
-                </div>
                 <label>
                   CEP
                   <input
@@ -1208,7 +1202,7 @@ function SessionContent({ session: initialSession, token }) {
               <button className="customer-back" type="button" onClick={() => setStep(2)}>{copy.backAddress}</button>
             </div>
           ) : (
-            <div className="next-step-placeholder payment-step">
+            <div className={`next-step-placeholder payment-step ${payment ? "payment-step-generated" : "payment-step-checkout"}`}>
               {String(payment?.status).toUpperCase() === 'PAID' ? <><h1>{copy.paymentConfirmed}</h1><div className="payment-confirmed" role="status"><CheckCircle2 size={38}/><p>{copy.paymentReceived}</p>{config.successUrl && config.successUrl !== '#' && <a className="customer-continue" href={config.successUrl}>{copy.continue} <ArrowRight size={19}/></a>}</div></> : payment ? <div className="pix-payment-panel">
                 <section className="pix-payment-intro">
                   <h1>Quase lá...</h1>
@@ -1228,7 +1222,7 @@ function SessionContent({ session: initialSession, token }) {
                     <div className="pix-how-to"><h2>Como pagar o Pix:</h2><ol><li><b>1</b> Copie o código Pix</li><li><b>2</b> Abra seu banco e escolha Pix Copia e Cola</li><li><b>3</b> Cole o código e confirme o pagamento de {money.format(payment.amountCents / 100)}</li></ol></div>
                   </div>
                   <div className="pix-processor"><small>Pix processado por</small><strong>Pagamento seguro</strong></div>
-                  <details className="pix-receipt"><summary>Já pagou o Pix? <span><Upload size={16}/> Enviar comprovante <ChevronDown size={15}/></span></summary><label><input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(event) => setReceiptName(event.target.files?.[0]?.name || "")}/><span>{receiptName || "Selecionar comprovante"}</span><small>O pagamento continua sendo confirmado automaticamente.</small></label></details>
+                  <details className="pix-receipt"><summary>Já pagou o Pix? <span><Upload size={16}/> Enviar comprovante <ChevronDown size={15}/></span></summary><label><input type="file" aria-label="Selecionar comprovante de pagamento" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(event) => setReceiptName(event.target.files?.[0]?.name || "")}/><span>{receiptName || "Selecionar comprovante"}</span><small>O pagamento continua sendo confirmado automaticamente.</small></label></details>
                 </section>
                 <section className="pix-copy-alternative">
                   <p>Você também pode pagar escolhendo a opção <b>Pix Copia e Cola</b> no seu aplicativo de pagamento ou Internet Banking. Copie o código no botão abaixo:</p>

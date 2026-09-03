@@ -39,6 +39,14 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: "auto-20260903-checkout-visual-rhythm",
+    category: "IMPROVEMENT" as const,
+    title: "Checkout com nova régua visual",
+    description:
+      "As etapas de entrega e pagamento agora compartilham a mesma largura, hierarquia e espaçamento. Campos, fretes, ofertas, CPF, ações e resumo do pedido também foram refinados para oferecer leitura mais clara, melhor equilíbrio no desktop e uma experiência compacta e confortável no celular.",
+    publishedAt: new Date("2026-09-03T19:30:00.000Z"),
+  },
+  {
     publicId: "auto-20260903-premium-checkout-flow",
     category: "IMPROVEMENT" as const,
     title: "Entrega e pagamento com uma jornada mais clara",
