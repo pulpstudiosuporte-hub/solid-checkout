@@ -1987,3 +1987,25 @@
     border-top: 1px solid var(--public-border);
   }
 }
+
+/* Keep both final payment actions on the same visual ruler. */
+.session-checkout .payment-step-checkout .payment-final-actions {
+  align-items: stretch;
+}
+
+.session-checkout .payment-step-checkout .payment-final-actions > .customer-back,
+.session-checkout .payment-step-checkout .payment-final-actions > .customer-continue {
+  box-sizing: border-box;
+  width: 100%;
+  height: 52px;
+  min-height: 52px;
+  max-height: 52px;
+  margin: 0;
+  padding: 0 18px;
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1;
+}

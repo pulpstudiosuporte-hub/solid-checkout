@@ -39,6 +39,14 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: "auto-20260903-payment-actions-aligned",
+    category: "FIX" as const,
+    title: "Ações de pagamento alinhadas",
+    description:
+      "Os botões Voltar e Gerar Pix agora ocupam colunas iguais e mantêm exatamente a mesma altura no desktop e no celular.",
+    publishedAt: new Date("2026-09-03T23:00:00.000Z"),
+  },
+  {
     publicId: "auto-20260903-payment-data-preserved",
     category: "FIX" as const,
     title: "Pagamento preserva os dados de entrega",
