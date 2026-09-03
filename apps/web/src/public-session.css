@@ -826,9 +826,28 @@
 .payment-order-bumps-title>span{color:var(--public-primary);font-size:9px;font-weight:850;letter-spacing:.12em}
 .payment-order-bumps-title h2{margin:5px 0 3px;font-size:19px}
 .payment-order-bumps-title p{margin:0!important;font-size:11px}
-.payment-order-bumps .public-order-bump{grid-template-columns:22px 68px minmax(0,1fr) auto;min-height:104px;margin:10px 0;border-style:dashed;background:var(--public-card);text-align:left}
-.payment-order-bumps .public-order-bump img,.payment-order-bumps .public-order-bump-image{width:68px;height:68px}
-.payment-order-bumps .public-order-bump small{white-space:normal}
+.payment-order-bump-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.payment-order-bump-list:has(.payment-order-bump-card:only-child){grid-template-columns:minmax(0,440px);justify-content:center}
+.payment-order-bump-card{position:relative;display:flex;min-width:0;flex-direction:column;gap:12px;border:1px dashed color-mix(in srgb,var(--public-text) 58%,var(--public-border));border-radius:calc(var(--public-radius) * .85);background:var(--public-card);padding:14px;color:var(--public-text);cursor:pointer;transition:border-color .16s ease,box-shadow .16s ease,background-color .16s ease}
+.payment-order-bump-card:hover{border-color:var(--public-primary);box-shadow:0 7px 18px color-mix(in srgb,var(--public-primary) 12%,transparent)}
+.payment-order-bump-card:focus-within{outline:3px solid color-mix(in srgb,var(--public-primary) 24%,transparent);outline-offset:2px}
+.payment-order-bump-card.is-selected{border-style:solid;border-color:#10a66a;background:color-mix(in srgb,#10a66a 4%,var(--public-card));box-shadow:0 0 0 1px color-mix(in srgb,#10a66a 22%,transparent)}
+.payment-order-bump-card>input{position:absolute;width:1px;height:1px;overflow:hidden;opacity:0}
+.payment-order-bump-product{display:grid;grid-template-columns:58px minmax(0,1fr);align-items:center;gap:11px;min-width:0}
+.payment-order-bump-product>img,.payment-order-bump-product>.public-order-bump-image{width:58px;height:58px;display:grid;place-items:center;object-fit:cover;border:1px solid var(--public-border);border-radius:9px;background:#fff;color:var(--public-primary)}
+.payment-order-bump-copy{display:grid;min-width:0;gap:5px}
+.payment-order-bump-copy>strong{overflow:hidden;font-size:12px;line-height:1.3;text-overflow:ellipsis}
+.payment-order-bump-price{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.payment-order-bump-price b{color:var(--public-primary);font-size:15px}
+.payment-order-bump-price del{color:var(--public-muted);font-size:9px}
+.payment-order-bump-price em{border-radius:999px;background:color-mix(in srgb,#10a66a 14%,var(--public-card));padding:3px 6px;color:#08794d;font-size:8px;font-style:normal;font-weight:850;white-space:nowrap}
+.payment-order-bump-description{display:grid;gap:5px;min-height:48px;border-top:1px dashed var(--public-border);padding-top:10px}
+.payment-order-bump-description>b{font-size:11px;line-height:1.35;text-transform:uppercase}
+.payment-order-bump-description>small{display:-webkit-box;overflow:hidden;color:var(--public-muted);font-size:10px;line-height:1.4;-webkit-box-orient:vertical;-webkit-line-clamp:3}
+.payment-order-bump-action{min-height:44px;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:auto;border-radius:999px;background:var(--public-button-bg,var(--public-primary));color:var(--public-button-text);font-size:11px;font-weight:850;touch-action:manipulation}
+.payment-order-bump-action .public-order-bump-check{width:16px;height:16px;border-color:currentColor;border-radius:5px;background:transparent;color:transparent}
+.payment-order-bump-card.is-selected .payment-order-bump-action{background:#10a66a;color:#fff}
+.payment-order-bump-card.is-selected .payment-order-bump-check{color:#fff}
 
 .payment-cpf-card{max-width:520px;margin-top:22px;padding:18px}
 .payment-cpf-card input{min-height:48px;font-size:16px}
@@ -863,9 +882,11 @@
   .payment-step{padding-inline:0}
   .payment-step>.payment-step-icon{width:50px;height:50px}
   .payment-step>h1{font-size:25px}
-  .payment-order-bumps .public-order-bump{grid-template-columns:20px 56px minmax(0,1fr);padding:12px}
-  .payment-order-bumps .public-order-bump img,.payment-order-bumps .public-order-bump-image{width:56px;height:56px}
-  .payment-order-bumps .public-order-bump em{grid-column:3;margin-top:4px}
+  .payment-order-bump-list{grid-template-columns:1fr;gap:10px}
+  .payment-order-bump-card{gap:10px;padding:12px}
+  .payment-order-bump-product{grid-template-columns:52px minmax(0,1fr)}
+  .payment-order-bump-product>img,.payment-order-bump-product>.public-order-bump-image{width:52px;height:52px}
+  .payment-order-bump-description{min-height:0}
   .pix-payment-card{padding:17px 14px}
   .phone-country{padding-inline:9px}
 }

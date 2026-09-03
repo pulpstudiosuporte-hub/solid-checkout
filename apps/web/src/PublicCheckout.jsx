@@ -1190,13 +1190,20 @@ function SessionContent({ session: initialSession, token }) {
               </div> : <>
                 <h1>{copy.readyPay}</h1>
                 <p>{copy.readyHelp}</p>
-                {availableOrderBumps.length > 0 && <section className="payment-order-bumps" aria-labelledby="payment-order-bumps-title"><div className="payment-order-bumps-title"><span>OFERTAS EXCLUSIVAS</span><h2 id="payment-order-bumps-title">Complete seu pedido</h2><p>Você pode adicionar mais de uma oferta antes de gerar o Pix.</p></div>{availableOrderBumps.map((bump) => <label className="public-order-bump" key={bump.publicId}>
-                  <input aria-label={`${copy.specialOffer}: ${bump.checkoutTitle}`} type="checkbox" checked={Boolean(session.items?.some(item => item.isOrderBump && item.product?.publicId === bump.publicId))} disabled={busy} onChange={(event) => toggleOrderBump(bump.publicId, event.target.checked)} />
-                  <span className="public-order-bump-check"><Check size={14} /></span>
-                  {bump.imageUrl ? <img src={bump.imageUrl} alt="" /> : <span className="public-order-bump-image"><ShoppingBag size={18}/></span>}
-                  <span><b>{bump.offerTitle || config.orderBumpTitle || copy.specialOffer}</b><strong>{bump.checkoutTitle}</strong>{descriptionText(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription) && <small>{descriptionText(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription)}</small>}</span>
-                  <em>+ {money.format(bump.priceCents / 100)}</em>
-                </label>)}</section>}
+                {availableOrderBumps.length > 0 && <section className="payment-order-bumps" aria-labelledby="payment-order-bumps-title"><div className="payment-order-bumps-title"><span>OFERTAS EXCLUSIVAS</span><h2 id="payment-order-bumps-title">Complete seu pedido</h2><p>Escolha as ofertas que deseja adicionar antes de gerar o Pix.</p></div><div className="payment-order-bump-list">{availableOrderBumps.map((bump) => {
+                  const selected = Boolean(session.items?.some(item => item.isOrderBump && item.product?.publicId === bump.publicId));
+                  const hasDiscount = Number(bump.compareAtCents) > Number(bump.priceCents);
+                  const discount = hasDiscount ? Math.round((1 - Number(bump.priceCents) / Number(bump.compareAtCents)) * 100) : 0;
+                  return <label className={`payment-order-bump-card${selected ? " is-selected" : ""}`} key={bump.publicId}>
+                    <input aria-label={`${copy.specialOffer}: ${bump.checkoutTitle}`} type="checkbox" checked={selected} disabled={busy} onChange={(event) => toggleOrderBump(bump.publicId, event.target.checked)} />
+                    <span className="payment-order-bump-product">
+                      {bump.imageUrl ? <img src={bump.imageUrl} alt="" loading="lazy" /> : <span className="public-order-bump-image"><ShoppingBag size={20}/></span>}
+                      <span className="payment-order-bump-copy"><strong>{bump.checkoutTitle}</strong><span className="payment-order-bump-price"><b>{money.format(bump.priceCents / 100)}</b>{hasDiscount && <><del>{money.format(bump.compareAtCents / 100)}</del><em>{discount}% OFF</em></>}</span></span>
+                    </span>
+                    <span className="payment-order-bump-description"><b>{bump.offerTitle || config.orderBumpTitle || copy.specialOffer}</b>{descriptionText(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription) && <small>{descriptionText(bump.offerMessage || config.orderBumpMessage || bump.checkoutDescription)}</small>}</span>
+                    <span className="payment-order-bump-action"><span className="public-order-bump-check"><Check size={14} /></span>{selected ? "Oferta adicionada" : "Adicionar oferta"}</span>
+                  </label>;
+                })}</div></section>}
                 <div className="payment-cpf-card"><label htmlFor="checkout-payment-cpf">CPF do pagador</label><input id="checkout-payment-cpf" aria-label="CPF do pagador" inputMode="numeric" autoComplete="off" value={form.document} onChange={(event) => update("document", formatCpf(event.target.value))} placeholder="000.000.000-00" maxLength="14"/><small className={form.document ? (validCpf(form.document) ? "success" : "error") : ""}>{form.document ? (validCpf(form.document) ? "CPF válido. Você já pode gerar o Pix." : "Digite um CPF válido com 11 números.") : "O CPF é coletado somente agora, antes de finalizar."}</small></div>
                 <button type="button" className={`customer-continue effect-${config.buttonEffect}`} onClick={generatePix} disabled={busy || !validCpf(form.document)}>{busy ? <LoaderCircle className="spin" size={18}/> : copy.generatePix} <ArrowRight size={19}/></button>
               </>}
