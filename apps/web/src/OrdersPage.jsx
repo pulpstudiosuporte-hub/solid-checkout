@@ -21,6 +21,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { getOrder, getOrders } from "./api";
+import OrderWorkspace from "./OrderWorkspace";
 import "./orders-page.css";
 
 const currency = new Intl.NumberFormat("pt-BR", {
@@ -352,7 +353,7 @@ function Address({ address }) {
   );
 }
 
-function OrderDetail({ orderId, onBack }) {
+function LegacyOrderDetail({ orderId, onBack }) {
   const { loading, error, order } = useOrderDetail(orderId);
   const [copied, setCopied] = useState(false);
   const copyPix = async () => {
@@ -529,7 +530,7 @@ function OrderDetail({ orderId, onBack }) {
   );
 }
 
-export default function OrdersPage({ storeKey }) {
+export default function OrdersPage({ storeKey, csrfToken }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -617,6 +618,7 @@ export default function OrdersPage({ storeKey }) {
       <OrderDetail
         orderId={selectedOrder}
         onBack={() => setSelectedOrder(null)}
+        csrfToken={csrfToken}
       />
     );
   return (
@@ -765,5 +767,15 @@ export default function OrdersPage({ storeKey }) {
         )}
       </section>
     </main>
+  );
+}
+
+function OrderDetail({ orderId, onBack, csrfToken }) {
+  return (
+    <OrderWorkspace
+      orderId={orderId}
+      onBack={onBack}
+      csrfToken={csrfToken}
+    />
   );
 }
