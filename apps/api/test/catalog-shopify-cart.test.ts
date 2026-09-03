@@ -3,6 +3,27 @@ import type { PrismaClient } from '@solid/database';
 import { PrismaCatalogRepository } from '../src/catalog-repository.js';
 
 describe('sessão de carrinho Shopify', () => {
+  it('preserva endereço e frete ao confirmar o CPF no pagamento', async () => {
+    const now = new Date('2026-09-03T22:00:00.000Z');
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    const database = {
+      checkoutSession: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'session-id', shippingCapturedAt: new Date('2026-09-03T21:55:00.000Z') }),
+        updateMany
+      }
+    } as unknown as PrismaClient;
+    const repository = new PrismaCatalogRepository(database);
+
+    const result = await repository.updatePublicCheckoutCustomer('session-public', 'token-hash', now, {
+      encryptedData: 'customer-encrypted', emailHash: 'email-hash', documentHash: 'document-hash'
+    });
+
+    expect(result).toEqual({ customerCaptured: true, shippingCaptured: true });
+    expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.not.objectContaining({ shippingAddressEncrypted: expect.anything(), shippingCapturedAt: expect.anything() })
+    }));
+  });
+
   it('aceita variante disponível com estoque zero e consolida linhas repetidas', async () => {
     const create = vi.fn().mockResolvedValue({
       publicId: 'session-shopify',

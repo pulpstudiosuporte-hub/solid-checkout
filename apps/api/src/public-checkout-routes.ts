@@ -208,7 +208,14 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
   app.post<{ Params: { sessionId: string }; Headers: { authorization?: string } }>('/public/checkout-sessions/:sessionId/payments/westpay/pix', { config: { rateLimit: { max: 5, timeWindow: '5 minutes' } } }, async (request, reply) => {
     if (!gateways || !environment.APP_ENCRYPTION_KEY || !environment.API_PUBLIC_URL) return reply.code(503).send(errorBody(request, 'PAYMENT_NOT_CONFIGURED', 'Pagamento ainda não configurado no servidor.'));
     const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization); if (!credentials) return reply.code(401).send(errorBody(request, 'INVALID_SESSION', 'Sessão inválida.'));
-    const context = await gateways.paymentContext(credentials.sessionId, credentials.tokenHash, new Date()); if (!context) return reply.code(409).send(errorBody(request, 'CHECKOUT_INCOMPLETE', 'Confirme os dados necessários antes do pagamento.'));
+    const context = await gateways.paymentContext(credentials.sessionId, credentials.tokenHash, new Date());
+    if (!context) return reply.code(404).send(errorBody(request, 'SESSION_NOT_FOUND', 'A sessão expirou ou não está mais disponível. Reabra o checkout para continuar.'));
+    if (!context.customerDataEncrypted) return reply.code(409).send(errorBody(request, 'CUSTOMER_REQUIRED', 'Preencha nome, e-mail e celular antes de gerar o Pix.'));
+    const requiresShipping = context.items.length
+      ? context.items.some(item => (item.product?.fulfillmentType ?? 'PHYSICAL') !== 'DIGITAL')
+      : (context.checkout.product?.fulfillmentType ?? 'PHYSICAL') !== 'DIGITAL';
+    if (requiresShipping && !context.shippingAddressEncrypted) return reply.code(409).send(errorBody(request, 'SHIPPING_ADDRESS_REQUIRED', 'Confirme o endereço de entrega antes de gerar o Pix.'));
+    if (requiresShipping && !context.shippingMethodPublicId) return reply.code(409).send(errorBody(request, 'SHIPPING_METHOD_REQUIRED', 'Escolha uma forma de entrega antes de gerar o Pix.'));
     if (database && !await storeOnboardingComplete(database, context.checkout.storeId, environment.APP_ENCRYPTION_KEY)) return reply.code(403).send(errorBody(request, 'STORE_ONBOARDING_REQUIRED', 'Esta loja ainda não concluiu o cadastro obrigatório.'));
     if (!await gateways.billingAccessAllowed(context.checkout.storeId)) return reply.code(402).send(errorBody(request, 'STORE_BILLING_BLOCKED', 'Esta loja está temporariamente indisponível para novos pagamentos.'));
     const providers = await gateways.paymentProviders(context.checkout.storeId); if (!providers.length) return reply.code(409).send(errorBody(request, 'GATEWAY_UNAVAILABLE', 'A loja ainda não configurou um gateway Pix.'));

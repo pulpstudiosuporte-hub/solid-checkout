@@ -39,6 +39,22 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: "auto-20260903-payment-data-preserved",
+    category: "FIX" as const,
+    title: "Pagamento preserva os dados de entrega",
+    description:
+      "Corrigimos a confirmação do CPF para manter o endereço e a forma de entrega já escolhidos. Quando alguma informação realmente estiver pendente, o checkout agora indica exatamente qual dado precisa ser confirmado antes de gerar o Pix.",
+    publishedAt: new Date("2026-09-03T22:30:00.000Z"),
+  },
+  {
+    publicId: "auto-20260903-direct-checkout-payment-layout",
+    category: "IMPROVEMENT" as const,
+    title: "Pagamento refinado nos links diretos",
+    description:
+      "O checkout de link direto ganhou uma etapa de pagamento mais compacta e equilibrada. Pix, ofertas adicionais, CPF e ações agora seguem uma hierarquia mais clara no desktop e no celular, sem alterar a experiência já otimizada da Shopify.",
+    publishedAt: new Date("2026-09-03T21:00:00.000Z"),
+  },
+  {
     publicId: "auto-20260903-checkout-visual-rhythm",
     category: "IMPROVEMENT" as const,
     title: "Checkout com nova régua visual",

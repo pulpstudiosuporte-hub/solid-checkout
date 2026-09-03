@@ -284,8 +284,16 @@ export class PrismaCatalogRepository implements CatalogRepository {
   }
 
   async updatePublicCheckoutCustomer(publicId: string, tokenHash: string, now: Date, input: CheckoutCustomerInput): Promise<object | null> {
-    const result = await this.database.checkoutSession.updateMany({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, data: { customerDataEncrypted: input.encryptedData, customerEmailHash: input.emailHash, customerDocumentHash: input.documentHash, customerCapturedAt: now, shippingAddressEncrypted: null, shippingCapturedAt: null } });
-    return result.count === 1 ? { customerCaptured: true, shippingCaptured: false } : null;
+    const session = await this.database.checkoutSession.findFirst({
+      where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } },
+      select: { id: true, shippingCapturedAt: true }
+    });
+    if (!session) return null;
+    const result = await this.database.checkoutSession.updateMany({
+      where: { id: session.id, status: 'OPEN', expiresAt: { gt: now } },
+      data: { customerDataEncrypted: input.encryptedData, customerEmailHash: input.emailHash, customerDocumentHash: input.documentHash, customerCapturedAt: now }
+    });
+    return result.count === 1 ? { customerCaptured: true, shippingCaptured: Boolean(session.shippingCapturedAt) } : null;
   }
 
   async updatePublicCheckoutShipping(publicId: string, tokenHash: string, now: Date, input: CheckoutShippingInput): Promise<object | null> {

@@ -29,7 +29,7 @@ function fixture(document = '49257810810') {
   let paymentState: PaymentState = 'PENDING'; let completedAttempt: Record<string, unknown> | null = null; let confirmations = 0;
   const customer = encryptSecret(JSON.stringify({ name: 'Cliente Teste', email: 'cliente@example.com', phone: '11999999999', document }), key);
   const credentials = { apiKeyEncrypted: encryptSecret('secret-key', key), publicKeyEncrypted: encryptSecret('public-key', key) };
-  const context = { id: 'internal-session', publicId: 'session-public', totalCents: 500, discountCents: 0, shippingPriceCents: 0, customerDataEncrypted: customer, shippingAddressEncrypted: null, expiresAt: new Date(Date.now() + 600_000), quantity: 1, unitPriceCents: 500, checkout: { storeId: 'store-a', store: { name: 'Loja' }, product: { id: 'product-internal', checkoutTitle: 'Produto teste', fulfillmentType: 'DIGITAL' } }, items: [{ productId: 'product-internal', titleSnapshot: 'Produto teste', unitPriceCents: 500, quantity: 1 }] };
+  const context = { id: 'internal-session', publicId: 'session-public', totalCents: 500, discountCents: 0, shippingPriceCents: 0, customerDataEncrypted: customer, shippingAddressEncrypted: null, shippingMethodPublicId: null, expiresAt: new Date(Date.now() + 600_000), quantity: 1, unitPriceCents: 500, checkout: { storeId: 'store-a', store: { name: 'Loja' }, product: { id: 'product-internal', checkoutTitle: 'Produto teste', fulfillmentType: 'DIGITAL' } }, items: [{ productId: 'product-internal', titleSnapshot: 'Produto teste', unitPriceCents: 500, quantity: 1, product: { fulfillmentType: 'DIGITAL' } }] };
   const gateway = {
     paymentContext: vi.fn().mockResolvedValue(context), primaryProvider: vi.fn().mockResolvedValue('ROAS'), paymentProviders: vi.fn().mockResolvedValue(['ROAS']),
     billingAccessAllowed: vi.fn().mockResolvedValue(true),
@@ -43,10 +43,26 @@ function fixture(document = '49257810810') {
     recordWebhookEvent: vi.fn().mockResolvedValue(undefined),
     confirmPayment: vi.fn((_attemptId: string, _sessionId: string, next: Exclude<PaymentState, 'PENDING'>) => { if (canTransitionPayment(paymentState, next)) { paymentState = next; confirmations += 1; } return Promise.resolve(); })
   };
-  return { gateway: gateway as unknown as PrismaGatewayRepository, catalog: {} as CatalogRepository, counters: () => ({ confirmations, paymentState }), raw: gateway };
+  return { gateway: gateway as unknown as PrismaGatewayRepository, catalog: {} as CatalogRepository, context, counters: () => ({ confirmations, paymentState }), raw: gateway };
 }
 
 describe('fluxo Pix integrado com Roas simulada', () => {
+  it('informa exatamente qual dado está pendente antes do pagamento', async () => {
+    const test = fixture();
+    const physicalItem = { ...test.context.items[0], product: { fulfillmentType: 'PHYSICAL' } };
+    test.raw.paymentContext.mockResolvedValueOnce({ ...test.context, items: [physicalItem], shippingAddressEncrypted: null, shippingMethodPublicId: null });
+    const app = buildApp(env, { catalogRepository: test.catalog, gatewayRepository: test.gateway });
+    const addressResponse = await app.inject({ method: 'POST', url: '/public/checkout-sessions/session-public/payments/westpay/pix', headers: { authorization: `Bearer ${token}` } });
+    test.raw.paymentContext.mockResolvedValueOnce({ ...test.context, items: [physicalItem], shippingAddressEncrypted: encryptSecret(JSON.stringify({ postalCode: '01310100' }), key), shippingMethodPublicId: null });
+    const methodResponse = await app.inject({ method: 'POST', url: '/public/checkout-sessions/session-public/payments/westpay/pix', headers: { authorization: `Bearer ${token}` } });
+    await app.close();
+    expect(addressResponse.statusCode).toBe(409);
+    expect(addressResponse.json<{ error: { code: string } }>().error.code).toBe('SHIPPING_ADDRESS_REQUIRED');
+    expect(methodResponse.statusCode).toBe(409);
+    expect(methodResponse.json<{ error: { code: string } }>().error.code).toBe('SHIPPING_METHOD_REQUIRED');
+    expect(createRoasPix).not.toHaveBeenCalled();
+  });
+
   it('exige CPF válido somente ao gerar a cobrança', async () => {
     const test = fixture('');
     const app = buildApp(env, { catalogRepository: test.catalog, gatewayRepository: test.gateway });

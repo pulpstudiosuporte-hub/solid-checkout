@@ -1846,3 +1846,144 @@
     font-size: 21px;
   }
 }
+
+/* Direct-link checkouts have a shorter, two-step journey. Keep their payment
+   surface compact without changing the Shopify cart checkout. */
+@media (min-width: 901px) {
+  .session-checkout.checkout-source-direct .payment-step-checkout {
+    padding: 28px 30px 30px;
+  }
+
+  .session-checkout.checkout-source-direct .payment-step-checkout .payment-section-heading {
+    margin-bottom: 18px;
+  }
+
+  .session-checkout.checkout-source-direct .payment-step-checkout .pix-method-card {
+    min-height: 78px;
+    padding: 13px 16px;
+  }
+
+  .session-checkout.checkout-source-direct .payment-order-bumps {
+    margin: 26px 0 22px;
+    padding-top: 24px;
+    border-top: 1px solid var(--public-border);
+  }
+
+  .session-checkout.checkout-source-direct .payment-order-bumps-title {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    column-gap: 18px;
+    margin: 0 0 14px;
+    text-align: left;
+  }
+
+  .session-checkout.checkout-source-direct .payment-order-bumps-title > span,
+  .session-checkout.checkout-source-direct .payment-order-bumps-title > h2,
+  .session-checkout.checkout-source-direct .payment-order-bumps-title > p {
+    grid-column: 1;
+  }
+
+  .session-checkout.checkout-source-direct .payment-order-bumps-title h2 {
+    margin: 4px 0 3px;
+    font-size: 21px;
+  }
+
+  .session-checkout.checkout-source-direct .payment-order-bumps-title p {
+    font-size: 12px;
+  }
+
+  .session-checkout.checkout-source-direct .payment-order-bumps-title > em {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: center;
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .session-checkout.checkout-source-direct .payment-order-bump-card {
+    grid-template-columns: minmax(0, 1fr) minmax(150px, 190px);
+    grid-template-rows: auto auto;
+    align-items: center;
+    gap: 10px 18px;
+    padding: 15px 16px;
+  }
+
+  .session-checkout.checkout-source-direct .payment-order-bump-product {
+    grid-column: 1;
+    grid-row: 1;
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .session-checkout.checkout-source-direct .payment-order-bump-product > img,
+  .session-checkout.checkout-source-direct .payment-order-bump-product > .public-order-bump-image {
+    width: 58px;
+    height: 58px;
+  }
+
+  .session-checkout.checkout-source-direct .payment-order-bump-description {
+    grid-column: 1;
+    grid-row: 2;
+    padding-top: 9px;
+  }
+
+  .session-checkout.checkout-source-direct .payment-order-bump-description small {
+    -webkit-line-clamp: 2;
+  }
+
+  .session-checkout.checkout-source-direct .payment-order-bump-action {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    width: 100%;
+    min-height: 46px;
+    margin: 0;
+  }
+
+  .session-checkout.checkout-source-direct .payment-cpf-card {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--public-border);
+  }
+
+  .session-checkout.checkout-source-direct .payment-step-checkout .payment-final-actions {
+    margin-top: 20px;
+  }
+}
+
+@media (max-width: 900px) {
+  .session-checkout.checkout-source-direct .payment-step-checkout {
+    max-width: 680px;
+    margin-inline: auto;
+  }
+
+  .session-checkout.checkout-source-direct .payment-order-bumps-title {
+    margin-bottom: 14px;
+  }
+}
+
+@media (max-width: 700px) {
+  .session-checkout.checkout-source-direct .payment-order-bumps {
+    margin: 24px 0 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--public-border);
+  }
+
+  .session-checkout.checkout-source-direct .payment-order-bumps-title {
+    text-align: left;
+  }
+
+  .session-checkout.checkout-source-direct .payment-order-bumps-title h2 {
+    font-size: 20px;
+  }
+
+  .session-checkout.checkout-source-direct .payment-order-bumps-title > em {
+    margin-top: 9px;
+  }
+
+  .session-checkout.checkout-source-direct .payment-cpf-card {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--public-border);
+  }
+}

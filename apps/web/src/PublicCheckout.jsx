@@ -591,6 +591,8 @@ function SessionContent({ session: initialSession, token }) {
     state: "",
   });
   const requiresShipping = session.checkout?.product?.fulfillmentType !== 'DIGITAL';
+  const checkoutSource = session.source === 'SHOPIFY' ? 'shopify' : 'direct';
+  const checkoutFlow = requiresShipping ? 'shipping' : 'digital';
   const [step, setStep] = useState(
     requiresShipping ? (session.shippingCaptured ? 3 : session.customerCaptured ? 2 : 1) : session.customerCaptured ? 4 : 1,
   );
@@ -837,7 +839,7 @@ function SessionContent({ session: initialSession, token }) {
   }
   return (
     <main
-      className={`public-checkout session-checkout template-${config.template} layout-${config.layout}`}
+      className={`public-checkout session-checkout template-${config.template} layout-${config.layout} checkout-source-${checkoutSource} checkout-flow-${checkoutFlow}`}
       style={configStyle(config)}
     >
       <header>
