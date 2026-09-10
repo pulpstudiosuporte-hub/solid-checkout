@@ -224,7 +224,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     const fallbackProduct = context.checkout.product;
     const paymentItems = context.items.length ? context.items : fallbackProduct ? [{ productId: fallbackProduct.id, titleSnapshot: fallbackProduct.checkoutTitle, unitPriceCents: context.unitPriceCents, quantity: context.quantity, product: { fulfillmentType: fallbackProduct.fulfillmentType } }] : [];
     if (!paymentItems.length) return reply.code(409).send(errorBody(request, 'CHECKOUT_EMPTY', 'O carrinho não possui itens válidos.'));
-    const customer = JSON.parse(decryptSecret(context.customerDataEncrypted!, environment.APP_ENCRYPTION_KEY)) as Record<string, string>; const address = context.shippingAddressEncrypted ? JSON.parse(decryptSecret(context.shippingAddressEncrypted, environment.APP_ENCRYPTION_KEY)) as Record<string, string> : null;
+    const customer = JSON.parse(decryptSecret(context.customerDataEncrypted, environment.APP_ENCRYPTION_KEY)) as Record<string, string>; const address = context.shippingAddressEncrypted ? JSON.parse(decryptSecret(context.shippingAddressEncrypted, environment.APP_ENCRYPTION_KEY)) as Record<string, string> : null;
     if (!validCpf(digits(customer.document))) return reply.code(409).send(errorBody(request, 'CPF_REQUIRED', 'Informe um CPF válido para gerar o Pix.'));
     for (const provider of providers) {
       const encryptedCredentials = await gateways.credentials(context.checkout.storeId, provider); if (!encryptedCredentials) continue;

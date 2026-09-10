@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { createCoupon, deleteCoupon, getCoupons, updateCoupon } from "./api";
+import PaymentDiscountSettings from "./PaymentDiscountSettings";
 
 const empty = {
   code: "",
@@ -472,6 +473,8 @@ export default function CouponsPage({ csrfToken, storeKey }) {
           </button>
         </div>
       </section>
+
+      <PaymentDiscountSettings key={storeKey} csrfToken={csrfToken} />
 
       {state.error && !editing && (
         <p className="public-error" role="alert">

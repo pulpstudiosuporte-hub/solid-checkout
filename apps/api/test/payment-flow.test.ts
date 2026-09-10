@@ -73,6 +73,19 @@ describe('fluxo Pix integrado com Roas simulada', () => {
     expect(createRoasPix).not.toHaveBeenCalled();
   });
 
+  it('envia ao gateway o total após cupom e desconto Pix, mais frete', async () => {
+    const test = fixture();
+    test.raw.paymentContext.mockResolvedValueOnce({ ...test.context, discountCents: 140, shippingPriceCents: 50 });
+    createRoasPix.mockResolvedValue({ id: 'roas-discount', status: 'PENDING', amount: 410, pixCode: 'pix-discount' });
+    const app = buildApp(env, { catalogRepository: test.catalog, gatewayRepository: test.gateway });
+    const response = await app.inject({ method: 'POST', url: '/public/checkout-sessions/session-public/payments/westpay/pix', headers: { authorization: `Bearer ${token}` } });
+    expect(response.statusCode).toBe(201);
+    const [, input] = createRoasPix.mock.calls[0] as [unknown, { amount: number }];
+    expect(input.amount).toBe(410);
+    expect(test.raw.createAttempt).toHaveBeenCalledWith('internal-session', 'ROAS', 410, expect.any(String));
+    await app.close();
+  });
+
   it('reutiliza a cobrança pendente em chamadas repetidas', async () => {
     createRoasPix.mockResolvedValue({ id: 'roas-transaction', status: 'PENDING', amount: 500, pixCode: 'pix-copia-e-cola' });
     const test = fixture(); const app = buildApp(env, { catalogRepository: test.catalog, gatewayRepository: test.gateway });

@@ -19,9 +19,9 @@ describe('sessão de carrinho Shopify', () => {
     });
 
     expect(result).toEqual({ customerCaptured: true, shippingCaptured: true });
-    expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.not.objectContaining({ shippingAddressEncrypted: expect.anything(), shippingCapturedAt: expect.anything() })
-    }));
+    const [updateInput] = updateMany.mock.calls[0] as [{ data: Record<string, unknown> }];
+    expect(updateInput.data).not.toHaveProperty('shippingAddressEncrypted');
+    expect(updateInput.data).not.toHaveProperty('shippingCapturedAt');
   });
 
   it('aceita variante disponível com estoque zero e consolida linhas repetidas', async () => {
@@ -34,6 +34,7 @@ describe('sessão de carrinho Shopify', () => {
       items: []
     });
     const transaction = {
+      paymentDiscount: { findFirst: vi.fn().mockResolvedValue({ percentageBps: 1000, minimumAmountCents: 0, maximumAmountCents: null }) },
       shopifyConnection: { findFirst: vi.fn().mockResolvedValue({ storeId: 'store-id', store: { slug: 'loja' } }) },
       checkout: { findFirst: vi.fn().mockResolvedValue({ id: 'checkout-id', publishedConfig: {} }) },
       productVariant: { findMany: vi.fn().mockResolvedValue([{
@@ -61,5 +62,6 @@ describe('sessão de carrinho Shopify', () => {
       totalCents: 16_800,
       items: { create: [{ variantId: 'variant-id', quantity: 3, totalCents: 16_800 }] }
     });
+    expect(createInput.data).toMatchObject({ discountCents: 1680, paymentDiscountCents: 1680, paymentDiscountRule: { percentageBps: 1000 } });
   });
 });

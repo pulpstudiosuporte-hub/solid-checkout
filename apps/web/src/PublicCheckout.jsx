@@ -711,7 +711,7 @@ function SessionContent({ session: initialSession, token }) {
   const paymentExpiry = useExpiry(payment?.expiresAt || session.expiresAt);
   const summaryTotal =
     selectedShipping?.grandTotalCents ??
-    session.totalCents - (session.discountCents || 0);
+    session.totalCents - (session.discountCents || 0) + (session.shippingPriceCents || 0);
   const layoutPositions = checkoutLayoutPositionMap(config);
   const layoutOrder = (kind, id) => layoutPositions.get(`${kind}:${id}`) ?? 1;
   const update = (field, value) =>
@@ -727,7 +727,7 @@ function SessionContent({ session: initialSession, token }) {
     setError("");
     try {
       const result = await setPublicOrderBump(session.publicId, token, productId, enabled);
-      setSession({ ...result.session, discountCents: result.update.discountCents, couponCode: session.couponCode });
+      setSession({ ...result.session, discountCents: result.update.discountCents, paymentDiscountCents: result.update.paymentDiscountCents, couponCode: session.couponCode });
       if (selectedShipping) setSelectedShipping((current) => current ? { ...current, subtotalCents: result.update.totalCents, grandTotalCents: result.update.grandTotalCents } : current);
     } catch (requestError) {
       setError(requestError.message);
@@ -744,7 +744,7 @@ function SessionContent({ session: initialSession, token }) {
   };
   const applyCoupon = async (event) => {
     event.preventDefault(); setBusy(true); setError(""); setCouponMessage("");
-    try { const { coupon } = await applyPublicCoupon(session.publicId, token, couponCode); setSession(current => ({ ...current, couponCode: coupon.code, discountCents: coupon.discountCents })); if (selectedShipping) setSelectedShipping(current => ({ ...current, discountCents: coupon.discountCents, grandTotalCents: coupon.grandTotalCents })); setCouponMessage(coupon.code ? `Cupom ${coupon.code} aplicado.` : "Cupom removido."); }
+    try { const { coupon } = await applyPublicCoupon(session.publicId, token, couponCode); setSession(current => ({ ...current, couponCode: coupon.code, discountCents: coupon.discountCents, paymentDiscountCents: coupon.paymentDiscountCents })); if (selectedShipping) setSelectedShipping(current => ({ ...current, discountCents: coupon.discountCents, grandTotalCents: coupon.grandTotalCents })); setCouponMessage(coupon.code ? `Cupom ${coupon.code} aplicado.` : "Cupom removido."); }
     catch (requestError) { setCouponMessage(requestError.message); }
     finally { setBusy(false); }
   };
@@ -1352,10 +1352,11 @@ function SessionContent({ session: initialSession, token }) {
                 <span>{copy.shippingCost}</span>
                 <small>{requiresShipping ? (selectedShipping ? (selectedShipping.shippingPriceCents === 0 ? copy.free : money.format(selectedShipping.shippingPriceCents / 100)) : copy.chooseShipping) : copy.notApplicable}</small>
               </div>
-              {session.discountCents > 0 && <div className="coupon-discount"><span>{copy.discount} ({session.couponCode})</span><b>- {money.format(session.discountCents / 100)}</b></div>}
+              {session.discountCents > (session.paymentDiscountCents || 0) && <div className="coupon-discount"><span>{copy.discount} ({session.couponCode})</span><b>- {money.format((session.discountCents - (session.paymentDiscountCents || 0)) / 100)}</b></div>}
+              {session.paymentDiscountCents > 0 && <div className="coupon-discount"><span>{copy.discount} Pix</span><b>- {money.format(session.paymentDiscountCents / 100)}</b></div>}
               <div className="session-grand-total">
                 <span>{copy.total}</span>
-                <strong>{money.format((selectedShipping?.grandTotalCents ?? (session.totalCents - (session.discountCents || 0))) / 100)}</strong>
+                <strong>{money.format((selectedShipping?.grandTotalCents ?? (session.totalCents - (session.discountCents || 0) + (session.shippingPriceCents || 0))) / 100)}</strong>
               </div>
             </div>
             <p className="session-security">
@@ -1400,7 +1401,7 @@ function ThankYouPage({ session, items, itemCount, selectedShipping, payment, co
         <div className="thank-you-items">{items.map((item) => <div key={`${item.titleSnapshot}-${item.variantSnapshot || "default"}`}><span>{item.quantity}× {item.titleSnapshot}</span><strong>{money.format(item.totalCents / 100)}</strong></div>)}</div>
         <div className="thank-you-totals" aria-label="Totais do pagamento">
           <div><span>Subtotal</span><strong>{money.format(subtotal / 100)}</strong></div>
-          {discount > 0 && <div className="discount"><span>Desconto{session.couponCode ? ` (${session.couponCode})` : ''}</span><strong>- {money.format(discount / 100)}</strong></div>}
+          {discount > 0 && <div className="discount"><span>Descontos{session.paymentDiscountCents > 0 ? ' (Pix' + (session.couponCode ? ' + cupom)' : ')') : session.couponCode ? ` (${session.couponCode})` : ''}</span><strong>- {money.format(discount / 100)}</strong></div>}
           {shipping > 0 && <div><span>Frete</span><strong>{money.format(shipping / 100)}</strong></div>}
           <div className="paid"><span>Total pago</span><strong>{money.format(total / 100)}</strong></div>
         </div>

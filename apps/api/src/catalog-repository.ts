@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from '@solid/database';
+import { checkoutDiscounts } from './checkout-discounts.js';
 import { planLimits } from './plan-entitlements.js';
 import { effectiveBilling } from './billing-entitlements.js';
 
@@ -55,12 +56,6 @@ const configuredOrderBumps = (config: Record<string, unknown>): readonly OrderBu
   }) : [];
   if (configured.length) return configured;
   return typeof config.orderBumpProductId === 'string' && /^[A-Za-z0-9_-]{1,32}$/.test(config.orderBumpProductId) ? [{ productId: config.orderBumpProductId, title: typeof config.orderBumpTitle === 'string' ? config.orderBumpTitle : '', message: typeof config.orderBumpMessage === 'string' ? config.orderBumpMessage : '' }] : [];
-};
-const sessionDiscount = (subtotal: number, coupon: { type: 'PERCENT' | 'FIXED'; value: number; maxDiscountCents: number | null } | null): number => {
-  if (!coupon) return 0;
-  let discount = coupon.type === 'PERCENT' ? Math.floor(subtotal * coupon.value / 10_000) : coupon.value;
-  if (coupon.maxDiscountCents) discount = Math.min(discount, coupon.maxDiscountCents);
-  return Math.max(0, Math.min(discount, subtotal - 1));
 };
 const checkoutSessionExpiry = (publishedConfig: unknown, fallback: Date): Date => {
   if (typeof publishedConfig !== 'object' || publishedConfig === null || Array.isArray(publishedConfig)) return fallback;
@@ -203,19 +198,20 @@ export class PrismaCatalogRepository implements CatalogRepository {
 
   async createPublicCheckoutSession(input: CheckoutSessionInput): Promise<object | null> {
     return this.database.$transaction(async transaction => {
-      const checkout = await transaction.checkout.findFirst({ where: { slug: input.checkoutSlug, mode: 'DIRECT_LINK', status: 'PUBLISHED', archivedAt: null, store: { slug: input.storeSlug, active: true, customDomain: { is: { status: 'ACTIVE' } } }, product: { is: { active: true } } }, select: { id: true, productId: true, publishedConfig: true, product: { select: { publicId: true, checkoutTitle: true, fulfillmentType: true, imageUrl: true, priceCents: true, maxPerOrder: true, stockQuantity: true, trackInventory: true } } } });
+      const checkout = await transaction.checkout.findFirst({ where: { slug: input.checkoutSlug, mode: 'DIRECT_LINK', status: 'PUBLISHED', archivedAt: null, store: { slug: input.storeSlug, active: true, customDomain: { is: { status: 'ACTIVE' } } }, product: { is: { active: true } } }, select: { id: true, storeId: true, productId: true, publishedConfig: true, product: { select: { publicId: true, checkoutTitle: true, fulfillmentType: true, imageUrl: true, priceCents: true, maxPerOrder: true, stockQuantity: true, trackInventory: true } } } });
       if (!checkout?.product || !checkout.productId || input.quantity > checkout.product.maxPerOrder || (checkout.product.trackInventory && (checkout.product.stockQuantity ?? 0) < input.quantity)) return null;
       const variant = input.variantPublicId ? await transaction.productVariant.findFirst({ where: { publicId: input.variantPublicId, productId: checkout.productId, availableForSale: true }, select: { id: true, publicId: true, title: true, priceCents: true, inventoryQuantity: true, imageUrl: true } }) : null;
       if (input.variantPublicId && !variant) return null;
       if (variant?.inventoryQuantity !== null && variant?.inventoryQuantity !== undefined && variant.inventoryQuantity < input.quantity) return null;
       const unitPriceCents = variant?.priceCents ?? checkout.product.priceCents;
-      const session = await transaction.checkoutSession.create({ data: { checkoutId: checkout.id, variantId: variant?.id ?? null, quantity: input.quantity, unitPriceCents, totalCents: unitPriceCents * input.quantity, tokenHash: input.tokenHash, source: input.source, trackingParameters: input.trackingParameters ?? {}, expiresAt: checkoutSessionExpiry(checkout.publishedConfig, input.expiresAt), ...(input.sourceCartId ? { sourceCartId: input.sourceCartId } : {}) }, select: { publicId: true, quantity: true, unitPriceCents: true, totalCents: true, currency: true, status: true, expiresAt: true, checkout: { select: { slug: true, name: true, publishedConfig: true, store: { select: { name: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } } } });
+      const paymentRule = await transaction.paymentDiscount.findFirst({ where: { storeId: checkout.storeId, paymentMethod: 'PIX', active: true }, select: { percentageBps: true, minimumAmountCents: true, maximumAmountCents: true } });
+      const session = await transaction.checkoutSession.create({ data: { checkoutId: checkout.id, variantId: variant?.id ?? null, quantity: input.quantity, unitPriceCents, totalCents: unitPriceCents * input.quantity, ...checkoutDiscounts(unitPriceCents * input.quantity, null, paymentRule), ...(paymentRule ? { paymentDiscountRule: paymentRule } : {}), tokenHash: input.tokenHash, source: input.source, trackingParameters: input.trackingParameters ?? {}, expiresAt: checkoutSessionExpiry(checkout.publishedConfig, input.expiresAt), ...(input.sourceCartId ? { sourceCartId: input.sourceCartId } : {}) }, select: { publicId: true, quantity: true, unitPriceCents: true, totalCents: true, discountCents: true, paymentDiscountCents: true, currency: true, status: true, expiresAt: true, checkout: { select: { slug: true, name: true, publishedConfig: true, store: { select: { name: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } } } });
       return { ...session, product: checkout.product };
     });
   }
 
   async getPublicCheckoutSession(publicId: string, tokenHash: string, now: Date): Promise<object | null> {
-    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, checkout: { store: { customDomain: { is: { status: 'ACTIVE' } } } } }, select: { publicId: true, source: true, quantity: true, unitPriceCents: true, totalCents: true, discountCents: true, couponCode: true, shippingPriceCents: true, currency: true, status: true, expiresAt: true, customerCapturedAt: true, shippingCapturedAt: true, checkout: { select: { storeId: true, slug: true, name: true, publishedConfig: true, store: { select: { name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, fulfillmentType: true, imageUrl: true, maxPerOrder: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true, isOrderBump: true, product: { select: { publicId: true } } } } } });
+    const session = await this.database.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, checkout: { store: { customDomain: { is: { status: 'ACTIVE' } } } } }, select: { publicId: true, source: true, quantity: true, unitPriceCents: true, totalCents: true, discountCents: true, paymentDiscountCents: true, couponCode: true, shippingPriceCents: true, currency: true, status: true, expiresAt: true, customerCapturedAt: true, shippingCapturedAt: true, checkout: { select: { storeId: true, slug: true, name: true, publishedConfig: true, store: { select: { name: true } }, product: { select: { publicId: true, checkoutTitle: true, checkoutDescription: true, fulfillmentType: true, imageUrl: true, maxPerOrder: true } } } }, variant: { select: { publicId: true, title: true, imageUrl: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true, isOrderBump: true, product: { select: { publicId: true } } } } } });
     if (!session) return null;
     const config = session.checkout.publishedConfig as Record<string, unknown>;
     const configured = configuredOrderBumps(config);
@@ -239,7 +235,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
 
   async setPublicOrderBump(publicId: string, tokenHash: string, productPublicId: string, enabled: boolean, now: Date): Promise<object | null> {
     return this.database.$transaction(async transaction => {
-      const session = await transaction.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { id: true, totalCents: true, shippingPriceCents: true, coupon: { select: { type: true, value: true, maxDiscountCents: true } }, checkout: { select: { storeId: true, publishedConfig: true } } } });
+      const session = await transaction.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, paymentAttempts: { none: {} } }, select: { id: true, totalCents: true, shippingPriceCents: true, paymentDiscountRule: true, coupon: { select: { type: true, value: true, maxDiscountCents: true } }, checkout: { select: { storeId: true, publishedConfig: true } } } });
       if (!session) return null;
       const config = session.checkout.publishedConfig as Record<string, unknown>;
       if (!configuredOrderBumps(config).some(bump => bump.productId === productPublicId)) return null;
@@ -249,16 +245,16 @@ export class PrismaCatalogRepository implements CatalogRepository {
       if (enabled && !existing) {
         await transaction.checkoutSessionItem.create({ data: { checkoutSessionId: session.id, productId: product.id, variantId: variant.id, quantity: 1, unitPriceCents: variant.priceCents, totalCents: variant.priceCents, titleSnapshot: product.checkoutTitle, variantSnapshot: variant.title, imageUrlSnapshot: variant.imageUrl ?? product.imageUrl, isOrderBump: true } });
         const totalCents = session.totalCents + variant.priceCents;
-        const discountCents = sessionDiscount(totalCents, session.coupon); await transaction.checkoutSession.update({ where: { id: session.id }, data: { totalCents, discountCents } });
-        return { totalCents, discountCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: totalCents - discountCents + session.shippingPriceCents, enabled: true };
+        const { discountCents, paymentDiscountCents } = checkoutDiscounts(totalCents, session.coupon, session.paymentDiscountRule); await transaction.checkoutSession.update({ where: { id: session.id }, data: { totalCents, discountCents, paymentDiscountCents } });
+        return { totalCents, discountCents, paymentDiscountCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: totalCents - discountCents + session.shippingPriceCents, enabled: true };
       }
       if (!enabled && existing) {
         await transaction.checkoutSessionItem.delete({ where: { id: existing.id } });
         const totalCents = session.totalCents - existing.totalCents;
-        const discountCents = sessionDiscount(totalCents, session.coupon); await transaction.checkoutSession.update({ where: { id: session.id }, data: { totalCents, discountCents } });
-        return { totalCents, discountCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: totalCents - discountCents + session.shippingPriceCents, enabled: false };
+        const { discountCents, paymentDiscountCents } = checkoutDiscounts(totalCents, session.coupon, session.paymentDiscountRule); await transaction.checkoutSession.update({ where: { id: session.id }, data: { totalCents, discountCents, paymentDiscountCents } });
+        return { totalCents, discountCents, paymentDiscountCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: totalCents - discountCents + session.shippingPriceCents, enabled: false };
       }
-      const discountCents = sessionDiscount(session.totalCents, session.coupon); return { totalCents: session.totalCents, discountCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: session.totalCents - discountCents + session.shippingPriceCents, enabled };
+      const { discountCents, paymentDiscountCents } = checkoutDiscounts(session.totalCents, session.coupon, session.paymentDiscountRule); return { totalCents: session.totalCents, discountCents, paymentDiscountCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: session.totalCents - discountCents + session.shippingPriceCents, enabled };
     });
   }
 
@@ -267,7 +263,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
       const session = await transaction.checkoutSession.findFirst({
         where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now } },
         select: {
-          id: true, unitPriceCents: true, source: true, shippingPriceCents: true,
+          id: true, unitPriceCents: true, source: true, shippingPriceCents: true, paymentDiscountRule: true,
           coupon: { select: { type: true, value: true, maxDiscountCents: true } },
           variant: { select: { inventoryQuantity: true } },
           checkout: { select: { product: { select: { maxPerOrder: true, trackInventory: true, stockQuantity: true } } } },
@@ -277,9 +273,9 @@ export class PrismaCatalogRepository implements CatalogRepository {
       });
       const product = session?.checkout.product;
       if (!session || session.source !== 'DIRECT' || !product || session.paymentAttempts.length || session.items.some(item => !item.isOrderBump) || quantity < 1 || quantity > product.maxPerOrder || product.trackInventory && (product.stockQuantity ?? 0) < quantity || session.variant?.inventoryQuantity !== null && session.variant?.inventoryQuantity !== undefined && session.variant.inventoryQuantity < quantity) return null;
-      const bumpsTotal = session.items.reduce((total, item) => total + item.totalCents, 0); const totalCents = session.unitPriceCents * quantity + bumpsTotal; const discountCents = sessionDiscount(totalCents, session.coupon);
-      await transaction.checkoutSession.update({ where: { id: session.id }, data: { quantity, totalCents, discountCents } });
-      return { quantity, totalCents, discountCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: totalCents - discountCents + session.shippingPriceCents };
+      const bumpsTotal = session.items.reduce((total, item) => total + item.totalCents, 0); const totalCents = session.unitPriceCents * quantity + bumpsTotal; const { discountCents, paymentDiscountCents } = checkoutDiscounts(totalCents, session.coupon, session.paymentDiscountRule);
+      await transaction.checkoutSession.update({ where: { id: session.id }, data: { quantity, totalCents, discountCents, paymentDiscountCents } });
+      return { quantity, totalCents, discountCents, paymentDiscountCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: totalCents - discountCents + session.shippingPriceCents };
     });
   }
 
@@ -297,7 +293,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
   }
 
   async updatePublicCheckoutShipping(publicId: string, tokenHash: string, now: Date, input: CheckoutShippingInput): Promise<object | null> {
-    const result = await this.database.checkoutSession.updateMany({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, customerCapturedAt: { not: null } }, data: { shippingAddressEncrypted: input.encryptedData, shippingCapturedAt: now, shippingMethodPublicId: null, shippingMethodName: null, shippingPriceCents: 0, shippingMinDays: null, shippingMaxDays: null } });
+    const result = await this.database.checkoutSession.updateMany({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, paymentAttempts: { none: {} }, customerCapturedAt: { not: null } }, data: { shippingAddressEncrypted: input.encryptedData, shippingCapturedAt: now, shippingMethodPublicId: null, shippingMethodName: null, shippingPriceCents: 0, shippingMinDays: null, shippingMaxDays: null } });
     return result.count === 1 ? { customerCaptured: true, shippingCaptured: true } : null;
   }
 
@@ -309,7 +305,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
 
   async selectPublicShippingMethod(publicId: string, tokenHash: string, methodPublicId: string, now: Date): Promise<object | null> {
     return this.database.$transaction(async transaction => {
-      const session = await transaction.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, shippingCapturedAt: { not: null } }, select: { id: true, totalCents: true, discountCents: true, checkout: { select: { storeId: true } } } });
+      const session = await transaction.checkoutSession.findFirst({ where: { publicId, tokenHash, status: 'OPEN', expiresAt: { gt: now }, paymentAttempts: { none: {} }, shippingCapturedAt: { not: null } }, select: { id: true, totalCents: true, discountCents: true, checkout: { select: { storeId: true } } } });
       if (!session) return null;
       const method = await transaction.shippingMethod.findFirst({ where: { publicId: methodPublicId, storeId: session.checkout.storeId, active: true }, select: { publicId: true, name: true, priceCents: true, minDays: true, maxDays: true } });
       if (!method) return null;
@@ -341,7 +337,8 @@ export class PrismaCatalogRepository implements CatalogRepository {
       if (items.length !== normalizedLines.length || items.some(({ line, variant }) => line.quantity > variant.product.maxPerOrder)) return null;
       const totalCents = items.reduce((total, { line, variant }) => total + variant.priceCents * line.quantity, 0);
       const first = items[0]; if (!first) return null;
-      const session = await transaction.checkoutSession.create({ data: { checkoutId: checkout.id, variantId: first.variant.id, quantity: items.reduce((total, item) => total + item.line.quantity, 0), unitPriceCents: first.variant.priceCents, totalCents, tokenHash: input.tokenHash, source: 'SHOPIFY', expiresAt: checkoutSessionExpiry(checkout.publishedConfig, input.expiresAt), ...(input.sourceCartId ? { sourceCartId: input.sourceCartId } : {}), items: { create: items.map(({ line, variant }) => ({ productId: variant.product.id, variantId: variant.id, quantity: line.quantity, unitPriceCents: variant.priceCents, totalCents: variant.priceCents * line.quantity, titleSnapshot: variant.product.checkoutTitle, variantSnapshot: variant.title, imageUrlSnapshot: variant.imageUrl ?? variant.product.imageUrl })) } }, select: { publicId: true, totalCents: true, currency: true, expiresAt: true, checkout: { select: { slug: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true } } } });
+      const paymentRule = await transaction.paymentDiscount.findFirst({ where: { storeId: connection.storeId, paymentMethod: 'PIX', active: true }, select: { percentageBps: true, minimumAmountCents: true, maximumAmountCents: true } });
+      const session = await transaction.checkoutSession.create({ data: { checkoutId: checkout.id, variantId: first.variant.id, quantity: items.reduce((total, item) => total + item.line.quantity, 0), unitPriceCents: first.variant.priceCents, totalCents, ...checkoutDiscounts(totalCents, null, paymentRule), ...(paymentRule ? { paymentDiscountRule: paymentRule } : {}), tokenHash: input.tokenHash, source: 'SHOPIFY', expiresAt: checkoutSessionExpiry(checkout.publishedConfig, input.expiresAt), ...(input.sourceCartId ? { sourceCartId: input.sourceCartId } : {}), items: { create: items.map(({ line, variant }) => ({ productId: variant.product.id, variantId: variant.id, quantity: line.quantity, unitPriceCents: variant.priceCents, totalCents: variant.priceCents * line.quantity, titleSnapshot: variant.product.checkoutTitle, variantSnapshot: variant.title, imageUrlSnapshot: variant.imageUrl ?? variant.product.imageUrl })) } }, select: { publicId: true, totalCents: true, discountCents: true, paymentDiscountCents: true, currency: true, expiresAt: true, checkout: { select: { slug: true } }, items: { select: { quantity: true, unitPriceCents: true, totalCents: true, titleSnapshot: true, variantSnapshot: true, imageUrlSnapshot: true } } } });
       return { ...session, storeSlug: connection.store.slug };
     });
   }

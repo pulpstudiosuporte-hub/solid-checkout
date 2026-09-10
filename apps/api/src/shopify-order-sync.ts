@@ -43,6 +43,7 @@ export async function syncPaidShopifyOrder(environment: AppEnvironment, reposito
       email: customer.email,
       phone,
       currency: context.currency,
+      ...(context.discountCents > 0 ? { discountCode: { itemFixedDiscountCode: { code: 'SOLID-DISCOUNT', amountSet: { shopMoney: { amount: (context.discountCents / 100).toFixed(2), currencyCode: context.currency } } } } } : {}),
       financialStatus: context.paid ? 'PAID' : 'PENDING',
       lineItems: context.items.map(item => item.variantExternalId.startsWith('gid://shopify/ProductVariant/') ? ({ variantId: item.variantExternalId, quantity: item.quantity }) : ({ title: item.title, quantity: item.quantity, priceSet: { shopMoney: { amount: (item.unitPriceCents / 100).toFixed(2), currencyCode: context.currency } } })),
       shippingAddress,

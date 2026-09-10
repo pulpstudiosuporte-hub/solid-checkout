@@ -203,6 +203,7 @@ model Store {
   gatewayConnections GatewayConnection[]
   customDomain StoreDomain?
   coupons Coupon[]
+  paymentDiscounts PaymentDiscount[]
   notificationStates NotificationState[]
   deliveryJobs IntegrationDeliveryJob[]
   mediaAssets MediaAsset[]
@@ -511,6 +512,8 @@ model CheckoutSession {
   couponId          String?               @map("coupon_id") @db.Uuid
   couponCode        String?               @map("coupon_code") @db.VarChar(40)
   discountCents     Int                   @default(0) @map("discount_cents")
+  paymentDiscountCents Int                @default(0) @map("payment_discount_cents")
+  paymentDiscountRule Json?               @map("payment_discount_rule")
   currency          String                @default("BRL") @db.Char(3)
   status            CheckoutSessionStatus @default(OPEN)
   source             String                @default("DIRECT") @db.VarChar(32)
@@ -703,6 +706,24 @@ model Coupon {
   @@unique([storeId, code])
   @@index([storeId, active, createdAt(sort: Desc)])
   @@map("coupons")
+}
+
+model PaymentDiscount {
+  id                 String   @id @default(uuid()) @db.Uuid
+  publicId           String   @unique @default(cuid()) @map("public_id") @db.VarChar(32)
+  storeId            String   @map("store_id") @db.Uuid
+  paymentMethod      String   @map("payment_method") @db.VarChar(32)
+  percentageBps      Int      @map("percentage_bps")
+  minimumAmountCents Int      @default(0) @map("minimum_amount_cents")
+  maximumAmountCents Int?     @map("maximum_amount_cents")
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  store              Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, paymentMethod])
+  @@index([storeId, active])
+  @@map("payment_discounts")
 }
 
 model GatewayConnection {

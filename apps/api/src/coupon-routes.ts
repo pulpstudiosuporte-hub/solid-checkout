@@ -1,3 +1,4 @@
+import { checkoutDiscounts, paymentDiscountRule } from './checkout-discounts.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '@solid/database';
@@ -40,6 +41,22 @@ export function registerCouponRoutes(app: FastifyInstance, environment: AppEnvir
     return { code, type: type as 'PERCENT' | 'FIXED', value: Number(value), minimumSubtotalCents: Number(minimumSubtotalCents), maxDiscountCents: maxDiscountCents === null ? null : Number(maxDiscountCents), maxRedemptions: maxRedemptions === null ? null : Number(maxRedemptions), startsAt, expiresAt, active: body.active };
   };
 
+  app.get('/payment-discounts/pix', async (request, reply) => {
+    const context = await authenticate(request);
+    if (!context) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
+    const discount = await database.paymentDiscount.findUnique({ where: { storeId_paymentMethod: { storeId: context.storeId, paymentMethod: 'PIX' } }, select: { percentageBps: true, minimumAmountCents: true, maximumAmountCents: true, active: true } });
+    return reply.header('cache-control', 'no-store').send({ discount });
+  });
+  app.put<{ Body: Record<string, unknown> }>('/payment-discounts/pix', async (request, reply) => {
+    const context = await authenticate(request, true);
+    if (!context || !canWrite(context)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    const rule = paymentDiscountRule(request.body);
+    if (!rule || typeof request.body?.active !== 'boolean') return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Revise o percentual e os limites do desconto Pix.'));
+    const data = { ...rule, active: request.body.active };
+    const discount = await database.paymentDiscount.upsert({ where: { storeId_paymentMethod: { storeId: context.storeId, paymentMethod: 'PIX' } }, create: { storeId: context.storeId, paymentMethod: 'PIX', ...data }, update: data, select: { percentageBps: true, minimumAmountCents: true, maximumAmountCents: true, active: true } });
+    return reply.send({ discount });
+  });
+
   app.get('/coupons', async (request, reply) => { const context = await authenticate(request); if (!context) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.')); return reply.send({ items: await database.coupon.findMany({ where: { storeId: context.storeId }, orderBy: { createdAt: 'desc' }, select: couponSelect }) }); });
   app.post<{ Body: Record<string, unknown> }>('/coupons', async (request, reply) => { const context = await authenticate(request, true); if (!context || !canWrite(context)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.')); const input = parseInput(request.body); if (!input) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Revise os dados do cupom.')); try { const coupon = await database.coupon.create({ data: { storeId: context.storeId, ...input }, select: couponSelect }); return reply.code(201).send({ coupon }); } catch (error) { if (isUniqueConstraintError(error)) return reply.code(409).send(errorBody(request, 'COUPON_EXISTS', 'Já existe um cupom com este código.')); throw error; } });
   app.put<{ Params: { couponId: string }; Body: Record<string, unknown> }>('/coupons/:couponId', async (request, reply) => { const context = await authenticate(request, true); if (!context || !canWrite(context)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.')); const input = parseInput(request.body); if (!input) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Revise os dados do cupom.')); const current = await database.coupon.findFirst({ where: { publicId: request.params.couponId, storeId: context.storeId }, select: { id: true } }); if (!current) return reply.code(404).send(errorBody(request, 'NOT_FOUND', 'Cupom não encontrado.')); try { return reply.send({ coupon: await database.coupon.update({ where: { id: current.id }, data: input, select: couponSelect }) }); } catch (error) { if (isUniqueConstraintError(error)) return reply.code(409).send(errorBody(request, 'COUPON_EXISTS', 'Já existe um cupom com este código.')); throw error; } });
@@ -49,14 +66,14 @@ export function registerCouponRoutes(app: FastifyInstance, environment: AppEnvir
     const authorization = request.headers.authorization; if (!authorization?.startsWith('Bearer ')) return reply.code(401).send(errorBody(request, 'INVALID_SESSION', 'Sessão inválida.'));
     const tokenHash = sha256(authorization.slice(7)); const code = normalizeCode(request.body?.code); const now = new Date();
     const result = await database.$transaction(async transaction => {
-      const session = await transaction.checkoutSession.findFirst({ where: { publicId: request.params.sessionId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { id: true, totalCents: true, shippingPriceCents: true, checkout: { select: { storeId: true } }, paymentAttempts: { take: 1, select: { id: true } } } });
+      const session = await transaction.checkoutSession.findFirst({ where: { publicId: request.params.sessionId, tokenHash, status: 'OPEN', expiresAt: { gt: now } }, select: { id: true, totalCents: true, shippingPriceCents: true, paymentDiscountRule: true, checkout: { select: { storeId: true } }, paymentAttempts: { take: 1, select: { id: true } } } });
       if (!session) return { error: 'INVALID_SESSION' as const }; if (session.paymentAttempts.length) return { error: 'PAYMENT_STARTED' as const };
-      if (!code) { await transaction.checkoutSession.update({ where: { id: session.id }, data: { couponId: null, couponCode: null, discountCents: 0 } }); return { discountCents: 0, code: null, subtotalCents: session.totalCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: session.totalCents + session.shippingPriceCents }; }
+      if (!code) { const discounts = checkoutDiscounts(session.totalCents, null, session.paymentDiscountRule); await transaction.checkoutSession.update({ where: { id: session.id }, data: { couponId: null, couponCode: null, ...discounts } }); return { ...discounts, code: null, subtotalCents: session.totalCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: session.totalCents - discounts.discountCents + session.shippingPriceCents }; }
       const coupon = await transaction.coupon.findFirst({ where: { storeId: session.checkout.storeId, code, active: true, OR: [{ startsAt: null }, { startsAt: { lte: now } }], AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] }] }, select: { id: true, code: true, type: true, value: true, minimumSubtotalCents: true, maxDiscountCents: true, maxRedemptions: true, redemptionCount: true } });
       if (!coupon || session.totalCents < coupon.minimumSubtotalCents || coupon.maxRedemptions !== null && coupon.redemptionCount >= coupon.maxRedemptions) return { error: 'INVALID_COUPON' as const };
-      let discountCents = coupon.type === 'PERCENT' ? Math.floor(session.totalCents * coupon.value / 10_000) : coupon.value; if (coupon.maxDiscountCents) discountCents = Math.min(discountCents, coupon.maxDiscountCents); discountCents = Math.min(discountCents, session.totalCents - 1);
-      await transaction.checkoutSession.update({ where: { id: session.id }, data: { couponId: coupon.id, couponCode: coupon.code, discountCents } });
-      return { discountCents, code: coupon.code, subtotalCents: session.totalCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: session.totalCents - discountCents + session.shippingPriceCents };
+      const discounts = checkoutDiscounts(session.totalCents, coupon, session.paymentDiscountRule);
+      await transaction.checkoutSession.update({ where: { id: session.id }, data: { couponId: coupon.id, couponCode: coupon.code, ...discounts } });
+      return { ...discounts, code: coupon.code, subtotalCents: session.totalCents, shippingPriceCents: session.shippingPriceCents, grandTotalCents: session.totalCents - discounts.discountCents + session.shippingPriceCents };
     });
     if ('error' in result) return reply.code(result.error === 'PAYMENT_STARTED' ? 409 : 400).send(errorBody(request, result.error, result.error === 'PAYMENT_STARTED' ? 'O pagamento já foi iniciado.' : 'Cupom inválido, expirado ou indisponível.'));
     return reply.send({ coupon: result });

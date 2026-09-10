@@ -71,3 +71,11 @@ Em produção/staging use somente `npm run db:deploy`; nunca use `migrate dev`.
 Configure o serviço web para construir com o arquivo `Dockerfile.web`. Ele gera o bundle Vite e publica pelo Nginx com fallback de SPA, cache correto dos assets e headers de segurança. O serviço deve expor a porta `80` e receber `VITE_API_URL` e `VITE_TURNSTILE_SITE_KEY` como argumentos de build.
 
 O serviço da API continua usando seu fluxo próprio e deve executar `prisma migrate deploy` antes de iniciar. Nunca compartilhe o mesmo health check ou Dockerfile entre web e API.
+
+## Desconto Pix
+
+Na página de cupons, configure o percentual, a compra mínima após cupom e um teto opcional para o desconto Pix. Apenas OWNER e ADMIN podem salvar. A configuração vale para novas sessões; cada sessão guarda sua regra, inclusive quando o lojista altera ou desativa o desconto depois.
+
+O desconto é calculado em centavos sobre os produtos após o cupom, sem frete, limitado para manter pelo menos R$ 0,01 em produtos. `discountCents` contém a soma dos descontos; `paymentDiscountCents` identifica a parcela Pix. Alterações de quantidade, bump e cupom recalculam ambas as parcelas. Pagamentos e integrações continuam usando o desconto total.
+
+Antes de publicar esta versão, aplique `npm run db:deploy` no ambiente configurado para instalar a migration `20260910190000_payment_discounts`. Nenhuma migration é executada pelo build. `DATABASE_URL` é necessária para comandos de banco e para iniciar a API, mas não para gerar o Prisma Client, compilar ou executar os testes unitários.

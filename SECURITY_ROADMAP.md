@@ -2,9 +2,11 @@
 
 ## Estado atual
 
-O projeto atual é um protótipo visual React/Vite. Não possui backend, banco, autenticação, autorização, isolamento multiempresa ou gateway real. As configurações do editor ficam em `localStorage`.
+O projeto possui frontend React/Vite, API Fastify, PostgreSQL/Prisma, autenticação, contexto de loja e integrações de pagamento. Este checklist foi iniciado na fase de protótipo; as marcações abaixo são históricas e ainda precisam ser conciliadas com a implementação e com evidências de operação.
 
-**Regra de liberação:** até a conclusão dos blocos P0, o sistema não pode coletar CPF real, armazenar credenciais, conectar lojas reais ou processar pagamentos reais.
+A revisão local de 10/09/2026 cobre verificações de código e testes automatizados, não uma certificação de segurança ou validação de pagamentos em produção. A configuração de desconto Pix fica na página de cupons. A regra é copiada ao iniciar uma sessão e aplicada após o cupom, sem incluir frete; sessões anteriores à migration continuam sem desconto Pix.
+
+O worker separado continua como estrutura inicial. Reconciliação, notificações e entregas são iniciadas pela API, sob coordenação de `job-leader.ts`.
 
 ## P0 — bloqueadores para qualquer piloto real
 
