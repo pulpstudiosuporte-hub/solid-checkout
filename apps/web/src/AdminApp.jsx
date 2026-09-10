@@ -8,13 +8,14 @@ import {
 } from 'lucide-react';
 import './admin-styles.css';
 import './admin-refresh.css';
-import CheckoutEditor, { defaultCheckoutConfig } from './CheckoutEditor';
+import { defaultCheckoutConfig } from './checkout-config';
+const CheckoutEditor = lazy(() => import('./CheckoutEditor'));
 import { archiveStore, bindTabToUser, clearTabUser, completeMfaLogin, createStore, forgotPassword, getApiHealth, getSession, getSettings, getStores, login, logout, registerAccount, resetPassword, selectStore, verifyAccount } from './api';
 import { currentWebPushSubscription, disableWebPushOnThisDevice } from './web-push';
 import Login, { SessionLoading } from './Auth';
 import DashboardPage from './DashboardPage';
 import StoreSwitcher from './StoreSwitcher';
-import CheckoutsPage from './CheckoutsPage';
+const CheckoutsPage = lazy(() => import('./CheckoutsPage'));
 import LogisticsPage from './LogisticsPage';
 import PageErrorBoundary from './PageErrorBoundary';
 import OrdersPage, { RecentOrders } from './OrdersPage';
@@ -273,7 +274,7 @@ export default function App(){
   if(auth.status==='checking') return <SessionLoading/>;
   if(auth.status==='anonymous'){return <Login onSubmit={handleLogin} onMfaSubmit={handleMfaLogin} onRegister={registerAccount} onVerify={verifyAccount} onForgot={forgotPassword} onReset={handlePasswordReset}/>;}
   if(window.location.hash==='#/login')window.history.replaceState({},'', '/');
-  if(editor) return <CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/>;
+  if(editor) return <Suspense fallback={<SessionLoading/>}><CheckoutEditor onBack={()=>setEditor(false)} onPreview={cfg=>{setPreviewConfig(cfg);setCheckout(true);setEditor(false)}}/></Suspense>;
   if(checkout) return <Checkout customConfig={previewConfig} onBack={()=>{setCheckout(false);setPreviewConfig(null)}}/>;
   const activeStore=stores.find(store=>store.active);
   const pageContent=storesStatus==='loading'||storesStatus==='idle'?<SessionLoading/>:storesStatus==='error'?<StoresUnavailable/>:storesStatus==='ready'&&!activeStore&&!canAccessWithoutActiveStore(page,auth.user?.platformAdmin)?<FirstStoreSetup onCreate={handleCreateStore} busy={storeBusy}/>:page==='Início'?<Dashboard setPage={setPage} storeKey={activeStore?.publicId}/>:page==='Novidades'?<NewsRoadmapPage csrfToken={auth.csrfToken}/>:page==='Análises'?<AnalyticsPage storeKey={activeStore?.publicId}/>:page==='Pedidos'?<OrdersPage storeKey={activeStore?.publicId} csrfToken={auth.csrfToken}/>:page==='Carrinhos'?<AbandonedCartsPage storeKey={activeStore?.publicId} csrfToken={auth.csrfToken}/>:page==='ChromaSense'?<ChromaSensePage storeKey={activeStore?.publicId}/>:page==='Webhooks'?<WebhooksPage storeKey={activeStore?.publicId} csrfToken={auth.csrfToken}/>:page==='Meu plano'?<BillingPage csrfToken={auth.csrfToken}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Operações'?<AdminOperationsPage csrfToken={auth.csrfToken}/>:page==='Conteúdo'?<AdminContentPage csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Gateways'?<GatewaysPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Domínios'?<DomainsPage csrfToken={auth.csrfToken}/>:page==='Produtos'?<ProductsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onOpenIntegrations={()=>setPage('Integrações')}/>:page==='Order bumps'?<OrderBumpsPage csrfToken={auth.csrfToken}/>:page==='Cupons'?<CouponsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>;

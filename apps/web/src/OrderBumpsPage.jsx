@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, ImageOff, LoaderCircle, PackagePlus, Plus, Search, Sparkles, Trash2 } from 'lucide-react';
 import { createProduct, deleteManualProduct, getCheckouts, getProducts, publishCheckout, resolveMediaUrl, updateCheckoutDraft, uploadProductImage } from './api';
-import { defaultCheckoutConfig } from './CheckoutEditor';
+import { defaultCheckoutConfig } from './checkout-config';
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const emptyEditor = { mode: 'existing', productId: '', editingProductId: '', title: '', message: '', productTitle: '', productPrice: '', compareAtPrice: '', productDescription: '', imageUrl: '' };

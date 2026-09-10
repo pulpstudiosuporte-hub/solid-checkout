@@ -268,12 +268,13 @@ function ElementImageDropzone({ id, value, onChange, uploadImage }) {
 export default function CheckoutElementsPanel({
   config,
   updateConfig,
+  replaceConfig,
   addElement,
   updateElement,
   removeElement,
   uploadImage,
 }) {
-  const [mode, setMode] = useState(config.elementEditMode || "guided");
+  const mode = config.elementEditMode || "guided";
   const [editing, setEditing] = useState(null);
   const [original, setOriginal] = useState(null);
   const elements = useMemo(
@@ -285,7 +286,6 @@ export default function CheckoutElementsPanel({
     [elements],
   );
   const setModeValue = (value) => {
-    setMode(value);
     updateConfig("elementEditMode", value);
   };
   const openEditor = (type, item) => {
@@ -307,6 +307,7 @@ export default function CheckoutElementsPanel({
   };
   const cancelEditor = () => {
     if (original && current) updateElement(current.id, original);
+    else if (current) removeElement(current.id);
     closeEditor();
   };
   if (current) {
@@ -316,15 +317,15 @@ export default function CheckoutElementsPanel({
     return (
       <div className="element-config-sheet">
         <header>
-          <button type="button" onClick={cancelEditor}>
-            <ChevronLeft size={17} />
+          <button type="button" onClick={cancelEditor} aria-label="Voltar aos elementos">
+            <ChevronLeft size={17} aria-hidden="true" />
           </button>
           <span>
             <Icon size={18} />
           </span>
           <div>
             <b>{meta.label}</b>
-            <small>{current.type} / elemento do checkout</small>
+            <small>Conteúdo e aparência do bloco</small>
           </div>
           <button type="button" onClick={cancelEditor} aria-label="Fechar">
             <span aria-hidden>×</span>
@@ -729,7 +730,7 @@ export default function CheckoutElementsPanel({
             Cancelar
           </button>
           <button type="button" className="primary" onClick={closeEditor}>
-            <Check size={14} /> Salvar
+            <Check size={14} /> Aplicar ao rascunho
           </button>
         </footer>
       </div>
@@ -740,17 +741,10 @@ export default function CheckoutElementsPanel({
     spacing: 12,
     fontScale: 100,
   };
-  const changeGlobal = (key, value) => {
-    updateConfig("elementGlobalStyle", { ...global, [key]: value });
-    if (key === "radius") {
-      updateConfig("radius", value);
-      updateConfig("timerRadius", value);
-      updateConfig(
-        "customElements",
-        elements.map((item) => ({ ...item, radius: value })),
-      );
-    }
-  };
+  const changeGlobal = (key, value) => replaceConfig(old => ({ ...old,
+    elementGlobalStyle: { ...(old.elementGlobalStyle || global), [key]: value },
+    ...(key === "radius" ? { radius: value, timerRadius: value, customElements: (old.customElements || []).map(item => ({ ...item, radius: value })) } : {}),
+  }));
   return (
     <>
       <h3>Modo de edição</h3>

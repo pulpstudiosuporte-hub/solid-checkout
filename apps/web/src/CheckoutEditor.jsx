@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { createContext, memo, useCallback, useContext, useDeferredValue, useEffect, useId, useMemo, useReducer, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowLeft,
@@ -25,6 +25,11 @@ import {
   Trash2,
   Type,
   Undo2,
+  Redo2,
+  Search,
+  X,
+  AlertCircle,
+  SlidersHorizontal,
   UserRound,
   WalletCards,
 } from "lucide-react";
@@ -47,116 +52,13 @@ import {
   reorderCheckoutLayout,
 } from "./checkout-layout";
 
+import { checkoutEditorHistory, createEditorHistory } from "./checkout-editor-history";
+import "./checkout-editor-refresh.css";
+
 export { reorderCheckoutLayout } from "./checkout-layout";
 
-const defaultBlockOrder = ["hero", "timer", "progress", "content"];
-export const defaultCheckoutConfig = {
-  template: "minimal",
-  layout: "split",
-  primary: "#7357e9",
-  pageBg: "#f6f7f9",
-  cardBg: "#ffffff",
-  headerBg: "#ffffff",
-  textColor: "#17171a",
-  pageTextColor: "#17171a",
-  headerTextColor: "#17171a",
-  buttonTextColor: "#ffffff",
-  borderColor: "#e5e5e9",
-  inputBg: "#ffffff",
-  radius: 14,
-  font: "Plus Jakarta Sans",
-  logoText: "SOLID",
-  logoUrl: "",
-  seoTitle: "",
-  seoDescription: "",
-  faviconUrl: "",
-  heroImageUrl: "",
-  heroMobileImageUrl: "",
-  heroEnabled: false,
-  heroHeight: 220,
-  secureHeader: true,
-  secureText: "Pagamento 100% seguro",
-  showProgress: true,
-  progressStyle: "outline",
-  progressActiveColor: "#7357e9",
-  progressInactiveColor: "#ffffff",
-  progressActiveTextColor: "#ffffff",
-  timer: true,
-  timerText: "Oferta reservada por",
-  timerMinutes: 10,
-  timerStyle: "bar",
-  timerBgColor: "#151c2c",
-  timerTextColor: "#ffffff",
-  timerNumberColor: "#ff515a",
-  timerRadius: 14,
-  socialProofEnabled: false,
-  socialProofPosition: "bottom-left",
-  socialProofVisibleSeconds: 5,
-  socialProofIntervalSeconds: 9,
-  socialProofHeadline: "{nome} acabou de comprar {produto}.",
-  socialProofSecondary: "há {tempo}",
-  socialProofPreviewMessages:
-    "Mariana | 5 minutos | este item | São Paulo\nGabriel | 8 minutos | este item | Curitiba",
-  socialProofIcon: "check",
-  socialProofCloseButton: true,
-  socialProofBackgroundColor: "#ffffff",
-  socialProofTextColor: "#111827",
-  socialProofSecondaryColor: "#6b7280",
-  socialProofBorderColor: "#e5e7eb",
-  socialProofIconBackgroundColor: "#10b981",
-  socialProofIconColor: "#ffffff",
-  socialProofRadius: 16,
-  socialProofShadow: "soft",
-  eyebrow: "FINALIZE SEU PEDIDO",
-  title: "Você está a um passo.",
-  subtitle: "Preencha seus dados para gerar o Pix. Leva menos de um minuto.",
-  summaryTitle: "Resumo da compra",
-  summaryBannerUrl: "",
-  summaryBannerFit: "cover",
-  buttonText: "Gerar Pix agora",
-  showCoupon: true,
-  showBump: true,
-  showSummary: true,
-  showTrust: true,
-  trustBenefit1: "Pagamento protegido",
-  trustBenefit2: "Confirmação automática",
-  trustBenefit3: "Seus dados estão seguros",
-  testimonialName: "Cliente verificado",
-  testimonialText: "Compra simples, rápida e segura.",
-  testimonials: [
-    {
-      id: "default",
-      name: "Cliente verificado",
-      text: "Compra simples, rápida e segura.",
-      imageUrl: "",
-      rating: 5,
-    },
-  ],
-  customElements: [],
-  footerEnabled: true,
-  footerBackgroundColor: "#000000",
-  footerTextColor: "#ffffff",
-  footerAlignment: "center",
-  footerLayout: "centered",
-  footerPadding: 48,
-  footerPaymentMethodsEnabled: true,
-  footerPaymentTitle: "Formas de pagamento",
-  footerPaymentMethods: defaultCheckoutFooterMethods,
-  footerCompanyName: "Solid Commerce",
-  footerCompanyDocument: "",
-  footerCompanyAddress: "",
-  footerSecureBadgeEnabled: true,
-  footerSecureText: "Pagamento 100% seguro",
-  footerShowPolicies: true,
-  footerText: "© 2026 Solid Commerce. Todos os direitos reservados.",
-  privacyUrl: "#",
-  termsUrl: "#",
-  language: "pt-BR",
-  currency: "BRL",
-  successUrl: "",
-  buttonEffect: "lift",
-  blockOrder: defaultBlockOrder,
-};
+import { defaultCheckoutConfig, defaultBlockOrder } from "./checkout-config";
+export { defaultCheckoutConfig } from "./checkout-config";
 const templatePresets = {
   minimal: {
     template: "minimal",
@@ -248,29 +150,6 @@ const groups = [
   ["Moeda e idioma", WalletCards],
   ["SEO", Monitor],
 ];
-Object.assign(defaultCheckoutConfig, {
-  contentWidth: 1120,
-  elementGlobalStyle: { radius: 12, spacing: 12, fontScale: 100 },
-  orderBumpProductId: "",
-  orderBumpTitle: "",
-  orderBumpMessage: "",
-});
-Object.assign(defaultCheckoutConfig, {
-  buttonBgColor: "#7357e9",
-  inputBorderColor: "#e5e5e9",
-  inputRadius: 10,
-  progressInactiveTextColor: "#777780",
-  progressLabelColor: "#777780",
-  progressActiveLabelColor: "#17171a",
-});
-Object.assign(defaultCheckoutConfig, {
-  heroDevice: "all",
-  timerDevice: "all",
-  progressDevice: "all",
-  summaryDevice: "desktop",
-  summaryBannerDevice: "desktop",
-  trustDevice: "all",
-});
 const checkoutFontStack = (font) =>
   font === "Georgia"
     ? "Georgia, serif"
@@ -320,13 +199,7 @@ const editorLocale = {
     offerCopy: "Añade la Guía de Resultados",
   },
 };
-let editorProducts = [];
-let createOrderBump = async () => {};
-let uploadOrderBumpImage = async () => {};
-let applyTemplate = () => {};
-let addCustomElement = () => {};
-let updateCustomElement = () => {};
-let removeCustomElement = () => {};
+const EditorServices = createContext({ uploadImage: async () => { throw new Error("Abra um checkout salvo para enviar imagens."); } });
 const customElementRegion = (item) => {
   if (item?.region === "sidebar") return "sidebar";
   if (item?.region === "top") return "top";
@@ -440,24 +313,13 @@ const Toggle = ({ checked, onChange, label }) => (
     <span />
   </button>
 );
-const Color = ({ label, value, onChange }) => (
-  <Field label={label}>
-    <div className="color-field">
-      <input
-        type="color"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-      <input
-        value={value.toUpperCase()}
-        onChange={(e) =>
-          /^#[0-9a-f]{0,6}$/i.test(e.target.value) && onChange(e.target.value)
-        }
-        maxLength="7"
-      />
-    </div>
-  </Field>
-);
+function Color({ label, value = "#ffffff", onChange }) {
+  const id = useId();
+  const [text, setText] = useState(value);
+  const [invalid, setInvalid] = useState(false);
+  useEffect(() => { setText(value); setInvalid(false); }, [value]);
+  return <div className="editor-field"><label htmlFor={id}>{label}</label><div className="color-field"><input type="color" aria-label={`Selecionar cor: ${label}`} value={/^#[0-9a-f]{6}$/i.test(value) ? value : "#ffffff"} onChange={event => onChange(event.target.value)}/><input id={id} value={text.toUpperCase()} spellCheck={false} maxLength={7} aria-invalid={invalid} onChange={event => { const next = event.target.value; setText(next); setInvalid(false); if (/^#[0-9a-f]{6}$/i.test(next)) onChange(next); }} onBlur={() => { if (!/^#[0-9a-f]{6}$/i.test(text)) { setText(value); setInvalid(true); } }}/></div>{invalid && <small role="alert">Use uma cor completa, como #7357E9. A cor anterior foi mantida.</small>}</div>;
+}
 function ImageDropzone({
   value,
   onChange,
@@ -465,10 +327,12 @@ function ImageDropzone({
   label = "Arraste uma imagem aqui",
   alt = "Prévia da imagem",
 }) {
+  const { uploadImage } = useContext(EditorServices);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const send = async (file) => {
-    if (!file) return;
+    if (!file || busy) return;
+    if (file.size > 10 * 1024 * 1024) { setError("A imagem deve ter até 10 MB."); return; }
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
       setError("Use JPG, PNG ou WebP.");
       return;
@@ -476,7 +340,7 @@ function ImageDropzone({
     setBusy(true);
     setError("");
     try {
-      const result = await uploadOrderBumpImage(file);
+      const result = await uploadImage(file);
       onChange(result.imageUrl);
     } catch (e) {
       setError(e.message || "Não foi possível enviar a imagem.");
@@ -498,6 +362,8 @@ function ImageDropzone({
         id={id}
         className="sr-only"
         type="file"
+        disabled={busy}
+        aria-label={label}
         accept="image/jpeg,image/png,image/webp"
         onChange={(e) => void send(e.target.files?.[0])}
       />
@@ -535,14 +401,14 @@ function ImageDropzone({
   );
 }
 
-function Settings({ group, c, u, replaceConfig, scarcityView, setScarcityView }) {
-  applyTemplate = (id) => {
+function Settings({ group, c, u, replaceConfig, scarcityView, setScarcityView, editorProducts, addCustomElement, updateCustomElement, removeCustomElement, uploadOrderBumpImage }) {
+  const applyTemplate = (id) => {
     const preset = templatePresets[id] || {};
-    Object.entries(preset).forEach(([key, value]) => u(key, value));
-    if (preset.primary) u("buttonBgColor", preset.primary);
-    if (preset.borderColor) u("inputBorderColor", preset.borderColor);
-    if (Number.isInteger(preset.radius))
-      u("inputRadius", Math.min(preset.radius, 14));
+    replaceConfig(old => ({ ...old, ...preset,
+      ...(preset.primary ? { buttonBgColor: preset.primary, progressActiveColor: preset.primary } : {}),
+      ...(preset.borderColor ? { inputBorderColor: preset.borderColor } : {}),
+      ...(Number.isInteger(preset.radius) ? { inputRadius: Math.min(preset.radius, 14) } : {}),
+    }));
   };
   const moveLayoutEntry = (entryKey, direction) => {
     replaceConfig(reorderCheckoutLayout(c, entryKey, direction));
@@ -1017,6 +883,7 @@ function Settings({ group, c, u, replaceConfig, scarcityView, setScarcityView })
         <CheckoutElementsPanel
           config={c}
           updateConfig={u}
+          replaceConfig={replaceConfig}
           addElement={addCustomElement}
           updateElement={updateCustomElement}
           removeElement={removeCustomElement}
@@ -1953,6 +1820,8 @@ function Preview({
   );
 }
 
+const MemoPreview = memo(Preview);
+
 export function CheckoutDesignPreview({ config, onClose }) {
   const noop = () => {};
   return (
@@ -2001,16 +1870,12 @@ export function CheckoutAnalyticsPreview({ config, product }) {
 
 export default function CheckoutEditor({
   onBack,
-  onPreview,
   checkout,
   onSaveDraft,
   onPublish,
-  onCreateOrderBump,
   onUploadOrderBumpImage,
   products = [],
 }) {
-  editorProducts = products;
-  uploadOrderBumpImage = onUploadOrderBumpImage || uploadOrderBumpImage;
   const load = () => {
     const draft = checkout?.draftConfig || {};
     const testimonials = Array.isArray(draft.testimonials)
@@ -2048,245 +1913,144 @@ export default function CheckoutEditor({
         : defaultBlockOrder,
     };
   };
-  const [c, setC] = useState(load),
-    [saved, setSaved] = useState(load),
-    [history, setHistory] = useState([load()]),
-    [group, setGroup] = useState(null),
-    [scarcityView, setScarcityView] = useState(null),
-    [device, setDevice] = useState("mobile"),
-    [toast, setToast] = useState(""),
-    [busy, setBusy] = useState(false);
-  const dirty = JSON.stringify(c) !== JSON.stringify(saved);
-  const u = (k, v) =>
-    setC((old) => {
-      const next = { ...old, [k]: v };
-      setHistory((h) => [...h.slice(-19), next]);
-      return next;
-    });
-  const replaceConfig = (next) =>
-    setC((old) => {
-      const resolved = typeof next === "function" ? next(old) : next;
-      setHistory((h) => [...h.slice(-19), resolved]);
-      return resolved;
-    });
-  addCustomElement = (
-    type,
-    slot = 2,
-    index = Number.POSITIVE_INFINITY,
-    placement = {},
-  ) => {
-    if (!elementCatalog[type] || (c.customElements || []).length >= 20) return;
-    const freePlacement =
-      c.elementEditMode === "free" &&
-      placement.horizontalAlign &&
-      placement.horizontalAlign !== "center"
-        ? { ...placement, widthPercent: 50 }
-        : placement;
+  const [history, dispatch] = useReducer(checkoutEditorHistory, null, () => createEditorHistory(load()));
+  const c = history.present;
+  const [saved, setSaved] = useState(() => c);
+  const [group, setGroup] = useState(null);
+  const [scarcityView, setScarcityView] = useState(null);
+  const [device, setDevice] = useState("mobile");
+  const [toast, setToast] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState("");
+  const [previewOnly, setPreviewOnly] = useState(false);
+  const [mobileTab, setMobileTab] = useState("settings");
+  const [confirmExit, setConfirmExit] = useState(false);
+  const operation = useRef(false);
+  const toastTimer = useRef(null);
+  const dirty = useMemo(() => JSON.stringify(c) !== JSON.stringify(saved), [c, saved]);
+  const deferredConfig = useDeferredValue(c);
+  const services = useMemo(() => ({ uploadImage: onUploadOrderBumpImage || (async () => { throw new Error("Abra um checkout salvo para enviar imagens."); }) }), [onUploadOrderBumpImage]);
+  const replaceConfig = useCallback(value => dispatch({ type: "change", value, at: Date.now() }), []);
+  const u = useCallback((key, value) => dispatch({ type: "change", key, at: Date.now(), value: old => Object.is(old[key], value) ? old : { ...old, [key]: value } }), []);
+  const undo = useCallback(() => dispatch({ type: "undo" }), []);
+  const redo = useCallback(() => dispatch({ type: "redo" }), []);
+  const msg = useCallback((text, error = false) => { clearTimeout(toastTimer.current); setToast({ text, error }); toastTimer.current = setTimeout(() => setToast(null), error ? 7000 : 3500); }, []);
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = event => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+  const addCustomElement = useCallback((type, slot = 2, index = Number.POSITIVE_INFINITY, placement = {}) => {
+    if (!elementCatalog[type]) return;
     const region = customElementRegion(placement);
-    const element = {
-      ...newElementDefaults(type, slot, region),
-      ...freePlacement,
-      region,
-    };
-    u(
-      "customElements",
-      placeCustomElement(c.customElements || [], element, slot, index),
-    );
-    setGroup("Elementos");
-  };
-  updateCustomElement = (id, patch) =>
-    u(
-      "customElements",
-      (c.customElements || []).map((item) =>
-        item.id === id ? { ...item, ...patch } : item,
-      ),
-    );
-  removeCustomElement = (id) =>
-    u(
-      "customElements",
-      (c.customElements || []).filter((item) => item.id !== id),
-    );
-  const moveCustomElement = (id, slot, index, placement = {}) => {
-    const item = (c.customElements || []).find((current) => current.id === id);
-    const freePlacement =
-      c.elementEditMode === "free" &&
-      item &&
-      (item.widthPercent || 100) === 100 &&
-      placement.horizontalAlign &&
-      placement.horizontalAlign !== "center"
-        ? { ...placement, widthPercent: 50 }
-        : placement;
-    u(
-      "customElements",
-      reorderCustomElements(
-        c.customElements || [],
-        id,
-        slot,
-        index,
-        freePlacement,
-      ),
-    );
-  };
-  const undo = () =>
-    setHistory((h) => {
-      if (h.length < 2) return h;
-      const n = h.slice(0, -1);
-      setC(n.at(-1));
-      return n;
+    const element = { ...newElementDefaults(type, slot, region), ...placement, region };
+    replaceConfig(old => {
+      if ((old.customElements || []).length >= 20) return old;
+      const free = old.elementEditMode === "free" && placement.horizontalAlign && placement.horizontalAlign !== "center";
+      return { ...old, customElements: placeCustomElement(old.customElements || [], free ? { ...element, widthPercent: 50 } : element, slot, index) };
     });
-  const msg = (t) => {
-    setToast(t);
-    setTimeout(() => setToast(""), 1900);
-  };
-  createOrderBump = async () => {
-    const title = (c.orderBumpDraftTitle || "").trim();
-    const price = Math.round(
-      Number(String(c.orderBumpDraftPrice || "").replace(",", ".")) * 100,
-    );
-    if (!title || !Number.isInteger(price) || price < 1) {
-      msg("Informe nome e preço válido para o order bump");
-      return;
-    }
-    setBusy(true);
-    try {
-      const product = await onCreateOrderBump({
-        title,
-        priceCents: price,
-        description: (c.orderBumpDraftDescription || "").trim(),
-        imageUrl: (c.orderBumpDraftImageUrl || "").trim(),
-      });
-      u("orderBumpProductId", product.publicId);
-      u("orderBumpDraftTitle", "");
-      u("orderBumpDraftPrice", "");
-      u("orderBumpDraftDescription", "");
-      u("orderBumpDraftImageUrl", "");
-      msg("Produto criado e selecionado no order bump");
-    } catch (error) {
-      msg(error.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-  const save = async () => {
-    setBusy(true);
-    try {
-      await onSaveDraft(c);
-      setSaved(c);
-      msg("Rascunho salvo no servidor");
-    } catch (error) {
-      msg(error.message);
-    } finally {
-      setBusy(false);
-    }
-  };
+    setGroup("Elementos");
+  }, [replaceConfig]);
+  const updateCustomElement = useCallback((id, patch) => replaceConfig(old => ({ ...old, customElements: (old.customElements || []).map(item => item.id === id ? { ...item, ...patch } : item) })), [replaceConfig]);
+  const removeCustomElement = useCallback(id => replaceConfig(old => ({ ...old, customElements: (old.customElements || []).filter(item => item.id !== id) })), [replaceConfig]);
+  const moveCustomElement = useCallback((id, slot, index, placement = {}) => replaceConfig(old => {
+    const item = (old.customElements || []).find(current => current.id === id);
+    const free = old.elementEditMode === "free" && item && (item.widthPercent || 100) === 100 && placement.horizontalAlign && placement.horizontalAlign !== "center";
+    return { ...old, customElements: reorderCustomElements(old.customElements || [], id, slot, index, free ? { ...placement, widthPercent: 50 } : placement) };
+  }), [replaceConfig]);
+  const save = useCallback(async () => {
+    if (operation.current || !onSaveDraft) return false;
+    operation.current = true; setBusy(true);
+    const snapshot = c;
+    try { await onSaveDraft(snapshot); setSaved(snapshot); dispatch({ type: "checkpoint" }); msg("Rascunho salvo. Seu checkout publicado continua como estava."); return true; }
+    catch (error) { msg(error.message || "Não foi possível salvar. Suas alterações continuam no editor.", true); return false; }
+    finally { operation.current = false; setBusy(false); }
+  }, [c, onSaveDraft, msg]);
   const publish = async () => {
-    setBusy(true);
+    if (operation.current || !onPublish || !onSaveDraft) return;
+    operation.current = true; setBusy(true);
+    const snapshot = c;
     try {
-      if (dirty) {
-        await onSaveDraft(c);
-        setSaved(c);
-      }
+      if (dirty) { await onSaveDraft(snapshot); setSaved(snapshot); dispatch({ type: "checkpoint" }); }
       await onPublish();
-      msg("Checkout publicado com sucesso");
-    } catch (error) {
-      msg(error.message);
-    } finally {
-      setBusy(false);
-    }
+      msg("Checkout publicado. O novo visual já está disponível para seus clientes.");
+    } catch (error) { msg(error.message || "Não foi possível publicar. Tente novamente.", true); }
+    finally { operation.current = false; setBusy(false); }
   };
+  useEffect(() => {
+    const shortcuts = event => {
+      if (!(event.ctrlKey || event.metaKey) || busy || confirmExit) return;
+      if (event.key.toLowerCase() === "s") { event.preventDefault(); if (dirty) void save(); }
+      const input = event.target.closest?.('input,textarea,[contenteditable="true"]');
+      if (!input && event.key.toLowerCase() === "z") { event.preventDefault(); event.shiftKey ? redo() : undo(); }
+    };
+    window.addEventListener("keydown", shortcuts);
+    return () => window.removeEventListener("keydown", shortcuts);
+  }, [busy, dirty, save, undo, redo, confirmExit]);
+  const leave = () => { if (!busy) dirty ? setConfirmExit(true) : onBack(); };
+  const sections = [
+    { name: "Identidade visual", items: ["Modelos", "Aparência", "Cores", "Cabeçalho"] },
+    { name: "Experiência de compra", items: ["Conteúdo das etapas", "Elementos", "Escassez", "Efeitos dos botões"] },
+    { name: "Informações da loja", items: ["Rodapé", "Políticas", "Moeda e idioma", "SEO", "Rastreamento de saída"] },
+  ];
+  const descriptions = {
+    Modelos: "Um ponto de partida para sua marca", Aparência: "Layout, fonte e arredondamento", Cores: "Paleta, fundos e botões", Cabeçalho: "Logo e banners da campanha",
+    "Conteúdo das etapas": "Títulos, instruções e botão de compra", Elementos: "Blocos, ofertas e organização", Escassez: "Cronômetro e prova social", "Efeitos dos botões": "Movimento e resposta ao toque",
+    Rodapé: "Empresa e formas de pagamento", Políticas: "Privacidade e termos da loja", "Moeda e idioma": "Idioma e moeda de exibição", SEO: "Título, descrição e favicon", "Rastreamento de saída": "Destino após a compra aprovada",
+  };
+  const normalize = value => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const matches = name => !query || normalize(`${name} ${descriptions[name]}`).includes(normalize(query));
+  const choose = name => { setGroup(name); setScarcityView(null); setQuery(""); };
+  const previewName = device === "mobile" ? "Celular" : device === "tablet" ? "Tablet" : "Desktop";
   return (
-    <div className="checkout-editor">
+    <EditorServices.Provider value={services}>
+    <div className={`checkout-editor solid-editor ${previewOnly ? "preview-only" : ""} mobile-${mobileTab}`}>
       <header className="editor-top">
-        <button className="icon-btn" onClick={onBack}>
-          <ArrowLeft size={19} />
-        </button>
-        <div className="editor-search">
-          <b>Checkout principal</b>
-          <span>{dirty ? "Alterações não salvas" : "Salvo"}</span>
-        </div>
-        <div className="device-picker">
-          {[
-            ["mobile", Smartphone],
-            ["tablet", Tablet],
-            ["desktop", Laptop],
-          ].map(([id, I]) => (
-            <button
-              key={id}
-              className={device === id ? "active" : ""}
-              onClick={() => setDevice(id)}
-            >
-              <I size={17} />
-            </button>
-          ))}
-        </div>
+        <button className="editor-back" onClick={leave} disabled={busy} aria-label="Voltar para checkouts"><ArrowLeft size={20}/></button>
+        <div className="editor-identity"><span className="editor-eyebrow">ESTÚDIO DO CHECKOUT</span><strong>{checkout?.name || "Personalizar checkout"}</strong><span className={`editor-save-state ${dirty ? "dirty" : ""}`} role="status"><i/>{busy ? "Processando..." : dirty ? "Alterações não salvas" : "Rascunho salvo"}</span></div>
         <div className="editor-actions">
-          <button
-            className="editor-action"
-            onClick={undo}
-            disabled={history.length < 2}
-          >
-            <Undo2 size={16} /> Desfazer
-          </button>
-          <button className="editor-action" onClick={() => onPreview(c)}>
-            <Eye size={16} /> Visualizar
-          </button>
-          <button className="editor-action" onClick={save} disabled={!dirty}>
-            <Save size={16} /> Salvar rascunho
-          </button>
-          <button className="publish-btn" onClick={publish}>
-            <Send size={16} /> Publicar
-          </button>
+          <div className="editor-history"><button onClick={undo} disabled={busy || !history.past.length} aria-label="Desfazer alteração" title="Desfazer (Ctrl+Z)"><Undo2 size={18}/></button><button onClick={redo} disabled={busy || !history.future.length} aria-label="Refazer alteração" title="Refazer (Ctrl+Shift+Z)"><Redo2 size={18}/></button></div>
+          <button className="editor-action preview-action" onClick={() => setPreviewOnly(value => !value)} aria-pressed={previewOnly}><Eye size={17}/><span>{previewOnly ? "Voltar à edição" : "Visualizar"}</span></button>
+          <button className="editor-action save-action" onClick={() => void save()} disabled={busy || !dirty || !onSaveDraft}><Save size={17}/><span>Salvar rascunho</span></button>
+          <button className="publish-btn" onClick={() => void publish()} disabled={busy || !onPublish}><Send size={17}/><span>{busy ? "Aguarde..." : "Publicar"}</span></button>
         </div>
       </header>
+      <div className="editor-workbar"><span><Palette size={16}/> {previewOnly ? "Confira antes de publicar" : "Crie uma experiência com a sua marca"}</span><div className="device-picker" role="group" aria-label="Dispositivo da prévia">{[["mobile", Smartphone, "Celular"], ["tablet", Tablet, "Tablet"], ["desktop", Laptop, "Desktop"]].map(([id, Icon, label]) => <button key={id} className={device === id ? "active" : ""} aria-pressed={device === id} aria-label={`Prévia em ${label.toLowerCase()}`} onClick={() => setDevice(id)}><Icon size={17}/><span>{label}</span></button>)}</div><small>Prévia visual · sem cobrança</small></div>
+      {<div className="editor-mobile-tabs" role="group" aria-label="Área do editor"><button aria-pressed={!previewOnly && mobileTab === "settings"} onClick={() => { setPreviewOnly(false); setMobileTab("settings"); }}><SlidersHorizontal size={16}/> Personalizar</button><button aria-pressed={previewOnly || mobileTab === "preview"} onClick={() => setMobileTab("preview")}><Eye size={16}/> Prévia</button></div>}
       <div className="editor-layout">
-        <aside className="editor-panel">
-          {group && (
-            <button className="panel-back" onClick={() => {
-              if (group === "Escassez" && scarcityView) setScarcityView(null);
-              else setGroup(null);
-            }}>
-              <ArrowLeft size={16} /> Voltar
-            </button>
-          )}
-          {!group ? (
-            <nav>
-              {groups.map(([n, I]) => (
-                <button key={n} onClick={() => { setGroup(n); setScarcityView(null); }}>
-                  <I size={17} />
-                  <span>{n}</span>
-                  <ChevronRight size={16} />
-                </button>
-              ))}
-            </nav>
-          ) : (
-            <div className="panel-settings">
-              <Settings
-                group={group}
-                c={c}
-                u={u}
-                replaceConfig={replaceConfig}
-                scarcityView={scarcityView}
-                setScarcityView={setScarcityView}
-              />
-            </div>
-          )}
+        <aside className="editor-panel" aria-label="Personalização do checkout" inert={busy ? true : undefined}>
+          <div className="editor-panel-intro"><span className="editor-eyebrow">PERSONALIZAR</span><h2>{group && !query ? group : "Do seu jeito."}</h2><p>{group && !query ? descriptions[group] : "Ajuste os detalhes e acompanhe o resultado ao lado."}</p><label className="editor-find"><Search size={17}/><input aria-label="Buscar configurações" placeholder="Buscar configurações..." value={query} onChange={event => setQuery(event.target.value)}/>{query && <button aria-label="Limpar busca" onClick={() => setQuery("")}><X size={15}/></button>}</label></div>
+          {group && !query && <button className="panel-back" onClick={() => { if (group === "Escassez" && scarcityView) setScarcityView(null); else setGroup(null); }}><ArrowLeft size={15}/> Todas as configurações</button>}
+          {!group || query ? <nav aria-label="Seções de personalização">{sections.map(section => <section className="editor-nav-section" key={section.name}>{section.items.some(matches) && <h3>{section.name}</h3>}{section.items.filter(matches).map(name => { const Icon = groups.find(([label]) => label === name)?.[1] || Palette; return <button key={name} onClick={() => choose(name)}><span className="editor-nav-icon"><Icon size={18}/></span><span><b>{name}</b><small>{descriptions[name]}</small></span><ChevronRight size={15}/></button>; })}</section>)}{!sections.some(section => section.items.some(matches)) && <p className="editor-search-empty">Nenhuma configuração encontrada. Tente “cores”, “logo” ou “texto”.</p>}<div className="editor-panel-tip"><ShieldCheck size={18}/><p><b>Você está editando um rascunho.</b> O checkout da loja só muda quando você publica.</p></div></nav> : <div className="panel-settings"><Settings key={group} group={group} c={c} u={u} replaceConfig={replaceConfig} scarcityView={scarcityView} setScarcityView={setScarcityView} editorProducts={products} addCustomElement={addCustomElement} updateCustomElement={updateCustomElement} removeCustomElement={removeCustomElement} uploadOrderBumpImage={services.uploadImage}/></div>}
         </aside>
-        <main className="editor-canvas">
-          <Preview
-            c={c}
-            device={device}
-            onAddElement={addCustomElement}
-            onMoveElement={moveCustomElement}
-            onRemoveElement={removeCustomElement}
-          />
+        <main className="editor-canvas" aria-label="Prévia do checkout" aria-busy={deferredConfig !== c}>
+          <div className="editor-preview-caption"><span><i/> PRÉVIA EM TEMPO REAL</span><b>{previewName}</b><small>{device === "mobile" ? "Até 390 px" : device === "tablet" ? "Até 768 px" : "Até 1120 px"}</small></div>
+          <div className={`editor-preview-stage stage-${device}`} inert={busy ? true : undefined}><MemoPreview c={deferredConfig} device={device} onAddElement={addCustomElement} onMoveElement={moveCustomElement} onRemoveElement={removeCustomElement} readOnly={previewOnly || mobileTab === "preview" || group !== "Elementos"}/></div>
+          <p className="editor-preview-note">Conteúdo de demonstração. Produtos e valores reais aparecem no checkout da loja.</p>
         </main>
       </div>
-      {toast && (
-        <div className="editor-toast">
-          <Check size={16} />
-          {toast}
-        </div>
-      )}
+      {toast && <div className={`editor-toast ${toast.error ? "error" : ""}`} role={toast.error ? "alert" : "status"}>{toast.error ? <AlertCircle size={18}/> : <Check size={18}/>}<span>{toast.text}</span><button aria-label="Fechar mensagem" onClick={() => setToast(null)}><X size={16}/></button></div>}
+      {confirmExit && <ExitEditorDialog busy={busy} canSave={Boolean(onSaveDraft)} onCancel={() => setConfirmExit(false)} onDiscard={onBack} onSave={async () => { if (await save()) onBack(); }}/>}
     </div>
+    </EditorServices.Provider>
   );
+}
+
+function ExitEditorDialog({ busy, canSave, onCancel, onDiscard, onSave }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const previous = document.activeElement;
+    ref.current?.querySelector('button')?.focus();
+    return () => previous?.focus();
+  }, []);
+  const keys = event => {
+    if (event.key === 'Escape' && !busy) onCancel();
+    if (event.key !== 'Tab') return;
+    const buttons = [...ref.current.querySelectorAll('button:not(:disabled)')];
+    if (event.shiftKey && document.activeElement === buttons[0]) { event.preventDefault(); buttons.at(-1)?.focus(); }
+    if (!event.shiftKey && document.activeElement === buttons.at(-1)) { event.preventDefault(); buttons[0]?.focus(); }
+  };
+  return <div className="editor-exit-overlay"><section ref={ref} className="editor-exit-dialog" role="dialog" aria-modal="true" aria-labelledby="editor-exit-title" onKeyDown={keys}><span className="editor-exit-icon"><Save size={24}/></span><h2 id="editor-exit-title">Guardar suas alterações?</h2><p>Você tem mudanças que ainda não foram salvas. Salve um rascunho para continuar depois.</p><div><button className="secondary" onClick={onCancel} disabled={busy}>Continuar editando</button><button className="editor-discard" onClick={onDiscard} disabled={busy}>Sair sem salvar</button><button className="primary" onClick={onSave} disabled={busy || !canSave}>{busy ? "Salvando..." : "Salvar e sair"}</button></div></section></div>;
 }
