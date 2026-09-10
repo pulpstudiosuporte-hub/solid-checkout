@@ -22,5 +22,7 @@ jobs:
           node-version: 22.12.0
           cache: npm
       - run: npm ci --ignore-scripts
+      # Lint resolves database types before the build generates them.
+      - run: npm run db:generate
       - run: npm run check
       - run: npm run audit:prod
