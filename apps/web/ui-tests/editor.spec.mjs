@@ -170,3 +170,60 @@ test('editor: code loads on demand and unsupported image stays local', async ({ 
   await expect(page.getByRole('alert')).toContainText('Use JPG, PNG ou WebP');
   expect(mutations).toEqual([]);
 });
+
+test('editor: touch controls, tablet split layout and mobile fixed actions', async ({ page }) => {
+  await mockAdmin(page); await mockWrites(page); await openEditor(page);
+  for (const [width, height] of [[320, 740], [390, 844], [540, 900], [700, 900], [768, 1024], [820, 1180], [1024, 768]]) {
+    await page.setViewportSize({ width, height });
+    const editor = page.locator('.solid-editor');
+    expect(await editor.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+    for (const name of ['Voltar para checkouts', 'Desfazer alteração', 'Refazer alteração', 'Salvar rascunho', 'Publicar']) {
+      const button = page.getByRole('button', { name, exact: true });
+      await expect(button).toBeInViewport();
+      const bounds = await button.boundingBox();
+      expect(bounds.width).toBeGreaterThanOrEqual(44);
+      expect(bounds.height).toBeGreaterThanOrEqual(44);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+    }
+    if (width <= 700) {
+      await expect(page.locator('.editor-workbar')).toBeHidden();
+      const bar = await page.locator('.editor-actions').boundingBox();
+      expect(bar.y).toBeGreaterThan(height - 100);
+      const panel = await page.locator('.editor-panel').boundingBox();
+      expect(panel.y + panel.height).toBeLessThanOrEqual(bar.y + 1);
+    } else {
+      await expect(page.locator('.editor-panel')).toBeVisible();
+      await expect(page.locator('.editor-canvas')).toBeVisible();
+      const panel = await page.locator('.editor-panel').boundingBox();
+      const canvas = await page.locator('.editor-canvas').boundingBox();
+      expect(canvas.x).toBeGreaterThanOrEqual(panel.x + panel.width);
+    }
+    if ([390,768,1024].includes(width)) await page.screenshot({ path: output(`responsive-editor-${width}.png`), fullPage: true });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await section(page, 'Elementos');
+  await page.locator('.element-row-copy').filter({ hasText: /^Texto/ }).click();
+  await expect(page.getByRole('button', { name: 'Voltar aos elementos' })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Aplicar ao rascunho' })).toBeInViewport();
+  await page.screenshot({ path: output('responsive-editor-block-mobile.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await editTitle(page, 'Edição no celular');
+  await page.getByRole('button', { name: 'Prévia', exact: true }).click();
+  await expect(page.locator('.editor-workbar')).toBeVisible();
+  await expect(page.locator('.editor-panel')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Voltar para checkouts' })).toBeInViewport();
+  expect((await page.locator('.editor-top').boundingBox()).y).toBeGreaterThanOrEqual(0);
+  await expect(page.getByRole('button', { name: 'Prévia', exact: true })).toHaveCSS('background-color', 'rgb(242, 234, 250)');
+  await page.screenshot({ path: output('responsive-editor-preview-mobile.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Salvar rascunho' }).click();
+  await expect(page.locator('.editor-toast')).toContainText('Rascunho salvo');
+  await expect(page.getByRole('button', { name: 'Publicar', exact: true })).toBeInViewport();
+  await page.getByRole('button', { name: 'Personalizar', exact: true }).click();
+  await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Edição no celular');
+  await page.setViewportSize({ width: 667, height: 375 });
+  await page.getByLabel('Título', { exact: true }).fill('Edição na horizontal');
+  await page.getByRole('button', { name: 'Voltar para checkouts' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByRole('button', { name: 'Continuar editando' }).click();
+  await page.screenshot({ path: output('responsive-editor-landscape.png'), fullPage: true });
+});

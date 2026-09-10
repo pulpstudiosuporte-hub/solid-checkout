@@ -2,6 +2,8 @@
 
 O editor abre em Checkouts → Personalizar, em uma área que ocupa a tela toda. A navegação agrupa identidade visual, experiência de compra e informações da loja. A busca considera nomes e descrições das configurações, sem diferenciar acentos.
 
+No celular (até 700 px), as ações Salvar, Publicar e desfazer/refazer ficam numa barra inferior, com espaço reservado no conteúdo e suporte às áreas seguras da tela. As abas alternam edição e prévia; a seleção do dispositivo aparece durante a visualização. No tablet, configurações e prévia ficam lado a lado. Controles maiores, campos com fonte de 16 px e rolagem independente favorecem o toque. O painel de blocos mantém suas ações locais visíveis, acima da barra de salvamento.
+
 ## Edição e publicação
 
 - A prévia acompanha o rascunho. Visualizar e voltar à edição preserva as mudanças. No celular, use Personalizar e Prévia para alternar as áreas.
@@ -30,3 +32,5 @@ npm.cmd run test:ui
 A suíte `apps/web/ui-tests/editor.spec.mjs` usa o Chrome instalado, viewports reais e respostas de API fictícias. Cobre seções, busca, modelos, desfazer/refazer, prévia, salvamento, publicação, falhas de API, saída com alterações, upload inválido e carregamento sob demanda. As capturas `editor-desktop.png`, `editor-mobile.png`, `editor-mobile-preview.png`, `editor-colors.png` e `editor-element.png` ficam em `.visual-check/` e devem ser abertas para revisão visual.
 
 Login real, persistência no servidor, upload aceito pelo serviço, publicação em domínio real e pagamento ponta a ponta dependem de ambiente integrado e não são comprovados por esses testes simulados.
+
+A revisão responsiva também captura `responsive-editor-390.png`, `responsive-editor-768.png`, `responsive-editor-1024.png`, `responsive-editor-block-mobile.png`, `responsive-editor-preview-mobile.png` e `responsive-editor-landscape.png`. O teste verifica áreas de toque, limites do viewport, barras sem sobreposição e retorno da prévia entre 320 e 1024 px. Teclado virtual e recortes físicos de aparelhos ainda precisam ser conferidos em dispositivos reais.

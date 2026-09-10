@@ -2013,7 +2013,7 @@ export default function CheckoutEditor({
         <div className="editor-actions">
           <div className="editor-history"><button onClick={undo} disabled={busy || !history.past.length} aria-label="Desfazer alteração" title="Desfazer (Ctrl+Z)"><Undo2 size={18}/></button><button onClick={redo} disabled={busy || !history.future.length} aria-label="Refazer alteração" title="Refazer (Ctrl+Shift+Z)"><Redo2 size={18}/></button></div>
           <button className="editor-action preview-action" onClick={() => setPreviewOnly(value => !value)} aria-pressed={previewOnly}><Eye size={17}/><span>{previewOnly ? "Voltar à edição" : "Visualizar"}</span></button>
-          <button className="editor-action save-action" onClick={() => void save()} disabled={busy || !dirty || !onSaveDraft}><Save size={17}/><span>Salvar rascunho</span></button>
+          <button className="editor-action save-action" aria-label="Salvar rascunho" onClick={() => void save()} disabled={busy || !dirty || !onSaveDraft}><Save size={17}/><span className="editor-label-full">Salvar rascunho</span><span className="editor-label-short" aria-hidden="true">Salvar</span></button>
           <button className="publish-btn" onClick={() => void publish()} disabled={busy || !onPublish}><Send size={17}/><span>{busy ? "Aguarde..." : "Publicar"}</span></button>
         </div>
       </header>
