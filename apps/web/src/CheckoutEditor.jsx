@@ -46,7 +46,6 @@ import {
   buildCheckoutLayoutEntries,
   reorderCheckoutLayout,
 } from "./checkout-layout";
-import "./checkout-polish.css";
 
 export { reorderCheckoutLayout } from "./checkout-layout";
 

@@ -24,6 +24,7 @@ export async function syncPaidShopifyOrder(environment: AppEnvironment, reposito
   try {
     const existing = await repository.shopifyOrderId(checkoutSessionId);
     if (existing) {
+      if (!existing.paid) return;
       affectedStoreId = existing.storeId;
       await markAsPaid(environment, repository, existing.storeId, existing.orderId);
       await repository.markOrderPaymentSynced(checkoutSessionId, new Date());

@@ -30,7 +30,7 @@ export interface ShopifyRepository {
   markOrderSynced(checkoutSessionId: string, order: { id: string; name?: string | null }, now: Date): Promise<void>;
   markOrderPaymentSynced(checkoutSessionId: string, now: Date): Promise<void>;
   markOrderSyncFailed(checkoutSessionId: string, message: string): Promise<void>;
-  shopifyOrderId(checkoutSessionId: string): Promise<{ storeId: string; orderId: string } | null>;
+  shopifyOrderId(checkoutSessionId: string): Promise<{ storeId: string; orderId: string; paid: boolean } | null>;
   paidOrdersAwaitingSync(now: Date): Promise<readonly string[]>;
 }
 
@@ -137,9 +137,9 @@ export class PrismaShopifyRepository implements ShopifyRepository {
   async markOrderSyncFailed(checkoutSessionId: string, message: string): Promise<void> {
     await this.database.checkoutSession.updateMany({ where: { id: checkoutSessionId }, data: { shopifySyncStatus: 'FAILED', shopifySyncError: message.slice(0, 500) } });
   }
-  async shopifyOrderId(checkoutSessionId: string): Promise<{ storeId: string; orderId: string } | null> {
-    const session = await this.database.checkoutSession.findUnique({ where: { id: checkoutSessionId }, select: { shopifyOrderId: true, checkout: { select: { storeId: true } } } });
-    return session?.shopifyOrderId ? { storeId: session.checkout.storeId, orderId: session.shopifyOrderId } : null;
+  async shopifyOrderId(checkoutSessionId: string): Promise<{ storeId: string; orderId: string; paid: boolean } | null> {
+    const session = await this.database.checkoutSession.findUnique({ where: { id: checkoutSessionId }, select: { shopifyOrderId: true, status: true, checkout: { select: { storeId: true } } } });
+    return session?.shopifyOrderId ? { storeId: session.checkout.storeId, orderId: session.shopifyOrderId, paid: session.status === 'COMPLETED' } : null;
   }
   async paidOrdersAwaitingSync(now: Date): Promise<readonly string[]> {
     const staleBefore = new Date(now.getTime() - 2 * 60_000);

@@ -16,6 +16,7 @@
     "dev:web": "npm run dev --workspace=@solid/web",
     "dev:api": "npm run dev --workspace=@solid/api",
     "dev:worker": "npm run dev --workspace=@solid/worker",
+    "visual:check": "npm run build --workspace=@solid/web && node scripts/visual-check.mjs",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",

@@ -3,9 +3,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import { decryptSecret } from './shopify-crypto.js';
 import type { PrismaGatewayRepository } from './gateway-repository.js';
 import type { ShopifyRepository } from './shopify-repository.js';
-import { syncPaidShopifyOrder } from './shopify-order-sync.js';
 import { getWestPayPix } from './westpay-client.js';
-import { syncMetaEvent } from './meta-sync.js';
 
 const paymentStatus = (value: string | undefined) => {
   const status = value?.toUpperCase();
@@ -17,7 +15,7 @@ const paymentStatus = (value: string | undefined) => {
   return null;
 };
 
-export function startWestPayReconciliation(environment: AppEnvironment, gateways: PrismaGatewayRepository, shopify: ShopifyRepository, log: FastifyBaseLogger): () => void {
+export function startWestPayReconciliation(environment: AppEnvironment, gateways: PrismaGatewayRepository, _shopify: ShopifyRepository, log: FastifyBaseLogger): () => void {
   if (!environment.APP_ENCRYPTION_KEY) return () => undefined;
   let running = false;
   const reconcile = async () => {
@@ -37,8 +35,6 @@ export function startWestPayReconciliation(environment: AppEnvironment, gateways
             continue;
           }
           await gateways.confirmPayment(attempt.id, attempt.checkoutSessionId, status, status === 'PAID' ? new Date() : undefined);
-          if (status === 'PAID') await syncMetaEvent(environment, gateways, attempt.checkoutSessionId, 'Purchase', log);
-          if (status === 'PAID') await syncPaidShopifyOrder(environment, shopify, attempt.checkoutSessionId);
         } catch (error) { log.warn({ err: error, paymentAttemptId: attempt.id }, 'westpay_reconciliation_item_failed'); }
       }
     } catch (error) { log.error({ err: error }, 'westpay_reconciliation_failed'); }

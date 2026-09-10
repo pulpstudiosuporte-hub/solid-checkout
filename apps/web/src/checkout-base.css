@@ -1,0 +1,95 @@
+/* Base rules shared with the existing checkout; admin styles load separately. */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Roboto:wght@400;500;700;900&display=swap');
+:root{--bg:#f6f7f9;--surface:#fff;--text:#17171a;--muted:#71717c;--border:#e5e5e9;--primary:#7357e9;--primary-dark:#5c40d2;--success:#149c62;--warning:#d68118;--danger:#d94343;--radius:14px;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--text);background:var(--bg);font-synthesis:none}
+*{box-sizing:border-box}body{margin:0;min-width:320px}button,input,select{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid rgba(115,87,233,.25);outline-offset:2px}.app{display:flex;min-height:100vh}.sidebar{width:244px;background:#fbfbfc;border-right:1px solid var(--border);position:fixed;inset:0 auto 0 0;z-index:30;display:flex;flex-direction:column}.brand{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:800;letter-spacing:.8px}.sidebar nav{padding:0 12px}.search{width:min(430px,42vw);height:40px;border:1px solid var(--border);background:#f8f8fa;border-radius:10px;display:flex;align-items:center;padding:0 12px;gap:9px;color:#94949c}.search input{border:0;background:transparent;outline:0;flex:1;min-width:0;font-size:12px}.search kbd{font-size:10px;border:1px solid #dddde3;background:#fff;border-radius:5px;padding:3px 6px}.primary{border:0;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:700}.primary{background:var(--primary);color:#fff;padding:11px 16px;box-shadow:0 3px 8px rgba(92,64,210,.16)}.primary:hover{background:var(--primary-dark);transform:translateY(-1px)}.primary.small{padding:9px 13px;font-size:12px}.eyebrow{font-size:10px!important;color:var(--primary)!important;font-weight:800;letter-spacing:1.1px}.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 2px 4px rgba(25,25,30,.025)}.line{fill:none;stroke:#7357e9;stroke-width:3;stroke-linecap:round}.progress{height:5px;background:#eeeef1;border-radius:5px;margin:18px 0}.progress span{display:block;height:100%;background:var(--primary);border-radius:5px}table{width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap}th{text-align:left;font-size:9px;color:#92929b;font-weight:600;background:#fafafb;padding:11px 18px;border-block:1px solid #eeeeF1}td{padding:12px 18px;border-bottom:1px solid #f0f0f2}.customer{display:flex;align-items:center;gap:8px}.customer>span{width:28px;height:28px;border-radius:50%;background:#eeeafd;color:#6348cb;display:grid;place-items:center;font-size:8px;font-weight:700}
+/* Order bumps and optimized image upload */
+
+/* Public checkout */.step{display:flex;align-items:center;gap:8px;color:#a0a0a7}.step span{width:28px;height:28px;border-radius:50%;border:1px solid #d8d8dd;display:grid;place-items:center;font-size:11px}.step b{font-size:10px}.step.active{color:var(--primary-dark)}.step.active span{background:#eeeafd;border-color:#cfc3f8}.bump{display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;gap:11px;background:#fff;border:1px dashed #cfcbdc;border-radius:14px;padding:15px;cursor:pointer;transition:.2s}.bump.selected{border:1px solid #8c75eb;background:#fbfaff;box-shadow:0 0 0 3px #eeeafd}.bump>input{position:absolute;opacity:0}.bump h3{font-size:11px;margin:5px 0 3px}.bump p{font-size:9px;color:var(--muted);margin:0}.bump>strong{font-size:11px}.product{display:flex;gap:14px;padding-bottom:20px}.product h2{font-size:15px;margin:7px 0 4px}.product p{font-size:10px;color:var(--muted);line-height:1.5;margin:0}
+@media(max-width:1050px){.sidebar{transform:translateX(-100%);transition:.25s}}
+@media(max-width:760px){.search{flex:1;width:auto}.search kbd{display:none}.product{padding-bottom:14px}.product p{display:none}.bump{grid-template-columns:auto 1fr auto}.bump>div:nth-of-type(2){grid-column:2}.bump>strong{grid-column:3;grid-row:1}}
+@media(max-width:480px){.search input::placeholder{color:transparent}.bump{grid-template-columns:1fr auto}.bump>div:nth-of-type(2){grid-column:1}.bump>strong{grid-column:2}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* Checkout visual editor */
+
+/* SOLID brand assets */
+.brand{gap:9px;min-width:0}
+
+/* Authentication */.session-loading{min-height:100vh;display:flex;align-items:center;justify-content:center;gap:12px;background:#f7f7fa;color:#625e70}.spin{animation:solid-spin .8s linear infinite}@keyframes solid-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.spin{animation-duration:1.6s}}
+
+/* Account security */
+
+/* Central unificada de configurações */
+
+/* Store context */
+
+/* Store archive layout */
+/* Shopify integration */
+
+/* Product catalog */
+
+/* Public checkout */
+.public-checkout{min-height:100vh;background:#f6f6f8;color:#17171f}.public-checkout>header{height:70px;border-bottom:1px solid #e3e3e8;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 max(24px,calc((100vw - 1120px)/2))}.public-checkout>header>b{font-size:21px;letter-spacing:.08em}.public-checkout>header>span{display:flex;align-items:center;gap:7px;color:#13784c;font-size:12px;font-weight:700}.public-checkout-grid{width:min(1120px,calc(100% - 32px));margin:48px auto;display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:24px}.public-checkout-grid>section,.public-checkout-grid>aside{border:1px solid #e0e0e6;border-radius:16px;background:#fff;padding:30px}.public-checkout-grid h1{font-size:30px;margin:8px 0 25px}.public-form-card{display:grid;gap:18px}.public-form-card label{display:grid;gap:8px;font-size:12px;font-weight:700}.public-form-card select,.public-form-card input{height:48px;border:1px solid #d7d7df;border-radius:10px;background:#fff;padding:0 12px;font:inherit}.public-form-card button{height:52px;border:0;border-radius:11px;background:#6747df;color:#fff;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:800}.public-form-card button:disabled{opacity:.55}.public-error{border:1px solid #fecaca;border-radius:9px;background:#fff1f2;padding:11px;color:#b42318;font-size:12px}.public-checkout-grid>aside{height:max-content}.public-checkout-grid>aside>img,.public-product-placeholder{width:100%;aspect-ratio:1.5;border-radius:12px;background:#f1f1f4;object-fit:contain;display:grid;place-items:center;color:#aaa}.public-checkout-grid>aside h2{margin:20px 0 8px;font-size:19px}.public-checkout-grid>aside p{color:#6e6e78;font-size:12px;line-height:1.6}.public-checkout-grid>aside>div:last-of-type{display:flex;justify-content:space-between;border-top:1px solid #e5e5ea;margin-top:20px;padding-top:18px}.public-checkout-grid>aside>small{display:block;margin-top:17px;color:#777780;font-size:10px}.public-session-created{text-align:center;border:1px solid #ccebd9;border-radius:14px;background:#f1fbf5;padding:35px;color:#14784d}.public-session-created h2{color:#17171f}.public-session-created p,.public-session-created small{display:block;color:#5f6f66}.public-session-created strong{display:block;margin:20px;font-size:25px}.public-checkout-state{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:#f6f6f8;color:#686872}.public-checkout-state.error{color:#b42318}.public-checkout-state b{font-size:18px}.public-checkout-state span{font-size:12px}@media(max-width:780px){.public-checkout-grid{grid-template-columns:1fr;margin:24px auto}.public-checkout-grid>aside{order:-1}.public-checkout-grid>section,.public-checkout-grid>aside{padding:20px}.public-checkout-grid>aside>img,.public-product-placeholder{aspect-ratio:2.2}.public-checkout-grid h1{font-size:24px}}
+
+/* Order bump actions */
+
+/* Custom domains */
+
+/* Public checkout recovery */
+.public-checkout-state>button{min-width:160px;min-height:46px;margin-top:8px;padding:0 20px;border:0;border-radius:11px;background:#6747df;color:#fff;font:inherit;font-weight:800;cursor:pointer}.public-checkout-state>button:focus-visible{outline:3px solid #c4b5fd;outline-offset:3px}
+
+/* Platform users administration */
+.session-conflict{min-height:100vh;display:grid;place-items:center;padding:24px;background:#f6f7fb}.session-conflict-card{width:min(520px,100%);padding:44px;text-align:center;background:#fff;border:1px solid #e4e5eb;border-radius:22px;box-shadow:0 20px 60px rgba(30,24,60,.1)}.session-conflict-icon{width:68px;height:68px;margin:0 auto 20px;display:grid;place-items:center;border-radius:50%;color:#6947e8;background:#f0ebff}.session-conflict-card h1{margin:8px 0 12px;font-size:30px}.session-conflict-card>p:not(.eyebrow){margin:0 auto 24px;color:#686578;line-height:1.6}.session-conflict-card .primary{width:100%;justify-content:center;margin-bottom:18px}.session-conflict-card small{display:block;color:#7b7888;line-height:1.5}
+
+/* Coupon management */
+
+/* Checkout width is shared by the editor preview and the published page. */
+
+/* Full-size desktop checkout preview: same hierarchy as the published page. */
+
+/* Layered element builder. */.public-custom-progress{display:block;height:8px;margin-top:12px;border-radius:999px;background:color-mix(in srgb,currentColor 14%,transparent);overflow:hidden}.public-custom-progress i{display:block;height:100%;border-radius:inherit;background:var(--ep)}
+
+/* Platform operations and delivery recovery */
+.session-device{display:flex;align-items:flex-start;gap:12px;padding:14px 0;border-bottom:1px solid var(--border,#e7e4ec)}.session-device>div{display:flex;flex:1;flex-direction:column;gap:3px;min-width:0}.session-device strong{display:flex;align-items:center;gap:8px}.session-device strong small{padding:2px 7px;border-radius:999px;background:#e8f8ef;color:#087c49}.session-device span{font-size:12px;color:#77717f}
+
+/* Installable mobile app and notification audio */
+@media(max-width:600px){body{overscroll-behavior-y:contain}}
+
+/* Dashboard v2 */
+
+/* Cloudflare Turnstile */
+
+/* Administrative commercial benefits */
+/* Central administrativa avançada */
+
+/* Início e análises */
+
+/* Checkout progress and summary banner preview. */
+
+/* Any custom element may carry an optimized image. */
+
+/* Independent visual tokens: buttons no longer recolor accents and inputs obey their own fill. */
+
+/* Full-screen design preview used by the real checkout editor. */@keyframes world-route-draw{to{stroke-dashoffset:0}}@keyframes world-point-pulse{0%{transform:scale(1);opacity:.65}100%{transform:scale(3.2);opacity:0}}
+
+/* Checkout controls: independent step tokens, professional trust cards and richer CTA motion. */
+@keyframes ep-button-pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ebutton-bg,var(--ep)) 28%,transparent)}50%{box-shadow:0 0 0 7px transparent}}
+@keyframes ep-button-shine{0%,55%{left:-35%}85%,100%{left:120%}}
+@keyframes ep-button-glow{from{box-shadow:0 7px 18px color-mix(in srgb,var(--ebutton-bg,var(--ep)) 18%,transparent)}to{box-shadow:0 9px 30px color-mix(in srgb,var(--ebutton-bg,var(--ep)) 48%,transparent)}}
+@keyframes ep-button-gradient{to{background-position:220% 0}}
+
+/* Checkout step icon variant and mobile summary preview. */
+/* Store activation onboarding */
+
+/* Automatic custom-domain verification */
+
+/* Checkout SEO preview */
+
+/* Review media is a customer avatar in both the editor and live checkout. */
+.public-custom-element:is(.type-testimonial,.type-reviews) .public-custom-stars{
+  display:block;
+  margin-bottom:4px;
+  line-height:1;
+  letter-spacing:1px;
+}

@@ -31,7 +31,7 @@ const stopJobLeader = startJobLeader(environment.DATABASE_URL, app.log, () => {
     startRoasReconciliation(environment, gatewayRepository, shopifyRepository, app.log),
     startShopifyOrderReconciliation(environment, shopifyRepository, app.log),
     startConfirmationEmailDelivery(environment, database, app.log),
-    startIntegrationDelivery(environment, gatewayRepository, app.log),
+    startIntegrationDelivery(environment, gatewayRepository, app.log, shopifyRepository),
     startSecurityCleanup(database, app.log),
     startAbandonedRecovery(environment, database, app.log),
     startWebhookDelivery(environment, database, app.log)

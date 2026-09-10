@@ -1,3 +1,4 @@
+import { dailySales } from './dashboard-metrics.js';
 import { createHash } from 'node:crypto';
 import type { AppEnvironment } from '@solid/config';
 import type { PrismaClient } from '@solid/database';
@@ -23,7 +24,6 @@ const visitorKey = (tracking: Record<string, unknown>, fallback: string): string
 };
 
 type DashboardPeriod = 'today' | 'yesterday' | '7d' | 'month' | 'year';
-const dashboardCache = new Map<string, { expiresAt: number; payload: unknown }>();
 
 function periodStart(now: Date, period: DashboardPeriod): Date {
   const today = dayFormatter.format(now);
@@ -37,6 +37,7 @@ function periodStart(now: Date, period: DashboardPeriod): Date {
 }
 
 export function registerDashboardRoutes(app: FastifyInstance, environment: AppEnvironment, auth: AuthRepository, db: PrismaClient): void {
+  const dashboardCache = new Map<string, { expiresAt: number; payload: unknown }>();
   const cookie = environment.NODE_ENV === 'production' ? '__Host-solid_session' : 'solid_session';
 
   app.get<{ Querystring: { period?: string } }>('/dashboard', async (request, reply) => {
@@ -64,7 +65,7 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
       db.checkoutSession.findMany({
         where: { checkout: { storeId }, createdAt: { gte: start, lte: end } },
         select: {
-          id: true, status: true, totalCents: true, discountCents: true, couponCode: true,
+          id: true, status: true, totalCents: true, discountCents: true, paymentDiscountCents: true, couponCode: true,
           customerEmailHash: true, customerCapturedAt: true, shippingCapturedAt: true, createdAt: true, trackingParameters: true,
           items: { select: { titleSnapshot: true, quantity: true, totalCents: true, isOrderBump: true } },
           paymentAttempts: { where: { providerTransactionId: { not: null } }, orderBy: { createdAt: 'desc' }, take: 1, select: { status: true, provider: true, amountCents: true } },
@@ -93,11 +94,7 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
     const paidSessionIds = new Set(paidBySession.keys());
     const lastDay = period === 'yesterday' ? end : now;
     const days = Math.max(1, Math.round((new Date(`${dayFormatter.format(lastDay)}T03:00:00.000Z`).getTime() - start.getTime()) / 86_400_000) + 1);
-    const series = Array.from({ length: days }, (_, index) => {
-      const date = new Date(start.getTime() + index * 86_400_000).toISOString().slice(0, 10);
-      const matches = paid.filter(attempt => dayFormatter.format(attempt.paidAt) === date);
-      return { date, revenueCents: matches.reduce((sum, attempt) => sum + attempt.amountCents, 0), paidOrders: matches.length };
-    });
+    const series = dailySales(paid, start, days);
 
     const paidCreatedSessions = createdSessions.filter(row => paidSessionIds.has(row.id)).length;
     const generatedSessions = createdSessions.filter(row => row.paymentAttempts.length > 0);
@@ -117,7 +114,7 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
       const current = couponMap.get(code) || { code, orders: 0, revenueCents: 0, discountCents: 0 };
       current.orders += 1;
       current.revenueCents += paidBySession.get(row.id)?.amountCents ?? row.totalCents ?? 0;
-      current.discountCents += row.discountCents ?? 0;
+      current.discountCents += Math.max(0, (row.discountCents ?? 0) - (row.paymentDiscountCents ?? 0));
       couponMap.set(code, current);
     }
     const hourlySales = Array.from({ length: 24 }, (_, hour) => ({ hour, orders: 0, revenueCents: 0 }));
@@ -203,7 +200,7 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
         coupons: {
           orders: couponSessions.length,
           revenueCents: couponSessions.reduce((sum, row) => sum + (paidBySession.get(row.id)?.amountCents ?? 0), 0),
-          discountCents: couponSessions.reduce((sum, row) => sum + (row.discountCents ?? 0), 0),
+          discountCents: couponSessions.reduce((sum, row) => sum + Math.max(0, (row.discountCents ?? 0) - (row.paymentDiscountCents ?? 0)), 0),
           items: [...couponMap.values()].sort((a, b) => b.revenueCents - a.revenueCents),
         },
         bestMoments: { bestHour: bestHour.orders ? bestHour.hour : null, bestWeekday: bestWeekday.orders ? bestWeekday.day : null, hourly: hourlySales, weekdays: weekdaySales },

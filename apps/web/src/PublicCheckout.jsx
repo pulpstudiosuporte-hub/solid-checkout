@@ -1,3 +1,4 @@
+import { pollPaymentStatus } from './payment-polling';
 import { Component, useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -48,8 +49,6 @@ import {
 import CheckoutFooter, { defaultCheckoutFooterMethods } from "./CheckoutFooter";
 import SocialProofToast from "./SocialProofToast";
 import { useChromaSense } from "./useChromaSense";
-import "./public-session.css";
-import "./checkout-polish.css";
 
 const checkoutLocales = {
   "pt-BR": {
@@ -802,13 +801,10 @@ function SessionContent({ session: initialSession, token }) {
   const fulfillmentType = session.checkout?.product?.fulfillmentType;
   useEffect(() => {
     if (!paymentPublicId || paymentStatus !== 'PENDING') return;
-    const controller = new AbortController();
-    const checkStatus = () => getLatestPublicPayment(session.publicId, token, controller.signal).then(result => {
-      setPayment(current => current ? { ...current, ...result.payment } : result.payment);
-    }).catch(() => {});
-    const interval = window.setInterval(checkStatus, 5000);
-    checkStatus();
-    return () => { controller.abort(); window.clearInterval(interval); };
+    return pollPaymentStatus({
+      fetchStatus: signal => getLatestPublicPayment(session.publicId, token, signal),
+      onPayment: payment => setPayment(current => current ? { ...current, ...payment } : payment),
+    });
   }, [paymentPublicId, paymentStatus, session.publicId, token]);
   useEffect(() => {
     if (paymentStatus !== 'PAID' || fulfillmentType !== 'DIGITAL') return;

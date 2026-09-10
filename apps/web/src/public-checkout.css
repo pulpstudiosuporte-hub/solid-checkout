@@ -1,0 +1,4 @@
+/* Keep the checkout cascade together when Vite splits shared JS chunks. */
+@import './checkout-base.css';
+@import './public-session.css';
+@import './checkout-polish.css';

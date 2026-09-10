@@ -6,11 +6,9 @@ import type { CatalogRepository } from './catalog-repository.js';
 import { decryptSecret, encryptSecret } from './shopify-crypto.js';
 import type { PrismaGatewayRepository } from './gateway-repository.js';
 import type { ShopifyRepository } from './shopify-repository.js';
-import { syncPaidShopifyOrder } from './shopify-order-sync.js';
 import { createWestPayPix, findWestPayPix, getWestPayPix, WestPayRequestError } from './westpay-client.js';
 import { createRoasPix, getRoasPix, RoasRequestError } from './roas-client.js';
 import { lookupBrazilianPostalCode, PostalCodeLookupError } from './postal-code.js';
-import { syncUtmifyOrder } from './utmify-sync.js';
 import { syncMetaEvent } from './meta-sync.js';
 import { mapProviderPaymentStatus, providerAmountMatches } from './payment-rules.js';
 import { storeOnboardingComplete } from './store-onboarding.js';
@@ -37,7 +35,7 @@ const validProxySignature = (query: Record<string, string | string[] | undefined
   return timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'));
 };
 
-export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: AppEnvironment, catalog: CatalogRepository, gateways?: PrismaGatewayRepository, shopify?: ShopifyRepository, database?: PrismaClient): void {
+export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: AppEnvironment, catalog: CatalogRepository, gateways?: PrismaGatewayRepository, _shopify?: ShopifyRepository, database?: PrismaClient): void {
   app.get<{ Params: { postalCode: string } }>('/public/postal-codes/:postalCode', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
     const postalCode = digits(request.params.postalCode);
     if (postalCode.length !== 8) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'CEP inválido.'));
@@ -232,14 +230,13 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       const roasCredentials = { secretKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) };
       let attempt = await gateways.latestAttempt(context.id, provider); if (!attempt || attempt.status !== 'PENDING') attempt = await gateways.createAttempt(context.id, provider, amountCents, `${provider.toLowerCase()}:${context.id}:${Date.now()}`);
       const externalRef = `solid-${attempt.publicId}`;
+      let providerCreated = false;
       try {
       if (provider === 'ROAS') {
         const transaction = await createRoasPix(roasCredentials, { payment_method: 'pix', customer: { document: { type: digits(customer.document).length === 14 ? 'cnpj' : 'cpf', number: digits(customer.document) }, name: customer.name, email: customer.email, phone: digits(customer.phone).startsWith('55') ? digits(customer.phone) : `55${digits(customer.phone)}` }, items: paymentItems.map(item => ({ title: item.titleSnapshot, unit_price: item.unitPriceCents, quantity: item.quantity })), amount: amountCents, postback_url: `${environment.API_PUBLIC_URL.replace(/\/$/, '')}/webhooks/roas`, metadata: { provider_name: 'SOLID Checkout', checkout_session: context.publicId } });
         if (!transaction.id || !transaction.pixCode) throw new Error('Roas returned an incomplete PIX response');
-        const expiresAt = transaction.expiresAt ? new Date(transaction.expiresAt) : null; const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pixCode, environment.APP_ENCRYPTION_KEY), expiresAt); if (typeof gateways.recordPendingPayment === 'function') await gateways.recordPendingPayment(attempt.id, provider, request.id);
-        await syncUtmifyOrder(environment, gateways, context.id, 'waiting_payment', request.log);
-        await syncMetaEvent(environment, gateways, context.id, 'AddPaymentInfo', request.log);
-        if (shopify) { try { await syncPaidShopifyOrder(environment, shopify, context.id); } catch (error) { request.log.error({ err: error, checkoutSessionId: context.id }, 'shopify_pending_order_sync_failed'); } }
+        providerCreated = true;
+        const expiresAt = transaction.expiresAt ? new Date(transaction.expiresAt) : null; const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pixCode, environment.APP_ENCRYPTION_KEY), expiresAt);
         return reply.header('cache-control', 'no-store').code(201).send({ payment: { ...saved, status: 'pending', pixCode: transaction.pixCode } });
       }
       let transaction = await findWestPayPix(westpayCredentials, externalRef);
@@ -256,16 +253,13 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
         ...(request.ip && /^\d{1,3}(?:\.\d{1,3}){3}$/.test(request.ip) ? { ip: request.ip } : {})
       });
       if (!transaction.id || !transaction.pix?.qrcode) throw new Error('WestPay returned an incomplete PIX response');
-      const expiresAt = transaction.pix.expiresAt ? new Date(transaction.pix.expiresAt) : null; const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pix.qrcode, environment.APP_ENCRYPTION_KEY), expiresAt); if (typeof gateways.recordPendingPayment === 'function') await gateways.recordPendingPayment(attempt.id, provider, request.id);
-      await syncUtmifyOrder(environment, gateways, context.id, 'waiting_payment', request.log);
-      await syncMetaEvent(environment, gateways, context.id, 'AddPaymentInfo', request.log);
-      if (shopify) {
-        try { await syncPaidShopifyOrder(environment, shopify, context.id); }
-        catch (error) { request.log.error({ err: error, checkoutSessionId: context.id }, 'shopify_pending_order_sync_failed'); }
-      }
+      providerCreated = true;
+      const expiresAt = transaction.pix.expiresAt ? new Date(transaction.pix.expiresAt) : null; const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pix.qrcode, environment.APP_ENCRYPTION_KEY), expiresAt);
       return reply.header('cache-control', 'no-store').code(201).send({ payment: { ...saved, status: 'pending', pixCode: transaction.pix.qrcode } });
       } catch (error) {
         request.log.warn({ err: error, provider, checkoutSession: context.publicId }, 'pix_creation_failed');
+        // A persistence failure after creation must not generate another Pix at a fallback gateway.
+        if (providerCreated) return reply.code(503).send(errorBody(request, 'PAYMENT_SAVE_FAILED', 'Não foi possível salvar o pagamento. Aguarde e consulte o status novamente.'));
         if (error instanceof WestPayRequestError && error.status === 422) {
           const detail = error.details.find(value => /m[ií]nim|minimum|amount|valor/i.test(value)) ?? '';
           const amount = detail.match(/R\$\s*\d+(?:[.,]\d{1,2})?/i)?.[0];
@@ -282,29 +276,6 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     if (!gateways) return reply.code(503).send(errorBody(request, 'PAYMENT_NOT_CONFIGURED', 'Pagamento ainda não configurado no servidor.'));
     const credentials = sessionCredentials(request.params.sessionId, request.headers.authorization);
     if (!credentials) return reply.code(401).send(errorBody(request, 'INVALID_SESSION', 'Sessão inválida.'));
-    const verification = environment.APP_ENCRYPTION_KEY ? await gateways.publicPaymentVerification(credentials.sessionId, credentials.tokenHash) : null;
-    // ROAS is webhook-first. Polling this public endpoint every few seconds must
-    // only read our database, otherwise one open checkout can exhaust the
-    // provider rate limit and also prevent webhook verification.
-    if (verification && verification.status === 'PENDING' && verification.provider !== 'ROAS') {
-      const provider = 'WESTPAY';
-      const encryptedCredentials = await gateways.credentials(verification.storeId, provider);
-      if (encryptedCredentials) {
-        try {
-          const official = await getWestPayPix({ apiKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY!), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY!) }, verification.providerTransactionId);
-          const mapped = westPayPaymentStatus(official?.status);
-          if (mapped && official && westPayAmountMatches(official.amount, verification.amountCents)) {
-            await gateways.confirmPayment(verification.id, verification.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined);
-            await syncUtmifyOrder(environment, gateways, verification.checkoutSessionId, mapped === 'PAID' ? 'paid' : mapped === 'REFUNDED' ? 'refunded' : 'refused', request.log);
-            if (mapped === 'PAID') await syncMetaEvent(environment, gateways, verification.checkoutSessionId, 'Purchase', request.log);
-            if (mapped === 'PAID' && shopify) {
-              try { await syncPaidShopifyOrder(environment, shopify, verification.checkoutSessionId); }
-              catch (error) { request.log.error({ err: error, checkoutSessionId: verification.checkoutSessionId }, 'shopify_order_sync_failed'); }
-            }
-          }
-        } catch (error) { request.log.warn({ err: error, provider, paymentAttemptId: verification.id }, 'payment_status_check_failed'); }
-      }
-    }
     const payment = await gateways.publicPaymentStatus(credentials.sessionId, credentials.tokenHash);
     if (!payment) return reply.code(404).send(errorBody(request, 'PAYMENT_NOT_FOUND', 'Pagamento ainda não gerado.'));
     return reply.header('cache-control', 'no-store').send({ payment });
@@ -343,12 +314,6 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
         try { await gateways.recordWebhookEvent(context, 'WESTPAY', official.status, request.id); }
         catch (auditError) { request.log.warn({ err: auditError, providerTransactionId: objectId }, 'westpay_webhook_audit_failed'); }
         await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined);
-        await syncUtmifyOrder(environment, gateways, context.checkoutSessionId, mapped === 'PAID' ? 'paid' : mapped === 'REFUNDED' ? 'refunded' : 'refused', request.log);
-        if (mapped === 'PAID') await syncMetaEvent(environment, gateways, context.checkoutSessionId, 'Purchase', request.log);
-        if (mapped === 'PAID' && shopify) {
-          try { await syncPaidShopifyOrder(environment, shopify, context.checkoutSessionId); }
-          catch (error) { request.log.error({ err: error, checkoutSessionId: context.checkoutSessionId }, 'shopify_order_sync_failed'); }
-        }
       }
       return reply.code(200).send({ received: true });
     } catch (error) { request.log.warn({ err: error, providerTransactionId: objectId }, 'westpay_webhook_verification_failed'); return reply.code(503).send(); }
@@ -367,7 +332,7 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       const official = await getRoasPix({ secretKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) }, objectId);
       if (!official || official.id !== objectId || !roasAmountMatches(official.amount, context.amountCents)) return reply.code(200).send({ received: true });
       const mapped = westPayPaymentStatus(official.status);
-      if (mapped) { try { await gateways.recordWebhookEvent(context, 'ROAS', official.status, request.id); } catch (auditError) { request.log.warn({ err: auditError, providerTransactionId: objectId }, 'roas_webhook_audit_failed'); } await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined); await syncUtmifyOrder(environment, gateways, context.checkoutSessionId, mapped === 'PAID' ? 'paid' : mapped === 'REFUNDED' ? 'refunded' : 'refused', request.log); if (mapped === 'PAID') await syncMetaEvent(environment, gateways, context.checkoutSessionId, 'Purchase', request.log); if (mapped === 'PAID' && shopify) { try { await syncPaidShopifyOrder(environment, shopify, context.checkoutSessionId); } catch (error) { request.log.error({ err: error, checkoutSessionId: context.checkoutSessionId }, 'shopify_order_sync_failed'); } } }
+      if (mapped) { try { await gateways.recordWebhookEvent(context, 'ROAS', official.status, request.id); } catch (auditError) { request.log.warn({ err: auditError, providerTransactionId: objectId }, 'roas_webhook_audit_failed'); } await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined); }
       return reply.code(200).send({ received: true });
     } catch (error) {
       // A 429 is transient. Acknowledge the notification so ROAS does not add

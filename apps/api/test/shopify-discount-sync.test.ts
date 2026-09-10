@@ -6,6 +6,12 @@ import { encryptSecret } from '../src/shopify-crypto.js';
 vi.mock('../src/shopify-token.js', () => ({ getShopifyAccessToken: vi.fn().mockResolvedValue('test-token') }));
 afterEach(() => vi.unstubAllGlobals());
 describe('sincronização do desconto Shopify', () => {
+  it('não marca um pedido pendente como pago ao repetir a entrega', async () => {
+    const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+    const repository = { shopifyOrderId: vi.fn().mockResolvedValue({ storeId: 'store-a', orderId: 'order-a', paid: false }) } as unknown as ShopifyRepository;
+    await syncPaidShopifyOrder({ NODE_ENV: 'test', API_HOST: 'localhost', API_PORT: 3333, LOG_LEVEL: 'silent', CORS_ORIGINS: [], TRUST_PROXY: false, APP_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64') }, repository, 'session');
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it('envia a soma de cupom e Pix como desconto fixo sem alterar frete', async () => {
     const key = Buffer.alloc(32, 7).toString('base64');
     const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { orderCreate: { order: { id: 'gid://shopify/Order/1' }, userErrors: [] } } }), { status: 200 }));

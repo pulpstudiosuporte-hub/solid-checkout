@@ -1,5 +1,25 @@
 {
-  "name": "SOLID Checkout", "short_name": "SOLID", "description": "Acompanhe pedidos, pagamentos e sua operação SOLID.",
-  "start_url": "/", "scope": "/", "display": "standalone", "background_color": "#f6f7fb", "theme_color": "#6849dc", "orientation": "portrait-primary",
-  "icons": [{ "src": "/brand/solid-symbol.png", "sizes": "any", "type": "image/png", "purpose": "any maskable" }]
+  "name": "SOLID Checkout",
+  "short_name": "SOLID",
+  "description": "Acompanhe pedidos, pagamentos e sua operação SOLID.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f7fb",
+  "theme_color": "#6849dc",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/brand/solid-symbol-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/solid-symbol-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
 }

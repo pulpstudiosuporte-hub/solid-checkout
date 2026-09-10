@@ -33,6 +33,8 @@ function fixture(document = '49257810810') {
   const gateway = {
     paymentContext: vi.fn().mockResolvedValue(context), primaryProvider: vi.fn().mockResolvedValue('ROAS'), paymentProviders: vi.fn().mockResolvedValue(['ROAS']),
     billingAccessAllowed: vi.fn().mockResolvedValue(true),
+    publicPaymentStatus: vi.fn().mockResolvedValue({ publicId: 'attempt-public', status: 'pending', amountCents: 500 }),
+    publicPaymentVerification: vi.fn().mockRejectedValue(new Error('Provider verification must not run in a public read')),
     credentials: vi.fn(() => Promise.resolve(credentials)),
     latestAttempt: vi.fn(() => Promise.resolve(completedAttempt)),
     createAttempt: vi.fn((_sessionId: string, provider: 'ROAS' | 'WESTPAY') => Promise.resolve({ id: `attempt-${provider.toLowerCase()}`, publicId: `attempt-${provider.toLowerCase()}-public`, provider, status: 'PENDING', amountCents: 500, pixCodeEncrypted: null, expiresAt: null })),
@@ -47,6 +49,29 @@ function fixture(document = '49257810810') {
 }
 
 describe('fluxo Pix integrado com Roas simulada', () => {
+  it('não aciona fallback se o Pix foi criado mas a persistência falhou', async () => {
+    const test = fixture();
+    test.raw.paymentProviders.mockResolvedValue(['ROAS', 'WESTPAY']);
+    test.raw.completeAttempt.mockRejectedValueOnce(new Error('queue unavailable'));
+    createRoasPix.mockResolvedValue({ id: 'roas-created', pixCode: 'pix-code' });
+    const app = buildApp(env, { catalogRepository: test.catalog, gatewayRepository: test.gateway });
+    const response = await app.inject({ method: 'POST', url: '/public/checkout-sessions/session-public/payments/westpay/pix', headers: { authorization: `Bearer ${token}` } });
+    expect(response.statusCode).toBe(503);
+    expect(response.json<{ error: { code: string } }>().error.code).toBe('PAYMENT_SAVE_FAILED');
+    expect(createWestPayPix).not.toHaveBeenCalled();
+    expect(test.raw.failAttempt).not.toHaveBeenCalled();
+    await app.close();
+  });
+  it('consulta status somente no banco, sem consultar gateway nem integrações', async () => {
+    const test = fixture();
+    const app = buildApp(env, { catalogRepository: test.catalog, gatewayRepository: test.gateway });
+    const response = await app.inject({ url: '/public/checkout-sessions/session-public/payments/latest', headers: { authorization: `Bearer ${token}` } });
+    expect(response.statusCode).toBe(200);
+    expect(test.raw.publicPaymentStatus).toHaveBeenCalled();
+    expect(test.raw.publicPaymentVerification).not.toHaveBeenCalled();
+    expect(test.raw.credentials).not.toHaveBeenCalled();
+    await app.close();
+  });
   it('informa exatamente qual dado está pendente antes do pagamento', async () => {
     const test = fixture();
     const physicalItem = { ...test.context.items[0], product: { fulfillmentType: 'PHYSICAL' } };

@@ -3,6 +3,7 @@ import { effectiveBilling } from './billing-entitlements.js';
 import { canTransitionPayment } from './payment-rules.js';
 import type { StorePushDispatcher } from './web-push-service.js';
 import { enqueueStoreWebhookEvent } from './webhook-routes.js';
+import { enqueuePaymentDeliveries, type DeliveryProvider } from './payment-delivery.js';
 
 export type GatewayContext = Readonly<{ storeId: string; role: 'OWNER' | 'ADMIN' | 'ANALYST' }>;
 export type PaymentProvider = 'ROAS' | 'WESTPAY';
@@ -13,7 +14,7 @@ type PaymentAttemptSummary = Readonly<{ id: string; publicId: string; provider: 
 type CompletedAttempt = Readonly<{ publicId: string; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; amountCents: number; expiresAt: Date | null }>;
 type WebhookContext = Readonly<{ id: string; publicId: string; checkoutSessionId: string; amountCents: number; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; session: { checkout: { storeId: string } } }>;
 export type PendingPaymentVerification = Readonly<{ id: string; checkoutSessionId: string; providerTransactionId: string; amountCents: number; createdAt: Date; session: { checkout: { storeId: string } } }>;
-export type PendingIntegrationDelivery = Readonly<{ id: string; publicId: string; checkoutSessionId: string; provider: string; event: string; attempts: number }>;
+export type PendingIntegrationDelivery = Readonly<{ id: string; publicId: string; storeId: string; checkoutSessionId: string; provider: string; event: string; attempts: number }>;
 type UtmifyOrderContext = Readonly<{ id: string; publicId: string; createdAt: Date; completedAt: Date | null; currency: string; customerDataEncrypted: string | null; trackingParameters: unknown; totalCents: number; discountCents: number; shippingPriceCents: number; checkout: { storeId: string; store: { name: string }; product: { publicId: string; checkoutTitle: string } | null }; items: readonly { productId: string; titleSnapshot: string; unitPriceCents: number; quantity: number; product: { publicId: string } }[] }>;
 
 export class PrismaGatewayRepository {
@@ -70,7 +71,7 @@ export class PrismaGatewayRepository {
     await this.database.auditLog.create({ data: { storeId, actorType: 'SYSTEM', action: success ? 'integration.event_sent' : 'integration.event_failed', targetType: 'integration', targetId: provider, metadata: { provider, event, ...metadata } } });
   }
 
-  async markIntegrationDeliverySuccess(storeId: string, checkoutSessionId: string, provider: 'UTMIFY' | 'META', event: string): Promise<void> {
+  async markIntegrationDeliverySuccess(storeId: string, checkoutSessionId: string, provider: DeliveryProvider, event: string): Promise<void> {
     const now = new Date();
     await this.database.integrationDeliveryJob.upsert({
       where: { checkoutSessionId_provider_event: { checkoutSessionId, provider, event } },
@@ -79,7 +80,7 @@ export class PrismaGatewayRepository {
     });
   }
 
-  async markIntegrationDeliveryFailure(storeId: string, checkoutSessionId: string, provider: 'UTMIFY' | 'META', event: string, error: string): Promise<void> {
+  async markIntegrationDeliveryFailure(storeId: string, checkoutSessionId: string, provider: DeliveryProvider, event: string, error: string): Promise<void> {
     await this.database.$transaction(async transaction => {
       const current = await transaction.integrationDeliveryJob.findUnique({ where: { checkoutSessionId_provider_event: { checkoutSessionId, provider, event } }, select: { attempts: true } });
       const attempts = (current?.attempts ?? 0) + 1;
@@ -97,8 +98,8 @@ export class PrismaGatewayRepository {
     const stale = new Date(now.getTime() - 5 * 60_000);
     const candidates = await this.database.integrationDeliveryJob.findMany({
       where: { OR: [{ status: 'PENDING', OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }] }, { status: 'PROCESSING', claimedAt: { lte: stale } }] },
-      orderBy: { nextAttemptAt: 'asc' }, take: 20,
-      select: { id: true, publicId: true, checkoutSessionId: true, provider: true, event: true, attempts: true }
+      orderBy: [{ nextAttemptAt: 'asc' }, { createdAt: 'asc' }], take: 20,
+      select: { id: true, publicId: true, storeId: true, checkoutSessionId: true, provider: true, event: true, attempts: true }
     });
     const claimed: PendingIntegrationDelivery[] = [];
     for (const candidate of candidates) {
@@ -113,6 +114,13 @@ export class PrismaGatewayRepository {
       where: { publicId },
       data: { status: 'DEAD', claimedAt: null, nextAttemptAt: null, lastError: error.slice(0, 500) }
     });
+  }
+
+  async deliveryPaymentStatus(checkoutSessionId: string): Promise<string | null> {
+    const settled = await this.database.paymentAttempt.findFirst({ where: { checkoutSessionId, status: { in: ['PAID', 'REFUNDED'] } }, orderBy: { updatedAt: 'desc' }, select: { status: true } });
+    if (settled) return settled.status;
+    const latest = await this.database.paymentAttempt.findFirst({ where: { checkoutSessionId, providerTransactionId: { not: null } }, orderBy: { createdAt: 'desc' }, select: { status: true } });
+    return latest?.status ?? null;
   }
 
   async diagnostics(storeId: string) {
@@ -193,7 +201,11 @@ export class PrismaGatewayRepository {
   }
 
   completeAttempt(id: string, providerTransactionId: string, pixCodeEncrypted: string, expiresAt: Date | null): Promise<CompletedAttempt> {
-    return this.database.paymentAttempt.update({ where: { id }, data: { providerTransactionId, pixCodeEncrypted, expiresAt }, select: { publicId: true, status: true, amountCents: true, expiresAt: true } });
+    return this.database.$transaction(async transaction => {
+      const { checkoutSessionId, ...payment } = await transaction.paymentAttempt.update({ where: { id }, data: { providerTransactionId, pixCodeEncrypted, expiresAt }, select: { checkoutSessionId: true, publicId: true, status: true, amountCents: true, expiresAt: true } });
+      await enqueuePaymentDeliveries(transaction, checkoutSessionId, 'PENDING');
+      return payment;
+    });
   }
 
   async recordPendingPayment(id: string, provider: PaymentProvider, requestId: string): Promise<void> {
@@ -224,6 +236,7 @@ export class PrismaGatewayRepository {
       const canTransition = canTransitionPayment(current.status, status);
       if (!canTransition) return false;
       await transaction.paymentAttempt.update({ where: { id: attemptId }, data: { status, ...(paidAt ? { paidAt } : {}) } });
+      await enqueuePaymentDeliveries(transaction, checkoutSessionId, status);
       if (status === 'PAID') {
         const completed = await transaction.checkoutSession.updateMany({ where: { id: checkoutSessionId, status: 'OPEN' }, data: { status: 'COMPLETED', completedAt: paidAt ?? new Date() } });
         if (completed.count) { const session = await transaction.checkoutSession.findUnique({ where: { id: checkoutSessionId }, select: { couponId: true } }); if (session?.couponId) await transaction.coupon.update({ where: { id: session.couponId }, data: { redemptionCount: { increment: 1 } } }); }

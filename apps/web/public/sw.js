@@ -1,5 +1,5 @@
-const CACHE = 'solid-shell-v4';
-const STATIC_ASSETS = ['/', '/manifest.webmanifest', '/brand/solid-symbol.png'];
+const CACHE = 'solid-shell-v5';
+const STATIC_ASSETS = ['/', '/manifest.webmanifest', '/brand/solid-symbol-48.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -69,8 +69,8 @@ self.addEventListener('push', event => {
 
   event.waitUntil(self.registration.showNotification(payload.title || 'Novo alerta SOLID', {
     body: payload.message || 'Abra o aplicativo para conferir.',
-    icon: '/brand/solid-symbol.png',
-    badge: '/brand/solid-symbol.png',
+    icon: '/brand/solid-symbol-48.png',
+    badge: '/brand/solid-symbol-48.png',
     tag: payload.tag || 'solid-alert',
     renotify: true,
     data: {
