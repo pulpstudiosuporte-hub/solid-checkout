@@ -41,11 +41,11 @@ export default function Login({ onSubmit, onMfaSubmit, onRegister, onVerify, onF
   }
 
   const changeMode = next => { setMode(next); setError(''); setNotice(''); setMfaChallenge(null); setMfaCode(''); setEmailCode(''); setPassword(''); setConfirmPassword(''); if (next === 'register') { setTurnstileToken(''); setTurnstileReset(value => value + 1); } window.history.replaceState({}, '', next === 'register' ? '/#/cadastro' : next === 'forgot' ? '/#/esqueci-senha' : '/#/login'); };
-  return <main className="login-page">
+  return <main className="login-page solid-auth">
     <section className="login-brand-panel" aria-label="SOLID Checkout">
       <div className="login-brand"><img src="/brand/solid-wordmark-light.png" alt="SOLID"/></div>
       <div className="login-message"><span className="login-kicker"><ShieldCheck size={16}/> Operação protegida</span><h1>Seu checkout.<br/>Sua operação.<br/><em>Sob controle.</em></h1><p>Acompanhe pedidos, personalize sua experiência e gerencie suas vendas em um só lugar.</p></div>
-      <div className="login-security"><LockKeyhole size={18}/><span><strong>Acesso seguro</strong><small>Sessão criptografada e protegida</small></span></div>
+      <div className="login-brand-features"><span><CheckCircle2 size={16}/> Pedidos organizados</span><span><CheckCircle2 size={16}/> Checkout com sua marca</span><span><CheckCircle2 size={16}/> Controle da operação</span></div><div className="login-security"><LockKeyhole size={18}/><span><strong>Acesso seguro</strong><small>Sessão criptografada e protegida</small></span></div>
     </section>
     <section className="login-form-panel"><form className="login-card" onSubmit={submit} noValidate>
       <div className="login-mobile-brand"><img src="/brand/solid-wordmark-dark.png" alt="SOLID"/></div>

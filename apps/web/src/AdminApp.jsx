@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight, BarChart3, Box, Check, CheckCircle2,
   CircleDollarSign, Clock3, Copy, CreditCard, Eye, FileText,
@@ -7,6 +7,7 @@ import {
   Tag, TrendingUp, Truck, Users, X, Zap, LogOut, ServerCog, Webhook, Megaphone, ScanSearch
 } from 'lucide-react';
 import './admin-styles.css';
+import './admin-refresh.css';
 import CheckoutEditor, { defaultCheckoutConfig } from './CheckoutEditor';
 import { archiveStore, bindTabToUser, clearTabUser, completeMfaLogin, createStore, forgotPassword, getApiHealth, getSession, getSettings, getStores, login, logout, registerAccount, resetPassword, selectStore, verifyAccount } from './api';
 import { currentWebPushSubscription, disableWebPushOnThisDevice } from './web-push';
@@ -57,7 +58,7 @@ const navGroups = [
 ];
 
 function Logo({ compact = false }) {
-  return <div className={`brand ${compact ? 'compact' : ''}`}><img className="brand-symbol" src="/brand/solid-symbol-96.png" alt=""/>{!compact && <img className="brand-wordmark" src="/brand/solid-wordmark-dark.png" alt="SOLID"/>}</div>;
+  return <div className={`brand ${compact ? 'compact' : ''}`}><img className="brand-symbol" src="/brand/solid-symbol-96.png" alt=""/>{!compact && <img className="brand-wordmark" src="/brand/solid-wordmark-light.png" alt="SOLID"/>}</div>;
 }
 
 function Badge({ children, tone = 'neutral' }) { return <span className={`badge ${tone}`}>{children}</span>; }
@@ -65,6 +66,24 @@ function Badge({ children, tone = 'neutral' }) { return <span className={`badge 
 const roleLabels = { OWNER: 'Proprietário', ADMIN: 'Administrador', ANALYST: 'Analista' };
 
 function Sidebar({ open, collapsed, onClose, onToggleCollapsed, page, setPage, user, onLogout, stores, storeBusy, onSelectStore, onCreateStore, onArchiveStore }) {
+  const drawer = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.activeElement;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const focusable = () => [...drawer.current.querySelectorAll('button:not(:disabled),a[href],input:not(:disabled)')].filter(element => element.getClientRects().length);
+    const frame = requestAnimationFrame(() => focusable()[0]?.focus());
+    const keydown = event => {
+      if (event.key === 'Escape') { event.preventDefault(); onClose(); }
+      if (event.key !== 'Tab') return;
+      const elements = focusable(); const first = elements[0]; const last = elements.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener('keydown', keydown);
+    return () => { cancelAnimationFrame(frame); document.body.style.overflow = overflow; document.removeEventListener('keydown', keydown); previous?.focus(); };
+  }, [open, onClose]);
   const activeRole = stores.find(store => store.active)?.role;
   const pageGroup = navGroups.find(group => group.items.some(item => item.label === page));
   const pageGroupLabel = pageGroup?.label;
@@ -75,8 +94,8 @@ function Sidebar({ open, collapsed, onClose, onToggleCollapsed, page, setPage, u
   const navigate = label => { setPage(label); onClose(); };
   return <>
     {open && <button className="backdrop" onClick={onClose} aria-label="Fechar menu" />}
-    <aside className={`sidebar ${open ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
-      <div className="side-head"><Logo compact={collapsed}/><button className="icon-btn sidebar-collapse" onClick={onToggleCollapsed} aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'} title={collapsed ? 'Expandir menu' : 'Recolher menu'}>{collapsed ? <PanelLeftOpen size={18}/> : <PanelLeftClose size={18}/>}</button><button className="icon-btn mobile-only" onClick={onClose}><X size={19}/></button></div>
+    <aside ref={drawer} aria-label="Navegação da loja" className={`sidebar ${open ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
+      <div className="side-head"><Logo compact={collapsed}/><button className="icon-btn sidebar-collapse" onClick={onToggleCollapsed} aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'} title={collapsed ? 'Expandir menu' : 'Recolher menu'}>{collapsed ? <PanelLeftOpen size={18}/> : <PanelLeftClose size={18}/>}</button><button className="icon-btn mobile-only" aria-label="Fechar navegação" onClick={onClose}><X size={19}/></button></div>
       <StoreSwitcher stores={stores} busy={storeBusy} onSelect={onSelectStore} onCreate={onCreateStore} onArchive={onArchiveStore}/>
       <nav aria-label="Menu principal">
         <section className="sidebar-navigation">
@@ -85,7 +104,7 @@ function Sidebar({ open, collapsed, onClose, onToggleCollapsed, page, setPage, u
           </div>
           <div className="resource-panel" id="sidebar-resources" role="tabpanel">
             <div className="resource-head"><small>RECURSOS</small><strong>{activeGroup.label}</strong><span>{activeGroup.description}</span></div>
-            <div className="resource-list">{activeGroup.items.map(item => <button key={item.label} title={collapsed ? item.label : undefined} className={page === item.label ? 'nav-item active' : 'nav-item'} onClick={() => navigate(item.label)}><item.icon size={18} aria-hidden="true"/><span>{item.label}</span>{item.count && <em>{item.count}</em>}</button>)}</div>
+            <div className="resource-list">{activeGroup.items.map(item => <button aria-current={page === item.label ? "page" : undefined} key={item.label} title={collapsed ? item.label : undefined} className={page === item.label ? 'nav-item active' : 'nav-item'} onClick={() => navigate(item.label)}><item.icon size={18} aria-hidden="true"/><span>{item.label}</span>{item.count && <em>{item.count}</em>}</button>)}</div>
           </div>
         </section>
         {user?.platformAdmin && <section className="platform-nav" aria-label="Administração da plataforma"><small className="nav-title">Administração</small>{adminItems.map(item => <button key={item.label} title={collapsed ? item.label : undefined} className={page === item.label ? 'nav-item active' : 'nav-item'} onClick={() => navigate(item.label)}><item.icon size={18} aria-hidden="true"/><span>{item.label}</span></button>)}</section>}
@@ -217,6 +236,7 @@ function SessionConflict() {
 }
 
 export default function App(){
+  const closeSidebar = useCallback(() => setSidebar(false), []);
   const [sidebar,setSidebar]=useState(false); const [sidebarCollapsed,setSidebarCollapsed]=useState(()=>localStorage.getItem('solid-sidebar-collapsed-v1')==='true'); const [page,setPage]=useState(()=>window.location.hash.startsWith('#/integrations')?'Integrações':'Início'); const [checkout,setCheckout]=useState(false); const [editor,setEditor]=useState(false); const [previewConfig,setPreviewConfig]=useState(null); const [apiStatus,setApiStatus]=useState('checking'); const [searchOpen,setSearchOpen]=useState(false);
   const [auth,setAuth]=useState({status:'checking',user:null,csrfToken:null});
   const [sessionConflict,setSessionConflict]=useState(false);
@@ -258,5 +278,5 @@ export default function App(){
   const activeStore=stores.find(store=>store.active);
   const pageContent=storesStatus==='loading'||storesStatus==='idle'?<SessionLoading/>:storesStatus==='error'?<StoresUnavailable/>:storesStatus==='ready'&&!activeStore&&!canAccessWithoutActiveStore(page,auth.user?.platformAdmin)?<FirstStoreSetup onCreate={handleCreateStore} busy={storeBusy}/>:page==='Início'?<Dashboard setPage={setPage} storeKey={activeStore?.publicId}/>:page==='Novidades'?<NewsRoadmapPage csrfToken={auth.csrfToken}/>:page==='Análises'?<AnalyticsPage storeKey={activeStore?.publicId}/>:page==='Pedidos'?<OrdersPage storeKey={activeStore?.publicId} csrfToken={auth.csrfToken}/>:page==='Carrinhos'?<AbandonedCartsPage storeKey={activeStore?.publicId} csrfToken={auth.csrfToken}/>:page==='ChromaSense'?<ChromaSensePage storeKey={activeStore?.publicId}/>:page==='Webhooks'?<WebhooksPage storeKey={activeStore?.publicId} csrfToken={auth.csrfToken}/>:page==='Meu plano'?<BillingPage csrfToken={auth.csrfToken}/>:page==='Configurações'?<AccountSettings csrfToken={auth.csrfToken}/>:page==='Operações'?<AdminOperationsPage csrfToken={auth.csrfToken}/>:page==='Conteúdo'?<AdminContentPage csrfToken={auth.csrfToken}/>:page==='Integrações'?<ShopifyIntegration csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Gateways'?<GatewaysPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:page==='Domínios'?<DomainsPage csrfToken={auth.csrfToken}/>:page==='Produtos'?<ProductsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onOpenIntegrations={()=>setPage('Integrações')}/>:page==='Order bumps'?<OrderBumpsPage csrfToken={auth.csrfToken}/>:page==='Cupons'?<CouponsPage csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>:<SimplePage page={page} onCheckout={()=>setCheckout(true)} onEdit={()=>setEditor(true)} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId}/>;
   const pendingCount=activation?.missing?.length;
-  return <div className={`app ${sidebarCollapsed?'sidebar-collapsed':''}`}><InstallAppPrompt/><CommandPalette open={searchOpen} onClose={()=>setSearchOpen(false)} onNavigate={setPage} platformAdmin={auth.user?.platformAdmin}/><Sidebar open={sidebar} collapsed={sidebarCollapsed} onToggleCollapsed={()=>setSidebarCollapsed(value=>!value)} onClose={()=>setSidebar(false)} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout} stores={stores} storeBusy={storeBusy} onSelectStore={handleSelectStore} onCreateStore={handleCreateStore} onArchiveStore={handleArchiveStore}/><div className="main-shell"><Header page={page} toggleSidebar={()=>setSidebar(true)} apiStatus={apiStatus} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onNavigate={setPage} onOpenSearch={()=>setSearchOpen(true)}/>{!auth.user?.platformAdmin&&activeStore&&!activeStore.onboardingCompleted&&page==='Início'&&<aside className="store-activation-banner" role="status"><ShieldCheck size={22}/><div><b>Conclua o cadastro para ativar a loja</b><span>{Number.isInteger(pendingCount)?`${pendingCount===1?'Falta 1 informação':`Faltam ${pendingCount} informações`}. `:'Existem informações pendentes. '}Você pode explorar o painel, mas publicar checkouts e receber pagamentos só será liberado após concluir os dados da loja e do responsável.</span></div><button type="button" onClick={()=>setPage('Configurações')}>Continuar cadastro <ArrowRight size={16}/></button></aside>}<PageErrorBoundary routeKey={`${activeStore?.publicId || 'store'}:${page}`} onHome={()=>setPage('Início')}><Suspense fallback={<SessionLoading/>}>{pageContent}</Suspense></PageErrorBoundary></div></div>
+  return <div className={`app solid-admin ${sidebarCollapsed?'sidebar-collapsed':''}`}><InstallAppPrompt/><CommandPalette open={searchOpen} onClose={()=>setSearchOpen(false)} onNavigate={setPage} platformAdmin={auth.user?.platformAdmin}/><Sidebar open={sidebar} collapsed={sidebarCollapsed} onToggleCollapsed={()=>setSidebarCollapsed(value=>!value)} onClose={closeSidebar} page={page} setPage={setPage} user={auth.user} onLogout={handleLogout} stores={stores} storeBusy={storeBusy} onSelectStore={handleSelectStore} onCreateStore={handleCreateStore} onArchiveStore={handleArchiveStore}/><div className="main-shell"><Header page={page} toggleSidebar={()=>setSidebar(true)} apiStatus={apiStatus} csrfToken={auth.csrfToken} storeKey={activeStore?.publicId} onNavigate={setPage} onOpenSearch={()=>setSearchOpen(true)}/>{!auth.user?.platformAdmin&&activeStore&&!activeStore.onboardingCompleted&&page==='Início'&&<aside className="store-activation-banner" role="status"><ShieldCheck size={22}/><div><b>Conclua o cadastro para ativar a loja</b><span>{Number.isInteger(pendingCount)?`${pendingCount===1?'Falta 1 informação':`Faltam ${pendingCount} informações`}. `:'Existem informações pendentes. '}Você pode explorar o painel, mas publicar checkouts e receber pagamentos só será liberado após concluir os dados da loja e do responsável.</span></div><button type="button" onClick={()=>setPage('Configurações')}>Continuar cadastro <ArrowRight size={16}/></button></aside>}<PageErrorBoundary routeKey={`${activeStore?.publicId || 'store'}:${page}`} onHome={()=>setPage('Início')}><Suspense fallback={<SessionLoading/>}>{pageContent}</Suspense></PageErrorBoundary></div></div>
 }
