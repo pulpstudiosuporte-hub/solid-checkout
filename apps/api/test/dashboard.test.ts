@@ -21,12 +21,25 @@ class DashboardAuth implements AuthRepository {
 function dashboardDatabase(): PrismaClient {
   return {
     session: { findUnique: () => Promise.resolve({ activeStoreId: 'store-a' }) },
-    storeMember: { findUnique: () => Promise.resolve({ storeId: 'store-a', userId: 'user-a' }) },
+    storeMember: { findUnique: () => Promise.resolve({ storeId: 'store-a', userId: 'user-a', store: { publicId: 'public-store-a' } }) },
     $queryRaw: () => Promise.resolve([{payload: {revenueCents:13467,paidOrders:1,pendingPix:1,activeVisitors:1,conversionRate:50,analytics:{generatedOrders:2,generatedRevenueCents:19067,geography:{visitors:1,countries:1,regions:1,cities:1},coupons:{discountCents:700,items:[{code:'SAVE',discountCents:700}]}},checklist:{store:true,product:true,checkout:true,gateway:true,published:true}}}]),
   } as unknown as PrismaClient;
 }
 
 describe('indicadores da loja ativa', () => {
+  it('valida a loja esperada e separa intervalos personalizados no cache', async () => {
+    const app = buildApp(env, { authRepository: new DashboardAuth(), database: dashboardDatabase() });
+    const headers = { cookie: `solid_session=${token}` };
+    try {
+      expect((await app.inject({ url: '/dashboard?store=outra-loja', headers })).statusCode).toBe(409);
+      expect((await app.inject({ url: '/dashboard?period=custom&from=2026-02-30&to=2026-03-01', headers })).statusCode).toBe(400);
+      for (const day of ['01', '02']) {
+        const response = await app.inject({ url: `/dashboard?store=public-store-a&period=custom&from=2024-01-${day}&to=2024-01-${day}`, headers });
+        expect(response.statusCode).toBe(200);
+        expect(response.json<{ range: { from: string } }>().range.from).toBe(`2024-01-${day}T03:00:00.000Z`);
+      }
+    } finally { await app.close(); }
+  });
   it('exige autenticação e usa o valor efetivamente pago', async () => {
     const app = buildApp(env, { authRepository: new DashboardAuth(), database: dashboardDatabase() });
     expect((await app.inject({ method: 'GET', url: '/dashboard' })).statusCode).toBe(401);

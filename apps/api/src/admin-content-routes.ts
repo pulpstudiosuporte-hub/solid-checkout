@@ -39,6 +39,14 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: "auto-20260911-analytics",
+    category: "IMPROVEMENT" as const,
+    title: "Análises com filtros mais úteis",
+    description:
+      "Escolha um período personalizado de até 366 dias, consulte a receita e os pedidos pagos por dia e acompanhe os indicadores com uma leitura melhor no celular. A troca de loja e de período limpa os dados anteriores, e falhas de carregamento permitem tentar novamente.",
+    publishedAt: new Date("2026-09-11T23:00:00.000Z"),
+  },
+  {
     publicId: "auto-20260911-google",
     category: "INTEGRATION" as const,
     title: "Google conectado à sua loja",
