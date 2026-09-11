@@ -2,12 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { BellRing, Bug, CheckCircle2, Eye, EyeOff, FileVideo2, Image, Inbox, LoaderCircle, Megaphone, Pencil, RefreshCw, Send, Sparkles, Trash2, Upload, X } from 'lucide-react';
 import { createAdminRelease, deleteAdminFeedback, deleteAdminRelease, getAdminContent, saveAdminIntegrationAsset, sendAdminBroadcast, updateAdminFeedback, updateAdminRelease, uploadPlatformImage } from './api';
 import { gatewayAssetOptions } from './gateway-catalog';
+import { integrationAssetOptions as integrations } from './integration-catalog';
 import { releaseCategoryMap } from './platform-content';
 
 const tabs = [['feedback', 'Feedback', Inbox], ['releases', 'Novidades', FileVideo2], ['integrations', 'Integrações', Image], ['notifications', 'Notificações', BellRing]];
 const statusLabels = { BACKLOG: 'Backlog', PLANNED: 'Faremos', IN_PROGRESS: 'Em desenvolvimento', DONE: 'Pronto' };
 const categoryLabels = Object.fromEntries(Object.entries(releaseCategoryMap).map(([key, labels]) => [key, labels[0]]));
-const integrations = [['shopify','Shopify'],['woocommerce','WooCommerce'],['melhor-envio','Melhor Envio'],['superfrete','Superfrete'],['frenet','Frenet'],['whatsapp','WhatsApp'],['meta','Meta Pixel'],['utmify','UTMify'],['webhooks','Webhooks']];
+
 const assetOptions = [...integrations, ...gatewayAssetOptions];
 
 function ImageField({ value, onChange, csrfToken, label = 'Imagem' }) {

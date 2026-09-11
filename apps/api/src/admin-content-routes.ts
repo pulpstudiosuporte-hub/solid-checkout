@@ -39,6 +39,22 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: "auto-20260911-google",
+    category: "INTEGRATION" as const,
+    title: "Google conectado à sua loja",
+    description:
+      "Configure o GA4, o Google Ads ou o Tag Manager em Integrações para acompanhar visitas e compras do checkout na sua conta Google. As configurações ficam separadas por loja, e gerar um Pix não é contado como compra. A administração também pode personalizar as imagens dessas integrações.",
+    publishedAt: new Date("2026-09-11T22:24:00.000Z"),
+  },
+  {
+    publicId: "auto-20260911-tracking-fixes",
+    category: "FIX" as const,
+    title: "Webhooks e ChromaSense mais consistentes",
+    description:
+      "O histórico de webhooks mostra as tentativas e falhas de envio com mais clareza. O ChromaSense ganhou correções na profundidade de rolagem, nos filtros e no isolamento das visitas entre checkouts. A prévia do mapa de calor continua sendo uma aproximação do layout atual.",
+    publishedAt: new Date("2026-09-11T22:23:00.000Z"),
+  },
+  {
     publicId: "auto-20260903-payment-actions-aligned",
     category: "FIX" as const,
     title: "Ações de pagamento alinhadas",

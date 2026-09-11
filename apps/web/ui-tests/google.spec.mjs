@@ -1,0 +1,95 @@
+import { test, expect } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
+const output = name => fileURLToPath(new URL(`../../../.visual-check/${name}`, import.meta.url));
+
+test('administration manages the same Google images shown in catalog and details', async ({ page }) => {
+  const imageUrl = 'https://assets.example.test/google.png';
+  await page.route(imageUrl, route => route.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64') }));
+  await page.goto('/ui-tests/google-review.html');
+  await page.getByRole('button', { name: 'Administração', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Seções de conteúdo' }).getByRole('button', { name: 'Integrações' }).click();
+  const select = page.getByRole('combobox');
+  for (const name of ['Google Analytics 4', 'Google Ads', 'Google Tag Manager']) await expect(select.getByRole('option', { name, exact: true })).toHaveCount(1);
+  await select.selectOption('ga4');
+  await page.getByRole('textbox', { name: 'Logo ou imagem por URL' }).fill(imageUrl);
+  await page.getByRole('textbox', { name: 'Texto alternativo' }).fill('Imagem Google da administração');
+  await page.getByRole('button', { name: 'Salvar imagem', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Imagem da integração atualizada');
+  await page.screenshot({ path: output('google-admin-desktop.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: output('google-admin-mobile.png'), fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole('button', { name: 'Catálogo', exact: true }).click();
+  const card = page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: 'Google Analytics 4' }) });
+  await expect(card.getByRole('img', { name: 'Imagem Google da administração' })).toHaveAttribute('src', imageUrl);
+  await card.getByRole('button', { name: 'Configurar' }).click();
+  await expect(page.locator('.google-card-heading').getByRole('img')).toHaveAttribute('src', imageUrl);
+});
+
+test('merchant config persists by store, opens reports and respects read-only permissions', async ({ page }) => {
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/ui-tests/google-review.html');
+  await page.getByLabel('ID de medição do GA4').fill('G-ABCDE12345');
+  await page.getByLabel('ID da propriedade GA4').fill('123456789');
+  await page.getByRole('button', { name: 'Salvar configuração' }).click();
+  await expect(page.getByRole('status')).toContainText('Configuração salva');
+  await expect(page.getByRole('link', { name: 'Abrir Google Analytics' })).toHaveAttribute('href', /p123456789\/reports/);
+  await page.screenshot({ path: output('google-desktop.png'), fullPage: true });
+  await page.getByLabel('Somente leitura').check();
+  await expect(page.getByLabel('ID de medição do GA4')).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Desconectar Google desta loja' })).toHaveCount(0);
+  await page.getByLabel('Somente leitura').uncheck();
+  await page.getByRole('button', { name: 'Trocar loja' }).click();
+  await expect(page.getByLabel('ID de medição do GA4')).toHaveValue('');
+  await page.getByRole('button', { name: 'Trocar loja' }).click();
+  await expect(page.getByLabel('ID de medição do GA4')).toHaveValue('G-ABCDE12345');
+  await page.getByRole('button', { name: 'Catálogo', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Buscar integração' }).fill('google');
+  await expect(page.getByRole('listitem')).toHaveCount(3);
+  expect(errors).toEqual([]);
+});
+
+test('mobile supports GTM, disconnect and loading error recovery without overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/ui-tests/google-review.html');
+  await page.getByRole('radio', { name: /Tag Manager/ }).check();
+  await page.getByLabel('ID do contêiner').fill('GTM-ABCDEF');
+  await page.getByRole('button', { name: 'Salvar configuração' }).click();
+  await expect(page.getByRole('status')).toContainText('Configuração salva');
+  await expect(page.getByLabel('ID de medição do GA4')).toHaveCount(0);
+  await page.screenshot({ path: output('google-mobile.png'), fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole('button', { name: 'Desconectar Google desta loja' }).click();
+  await page.getByRole('button', { name: 'Confirmar desconexão' }).click();
+  await expect(page.getByRole('status')).toContainText('desconectadas');
+  await page.getByRole('button', { name: 'Alternar falha' }).click();
+  await page.getByRole('button', { name: 'Trocar loja' }).click();
+  await expect(page.getByRole('alert')).toContainText('Falha simulada');
+  await page.getByRole('button', { name: 'Alternar falha' }).click();
+  await page.getByRole('button', { name: 'Tentar novamente' }).click();
+  await expect(page.getByLabel('ID de medição do GA4')).toBeEnabled();
+});
+
+test('checkout waits for consent, never counts generated Pix as purchase and deduplicates confirmation', async ({ page }) => {
+  const external = []; page.on('request', request => { if (/google(tagmanager|adservices)|google-analytics/.test(request.url())) external.push(request.url()); });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/ui-tests/google-review.html');
+  await page.getByRole('button', { name: 'Checkout de teste' }).click();
+  await expect(page.getByRole('region', { name: 'Preferências de cookies' })).toBeVisible();
+  await expect(page.getByLabel('Eventos locais')).toContainText('"scripts": []');
+  await page.getByRole('button', { name: 'Só essenciais' }).click();
+  await page.getByRole('button', { name: 'Gerar Pix simulado' }).click();
+  await expect(page.getByLabel('Eventos locais')).toContainText('"scripts": []');
+  await page.getByRole('button', { name: 'Preferências de cookies', exact: true }).click();
+  await page.screenshot({ path: output('google-consent-mobile.png') });
+  await page.getByRole('button', { name: 'Aceitar medição' }).click();
+  await expect(page.getByLabel('Eventos locais')).toContainText('add_payment_info');
+  await expect(page.getByLabel('Eventos locais')).not.toContainText('"event": "purchase"');
+  await page.getByRole('button', { name: 'Confirmar pagamento simulado' }).click();
+  await expect(page.getByLabel('Eventos locais')).toContainText('"event": "purchase"');
+  const snapshot = JSON.parse(await page.getByLabel('Eventos locais').innerText());
+  expect(snapshot.scripts).toHaveLength(1);
+  expect(snapshot.events.filter(item => item.event === 'purchase')).toHaveLength(1);
+  expect(snapshot.events.filter(item => item.event === 'conversion')).toHaveLength(1);
+  expect(external).toEqual([]);
+});

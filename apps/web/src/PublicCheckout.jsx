@@ -1,6 +1,7 @@
 import { mergePaymentUpdate, pollPaymentStatus } from './payment-polling';
 import { Component, useCallback, useEffect, useRef, useState } from "react";
 import PixPaymentPanel from "./PixPaymentPanel";
+import GoogleCheckoutTracking from "./GoogleCheckoutTracking";
 import {
   ArrowRight,
   Check,
@@ -473,7 +474,7 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
     setBusy(true);
     setState((current) => ({ ...current, error: "" }));
     try {
-      const search = new URLSearchParams(window.location.search); const hashSearch = new URLSearchParams(window.location.hash.split('?')[1] || ''); const read = key => search.get(key) || hashSearch.get(key); const fbclid = read('fbclid'); const trackingParameters = { ...Object.fromEntries(['src','sck','utm_source','utm_campaign','utm_medium','utm_content','utm_term'].map(key => [key, read(key)])), fbp: cookieValue('_fbp') || null, fbc: cookieValue('_fbc') || (fbclid ? `fb.1.${Date.now()}.${fbclid}` : null), event_source_url: window.location.href, visitor_id: checkoutVisitorId() };
+      const search = new URLSearchParams(window.location.search); const hashSearch = new URLSearchParams(window.location.hash.split('?')[1] || ''); const read = key => search.get(key) || hashSearch.get(key); const fbclid = read('fbclid'); const trackingParameters = { ...Object.fromEntries(['gclid','gbraid','wbraid','src','sck','utm_source','utm_campaign','utm_medium','utm_content','utm_term'].map(key => [key, read(key)])), fbp: cookieValue('_fbp') || null, fbc: cookieValue('_fbc') || (fbclid ? `fb.1.${Date.now()}.${fbclid}` : null), event_source_url: window.location.href, visitor_id: checkoutVisitorId() };
       const result = await createPublicCheckoutSession(
         storeSlug,
         checkoutSlug,
@@ -487,10 +488,12 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
         result.session.publicId,
         result.token,
       );
+      const googleSearch = new URLSearchParams();
+      for (const key of ['gclid', 'gbraid', 'wbraid']) { const value = read(key); if (value && /^[A-Za-z0-9_-]{1,200}$/.test(value)) googleSearch.set(key, value); }
       window.history.replaceState(
         {},
         "",
-        `/#/session/${result.session.publicId}`,
+        `/${googleSearch.size ? `?${googleSearch}` : ""}#/session/${result.session.publicId}`,
       );
       setSessionToken(result.token);
       setSession(completeSession);
@@ -827,10 +830,12 @@ function SessionContent({ session: initialSession, token }) {
     setPayment(current => mergePaymentUpdate(current, result.payment));
     return result.payment;
   };
+  const googleTracking = <GoogleCheckoutTracking sessionId={session.publicId} token={token} paymentStatus={paymentStatus} shippingSelected={Boolean(selectedShipping)} paymentCreated={Boolean(payment?.publicId)} checkoutRevision={`${session.totalCents}:${session.discountCents}:${selectedShipping?.shippingPriceCents ?? session.shippingPriceCents}`}/>;
   if (String(payment?.status).toUpperCase() === "PAID") {
-    return <ThankYouPage session={session} items={items} itemCount={itemCount} selectedShipping={selectedShipping} payment={payment} config={config} delivery={delivery} />;
+    return <><ThankYouPage session={session} items={items} itemCount={itemCount} selectedShipping={selectedShipping} payment={payment} config={config} delivery={delivery} />{googleTracking}</>;
   }
   return (
+    <>
     <main
       className={`public-checkout session-checkout template-${config.template} layout-${config.layout} checkout-source-${checkoutSource} checkout-flow-${checkoutFlow}`}
       style={configStyle(config)}
@@ -1341,6 +1346,8 @@ function SessionContent({ session: initialSession, token }) {
       <CheckoutFooter config={config} />
       <SocialProofToast config={config} messages={socialProofMessages} />
     </main>
+    {googleTracking}
+    </>
   );
 }
 

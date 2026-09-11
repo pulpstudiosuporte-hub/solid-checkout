@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, CheckCircle2, Globe2, Images, Layers3, LoaderCircle, MessageCircle, Plug, RefreshCw, Search, ShieldCheck, ShoppingBag, Truck, Unplug, Webhook, Workflow } from 'lucide-react';
-import { connectShopifyCredentials, disconnectShopify, getMetaStatus, getPlatformContent, getSettings, getShopifyStatus, getStoreDomain, getUtmifyStatus, syncShopifyCatalog } from './api';
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Images, Layers3, LoaderCircle, Plug, RefreshCw, Search, ShieldCheck, ShoppingBag, Unplug, Workflow } from 'lucide-react';
+import { connectShopifyCredentials, disconnectShopify, getGoogleIntegration, getMetaStatus, getPlatformContent, getSettings, getShopifyStatus, getStoreDomain, getUtmifyStatus, syncShopifyCatalog } from './api';
 import ShopifyOnboarding from './ShopifyOnboarding';
 import UtmifyIntegration from './UtmifyIntegration';
 import MetaIntegration from './MetaIntegration';
+import GoogleIntegration from './GoogleIntegration';
+import { integrations } from './integration-catalog';
 import IntegrationDiagnostics from './IntegrationDiagnostics';
 
 const formatDate = value => value ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : 'Ainda não sincronizado';
@@ -68,17 +70,7 @@ function ShopifyIntegrationDetails({ csrfToken, storeKey, onBack }) {
 }
 
 const categories = ['Todas', 'E-commerce', 'Logística e Frete', 'Atendimento', 'Marketing', 'Automação'];
-const integrations = [
-  { id: 'shopify', name: 'Shopify', category: 'E-commerce', description: 'Sincronize produtos, variantes, imagens e coleções da sua loja Shopify.', icon: ShoppingBag, tone: 'shopify', available: true, keywords: 'loja ecommerce catálogo produtos' },
-  { id: 'woocommerce', name: 'WooCommerce', category: 'E-commerce', description: 'Conecte sua operação WooCommerce de forma simples.', icon: Globe2, tone: 'woo', keywords: 'wordpress ecommerce loja' },
-  { id: 'melhor-envio', name: 'Melhor Envio', category: 'Logística e Frete', description: 'Calcule fretes e automatize envios com Correios e transportadoras.', icon: Truck, tone: 'shipping', keywords: 'frete correios entrega transportadora' },
-  { id: 'superfrete', name: 'Superfrete', category: 'Logística e Frete', description: 'Calcule fretes automaticamente em seus checkouts.', icon: Truck, tone: 'superfrete', keywords: 'frete entrega logística' },
-  { id: 'frenet', name: 'Frenet', category: 'Logística e Frete', description: 'Cotação de frete, etiquetas e rastreio via Frenet.', icon: Truck, tone: 'frenet', keywords: 'frete etiqueta rastreio logística' },
-  { id: 'whatsapp', name: 'WhatsApp', category: 'Atendimento', description: 'Recupere carrinhos e acompanhe clientes pelo WhatsApp.', icon: MessageCircle, tone: 'whatsapp', keywords: 'atendimento recuperação carrinho mensagens' },
-  { id: 'meta', name: 'Meta Pixel', category: 'Marketing', description: 'Pixel e API de Conversões com eventos deduplicados.', icon: BarChart3, tone: 'meta', available: true, keywords: 'facebook instagram pixel conversões tráfego' },
-  { id: 'utmify', name: 'UTMify', category: 'Marketing', description: 'Envie pedidos e conversões para sua operação de tráfego.', icon: Activity, tone: 'utmify', available: true, keywords: 'utm rastreamento tráfego pedidos' },
-  { id: 'webhooks', name: 'Webhooks', category: 'Automação', description: 'Dispare eventos da loja para sistemas e fluxos externos.', icon: Webhook, tone: 'webhook', available: true, keywords: 'api eventos automação endpoint integração' },
-];
+
 
 function DetailShell({ title, onBack, children }) {
   return <main className="page integrations-page integration-detail-page"><button className="integration-back" type="button" onClick={onBack}><ArrowLeft size={16}/> Voltar para integrações</button><div className="integration-detail-heading"><p className="eyebrow">INTEGRAÇÕES</p><h1>{title}</h1></div>{children}</main>;
@@ -95,11 +87,14 @@ export default function ShopifyIntegration({ csrfToken, storeKey }) {
   useEffect(() => {
     let active = true;
     setConnectionsLoading(true);
-    Promise.allSettled([getShopifyStatus(), getMetaStatus(), getUtmifyStatus()]).then(([shopify, meta, utmify]) => {
+    Promise.allSettled([getShopifyStatus(), getMetaStatus(), getUtmifyStatus(), getGoogleIntegration(undefined, storeKey)]).then(([shopify, meta, utmify, google]) => {
       if (!active) return;
       setConnections({
         shopify: shopify.status === 'fulfilled' && Boolean(shopify.value.connected),
         meta: meta.status === 'fulfilled' && Boolean(meta.value.connected),
+        ga4: google.status === 'fulfilled' && google.value.configured && Boolean(google.value.config?.measurementId),
+        ads: google.status === 'fulfilled' && google.value.configured && Boolean(google.value.config?.adsId),
+        gtm: google.status === 'fulfilled' && google.value.configured && google.value.config?.mode === 'gtm',
         utmify: utmify.status === 'fulfilled' && Boolean(utmify.value.connected),
       });
       setConnectionsLoading(false);
@@ -108,6 +103,7 @@ export default function ShopifyIntegration({ csrfToken, storeKey }) {
   }, [storeKey, selected]);
   useEffect(() => { const controller = new AbortController(); getPlatformContent(controller.signal).then(data => setCatalogAssets(Object.fromEntries((data.integrationAssets || []).map(item => [item.integrationKey, item])))).catch(() => {}); return () => controller.abort(); }, []);
   if (selected === 'shopify') return <ShopifyIntegrationDetails csrfToken={csrfToken} storeKey={storeKey} onBack={() => setSelected(null)}/>;
+  if (['ga4', 'ads', 'gtm'].includes(selected)) return <DetailShell title="Google" onBack={() => setSelected(null)}><GoogleIntegration csrfToken={csrfToken} storeKey={storeKey} initialService={selected} asset={catalogAssets[selected]}/></DetailShell>;
   if (selected === 'meta') return <DetailShell title="Meta Pixel" onBack={() => setSelected(null)}><MetaIntegration csrfToken={csrfToken} storeKey={storeKey}/></DetailShell>;
   if (selected === 'utmify') return <DetailShell title="UTMify" onBack={() => setSelected(null)}><UtmifyIntegration csrfToken={csrfToken} storeKey={storeKey}/></DetailShell>;
   const term = query.trim().toLocaleLowerCase('pt-BR');
@@ -126,9 +122,9 @@ export default function ShopifyIntegration({ csrfToken, storeKey }) {
         <label className="integration-category-filter"><span className="sr-only">Filtrar por categoria</span><select value={category} onChange={event => setCategory(event.target.value)}>{categories.map(name => <option key={name} value={name}>{name === 'Todas' ? 'Todas as categorias' : name}</option>)}</select></label>
       </div>
       {visible.length ? <div className="integration-directory-list" role="list">{visible.map(item => {
-        const checksConnection = ['shopify', 'meta', 'utmify'].includes(item.id);
+        const checksConnection = ['shopify', 'meta', 'utmify', 'ga4', 'ads', 'gtm'].includes(item.id);
         const checking = item.available && checksConnection && connectionsLoading;
-        return <article className="integration-catalog-item" role="listitem" key={item.id}><span className={`integration-logo ${item.tone}`}>{catalogAssets[item.id] ? <img src={catalogAssets[item.id].imageUrl} alt={catalogAssets[item.id].altText || item.name}/> : <item.icon size={21}/>}</span><div><h3>{item.name}{connections[item.id] && <span className="integration-active"><CheckCircle2 size={12}/> Ativa</span>}{!item.available && <span className="integration-soon">Em breve</span>}<span className="integration-category-chip">{item.category}</span></h3><p>{item.description}</p></div><button type="button" disabled={!item.available || checking} onClick={() => open(item)}>{checking ? <><LoaderCircle className="spin" size={15}/> Verificando</> : item.available ? <>{connections[item.id] ? 'Gerenciar' : 'Configurar'}<ArrowRight size={16}/></> : 'Em breve'}</button></article>;
+        return <article className="integration-catalog-item" role="listitem" key={item.id}><span className={`integration-logo ${item.tone}`}>{catalogAssets[item.id] ? <img src={catalogAssets[item.id].imageUrl} alt={catalogAssets[item.id].altText || item.name}/> : <item.icon size={21}/>}</span><div><h3>{item.name}{connections[item.id] && <span className="integration-active"><CheckCircle2 size={12}/> {['ga4', 'ads', 'gtm'].includes(item.id) ? 'Configurada' : 'Ativa'}</span>}{!item.available && <span className="integration-soon">Em breve</span>}<span className="integration-category-chip">{item.category}</span></h3><p>{item.description}</p></div><button type="button" disabled={!item.available || checking} onClick={() => open(item)}>{checking ? <><LoaderCircle className="spin" size={15}/> Verificando</> : item.available ? <>{connections[item.id] ? 'Gerenciar' : 'Configurar'}<ArrowRight size={16}/></> : 'Em breve'}</button></article>;
       })}</div> : <section className="integration-catalog-empty"><Workflow size={27}/><h2>Nenhuma integração encontrada</h2><p>Altere a busca ou selecione outra categoria.</p><button type="button" className="secondary" onClick={() => { setQuery(''); setCategory('Todas'); }}>Limpar filtros</button></section>}
       <footer className="integration-directory-footer"><span><strong>{visible.length}</strong> {visible.length === 1 ? 'integração encontrada' : 'integrações encontradas'}</span><small>As conexões são configuradas separadamente para cada loja.</small></footer>
     </section>

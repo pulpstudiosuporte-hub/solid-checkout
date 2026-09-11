@@ -18,6 +18,7 @@ import { registerShopifyRoutes } from './shopify-routes.js';
 import { registerPublicCheckoutRoutes } from './public-checkout-routes.js';
 import { registerPaymentReceiptRoutes } from './payment-receipt-routes.js';
 import { registerGatewayRoutes } from './gateway-routes.js';
+import { registerGoogleIntegration } from './google-integration.js';
 import type { PrismaGatewayRepository } from './gateway-repository.js';
 import type { OrderRepository } from './order-repository.js';
 import { registerOrderRoutes } from './order-routes.js';
@@ -124,6 +125,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
   if (dependencies.authRepository && dependencies.catalogRepository && dependencies.database) registerCouponRoutes(app, environment, dependencies.authRepository, dependencies.catalogRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.catalogRepository && dependencies.database) registerMediaRoutes(app, environment, dependencies.authRepository, dependencies.catalogRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.gatewayRepository) registerGatewayRoutes(app, environment, dependencies.authRepository, dependencies.gatewayRepository);
+  if (dependencies.authRepository && dependencies.database) registerGoogleIntegration(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.orderRepository) registerOrderRoutes(app, environment, dependencies.authRepository, dependencies.orderRepository);
   if (dependencies.authRepository && dependencies.database) registerAbandonedCartRoutes(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.database) registerWebhookRoutes(app, environment, dependencies.authRepository, dependencies.database);
