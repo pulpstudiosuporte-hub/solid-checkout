@@ -62,6 +62,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:ui
       - run: npx playwright test --config scripts/analytics-ui.config.mjs
+      - run: npx playwright test --config scripts/roadmap-ui.config.mjs
   static-security:
     runs-on: ubuntu-latest
     timeout-minutes: 15

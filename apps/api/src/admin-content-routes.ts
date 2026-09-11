@@ -30,6 +30,32 @@ const optionalUrl = (value: unknown): string | null | undefined => {
   }
 };
 const statuses = ["BACKLOG", "PLANNED", "IN_PROGRESS", "DONE"] as const;
+type RoadmapData = { title?: string; description?: string; type?: 'BUG' | 'SUGGESTION'; status?: (typeof statuses)[number]; approved?: boolean };
+function roadmapData(body: unknown): RoadmapData {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('Informe os dados do roadmap.');
+  const input = body as Record<string, unknown>;
+  const data: RoadmapData = {};
+  for (const [field, min, max] of [['title', 5, 120], ['description', 10, 2000]] as const) {
+    if (input[field] === undefined) continue;
+    const value = typeof input[field] === 'string' ? input[field].trim().replace(/\0/g, '') : '';
+    if (value.length < min || value.length > max) throw new Error(`${field === 'title' ? 'Título' : 'Descrição'} deve ter entre ${min} e ${max} caracteres.`);
+    data[field] = value;
+  }
+  if (input.type !== undefined) {
+    if (input.type !== 'BUG' && input.type !== 'SUGGESTION') throw new Error('Tipo inválido.');
+    data.type = input.type;
+  }
+  if (input.status !== undefined) {
+    if (!statuses.includes(input.status as (typeof statuses)[number])) throw new Error('Status inválido.');
+    data.status = input.status as (typeof statuses)[number];
+  }
+  if (input.approved !== undefined) {
+    if (typeof input.approved !== 'boolean') throw new Error('Visibilidade inválida.');
+    data.approved = input.approved;
+  }
+  if (!Object.keys(data).length) throw new Error('Nenhuma alteração informada.');
+  return data;
+}
 const categories = [
   "NEWS",
   "IMPROVEMENT",
@@ -38,6 +64,13 @@ const categories = [
   "SECURITY",
 ] as const;
 const automaticReleases = [
+  {
+    publicId: "auto-20260911-roadmap",
+    category: "IMPROVEMENT" as const,
+    title: "Roadmap com gestão completa",
+    description: "A administração agora pode criar e editar itens do roadmap, organizar o que está aguardando, planejado, em andamento ou concluído e escolher o que fica visível para os lojistas.",
+    publishedAt: new Date("2026-09-11T23:15:00.000Z"),
+  },
   {
     publicId: "auto-20260911-analytics",
     category: "IMPROVEMENT" as const,
@@ -509,31 +542,29 @@ export function registerAdminContentRoutes(
       });
   });
 
+  app.post<{ Body: unknown }>("/admin/content/feedback", async (request, reply) => {
+    const current = await admin(request);
+    if (!current || !mutationAllowed(request, current)) return reply.code(403).send(failure(request, "FORBIDDEN", "Acesso negado."));
+    let data: RoadmapData;
+    try { data = roadmapData(request.body); }
+    catch (error) { return reply.code(400).send(failure(request, "VALIDATION_ERROR", (error as Error).message)); }
+    if (!data.title || !data.description) return reply.code(400).send(failure(request, "VALIDATION_ERROR", "Informe título e descrição."));
+    const feedback = await db.productFeedback.create({ data: { ...data, title: data.title, description: data.description, userId: current.userId, storeId: null }, select: { publicId: true } });
+    return reply.code(201).send({ feedback });
+  });
+
   app.patch<{
     Params: { feedbackId: string };
-    Body: { status?: string; approved?: boolean };
+    Body: unknown;
   }>("/admin/content/feedback/:feedbackId", async (request, reply) => {
     const current = await admin(request);
     if (!current || !mutationAllowed(request, current))
       return reply
         .code(403)
         .send(failure(request, "FORBIDDEN", "Acesso negado."));
-    const data: { status?: (typeof statuses)[number]; approved?: boolean } = {};
-    if (request.body?.status !== undefined) {
-      if (!statuses.includes(request.body.status as (typeof statuses)[number]))
-        return reply
-          .code(400)
-          .send(failure(request, "VALIDATION_ERROR", "Status inválido."));
-      data.status = request.body.status as (typeof statuses)[number];
-    }
-    if (typeof request.body?.approved === "boolean")
-      data.approved = request.body.approved;
-    if (!Object.keys(data).length)
-      return reply
-        .code(400)
-        .send(
-          failure(request, "VALIDATION_ERROR", "Nenhuma alteração informada."),
-        );
+    let data: RoadmapData;
+    try { data = roadmapData(request.body); }
+    catch (error) { return reply.code(400).send(failure(request, "VALIDATION_ERROR", (error as Error).message)); }
     const result = await db.productFeedback.updateMany({
       where: { publicId: clean(request.params.feedbackId, 32) },
       data,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertCircle, ArrowRight, Bug, CheckCircle2, Heart, Lightbulb, LoaderCircle, Plus, Rocket, Send, Sparkles, X } from 'lucide-react';
 import { createProductFeedback, getPlatformContent, getProductFeedback, toggleProductFeedbackVote } from './api';
 import { normalizePlatformReleases, releaseVideoSource } from './platform-content';
@@ -10,12 +10,6 @@ const columns = [
   { id: 'IN_PROGRESS', title: 'Estamos construindo', description: 'Em desenvolvimento pela equipe', tone: 'blue' },
   { id: 'DONE', title: 'Pronto', description: 'Já disponível na plataforma', tone: 'green' },
 ];
-const platformRoadmap = [
-  { publicId: 'platform-freight', status: 'PLANNED', type: 'SUGGESTION', title: 'Novas integrações de frete', description: 'Melhor Envio, Superfrete e Frenet no catálogo de integrações.', author: 'Equipe SOLID', votes: 0, voted: false, platform: true },
-  { publicId: 'platform-gateways', status: 'IN_PROGRESS', type: 'SUGGESTION', title: 'Mais gateways de pagamento', description: 'Expansão dos meios de pagamento e adquirentes disponíveis.', author: 'Equipe SOLID', votes: 0, voted: false, platform: true },
-  { publicId: 'platform-feedback', status: 'DONE', type: 'SUGGESTION', title: 'Novidades e roadmap', description: 'Área pública para acompanhar entregas, sugerir ideias e votar.', author: 'Equipe SOLID', votes: 0, voted: false, platform: true },
-];
-
 function ReleaseMedia({ item }) {
   if (item.videoUrl) {
     const source = releaseVideoSource(item.videoUrl);
@@ -43,7 +37,7 @@ export default function NewsRoadmapPage({ csrfToken }) {
   const vote = async item => { if (item.platform) return; setFeedback(current => ({ ...current, items: current.items.map(entry => entry.publicId === item.publicId ? { ...entry, voted: !entry.voted, votes: entry.votes + (entry.voted ? -1 : 1) } : entry) })); try { const result = await toggleProductFeedbackVote(item.publicId, csrfToken); setFeedback(current => ({ ...current, items: current.items.map(entry => entry.publicId === item.publicId ? { ...entry, ...result } : entry) })); } catch (error) { setFeedback(current => ({ ...current, items: current.items.map(entry => entry.publicId === item.publicId ? item : entry), error: error.message })); } };
   const releases = releaseState.items;
   const visibleReleases = filter === 'Todos' ? releases : releases.filter(item => item.category === filter);
-  const roadmapItems = useMemo(() => [...feedback.items, ...platformRoadmap], [feedback.items]);
+  const roadmapItems = feedback.items;
   return <main className="page news-page"><div className="news-breadcrumb"><span>Início</span><ArrowRight size={13}/><b>Novidades</b></div><section className="news-heading"><div><h1>Novidades da SOLID</h1><p>{tab === 'updates' ? 'Histórico de lançamentos, melhorias e correções publicadas pela equipe.' : 'Vote nas ideias da comunidade e acompanhe o que estamos construindo.'}</p></div>{tab === 'roadmap' && <div><button className="secondary" onClick={() => setDialog('BUG')}><Bug size={16}/> Reportar problema</button><button className="primary" onClick={() => setDialog('SUGGESTION')}><Plus size={16}/> Enviar sugestão</button></div>}</section>
     <div className="news-tabs" role="tablist"><button role="tab" aria-selected={tab === 'updates'} className={tab === 'updates' ? 'active' : ''} onClick={() => setTab('updates')}>Atualizações</button><button role="tab" aria-selected={tab === 'roadmap'} className={tab === 'roadmap' ? 'active' : ''} onClick={() => setTab('roadmap')}>Roadmap</button></div>
     {message && <div className="news-message" role="status"><CheckCircle2 size={16}/>{message}</div>}{feedback.error && tab === 'roadmap' && <div className="news-message error" role="alert"><AlertCircle size={16}/>{feedback.error}</div>}

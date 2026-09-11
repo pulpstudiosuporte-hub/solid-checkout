@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BellRing, Bug, CheckCircle2, Eye, EyeOff, FileVideo2, Image, Inbox, LoaderCircle, Megaphone, Pencil, RefreshCw, Send, Sparkles, Trash2, Upload, X } from 'lucide-react';
-import { createAdminRelease, deleteAdminFeedback, deleteAdminRelease, getAdminContent, saveAdminIntegrationAsset, sendAdminBroadcast, updateAdminFeedback, updateAdminRelease, uploadPlatformImage } from './api';
+import { BellRing, CheckCircle2, Eye, EyeOff, FileVideo2, Image, Inbox, LoaderCircle, Megaphone, Pencil, RefreshCw, Send, Trash2, Upload, X } from 'lucide-react';
+import { createAdminRelease, deleteAdminRelease, getAdminContent, saveAdminIntegrationAsset, sendAdminBroadcast, updateAdminRelease, uploadPlatformImage } from './api';
+import AdminRoadmap from './AdminRoadmap';
 import { gatewayAssetOptions } from './gateway-catalog';
 import { integrationAssetOptions as integrations } from './integration-catalog';
 import { releaseCategoryMap } from './platform-content';
 
-const tabs = [['feedback', 'Feedback', Inbox], ['releases', 'Novidades', FileVideo2], ['integrations', 'Integrações', Image], ['notifications', 'Notificações', BellRing]];
-const statusLabels = { BACKLOG: 'Backlog', PLANNED: 'Faremos', IN_PROGRESS: 'Em desenvolvimento', DONE: 'Pronto' };
+const tabs = [['feedback', 'Roadmap', Inbox], ['releases', 'Novidades', FileVideo2], ['integrations', 'Integrações', Image], ['notifications', 'Notificações', BellRing]];
 const categoryLabels = Object.fromEntries(Object.entries(releaseCategoryMap).map(([key, labels]) => [key, labels[0]]));
 
 const assetOptions = [...integrations, ...gatewayAssetOptions];
@@ -30,27 +30,6 @@ function ImageField({ value, onChange, csrfToken, label = 'Imagem' }) {
     </div>
     {error && <small>{error}</small>}{value && <img src={value} alt="Prévia do arquivo enviado"/>}
   </div>;
-}
-
-function FeedbackCard({ item, busy, csrfToken, act }) {
-  const toggleApproval = () => act(item.publicId, () => updateAdminFeedback(item.publicId, { approved: !item.approved }, csrfToken), item.approved ? 'Item ocultado do roadmap.' : 'Item aprovado e publicado no roadmap.');
-  const remove = () => {
-    if (window.confirm(`Excluir definitivamente “${item.title}”? Esta ação não pode ser desfeita.`)) void act(item.publicId, () => deleteAdminFeedback(item.publicId, csrfToken), 'Feedback excluído.');
-  };
-  return <article className={`card admin-feedback-card ${item.approved ? 'approved' : 'pending'}`}>
-    <header>
-      <span className={item.type === 'BUG' ? 'bug' : ''}>{item.type === 'BUG' ? <Bug size={14}/> : <Sparkles size={14}/>} {item.type === 'BUG' ? 'Problema' : 'Sugestão'}</span>
-      <b>{item.votes} votos</b>
-    </header>
-    <div className={`admin-feedback-visibility ${item.approved ? 'approved' : 'pending'}`}>{item.approved ? <Eye size={13}/> : <EyeOff size={13}/>} {item.approved ? 'Publicado no roadmap' : 'Aguardando aprovação'}</div>
-    <h2>{item.title}</h2><p>{item.description}</p>
-    <small>{item.author} · {item.email}<br/>{item.store} · {new Date(item.createdAt).toLocaleDateString('pt-BR')}</small>
-    <label>Status<select value={item.status} disabled={busy === item.publicId} onChange={event => void act(item.publicId, () => updateAdminFeedback(item.publicId, { status: event.target.value }, csrfToken), 'Status do roadmap atualizado.')}>{Object.entries(statusLabels).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-    <div className="admin-feedback-actions">
-      <button type="button" className={item.approved ? 'secondary' : 'primary'} disabled={busy === item.publicId} onClick={toggleApproval}>{busy === item.publicId ? <LoaderCircle className="spin" size={15}/> : item.approved ? <EyeOff size={15}/> : <CheckCircle2 size={15}/>} {item.approved ? 'Ocultar' : 'Aprovar'}</button>
-      <button type="button" className="danger" disabled={busy === item.publicId} onClick={remove}><Trash2 size={15}/> Excluir</button>
-    </div>
-  </article>;
 }
 
 export default function AdminContentPage({ csrfToken }) {
@@ -95,10 +74,7 @@ export default function AdminContentPage({ csrfToken }) {
 
   let content;
   if (state.loading && !state.data) content = <div className="admin-content-loading"><LoaderCircle className="spin"/> Carregando central...</div>;
-  else if (tab === 'feedback') content = <section className="admin-feedback-grid">
-    {state.data?.feedback?.map(item => <FeedbackCard key={item.publicId} item={item} busy={busy} csrfToken={csrfToken} act={act}/>)}
-    {!state.data?.feedback?.length && <div className="admin-content-empty"><Inbox/><b>Nenhum feedback recebido</b></div>}
-  </section>;
+  else if (tab === 'feedback') content = <AdminRoadmap items={state.data?.feedback || []} csrfToken={csrfToken} onSaved={load}/>;
   else if (tab === 'releases') content = <div className="admin-content-split">
     <form className="card admin-content-form" onSubmit={publish}><div className="admin-release-form-heading"><div><h2>{editingReleaseId ? 'Editar publicação' : 'Publicar novidade'}</h2><p>{editingReleaseId ? 'Altere qualquer campo, imagem ou visibilidade.' : 'Crie uma publicação manual com imagem ou vídeo.'}</p></div>{editingReleaseId && <button type="button" onClick={cancelReleaseEdit} aria-label="Cancelar edição"><X size={17}/></button>}</div>
       <label>Categoria<select value={release.category} onChange={event => setRelease(current => ({ ...current, category: event.target.value }))}>{Object.entries(categoryLabels).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label>

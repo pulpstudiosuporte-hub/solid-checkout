@@ -20,11 +20,12 @@ class AdminAuth implements AuthRepository {
   updatePasswordAndRevokeOtherSessions(): Promise<void> { return Promise.resolve(); }
 }
 
-function contentDatabase(spies?: { updateFeedback?: ReturnType<typeof vi.fn>; deleteFeedback?: ReturnType<typeof vi.fn>; createMedia?: ReturnType<typeof vi.fn>; upsertAsset?: ReturnType<typeof vi.fn>; updateRelease?: ReturnType<typeof vi.fn> }): PrismaClient {
+function contentDatabase(spies?: { createFeedback?: ReturnType<typeof vi.fn>; updateFeedback?: ReturnType<typeof vi.fn>; deleteFeedback?: ReturnType<typeof vi.fn>; createMedia?: ReturnType<typeof vi.fn>; upsertAsset?: ReturnType<typeof vi.fn>; updateRelease?: ReturnType<typeof vi.fn> }): PrismaClient {
   return {
     productRelease: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn(), upsert: vi.fn().mockResolvedValue({}), findUnique: vi.fn().mockResolvedValue({ id: 'release-a' }), update: spies?.updateRelease ?? vi.fn(), deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     integrationCatalogAsset: { findMany: vi.fn().mockResolvedValue([]), upsert: spies?.upsertAsset ?? vi.fn() },
     productFeedback: {
+      create: spies?.createFeedback ?? vi.fn().mockResolvedValue({ publicId: 'roadmap-new' }),
       findMany: vi.fn().mockResolvedValue([]),
       updateMany: spies?.updateFeedback ?? vi.fn().mockResolvedValue({ count: 1 }),
       deleteMany: spies?.deleteFeedback ?? vi.fn().mockResolvedValue({ count: 1 }),
@@ -43,6 +44,37 @@ const mutationHeaders = { ...authenticated, origin: 'http://localhost:5173', 'x-
 const unusedCatalog = {} as CatalogRepository;
 
 describe('conteúdo administrável da plataforma', () => {
+  it('impede lojistas comuns de criar ou editar o roadmap administrativo', async () => {
+    const auth = new AdminAuth();
+    const session = await auth.findActiveSession(hash(token));
+    vi.spyOn(auth, 'findActiveSession').mockResolvedValue({ ...session!, user: { ...session!.user, platformAdmin: false } });
+    const app = buildApp(env, { authRepository: auth, database: contentDatabase() });
+    try {
+      for (const method of ['POST', 'PATCH'] as const) {
+        const url = method === 'POST' ? '/admin/content/feedback' : '/admin/content/feedback/existing';
+        expect((await app.inject({ method, url, headers: mutationHeaders, payload: { title: 'Nova entrega', description: 'Uma descrição detalhada.', approved: true } })).statusCode).toBe(403);
+      }
+    } finally { await app.close(); }
+  });
+  it('cria itens sem loja e permite editar conteúdo, etapa e visibilidade sem alterar autor ou votos', async () => {
+    const createFeedback = vi.fn().mockResolvedValue({ publicId: 'roadmap-new' });
+    const updateFeedback = vi.fn().mockResolvedValue({ count: 1 });
+    const app = buildApp(env, { authRepository: new AdminAuth(), database: contentDatabase({ createFeedback, updateFeedback }) });
+    const payload = { title: 'Exportar relatórios', description: 'Exportar os resultados em uma planilha.', type: 'SUGGESTION', status: 'PLANNED', approved: false };
+    try {
+      expect((await app.inject({ method: 'POST', url: '/admin/content/feedback', headers: authenticated, payload })).statusCode).toBe(403);
+      const response = await app.inject({ method: 'POST', url: '/admin/content/feedback', headers: mutationHeaders, payload: { ...payload, userId: 'other-user', storeId: 'other-store' } });
+      expect(response.statusCode).toBe(201);
+      expect(createFeedback).toHaveBeenCalledWith({ data: { ...payload, userId: 'user-a', storeId: null }, select: { publicId: true } });
+      const updated = { ...payload, title: 'Relatórios exportáveis', status: 'DONE', approved: true };
+      expect((await app.inject({ method: 'PATCH', url: '/admin/content/feedback/roadmap-new', headers: mutationHeaders, payload: { ...updated, votes: 999, userId: 'other-user' } })).statusCode).toBe(200);
+      expect(updateFeedback).toHaveBeenCalledWith({ where: { publicId: 'roadmap-new' }, data: updated });
+      for (const invalid of [{ title: 'x' }, { description: '' }, { approved: 'yes' }, { status: 'UNKNOWN' }, { type: 'UNKNOWN' }, { title: 'a'.repeat(121) }]) {
+        expect((await app.inject({ method: 'PATCH', url: '/admin/content/feedback/roadmap-new', headers: mutationHeaders, payload: invalid })).statusCode).toBe(400);
+      }
+      expect((await app.inject({ method: 'POST', url: '/admin/content/feedback', headers: mutationHeaders, payload: { status: 'DONE' } })).statusCode).toBe(400);
+    } finally { await app.close(); }
+  });
   it('exige sessão e preserva uma lista realmente vazia', async () => {
     const database = contentDatabase();
     const app = buildApp(env, { authRepository: new AdminAuth(), database });
