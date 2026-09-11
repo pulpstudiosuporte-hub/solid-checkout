@@ -4,7 +4,7 @@ import { canTransitionPayment, mapProviderPaymentStatus, providerAmountMatches }
 describe('regras críticas de pagamento', () => {
   it('normaliza apenas estados conhecidos do provedor', () => {
     expect(mapProviderPaymentStatus('approved')).toBe('PAID');
-    expect(mapProviderPaymentStatus('partially_refunded')).toBe('REFUNDED');
+    expect(mapProviderPaymentStatus('partially_refunded')).toBeNull();
     expect(mapProviderPaymentStatus('pending')).toBeNull();
     expect(mapProviderPaymentStatus('qualquer-coisa')).toBeNull();
   });

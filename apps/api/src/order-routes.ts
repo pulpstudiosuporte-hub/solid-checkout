@@ -202,7 +202,7 @@ function serializeDetail(order: OrderRecord, encryptionKey: string, request: Fas
     paymentAttempts: order.paymentAttempts.map(payment => ({
       publicId: payment.publicId, provider: payment.provider, providerTransactionId: payment.providerTransactionId,
       amountCents: payment.amountCents ?? order.totalCents, status: payment.status, createdAt: payment.createdAt, updatedAt: payment.updatedAt ?? payment.createdAt,
-      paidAt: payment.paidAt, expiresAt: payment.expiresAt
+      partialRefundAt: payment.partialRefundAt ?? null, refundedAmountCents: payment.refundedAmountCents ?? null, paidAt: payment.paidAt, expiresAt: payment.expiresAt
     })),
     integrationJobs: order.deliveryJobs ?? [],
     customerHistory: history.map(item => ({ ...item, totalCents: item.totalCents - item.discountCents + item.shippingPriceCents })),

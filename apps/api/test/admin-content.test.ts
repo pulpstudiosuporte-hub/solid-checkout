@@ -29,6 +29,7 @@ function contentDatabase(spies?: { updateFeedback?: ReturnType<typeof vi.fn>; de
       updateMany: spies?.updateFeedback ?? vi.fn().mockResolvedValue({ count: 1 }),
       deleteMany: spies?.deleteFeedback ?? vi.fn().mockResolvedValue({ count: 1 }),
     },
+    $transaction: async (work: (tx: unknown) => Promise<unknown>) => work({ $queryRaw: () => Promise.resolve([{locked:1}]), mediaAsset: { findFirst: () => Promise.resolve(null), aggregate: () => Promise.resolve({_sum:{sizeBytes:0}}), create: spies?.createMedia ?? (() => Promise.resolve({filename:'test.webp'})) } }),
     mediaAsset: {
       aggregate: vi.fn().mockResolvedValue({ _sum: { sizeBytes: 0 } }),
       create: spies?.createMedia ?? vi.fn().mockResolvedValue({}),
@@ -92,7 +93,7 @@ describe('conteúdo administrável da plataforma', () => {
   });
 
   it('otimiza mídia global sem vinculá-la à loja ativa', async () => {
-    const createMedia = vi.fn().mockResolvedValue({});
+    const createMedia = vi.fn().mockResolvedValue({filename:'test.webp'});
     const app = buildApp(env, { authRepository: new AdminAuth(), catalogRepository: unusedCatalog, database: contentDatabase({ createMedia }) });
     const boundary = '----solid-content-test';
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');

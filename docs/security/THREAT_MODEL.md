@@ -1,66 +1,49 @@
-# Modelo de ameaças inicial — SOLID
+# Modelo de ameaças — SOLID
 
-Data: 2026-08-13. Escopo: fundação, antes de autenticação, banco e pagamentos.
+Revisão: 10/09/2026. Escopo atual: painel autenticado, múltiplas lojas, checkout público, PostgreSQL, Pix, Shopify, integrações, mídia, filas e publicação. Substitui o documento da fundação de agosto, que descrevia serviços ainda não implementados.
 
-## Ativos críticos
+## Ativos e fronteiras de confiança
 
-- Credenciais e sessões dos lojistas.
-- Tokens Shopify e gateway Pix.
-- CPF/CNPJ, contato e endereço de compradores.
-- Preços, totais, pedidos e estados de pagamento.
-- Versões publicadas dos checkouts.
-- Chaves de criptografia, logs e backups.
-
-## Fronteiras de confiança
+- Credenciais, sessões, MFA e permissões dos lojistas e administradores da plataforma.
+- Tokens de integração, chave de criptografia, dados pessoais de compradores e backups.
+- Preços, snapshots de pedidos, estados de pagamento, taxas e versões publicadas dos checkouts.
 
 ```text
-Navegador do lojista -> painel -> API -> banco/Redis
+Navegador do lojista -> proxy/CDN -> painel -> API -> PostgreSQL/Redis
 Navegador do comprador -> checkout público -> API -> gateway Pix
-Shopify/gateway -> endpoint de webhook -> fila -> worker -> banco
-Operador/CI -> ambiente de deploy -> secret manager
+Shopify/gateway -> webhook -> verificação oficial -> banco/fila -> processadores
+Operador/CI -> imagem publicada -> proxy -> serviços e cofre de segredos
 ```
 
-Tudo vindo do navegador, query string, webhook ou integração externa é não confiável até autenticação, autorização e validação.
+Entrada do navegador ou de integrações não recebe confiança por conter um identificador conhecido. Autenticação, autorização da loja, validação do conteúdo e controle de repetição são verificações separadas.
 
-## Ameaças prioritárias e controles planejados
+## Controles implementados e limites
 
-| Ameaça | Impacto | Controle obrigatório |
+| Ameaça | Controles no código | Limite operacional |
 |---|---|---|
-| Acesso cruzado entre lojas | Crítico | `store_id` derivado da sessão, autorização central e testes negativos |
-| Alteração de preço no navegador | Crítico | cálculo integral no servidor e snapshot do pedido |
-| Webhook Pix falso ou repetido | Crítico | assinatura, timestamp, idempotência persistida e reconciliação |
-| Roubo de sessão | Crítico | cookie seguro, rotação, MFA, revogação e reautenticação |
-| Vazamento de tokens/CPF | Crítico | criptografia, minimização, mascaramento e redação de logs |
-| XSS por editor/lojista | Alto | esquema fechado de tokens, sanitização e CSP; sem JS/HTML livre |
-| CSRF administrativo | Alto | cookie SameSite e token CSRF em ações mutáveis |
-| SSRF por imagens/URLs | Alto | allowlist de protocolo/destino, bloqueio de redes internas e fetch controlado |
-| Abuso de login/cupom/Pix | Alto | rate limit por IP, conta, loja e endpoint |
-| Dependência comprometida | Alto | versões fixas, lockfile, auditoria e atualização controlada |
-| Falha/duplicação de worker | Alto | jobs idempotentes, retry limitado e dead-letter queue |
-| Operação sem recuperação | Alto | backups externos, restauração ensaiada e rollback |
+| Acesso entre lojas | Sessão, loja ativa, vínculo/role e filtros por loja; testes negativos | Auditar novas rotas e privilégios do administrador da plataforma |
+| Roubo de sessão e CSRF | Tokens opacos com hash, revogação, cookies de produção Secure/HttpOnly/SameSite, origem e CSRF nas mutações; MFA disponível | MFA não é presumido obrigatório para todas as contas |
+| Cadastro abusivo | Fluxo de cadastro/verificação e aprovação da conta, limites de tentativas | Monitorar filas de aprovação, entrega de e-mail e abuso |
+| Manipulação de preços | Cálculo no servidor e snapshot; total conferido ao reservar pagamento | Integrações de catálogo devem manter validação de origem |
+| Pix repetido ou resultado desconhecido | Reserva durável por sessão entre gateways, resposta persistida e retomada, bloqueio de fallback após resultado incerto | Sem resposta oficial não é seguro afirmar que a cobrança falhou |
+| Webhook falso/repetido | Autenticação conforme integração, consulta oficial e comparação de identificador/valor, transições condicionais e entregas persistidas | Exercitar contratos de produção dos provedores |
+| Crédito indevido no estorno | Crédito vinculado à taxa original, cumulativo/proporcional, bloqueio de linha e lançamentos imutáveis após faturamento | Valor parcial não confirmado exige conferência |
+| Perda de trabalhos após reinício | Lease no banco, backoff, recuperação de PROCESSING e conclusão vinculada à lease | Monitorar atraso, DEAD e falhas externas; não implica entrega exatamente uma vez no provedor |
+| Vazamento de dados e segredos | Criptografia de campos sensíveis, hashes, mascaramento e retenção seletiva | Cofre, controle de acesso e restauração de backups dependem da infraestrutura |
+| Conteúdo malicioso e SSRF | Esquemas/validações de URLs e imagens, processamento de formatos permitidos, CSP no servidor web | Temas e serviços externos exigem testes contínuos; verificar CSP após proxy/CDN |
+| Abuso e consumo de recursos | Rate limiting, quota transacional de mídia, paginação, agregação SQL e resultados limitados | Redis deve estar configurado para limites compartilhados entre réplicas |
+| Dependência vulnerável | Versões fixadas, lockfile, auditoria que falha em erros, Semgrep e testes no CI | Quatro exceções transitivas do Prisma com vencimento explícito |
 
-## Decisões desta fundação
+## Retenção e pagamentos tardios
 
-- API e worker são módulos separados, embora possam rodar na mesma infraestrutura inicialmente.
-- API escuta apenas loopback por padrão.
-- Erros públicos são genéricos e incluem `requestId`; detalhes ficam apenas em logs redigidos.
-- CORS usa allowlist explícita e credenciais; wildcard é proibido.
-- O worker não processa filas até Redis, idempotência e persistência estarem implementados.
-- O frontend atual permanece protótipo JavaScript dentro do workspace. Todo código server-side novo é TypeScript estrito; a migração visual para TSX será incremental e rastreada.
+Sessões expiradas/canceladas só são elegíveis à anonimização quando não há tentativa PAID ou REFUNDED. Abandonos usam 30/90/180 dias conforme o plano; dados de segurança/telemetria têm os prazos descritos em [segurança operacional](../production-security.md). Confirmação tardia pode concluir a sessão; dados anonimizados antes dessa confirmação não são reconstruídos automaticamente.
 
-## Riscos ainda abertos
+## Riscos e verificações pendentes em produção
 
-- Não há autenticação, banco, autorização, CSRF nem armazenamento seguro de segredos.
-- Não há proxy de produção configurado nem CSP com nonce para uma aplicação renderizada no servidor.
-- `localStorage` mantém apenas configuração visual de demonstração; nunca deve guardar token ou dado pessoal.
-- Health readiness ainda não verifica banco/Redis porque esses serviços não foram adicionados.
+1. Confirmar cabeçalhos no domínio publicado e funcionamento de login, CSP, gateway e e-mail após a atualização.
+2. Revisar as exceções de dependências antes de 31/10/2026, sem ampliar a lista automaticamente.
+3. Concluir a integração operacional de alertas de reconciliação, estornos em conferência e filas atrasadas.
+4. Ensaiar restauração de backup e rollback coordenado, especialmente após a nova unicidade do livro de taxas.
+5. Medir agregações e filas com volume real; testes locais demonstram correção funcional, não capacidade de produção.
 
-Revisar este documento a cada integração, nova categoria de dado ou mudança de fronteira de confiança.
-# Autenticação administrativa
-
-- Não existe cadastro público. O primeiro proprietário é criado por um comando de bootstrap que recusa execução quando já existe usuário.
-- Senhas são derivadas com scrypt (`N=32768`, `r=8`, `p=1`) e salt aleatório; senha e token de sessão nunca são persistidos em claro.
-- Sessões usam tokens opacos, expiração ociosa de 8 horas, limite absoluto de 7 dias e revogação server-side.
-- Cookies de produção usam prefixo `__Host-`, `Secure`, `HttpOnly`, `SameSite=Strict` e `Path=/`.
-- Login e logout exigem origem explicitamente permitida e token CSRF ligado à sessão. O login possui rate limit dedicado e resposta genérica contra enumeração de usuários.
-- Por exigir cookies `Secure`, autenticação administrativa não deve ser ativada nos domínios HTTP temporários.
+O [registro de correções](REMEDIACAO-2026-09-10.md) contém evidências e limites da validação. Revisar este modelo a cada nova integração, categoria de dado ou mudança de fronteira de confiança.

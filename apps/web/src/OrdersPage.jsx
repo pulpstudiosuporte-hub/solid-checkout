@@ -1,26 +1,6 @@
-import React, { useEffect, useState } from "react";
-import {
-  ArrowLeft,
-  ArrowUpDown,
-  CalendarDays,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  CreditCard,
-  Download,
-  ExternalLink,
-  MapPin,
-  MessageCircle,
-  Package,
-  QrCode,
-  RefreshCw,
-  Search,
-  ShoppingBag,
-  SlidersHorizontal,
-  UserRound,
-} from "lucide-react";
-import { getOrder, getOrders } from "./api";
+import { useEffect, useState } from "react";
+import { ArrowUpDown, CalendarDays, ChevronLeft, ChevronRight, Download, ExternalLink, QrCode, RefreshCw, Search, ShoppingBag, SlidersHorizontal } from "lucide-react";
+import { getOrders } from "./api";
 import OrderWorkspace from "./OrderWorkspace";
 import "./orders-page.css";
 
@@ -28,7 +8,6 @@ const currency = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
 });
-const relative = new Intl.RelativeTimeFormat("pt-BR", { numeric: "auto" });
 const statusLabels = {
   PAID: "Pago",
   PENDING: "Aguardando Pix",
@@ -46,14 +25,6 @@ const statusTones = {
   REFUNDED: "refunded",
 };
 const orderCode = (publicId) => `#SLD-${publicId.slice(-6).toUpperCase()}`;
-const initials = (name) =>
-  (name || "Cliente")
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
 const countryFlag = (country) =>
   country === "BR"
     ? "🇧🇷"
@@ -62,37 +33,6 @@ const countryFlag = (country) =>
       : country === "PT"
         ? "🇵🇹"
         : country || "—";
-const whatsappNumber = (phone) => {
-  let digits = String(phone || "")
-    .replace(/\D/g, "")
-    .replace(/^0+/, "");
-  if (digits.length === 10 || digits.length === 11) digits = `55${digits}`;
-  return /^\d{12,15}$/.test(digits) ? digits : null;
-};
-const whatsappUrl = (order) => {
-  const number = whatsappNumber(order.customer?.phone);
-  if (!number) return null;
-  const firstName = order.customer?.name?.trim().split(/\s+/)[0];
-  const product = order.items?.[0]?.titleSnapshot || "seu produto";
-  const extra =
-    order.items?.length > 1 ? " e os outros itens da sua compra" : "";
-  const greeting = firstName
-    ? `Olá, ${firstName}! Tudo bem?`
-    : "Olá! Tudo bem?";
-  const message = `${greeting} Estou entrando em contato sobre sua compra de ${product}${extra} em nossa loja.`;
-  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
-};
-
-function relativeDate(value) {
-  const seconds = Math.round((new Date(value).getTime() - Date.now()) / 1000);
-  if (Math.abs(seconds) < 60) return relative.format(seconds, "second");
-  const minutes = Math.round(seconds / 60);
-  if (Math.abs(minutes) < 60) return relative.format(minutes, "minute");
-  const hours = Math.round(minutes / 60);
-  return Math.abs(hours) < 24
-    ? relative.format(hours, "hour")
-    : relative.format(Math.round(hours / 24), "day");
-}
 function PaymentStatus({ status }) {
   return (
     <span className={`payment-status ${statusTones[status] || "neutral"}`}>
@@ -294,32 +234,6 @@ function useOrders(storeKey, page, pageSize, filters = {}) {
   return [state, () => setRefresh((value) => value + 1)];
 }
 
-function useOrderDetail(orderId) {
-  const [state, setState] = useState({ loading: true, error: "", order: null });
-  useEffect(() => {
-    const controller = new AbortController();
-    let active = true;
-    const load = async (initial) => {
-      if (initial) setState({ loading: true, error: "", order: null });
-      try {
-        const order = await getOrder(orderId, controller.signal);
-        if (active) setState({ loading: false, error: "", order });
-      } catch (error) {
-        if (active && error.name !== "AbortError" && initial)
-          setState({ loading: false, error: error.message, order: null });
-      }
-    };
-    void load(true);
-    const interval = window.setInterval(() => void load(false), 5_000);
-    return () => {
-      active = false;
-      window.clearInterval(interval);
-      controller.abort();
-    };
-  }, [orderId]);
-  return state;
-}
-
 export function RecentOrders({ storeKey, onViewAll }) {
   const [state, load] = useOrders(storeKey, 1, 5);
   return (
@@ -335,198 +249,6 @@ export function RecentOrders({ storeKey, onViewAll }) {
       </div>
       <OrdersTable {...state} onRetry={load} />
     </section>
-  );
-}
-
-function Address({ address }) {
-  if (!address?.street) return <span>Endereço não informado</span>;
-  return (
-    <span>
-      {address.street}, {address.number}
-      {address.complement ? ` — ${address.complement}` : ""}
-      <br />
-      {address.neighborhood && `${address.neighborhood} — `}
-      {address.city}/{address.state}
-      <br />
-      {address.postalCode && `CEP ${address.postalCode}`}
-    </span>
-  );
-}
-
-function LegacyOrderDetail({ orderId, onBack }) {
-  const { loading, error, order } = useOrderDetail(orderId);
-  const [copied, setCopied] = useState(false);
-  const copyPix = async () => {
-    if (!order?.pixCode) return;
-    await navigator.clipboard.writeText(order.pixCode);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
-  };
-  return (
-    <main className="page orders-page">
-      <button className="back-link" onClick={onBack}>
-        <ArrowLeft size={17} /> Voltar para pedidos
-      </button>
-      {loading && (
-        <section className="card orders-state" role="status">
-          <RefreshCw className="orders-spinner" />
-          <span>Carregando detalhes do pedido...</span>
-        </section>
-      )}
-      {error && (
-        <section className="card orders-state error" role="alert">
-          <ShoppingBag />
-          <b>Não foi possível abrir este pedido</b>
-          <span>{error}</span>
-          <button className="secondary" onClick={onBack}>
-            Voltar para pedidos
-          </button>
-        </section>
-      )}
-      {order && (
-        <>
-          <section className="page-title order-detail-title">
-            <div>
-              <p className="eyebrow">PEDIDO</p>
-              <h1>{orderCode(order.publicId)}</h1>
-              <p>
-                Criado em {new Date(order.createdAt).toLocaleString("pt-BR")}
-              </p>
-            </div>
-            <PaymentStatus status={order.status} />
-          </section>
-          <section className="order-detail-grid">
-            <div className="order-detail-main">
-              <section className="card detail-card">
-                <div className="detail-card-head">
-                  <div>
-                    <Package size={19} />
-                    <h2>Itens do pedido</h2>
-                  </div>
-                  <strong>{currency.format(order.subtotalCents / 100)}</strong>
-                </div>
-                {order.items.map((item, index) => (
-                  <article
-                    className="detail-item"
-                    key={`${item.titleSnapshot}-${index}`}
-                  >
-                    <span className="detail-product-image">
-                      {item.imageUrlSnapshot ? (
-                        <img src={item.imageUrlSnapshot} alt="" />
-                      ) : (
-                        <Package size={19} />
-                      )}
-                    </span>
-                    <div>
-                      <b>{item.titleSnapshot}</b>
-                      {item.variantSnapshot && (
-                        <small>{item.variantSnapshot}</small>
-                      )}
-                      <small>
-                        {item.quantity}{" "}
-                        {item.quantity === 1 ? "unidade" : "unidades"}
-                      </small>
-                    </div>
-                  </article>
-                ))}
-              </section>
-              <section className="card detail-card">
-                <div className="detail-card-head">
-                  <div>
-                    <UserRound size={19} />
-                    <h2>Cliente</h2>
-                  </div>
-                </div>
-                <div className="detail-info">
-                  <b>{order.customer?.name || "Cliente não identificado"}</b>
-                  <span>{order.customer?.email || "E-mail não informado"}</span>
-                  {order.customer?.phone && <span>{order.customer.phone}</span>}
-                  {whatsappUrl(order) && (
-                    <a
-                      className="whatsapp-link"
-                      href={whatsappUrl(order)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <MessageCircle size={16} /> Chamar no WhatsApp
-                    </a>
-                  )}
-                </div>
-              </section>
-              <section className="card detail-card">
-                <div className="detail-card-head">
-                  <div>
-                    <MapPin size={19} />
-                    <h2>Entrega</h2>
-                  </div>
-                </div>
-                <div className="detail-info">
-                  <b>{order.shippingMethodName || "Frete não informado"}</b>
-                  <Address address={order.shippingAddress} />
-                </div>
-              </section>
-            </div>
-            <aside className="card payment-detail">
-              <div className="payment-detail-icon">
-                <CreditCard size={22} />
-              </div>
-              <p className="eyebrow">PAGAMENTO</p>
-              <h2>{order.paymentProvider || "Pix"}</h2>
-              <PaymentStatus status={order.status} />
-              <dl>
-                <div>
-                  <dt>Subtotal</dt>
-                  <dd>{currency.format(order.subtotalCents / 100)}</dd>
-                </div>
-                {order.discountCents > 0 && (
-                  <div className="payment-discount">
-                    <dt>
-                      Desconto{order.couponCode ? ` (${order.couponCode})` : ""}
-                    </dt>
-                    <dd>-{currency.format(order.discountCents / 100)}</dd>
-                  </div>
-                )}
-                <div>
-                  <dt>Frete</dt>
-                  <dd>
-                    {order.shippingPriceCents === 0
-                      ? "Grátis"
-                      : currency.format(order.shippingPriceCents / 100)}
-                  </dd>
-                </div>
-                <div className="payment-total">
-                  <dt>Total</dt>
-                  <dd>{currency.format(order.totalCents / 100)}</dd>
-                </div>
-              </dl>
-              {order.pixCode && order.status === "PENDING" && (
-                <div className="payment-code-card">
-                  <div>
-                    <span>PIX copia e cola</span>
-                    <small>
-                      Atualizado automaticamente enquanto estiver pendente.
-                    </small>
-                  </div>
-                  <button
-                    type="button"
-                    className="copy-payment-code"
-                    onClick={copyPix}
-                  >
-                    {copied ? <Check size={15} /> : <Copy size={15} />}
-                    {copied ? "Copiado" : "Copiar código PIX"}
-                  </button>
-                </div>
-              )}
-              {order.paidAt && (
-                <p className="payment-confirmed">
-                  Confirmado em {new Date(order.paidAt).toLocaleString("pt-BR")}
-                </p>
-              )}
-            </aside>
-          </section>
-        </>
-      )}
-    </main>
   );
 }
 

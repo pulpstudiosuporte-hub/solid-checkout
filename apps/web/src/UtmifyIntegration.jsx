@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Activity, CheckCircle2, KeyRound, LoaderCircle, ShieldCheck, Unplug } from 'lucide-react';
 import { disconnectUtmify, getUtmifyStatus, saveUtmify } from './api';
 

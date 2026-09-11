@@ -44,6 +44,7 @@ export async function runSecurityCleanup(database: PrismaClient, logger: Fastify
       where: {
         checkout: { storeId: { in: storeIds } },
         status: { in: ['EXPIRED', 'CANCELLED'] },
+        paymentAttempts: { none: { status: { in: ['PAID', 'REFUNDED'] } } },
         expiresAt: { lt: new Date(now.getTime() - days * DAY) },
         OR: [{ customerDataEncrypted: { not: null } }, { shippingAddressEncrypted: { not: null } }, { customerEmailHash: { not: null } }, { customerDocumentHash: { not: null } }]
       },

@@ -60,7 +60,7 @@ async function send(environment: AppEnvironment, database: PrismaClient, deliver
   const checkoutUrl = `https://${domain.hostname}/#/c/${encodeURIComponent(session.checkout.store.slug)}/${encodeURIComponent(session.checkout.slug)}`;
   const product = session.items[0]?.titleSnapshot || 'seu pedido';
   const subject = delivery.step === 1 ? `Você esqueceu ${product} no carrinho` : `Seu carrinho na ${session.checkout.store.name} ainda está disponível`;
-  const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${environment.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': `solid-abandoned-${session.publicId}-${delivery.step}` }, body: JSON.stringify({ from: environment.EMAIL_FROM, to: [customer.email], subject, html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#17131f"><p style="color:#7047eb;font-weight:700">${escapeHtml(session.checkout.store.name)}</p><h1>Seu carrinho está esperando por você</h1><p>Olá, ${escapeHtml(customer.name || 'cliente')}. Você iniciou uma compra de <strong>${escapeHtml(product)}</strong> no valor de <strong>${money(amount)}</strong>, mas não concluiu.</p><p style="margin:28px 0"><a href="${checkoutUrl}" style="display:inline-block;padding:14px 22px;border-radius:10px;background:#7047eb;color:#fff;text-decoration:none;font-weight:700">Voltar ao checkout</a></p><p style="color:#686471;font-size:13px">Se você não quiser continuar, ignore este e-mail. Nenhuma cobrança foi realizada.</p></div>` }) });
+  const response = await fetch('https://api.resend.com/emails', { signal: AbortSignal.timeout(15_000), method: 'POST', headers: { Authorization: `Bearer ${environment.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': `solid-abandoned-${session.publicId}-${delivery.step}` }, body: JSON.stringify({ from: environment.EMAIL_FROM, to: [customer.email], subject, html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#17131f"><p style="color:#7047eb;font-weight:700">${escapeHtml(session.checkout.store.name)}</p><h1>Seu carrinho está esperando por você</h1><p>Olá, ${escapeHtml(customer.name || 'cliente')}. Você iniciou uma compra de <strong>${escapeHtml(product)}</strong> no valor de <strong>${money(amount)}</strong>, mas não concluiu.</p><p style="margin:28px 0"><a href="${checkoutUrl}" style="display:inline-block;padding:14px 22px;border-radius:10px;background:#7047eb;color:#fff;text-decoration:none;font-weight:700">Voltar ao checkout</a></p><p style="color:#686471;font-size:13px">Se você não quiser continuar, ignore este e-mail. Nenhuma cobrança foi realizada.</p></div>` }) });
   if (!response.ok) throw new Error(`Resend recusou o envio (${response.status})`);
   return 'DELIVERED';
 }
@@ -73,6 +73,7 @@ export function startAbandonedRecovery(environment: AppEnvironment, database: Pr
     running = true;
     try {
       await enqueue(database);
+      await recoverAbandonedDeliveryLeases(database);
       for (let count = 0; count < 20; count += 1) {
         const now = new Date();
         const delivery = await database.abandonedRecoveryDelivery.findFirst({ where: { status: 'PENDING', scheduledAt: { lte: now }, attempts: { lt: 8 }, OR: [{ claimedAt: null }, { claimedAt: { lt: new Date(now.getTime() - 5 * MINUTE) } }] }, orderBy: { scheduledAt: 'asc' }, select: { id: true, attempts: true } });
@@ -81,11 +82,11 @@ export function startAbandonedRecovery(environment: AppEnvironment, database: Pr
         if (!claim.count) continue;
         try {
           const result = await send(environment, database, delivery.id);
-          await database.abandonedRecoveryDelivery.update({ where: { id: delivery.id }, data: { status: 'DELIVERED', deliveredAt: new Date(), claimedAt: null, lastError: result === 'DELIVERED' ? null : result } });
+          await database.abandonedRecoveryDelivery.updateMany({ where: { id: delivery.id, status: 'PROCESSING', claimedAt: now }, data: { status: 'DELIVERED', deliveredAt: new Date(), claimedAt: null, lastError: result === 'DELIVERED' ? null : result } });
           log.info({ deliveryId: delivery.id, result }, 'abandoned_recovery_processed');
         } catch (error) {
           const attempts = delivery.attempts + 1;
-          await database.abandonedRecoveryDelivery.update({ where: { id: delivery.id }, data: { status: attempts >= 8 ? 'DEAD' : 'PENDING', attempts: { increment: 1 }, claimedAt: null, scheduledAt: new Date(Date.now() + Math.min(360, 2 ** attempts) * MINUTE), lastError: (error instanceof Error ? error.message : 'Falha desconhecida').slice(0, 500) } });
+          await database.abandonedRecoveryDelivery.updateMany({ where: { id: delivery.id, status: 'PROCESSING', claimedAt: now }, data: { status: attempts >= 8 ? 'DEAD' : 'PENDING', attempts: { increment: 1 }, claimedAt: null, scheduledAt: new Date(Date.now() + Math.min(360, 2 ** attempts) * MINUTE), lastError: (error instanceof Error ? error.message : 'Falha desconhecida').slice(0, 500) } });
           log.warn({ err: error, deliveryId: delivery.id, attempts }, 'abandoned_recovery_failed');
         }
       }
@@ -94,4 +95,8 @@ export function startAbandonedRecovery(environment: AppEnvironment, database: Pr
   const initial = setTimeout(() => void run(), 45_000); initial.unref();
   const interval = setInterval(() => void run(), 60_000); interval.unref();
   return () => { clearTimeout(initial); clearInterval(interval); };
+}
+
+export async function recoverAbandonedDeliveryLeases(database: PrismaClient): Promise<void> {
+  await database.abandonedRecoveryDelivery.updateMany({ where: { status: 'PROCESSING', claimedAt: { lt: new Date(Date.now() - 5 * MINUTE) } }, data: { status: 'PENDING', claimedAt: null } });
 }

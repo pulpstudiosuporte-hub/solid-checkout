@@ -1,6 +1,8 @@
 .world-map-visual > img {
   object-fit: fill;
 }
+.world-map-visual[data-paused="true"] * { animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) { .world-map-visual * { animation: none !important; } }
 
 .home-geo .geo-location-list {
   display: none;

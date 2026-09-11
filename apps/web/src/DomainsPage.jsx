@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Copy, ExternalLink, Globe2, LoaderCircle, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
 import { deleteStoreDomain, getStoreDomain, saveStoreDomain, verifyStoreDomain } from './api';
 

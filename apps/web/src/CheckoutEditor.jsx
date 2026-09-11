@@ -47,12 +47,15 @@ import CheckoutFooter, {
   defaultCheckoutFooterMethods,
 } from "./CheckoutFooter";
 import SocialProofToast from "./SocialProofToast";
+import MediaLibrary from "./MediaLibrary";
 import {
   buildCheckoutLayoutEntries,
   reorderCheckoutLayout,
 } from "./checkout-layout";
 
 import { checkoutEditorHistory, createEditorHistory } from "./checkout-editor-history";
+import "./public-session.css";
+import "./checkout-polish.css";
 import "./checkout-editor-refresh.css";
 
 export { reorderCheckoutLayout } from "./checkout-layout";
@@ -327,7 +330,9 @@ function ImageDropzone({
   label = "Arraste uma imagem aqui",
   alt = "Prévia da imagem",
 }) {
-  const { uploadImage } = useContext(EditorServices);
+  const services = useContext(EditorServices);
+  const { uploadImage } = services;
+  const [library, setLibrary] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const send = async (file) => {
@@ -382,6 +387,8 @@ function ImageDropzone({
         <label htmlFor={id} className="dropzone-button">
           Selecionar arquivo
         </label>
+        {services.listImages && <button type="button" className="dropzone-button" disabled={busy} onClick={() => setLibrary(true)}>Biblioteca de imagens</button>}
+        {library && <MediaLibrary services={services} onClose={() => setLibrary(false)} onSelect={url => { onChange(url); setLibrary(false); }}/>}
         {value && (
           <button
             type="button"
@@ -1874,6 +1881,8 @@ export default function CheckoutEditor({
   onSaveDraft,
   onPublish,
   onUploadOrderBumpImage,
+  onListImages,
+  onDeleteImage,
   products = [],
 }) {
   const load = () => {
@@ -1929,7 +1938,9 @@ export default function CheckoutEditor({
   const toastTimer = useRef(null);
   const dirty = useMemo(() => JSON.stringify(c) !== JSON.stringify(saved), [c, saved]);
   const deferredConfig = useDeferredValue(c);
-  const services = useMemo(() => ({ uploadImage: onUploadOrderBumpImage || (async () => { throw new Error("Abra um checkout salvo para enviar imagens."); }) }), [onUploadOrderBumpImage]);
+  const draftRef = useRef(c);
+  draftRef.current = c;
+  const services = useMemo(() => ({ uploadImage: onUploadOrderBumpImage || (async () => { throw new Error("Abra um checkout salvo para enviar imagens."); }), listImages: onListImages, deleteImage: onDeleteImage, isImageInDraft: filename => JSON.stringify(draftRef.current).includes(filename) }), [onUploadOrderBumpImage, onListImages, onDeleteImage]);
   const replaceConfig = useCallback(value => dispatch({ type: "change", value, at: Date.now() }), []);
   const u = useCallback((key, value) => dispatch({ type: "change", key, at: Date.now(), value: old => Object.is(old[key], value) ? old : { ...old, [key]: value } }), []);
   const undo = useCallback(() => dispatch({ type: "undo" }), []);
@@ -2021,7 +2032,7 @@ export default function CheckoutEditor({
       {<div className="editor-mobile-tabs" role="group" aria-label="Área do editor"><button aria-pressed={!previewOnly && mobileTab === "settings"} onClick={() => { setPreviewOnly(false); setMobileTab("settings"); }}><SlidersHorizontal size={16}/> Personalizar</button><button aria-pressed={previewOnly || mobileTab === "preview"} onClick={() => setMobileTab("preview")}><Eye size={16}/> Prévia</button></div>}
       <div className="editor-layout">
         <aside className="editor-panel" aria-label="Personalização do checkout" inert={busy ? true : undefined}>
-          <div className="editor-panel-intro"><span className="editor-eyebrow">PERSONALIZAR</span><h2>{group && !query ? group : "Do seu jeito."}</h2><p>{group && !query ? descriptions[group] : "Ajuste os detalhes e acompanhe o resultado ao lado."}</p><label className="editor-find"><Search size={17}/><input aria-label="Buscar configurações" placeholder="Buscar configurações..." value={query} onChange={event => setQuery(event.target.value)}/>{query && <button aria-label="Limpar busca" onClick={() => setQuery("")}><X size={15}/></button>}</label></div>
+          <div className="editor-panel-intro"><span className="editor-eyebrow">PERSONALIZAR</span><h2>{group && !query ? group : "Do seu jeito."}</h2><p>{group && !query ? descriptions[group] : "Ajuste os detalhes e confira o resultado na prévia."}</p><label className="editor-find"><Search size={17}/><input aria-label="Buscar configurações" placeholder="Buscar configurações..." value={query} onChange={event => setQuery(event.target.value)}/>{query && <button aria-label="Limpar busca" onClick={() => setQuery("")}><X size={15}/></button>}</label></div>
           {group && !query && <button className="panel-back" onClick={() => { if (group === "Escassez" && scarcityView) setScarcityView(null); else setGroup(null); }}><ArrowLeft size={15}/> Todas as configurações</button>}
           {!group || query ? <nav aria-label="Seções de personalização">{sections.map(section => <section className="editor-nav-section" key={section.name}>{section.items.some(matches) && <h3>{section.name}</h3>}{section.items.filter(matches).map(name => { const Icon = groups.find(([label]) => label === name)?.[1] || Palette; return <button key={name} onClick={() => choose(name)}><span className="editor-nav-icon"><Icon size={18}/></span><span><b>{name}</b><small>{descriptions[name]}</small></span><ChevronRight size={15}/></button>; })}</section>)}{!sections.some(section => section.items.some(matches)) && <p className="editor-search-empty">Nenhuma configuração encontrada. Tente “cores”, “logo” ou “texto”.</p>}<div className="editor-panel-tip"><ShieldCheck size={18}/><p><b>Você está editando um rascunho.</b> O checkout da loja só muda quando você publica.</p></div></nav> : <div className="panel-settings"><Settings key={group} group={group} c={c} u={u} replaceConfig={replaceConfig} scarcityView={scarcityView} setScarcityView={setScarcityView} editorProducts={products} addCustomElement={addCustomElement} updateCustomElement={updateCustomElement} removeCustomElement={removeCustomElement} uploadOrderBumpImage={services.uploadImage}/></div>}
         </aside>

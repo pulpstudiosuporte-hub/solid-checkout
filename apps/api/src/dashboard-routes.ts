@@ -1,4 +1,4 @@
-import { dailySales } from './dashboard-metrics.js';
+import { loadDashboardData } from './dashboard-query.js';
 import { createHash } from 'node:crypto';
 import type { AppEnvironment } from '@solid/config';
 import type { PrismaClient } from '@solid/database';
@@ -8,21 +8,6 @@ import type { AuthRepository } from './auth-repository.js';
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const failure = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
 const dayFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' });
-const hourFormatter = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hourCycle: 'h23' });
-const weekdayFormatter = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long' });
-const countryCentroids: Record<string, readonly [number, number]> = {
-  BR: [-14.235, -51.9253], US: [37.0902, -95.7129], PT: [39.3999, -8.2245],
-  AR: [-38.4161, -63.6167], CL: [-35.6751, -71.543], CO: [4.5709, -74.2973],
-  MX: [23.6345, -102.5528], CA: [56.1304, -106.3468], GB: [55.3781, -3.436],
-};
-const trackingRecord = (value: unknown): Record<string, unknown> => typeof value === 'object' && value && !Array.isArray(value) ? value as Record<string, unknown> : {};
-const visitorKey = (tracking: Record<string, unknown>, fallback: string): string => {
-  const visitorId = typeof tracking.visitor_id === 'string' ? tracking.visitor_id : null;
-  const ip = typeof tracking.client_ip_address === 'string' ? tracking.client_ip_address : null;
-  const agent = typeof tracking.client_user_agent === 'string' ? tracking.client_user_agent : null;
-  return visitorId || (ip ? sha256(`${ip}:${agent ?? ''}`) : fallback);
-};
-
 type DashboardPeriod = 'today' | 'yesterday' | '7d' | 'month' | 'year';
 
 function periodStart(now: Date, period: DashboardPeriod): Date {
@@ -61,165 +46,9 @@ export function registerDashboardRoutes(app: FastifyInstance, environment: AppEn
     if (cached && cached.expiresAt > Date.now()) return reply.header('cache-control', 'private, no-store').send(cached.payload);
     if (cached) dashboardCache.delete(cacheKey);
 
-    const [createdSessions, paidAttempts, products, checkouts, published, gateways, activeSessions] = await Promise.all([
-      db.checkoutSession.findMany({
-        where: { checkout: { storeId }, createdAt: { gte: start, lte: end } },
-        select: {
-          id: true, status: true, totalCents: true, discountCents: true, paymentDiscountCents: true, couponCode: true,
-          customerEmailHash: true, customerCapturedAt: true, shippingCapturedAt: true, createdAt: true, trackingParameters: true,
-          items: { select: { titleSnapshot: true, quantity: true, totalCents: true, isOrderBump: true } },
-          paymentAttempts: { where: { providerTransactionId: { not: null } }, orderBy: { createdAt: 'desc' }, take: 1, select: { status: true, provider: true, amountCents: true } },
-        },
-      }),
-      db.paymentAttempt.findMany({
-        where: { status: 'PAID', paidAt: { gte: start, lte: end }, session: { checkout: { storeId } } },
-        orderBy: { paidAt: 'asc' },
-        select: { checkoutSessionId: true, amountCents: true, paidAt: true },
-      }),
-      db.product.count({ where: { storeId, active: true } }),
-      db.checkout.count({ where: { storeId, archivedAt: null } }),
-      db.checkout.count({ where: { storeId, status: 'PUBLISHED', archivedAt: null } }),
-      db.gatewayConnection.count({ where: { storeId, active: true } }),
-      db.checkoutSession.findMany({ where: { checkout: { storeId }, status: 'OPEN', expiresAt: { gt: now }, updatedAt: { gte: new Date(now.getTime() - 60_000) } }, select: { id: true, trackingParameters: true } }),
-    ]);
-
-    const activeVisitorKeys = new Set(activeSessions.map(row => {
-      return visitorKey(trackingRecord(row.trackingParameters), row.id);
-    }));
-    const activeVisitors = activeVisitorKeys.size;
-
-    const paidBySession = new Map<string, { amountCents: number; paidAt: Date }>();
-    for (const attempt of paidAttempts) if (attempt.paidAt) paidBySession.set(attempt.checkoutSessionId, { amountCents: attempt.amountCents, paidAt: attempt.paidAt });
-    const paid = [...paidBySession.values()];
-    const paidSessionIds = new Set(paidBySession.keys());
-    const lastDay = period === 'yesterday' ? end : now;
-    const days = Math.max(1, Math.round((new Date(`${dayFormatter.format(lastDay)}T03:00:00.000Z`).getTime() - start.getTime()) / 86_400_000) + 1);
-    const series = dailySales(paid, start, days);
-
-    const paidCreatedSessions = createdSessions.filter(row => paidSessionIds.has(row.id)).length;
-    const generatedSessions = createdSessions.filter(row => row.paymentAttempts.length > 0);
-    const generatedRevenueCents = generatedSessions.reduce((sum, row) => sum + (row.paymentAttempts[0]?.amountCents ?? 0), 0);
-    const paidRevenueCents = paid.reduce((sum, attempt) => sum + attempt.amountCents, 0);
-    const abandoned = createdSessions.filter(row => row.status === 'EXPIRED' || (row.status === 'OPEN' && row.createdAt && row.createdAt < new Date(now.getTime() - 30 * 60_000))).length;
-    const pending = createdSessions.filter(row => row.paymentAttempts[0]?.status === 'PENDING').length;
-    const refunded = createdSessions.filter(row => row.paymentAttempts[0]?.status === 'REFUNDED').length;
-    const cancelled = createdSessions.filter(row => row.status === 'CANCELLED' || row.paymentAttempts[0]?.status === 'CANCELLED').length;
-    const customerHashes = createdSessions.map(row => row.customerEmailHash).filter((value): value is string => Boolean(value));
-    const uniqueCustomers = new Set(customerHashes).size;
-    const paidSessions = createdSessions.filter(row => paidSessionIds.has(row.id));
-    const couponSessions = paidSessions.filter(row => row.couponCode);
-    const couponMap = new Map<string, { code: string; orders: number; revenueCents: number; discountCents: number }>();
-    for (const row of couponSessions) {
-      const code = row.couponCode || 'Sem código';
-      const current = couponMap.get(code) || { code, orders: 0, revenueCents: 0, discountCents: 0 };
-      current.orders += 1;
-      current.revenueCents += paidBySession.get(row.id)?.amountCents ?? row.totalCents ?? 0;
-      current.discountCents += Math.max(0, (row.discountCents ?? 0) - (row.paymentDiscountCents ?? 0));
-      couponMap.set(code, current);
-    }
-    const hourlySales = Array.from({ length: 24 }, (_, hour) => ({ hour, orders: 0, revenueCents: 0 }));
-    const weekdayNames = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
-    const weekdaySales = weekdayNames.map(day => ({ day, orders: 0, revenueCents: 0 }));
-    for (const sale of paid) {
-      const hour = Number(hourFormatter.format(sale.paidAt));
-      const weekday = weekdayFormatter.format(sale.paidAt).toLocaleLowerCase('pt-BR');
-      const dayIndex = weekdayNames.indexOf(weekday);
-      const hourBucket = hourlySales[hour];
-      const weekdayBucket = dayIndex >= 0 ? weekdaySales[dayIndex] : undefined;
-      if (hourBucket) { hourBucket.orders += 1; hourBucket.revenueCents += sale.amountCents; }
-      if (weekdayBucket) { weekdayBucket.orders += 1; weekdayBucket.revenueCents += sale.amountCents; }
-    }
-    const bestHour = hourlySales.reduce((best, item) => item.orders > best.orders || (item.orders === best.orders && item.revenueCents > best.revenueCents) ? item : best, hourlySales[0]!);
-    const bestWeekday = weekdaySales.reduce((best, item) => item.orders > best.orders || (item.orders === best.orders && item.revenueCents > best.revenueCents) ? item : best, weekdaySales[0]!);
-    const bumpItems = paidSessions.flatMap(row => row.items ?? []).filter(item => item.isOrderBump);
-    const productMap = new Map<string, { title: string; quantity: number; revenueCents: number }>();
-    for (const row of createdSessions) for (const item of row.items ?? []) {
-      const current = productMap.get(item.titleSnapshot) || { title: item.titleSnapshot, quantity: 0, revenueCents: 0 };
-      current.quantity += item.quantity; current.revenueCents += item.totalCents; productMap.set(item.titleSnapshot, current);
-    }
-    const gatewayMap = new Map<string, { provider: string; attempts: number; paid: number; revenueCents: number }>();
-    for (const row of createdSessions) {
-      const attempt = row.paymentAttempts[0]; if (!attempt) continue;
-      const current = gatewayMap.get(attempt.provider) || { provider: attempt.provider, attempts: 0, paid: 0, revenueCents: 0 };
-      current.attempts += 1; if (attempt.status === 'PAID') { current.paid += 1; current.revenueCents += attempt.amountCents; } gatewayMap.set(attempt.provider, current);
-    }
-    const geoMap = new Map<string, { country: string; region: string | null; city: string | null; latitude: number | null; longitude: number | null; visitorKeys: Set<string> }>();
-    const locatedVisitorKeys = new Set<string>();
-    for (const row of createdSessions) {
-      const tracking = trackingRecord(row.trackingParameters);
-      const country = typeof tracking.geo_country === 'string' ? tracking.geo_country : null;
-      if (!country) continue;
-      const region = typeof tracking.geo_region_code === 'string' ? tracking.geo_region_code : typeof tracking.geo_region === 'string' ? tracking.geo_region : null;
-      const city = typeof tracking.geo_city === 'string' ? tracking.geo_city : null;
-      const fallbackCoordinates = countryCentroids[country.toUpperCase()];
-      const latitude = typeof tracking.geo_latitude === 'string' && Number.isFinite(Number(tracking.geo_latitude)) ? Number(tracking.geo_latitude) : fallbackCoordinates?.[0] ?? null;
-      const longitude = typeof tracking.geo_longitude === 'string' && Number.isFinite(Number(tracking.geo_longitude)) ? Number(tracking.geo_longitude) : fallbackCoordinates?.[1] ?? null;
-      const key = `${country}:${region ?? ''}:${city ?? ''}`;
-      const uniqueVisitor = visitorKey(tracking, row.id);
-      const current = geoMap.get(key) || { country, region, city, latitude, longitude, visitorKeys: new Set<string>() };
-      current.visitorKeys.add(uniqueVisitor); locatedVisitorKeys.add(uniqueVisitor); geoMap.set(key, current);
-    }
-    const locations = [...geoMap.values()].map(({ visitorKeys, ...location }) => ({ ...location, visitors: visitorKeys.size })).sort((a, b) => b.visitors - a.visitors);
-    const stateSalesMap = new Map<string, { state: string; orders: number; revenueCents: number }>();
-    const citySalesMap = new Map<string, { city: string; state: string; orders: number; revenueCents: number }>();
-    for (const row of paidSessions) {
-      const tracking = trackingRecord(row.trackingParameters);
-      const state = typeof tracking.geo_region_code === 'string' ? tracking.geo_region_code : typeof tracking.geo_region === 'string' ? tracking.geo_region : null;
-      const city = typeof tracking.geo_city === 'string' ? tracking.geo_city : null;
-      const revenueCents = paidBySession.get(row.id)?.amountCents ?? 0;
-      if (state) {
-        const current = stateSalesMap.get(state) || { state, orders: 0, revenueCents: 0 };
-        current.orders += 1; current.revenueCents += revenueCents; stateSalesMap.set(state, current);
-      }
-      if (state && city) {
-        const key = `${state}:${city}`;
-        const current = citySalesMap.get(key) || { city, state, orders: 0, revenueCents: 0 };
-        current.orders += 1; current.revenueCents += revenueCents; citySalesMap.set(key, current);
-      }
-    }
-    const payload = {
-      userName: session.user.name,
-      revenueCents: paidRevenueCents,
-      paidOrders: paid.length,
-      pendingPix: pending,
-      activeVisitors,
-      conversionRate: createdSessions.length ? Math.round(paidCreatedSessions / createdSessions.length * 10_000) / 100 : 0,
-      series,
-      analytics: {
-        sessions: createdSessions.length, generatedOrders: generatedSessions.length, generatedRevenueCents, paidRevenueCents,
-        averageTicketCents: paid.length ? Math.round(paidRevenueCents / paid.length) : 0,
-        abandoned, abandonmentRate: createdSessions.length ? Math.round(abandoned / createdSessions.length * 10_000) / 100 : 0,
-        pending, cancelled, refunded, uniqueCustomers,
-        checkoutSteps: {
-          visitors: createdSessions.length,
-          personal: createdSessions.filter(row => row.customerCapturedAt).length,
-          shipping: createdSessions.filter(row => row.shippingCapturedAt).length,
-          payment: createdSessions.filter(row => row.paymentAttempts.length).length,
-          paid: paidCreatedSessions,
-        },
-        coupons: {
-          orders: couponSessions.length,
-          revenueCents: couponSessions.reduce((sum, row) => sum + (paidBySession.get(row.id)?.amountCents ?? 0), 0),
-          discountCents: couponSessions.reduce((sum, row) => sum + Math.max(0, (row.discountCents ?? 0) - (row.paymentDiscountCents ?? 0)), 0),
-          items: [...couponMap.values()].sort((a, b) => b.revenueCents - a.revenueCents),
-        },
-        bestMoments: { bestHour: bestHour.orders ? bestHour.hour : null, bestWeekday: bestWeekday.orders ? bestWeekday.day : null, hourly: hourlySales, weekdays: weekdaySales },
-        orderBumps: {
-          items: bumpItems.reduce((sum, item) => sum + item.quantity, 0),
-          revenueCents: bumpItems.reduce((sum, item) => sum + item.totalCents, 0),
-        },
-        gateways: [...gatewayMap.values()].map(item => ({ ...item, conversionRate: item.attempts ? Math.round(item.paid / item.attempts * 10_000) / 100 : 0 })),
-        products: [...productMap.values()].sort((a, b) => b.revenueCents - a.revenueCents).slice(0, 8),
-        geography: { locations, countries: new Set(locations.map(item => item.country)).size, regions: new Set(locations.filter(item => item.region).map(item => `${item.country}:${item.region}`)).size, cities: new Set(locations.filter(item => item.city).map(item => `${item.country}:${item.region ?? ''}:${item.city}`)).size, visitors: locatedVisitorKeys.size },
-        salesGeography: {
-          states: [...stateSalesMap.values()].sort((a, b) => b.revenueCents - a.revenueCents),
-          cities: [...citySalesMap.values()].sort((a, b) => b.revenueCents - a.revenueCents),
-        },
-      },
-      checklist: { store: true, product: products > 0, checkout: checkouts > 0, gateway: gateways > 0, published: published > 0 },
-    };
+    const payload = { userName: session.user.name, ...await loadDashboardData(db, storeId, start, end, now) };
     dashboardCache.set(cacheKey, { expiresAt: Date.now() + 15_000, payload });
-    if (dashboardCache.size > 500) for (const [key, value] of dashboardCache) if (value.expiresAt <= Date.now()) dashboardCache.delete(key);
+    while (dashboardCache.size > 500) dashboardCache.delete(dashboardCache.keys().next().value!);
     return reply.header('cache-control', 'private, no-store').send(payload);
   });
 }

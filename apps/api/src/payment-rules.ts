@@ -3,10 +3,10 @@ export type PaymentState = 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRE
 export function mapProviderPaymentStatus(value: string | undefined): Exclude<PaymentState, 'PENDING'> | null {
   const status = value?.toUpperCase();
   if (['PAID', 'APPROVED', 'CONFIRMED', 'COMPLETED', 'SUCCESS', 'SUCCEEDED', 'SETTLED'].includes(status ?? '')) return 'PAID';
-  if (status === 'FAILED') return 'FAILED';
+  if (['FAILED', 'ERROR', 'REFUSED'].includes(status ?? '')) return 'FAILED';
   if (status === 'CANCELLED') return 'CANCELLED';
   if (status === 'EXPIRED') return 'EXPIRED';
-  if (['REFUNDED', 'PARTIALLY_REFUNDED'].includes(status ?? '')) return 'REFUNDED';
+  if (status === 'REFUNDED') return 'REFUNDED';
   return null;
 }
 

@@ -6,10 +6,13 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 
 const typed = tseslint.configs.recommendedTypeChecked.map(config => ({ ...config, files: ['**/*.ts', '**/*.tsx'] }));
-const accessibilityWarnings = Object.fromEntries(Object.keys(jsxA11y.flatConfigs.recommended.rules).map(rule => [rule, 'warn']));
+const accessibilityWarnings = Object.fromEntries(Object.entries(jsxA11y.flatConfigs.recommended.rules).map(([rule, config]) => {
+  const [severity, ...options] = Array.isArray(config) ? config : [config];
+  return [rule, [severity === 'off' || severity === 0 ? 'off' : 'warn', ...options]];
+}));
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', '.shopify/**', 'apps/web/public/**', 'extensions/**/assets/**', 'scripts/*.mjs', 'eslint.config.js'] },
+  { ignores: ['**/dist/**', '**/node_modules/**', '.shopify/**', '.visual-check/**', 'apps/web/public/**', 'extensions/**/assets/**', 'scripts/*.mjs', 'eslint.config.js'] },
   { files: ['**/*.js', '**/*.jsx'], ...js.configs.recommended },
   {
     files: ['apps/web/src/**/*.{js,jsx}', 'apps/web/test/**/*.{js,jsx}'],

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Bell, Building2, CheckCircle2, Globe2, LoaderCircle, Save, ShieldCheck, UserRound, UsersRound } from 'lucide-react';
 import { getSettings, saveSettings } from './api';
 import AccountSettings from './AccountSettings';

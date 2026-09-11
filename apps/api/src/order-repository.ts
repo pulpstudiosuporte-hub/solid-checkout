@@ -60,6 +60,8 @@ const orderSelect = {
       createdAt: true,
       updatedAt: true,
       paidAt: true,
+      partialRefundAt: true,
+      refundedAmountCents: true,
       expiresAt: true
     }
   },
@@ -105,7 +107,7 @@ export type OrderRecord = Readonly<{
   completedAt: Date | null;
   checkout?: Readonly<{ publicId: string; name: string; slug: string; mode: string; store: Readonly<{ name: string; slug: string }> }>;
   items: readonly Readonly<{ titleSnapshot: string; variantSnapshot: string | null; quantity: number; unitPriceCents?: number; totalCents?: number; imageUrlSnapshot: string | null; isOrderBump?: boolean }>[];
-  paymentAttempts: readonly Readonly<{ publicId: string; provider: string; providerTransactionId?: string | null; amountCents?: number; status: string; pixCodeEncrypted?: string | null; createdAt: Date; updatedAt?: Date; paidAt: Date | null; expiresAt: Date | null }>[];
+  paymentAttempts: readonly Readonly<{ publicId: string; provider: string; providerTransactionId?: string | null; amountCents?: number; status: string; pixCodeEncrypted?: string | null; createdAt: Date; updatedAt?: Date; paidAt: Date | null; partialRefundAt?: Date | null; refundedAmountCents?: number | null; expiresAt: Date | null }>[];
   deliveryJobs?: readonly Readonly<{ publicId: string; provider: string; event: string; status: string; attempts: number; deliveredAt: Date | null; lastError: string | null; createdAt: Date; updatedAt: Date }>[];
 }>;
 export type CustomerHistoryRecord = Readonly<{

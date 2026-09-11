@@ -3,6 +3,7 @@ import type { AppEnvironment } from '@solid/config';
 import type { CatalogRepository } from '../src/catalog-repository.js';
 import type { PrismaGatewayRepository } from '../src/gateway-repository.js';
 import { buildApp } from '../src/app.js';
+import { RoasRequestError } from '../src/roas-client.js';
 import { encryptSecret } from '../src/shopify-crypto.js';
 import { canTransitionPayment, type PaymentState } from '../src/payment-rules.js';
 
@@ -26,6 +27,7 @@ const token = 't'.repeat(43);
 beforeEach(() => vi.clearAllMocks());
 
 function fixture(document = '49257810810') {
+  let reserved = false;
   let paymentState: PaymentState = 'PENDING'; let completedAttempt: Record<string, unknown> | null = null; let confirmations = 0;
   const customer = encryptSecret(JSON.stringify({ name: 'Cliente Teste', email: 'cliente@example.com', phone: '11999999999', document }), key);
   const credentials = { apiKeyEncrypted: encryptSecret('secret-key', key), publicKeyEncrypted: encryptSecret('public-key', key) };
@@ -37,9 +39,18 @@ function fixture(document = '49257810810') {
     publicPaymentVerification: vi.fn().mockRejectedValue(new Error('Provider verification must not run in a public read')),
     credentials: vi.fn(() => Promise.resolve(credentials)),
     latestAttempt: vi.fn(() => Promise.resolve(completedAttempt)),
-    createAttempt: vi.fn((_sessionId: string, provider: 'ROAS' | 'WESTPAY') => Promise.resolve({ id: `attempt-${provider.toLowerCase()}`, publicId: `attempt-${provider.toLowerCase()}-public`, provider, status: 'PENDING', amountCents: 500, pixCodeEncrypted: null, expiresAt: null })),
+    createAttempt: vi.fn((_sessionId: string, provider: 'ROAS' | 'WESTPAY', _amountCents: number, _key: string) => Promise.resolve({ id: `attempt-${provider.toLowerCase()}`, publicId: `attempt-${provider.toLowerCase()}-public`, provider, status: 'PENDING', amountCents: _amountCents, idempotencyKey: _key, pixCodeEncrypted: null, expiresAt: null })),
+    claimPaymentCreation: vi.fn(async (_sessionId: string, provider: 'ROAS' | 'WESTPAY', amountCents: number) => {
+      if (reserved) return { claimed: false, attempt: { id: 'reserved', publicId: 'reserved-public', status: 'PENDING', pixCodeEncrypted: null, amountCents } };
+      reserved = true;
+      const attempt = await gateway.createAttempt(_sessionId, provider, amountCents, 'stable-reservation-key');
+      return { claimed: true, attempt };
+    }),
+    saveProviderResponse: vi.fn((_id: string, _providerId: string, pixCodeEncrypted: string, expiresAt: Date | null) => { completedAttempt = { id: 'attempt-internal', publicId: 'attempt-public', provider: 'ROAS', status: 'PENDING', amountCents: 500, pixCodeEncrypted, expiresAt }; return Promise.resolve(); }),
+    markCreationUncertain: vi.fn().mockResolvedValue(undefined),
+    recordPartialRefund: vi.fn().mockResolvedValue(undefined),
     completeAttempt: vi.fn((_id: string, _providerId: string, pixCodeEncrypted: string, expiresAt: Date | null) => { completedAttempt = { id: 'attempt-internal', publicId: 'attempt-public', provider: 'ROAS', status: 'PENDING', amountCents: 500, pixCodeEncrypted, expiresAt }; return Promise.resolve({ publicId: 'attempt-public', status: 'PENDING', amountCents: 500, expiresAt }); }),
-    failAttempt: vi.fn().mockResolvedValue(undefined),
+    failAttempt: vi.fn(() => { reserved = false; return Promise.resolve(); }),
     utmifyOrderContext: vi.fn().mockResolvedValue(null),
     webhookContext: vi.fn().mockResolvedValue({ id: 'attempt-internal', publicId: 'attempt-public', checkoutSessionId: 'internal-session', amountCents: 500, status: paymentState, session: { checkout: { storeId: 'store-a' } } }),
     recordWebhookEvent: vi.fn().mockResolvedValue(undefined),
@@ -49,6 +60,45 @@ function fixture(document = '49257810810') {
 }
 
 describe('fluxo Pix integrado com Roas simulada', () => {
+  it('blocks concurrent creation before a provider response exists', async () => {
+    const test = fixture();
+    let release!: () => void;
+    const barrier = new Promise<void>(resolve => { release = resolve; });
+    createRoasPix.mockImplementation(async () => { await barrier; return { id: 'roas-single', pixCode: 'pix-single' }; });
+    const app = buildApp(env, { catalogRepository: test.catalog, gatewayRepository: test.gateway });
+    const request = { method: 'POST' as const, url: '/public/checkout-sessions/session-public/payments/westpay/pix', headers: { authorization: `Bearer ${token}` } };
+    try {
+      const first = app.inject(request);
+      await vi.waitFor(() => expect(createRoasPix).toHaveBeenCalledTimes(1));
+      expect((await app.inject(request)).statusCode).toBe(409);
+      release();
+      expect((await first).statusCode).toBe(201);
+      expect(createRoasPix).toHaveBeenCalledTimes(1);
+    } finally { release(); await app.close(); }
+  });
+  it('does not retry or fail over an uncertain provider response', async () => {
+    const test = fixture(); test.raw.paymentProviders.mockResolvedValue(['ROAS', 'WESTPAY']);
+    createRoasPix.mockRejectedValue(new Error('connection closed after request'));
+    const app = buildApp(env, { catalogRepository: test.catalog, gatewayRepository: test.gateway });
+    const request = { method: 'POST' as const, url: '/public/checkout-sessions/session-public/payments/westpay/pix', headers: { authorization: `Bearer ${token}` } };
+    try {
+      expect((await app.inject(request)).statusCode).toBe(503);
+      expect((await app.inject(request)).statusCode).toBe(409);
+      expect(createRoasPix).toHaveBeenCalledTimes(1);
+      expect(createWestPayPix).not.toHaveBeenCalled();
+    } finally { await app.close(); }
+  });
+  it('reuses a saved provider response after integration enqueueing fails', async () => {
+    const test = fixture(); test.raw.completeAttempt.mockRejectedValueOnce(new Error('queue unavailable'));
+    createRoasPix.mockResolvedValue({ id: 'roas-created', pixCode: 'original-pix' });
+    const app = buildApp(env, { catalogRepository: test.catalog, gatewayRepository: test.gateway });
+    const request = { method: 'POST' as const, url: '/public/checkout-sessions/session-public/payments/westpay/pix', headers: { authorization: `Bearer ${token}` } };
+    try {
+      expect((await app.inject(request)).statusCode).toBe(503);
+      expect((await app.inject(request)).json<{payment:{pixCode:string}}>().payment.pixCode).toBe('original-pix');
+      expect(createRoasPix).toHaveBeenCalledTimes(1);
+    } finally { await app.close(); }
+  });
   it('não aciona fallback se o Pix foi criado mas a persistência falhou', async () => {
     const test = fixture();
     test.raw.paymentProviders.mockResolvedValue(['ROAS', 'WESTPAY']);
@@ -123,7 +173,7 @@ describe('fluxo Pix integrado com Roas simulada', () => {
   });
 
   it('usa o gateway de contingência quando o principal está indisponível', async () => {
-    createRoasPix.mockRejectedValueOnce(new Error('Roas indisponível'));
+    createRoasPix.mockRejectedValueOnce(new RoasRequestError(403, ['not authorized']));
     findWestPayPix.mockResolvedValue(null);
     createWestPayPix.mockResolvedValue({ id: 'westpay-transaction', pix: { qrcode: 'pix-contingencia', expiresAt: null } });
     const test = fixture(); test.raw.paymentProviders.mockResolvedValue(['ROAS', 'WESTPAY']);

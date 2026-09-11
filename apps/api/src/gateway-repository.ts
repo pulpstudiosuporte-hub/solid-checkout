@@ -1,4 +1,6 @@
 import type { PrismaClient } from '@solid/database';
+import { creditRefundFee } from './payment-accounting.js';
+import { randomUUID } from 'node:crypto';
 import { effectiveBilling } from './billing-entitlements.js';
 import { canTransitionPayment } from './payment-rules.js';
 import type { StorePushDispatcher } from './web-push-service.js';
@@ -13,7 +15,7 @@ type GatewayCredentials = Readonly<{ apiKeyEncrypted: string; publicKeyEncrypted
 type PaymentAttemptSummary = Readonly<{ id: string; publicId: string; provider: string; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; amountCents: number; pixCodeEncrypted: string | null; expiresAt: Date | null }>;
 type CompletedAttempt = Readonly<{ publicId: string; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; amountCents: number; expiresAt: Date | null }>;
 type WebhookContext = Readonly<{ id: string; publicId: string; checkoutSessionId: string; amountCents: number; status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'; session: { checkout: { storeId: string } } }>;
-export type PendingPaymentVerification = Readonly<{ id: string; checkoutSessionId: string; providerTransactionId: string; amountCents: number; createdAt: Date; session: { checkout: { storeId: string } } }>;
+export type PendingPaymentVerification = Readonly<{ id: string; checkoutSessionId: string; providerTransactionId: string; amountCents: number; createdAt: Date; verificationFailures: number; session: { checkout: { storeId: string } } }>;
 export type PendingIntegrationDelivery = Readonly<{ id: string; publicId: string; storeId: string; checkoutSessionId: string; provider: string; event: string; attempts: number }>;
 type UtmifyOrderContext = Readonly<{ id: string; publicId: string; createdAt: Date; completedAt: Date | null; currency: string; customerDataEncrypted: string | null; trackingParameters: unknown; totalCents: number; discountCents: number; shippingPriceCents: number; checkout: { storeId: string; store: { name: string }; product: { publicId: string; checkoutTitle: string } | null }; items: readonly { productId: string; titleSnapshot: string; unitPriceCents: number; quantity: number; product: { publicId: string } }[] }>;
 
@@ -191,21 +193,59 @@ export class PrismaGatewayRepository {
     return session && attempt?.providerTransactionId ? { storeId: session.checkout.storeId, ...attempt, providerTransactionId: attempt.providerTransactionId } : null;
   }
 
-  async pendingPaymentVerifications(since: Date, provider: PaymentProvider = 'WESTPAY'): Promise<readonly PendingPaymentVerification[]> {
-    const attempts = await this.database.paymentAttempt.findMany({ where: { provider, status: 'PENDING', providerTransactionId: { not: null }, createdAt: { gte: since } }, orderBy: { createdAt: 'asc' }, take: 50, select: { id: true, checkoutSessionId: true, providerTransactionId: true, amountCents: true, createdAt: true, session: { select: { checkout: { select: { storeId: true } } } } } });
-    return attempts.flatMap(attempt => attempt.providerTransactionId ? [{ ...attempt, providerTransactionId: attempt.providerTransactionId }] : []);
+  async pendingPaymentVerifications(_since: Date, provider: PaymentProvider = 'WESTPAY'): Promise<readonly PendingPaymentVerification[]> {
+    return this.database.$transaction(async transaction => {
+      // Claim due work across processes; advance its lease before the network call.
+      const rows = await transaction.$queryRaw<{ id: string }[]>`SELECT id FROM payment_attempts WHERE provider = ${provider} AND status = 'PENDING' AND provider_transaction_id IS NOT NULL AND next_verification_at <= NOW() AND created_at <= NOW() - INTERVAL '30 seconds' ORDER BY next_verification_at, id LIMIT 5 FOR UPDATE SKIP LOCKED`;
+      if (!rows.length) return [];
+      const ids = rows.map(row => row.id);
+      await transaction.paymentAttempt.updateMany({ where: { id: { in: ids } }, data: { nextVerificationAt: new Date(Date.now() + 120_000) } });
+      const attempts = await transaction.paymentAttempt.findMany({ where: { id: { in: ids } }, select: { id: true, checkoutSessionId: true, providerTransactionId: true, amountCents: true, createdAt: true, verificationFailures: true, session: { select: { checkout: { select: { storeId: true } } } } } });
+      return attempts.flatMap(attempt => attempt.providerTransactionId ? [{ ...attempt, providerTransactionId: attempt.providerTransactionId }] : []);
+    });
+  }
+
+  async rescheduleVerification(id: string, delayMs: number, failed = false): Promise<void> {
+    await this.database.paymentAttempt.updateMany({ where: { id, status: 'PENDING' }, data: { nextVerificationAt: new Date(Date.now() + delayMs), verificationFailures: failed ? { increment: 1 } : 0 } });
   }
 
   createAttempt(checkoutSessionId: string, provider: PaymentProvider, amountCents: number, idempotencyKey: string): Promise<PaymentAttemptSummary> {
     return this.database.paymentAttempt.create({ data: { checkoutSessionId, provider, amountCents, idempotencyKey } });
   }
 
+  async claimPaymentCreation(checkoutSessionId: string, provider: PaymentProvider, amountCents: number): Promise<{ claimed: boolean; attempt: PaymentAttemptSummary }> {
+    return this.database.$transaction(async transaction => {
+      // Serialize all providers for one checkout. The durable reservation survives restarts.
+      await transaction.$queryRaw`SELECT id FROM checkout_sessions WHERE id = ${checkoutSessionId}::uuid FOR UPDATE`;
+      const active = await transaction.paymentAttempt.findFirst({ where: { checkoutSessionId, status: { in: ['PENDING', 'PAID', 'REFUNDED'] } }, orderBy: { createdAt: 'desc' } });
+      if (active) return { claimed: false, attempt: active };
+      const session = await transaction.checkoutSession.findUniqueOrThrow({ where: { id: checkoutSessionId } });
+      if (session.status !== 'OPEN' || session.expiresAt <= new Date() || session.totalCents - session.discountCents + session.shippingPriceCents !== amountCents) throw new Error('Checkout changed before payment reservation');
+      const attempt = await transaction.paymentAttempt.create({ data: { checkoutSessionId, provider, amountCents, idempotencyKey: `solid:${randomUUID()}`, creationState: 'CREATING', nextVerificationAt: new Date(Date.now() + 30_000) } });
+      return { claimed: true, attempt };
+    });
+  }
+
+  async markCreationUncertain(id: string): Promise<void> {
+    await this.database.paymentAttempt.updateMany({ where: { id, status: 'PENDING', pixCodeEncrypted: null }, data: { creationState: 'UNCERTAIN' } });
+  }
+
+  async saveProviderResponse(id: string, providerTransactionId: string, pixCodeEncrypted: string, expiresAt: Date | null): Promise<void> {
+    // Persist the external result independently of integration enqueueing failures.
+    await this.database.paymentAttempt.update({ where: { id }, data: { providerTransactionId, pixCodeEncrypted, expiresAt, creationState: 'RECEIVED' } });
+  }
+
   completeAttempt(id: string, providerTransactionId: string, pixCodeEncrypted: string, expiresAt: Date | null): Promise<CompletedAttempt> {
     return this.database.$transaction(async transaction => {
-      const { checkoutSessionId, ...payment } = await transaction.paymentAttempt.update({ where: { id }, data: { providerTransactionId, pixCodeEncrypted, expiresAt }, select: { checkoutSessionId: true, publicId: true, status: true, amountCents: true, expiresAt: true } });
+      const { checkoutSessionId, ...payment } = await transaction.paymentAttempt.update({ where: { id }, data: { providerTransactionId, pixCodeEncrypted, expiresAt, creationState: 'READY' }, select: { checkoutSessionId: true, publicId: true, status: true, amountCents: true, expiresAt: true } });
       await enqueuePaymentDeliveries(transaction, checkoutSessionId, 'PENDING');
       return payment;
     });
+  }
+
+  async resumeSavedCreation(id: string): Promise<void> {
+    const attempt = await this.database.paymentAttempt.findFirst({ where: { id, creationState: 'RECEIVED' } });
+    if (attempt?.providerTransactionId && attempt.pixCodeEncrypted) await this.completeAttempt(id, attempt.providerTransactionId, attempt.pixCodeEncrypted, attempt.expiresAt);
   }
 
   async recordPendingPayment(id: string, provider: PaymentProvider, requestId: string): Promise<void> {
@@ -231,35 +271,55 @@ export class PrismaGatewayRepository {
 
   async confirmPayment(attemptId: string, checkoutSessionId: string, status: 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED', paidAt?: Date) {
     const transitioned = await this.database.$transaction(async transaction => {
-      const current = await transaction.paymentAttempt.findUnique({ where: { id: attemptId }, select: { publicId: true, status: true, amountCents: true, session: { select: { publicId: true, checkout: { select: { storeId: true, store: { select: { members: { where: { role: 'OWNER' }, orderBy: { createdAt: 'asc' }, take: 1, select: { userId: true } } } } } } } } } });
+      const current = await transaction.paymentAttempt.findUnique({ where: { id: attemptId }, select: { publicId: true, status: true, paidAt: true, refundedAmountCents: true, amountCents: true, session: { select: { publicId: true, checkout: { select: { storeId: true, store: { select: { members: { where: { role: 'OWNER' }, orderBy: { createdAt: 'asc' }, take: 1, select: { userId: true } } } } } } } } } });
       if (!current || current.status === 'REFUNDED' || current.status === status) return false;
+      if (status === 'PAID') paidAt ??= current.paidAt ?? new Date();
       const canTransition = canTransitionPayment(current.status, status);
       if (!canTransition) return false;
-      await transaction.paymentAttempt.update({ where: { id: attemptId }, data: { status, ...(paidAt ? { paidAt } : {}) } });
+      const claimed = await transaction.paymentAttempt.updateMany({ where: { id: attemptId, status: current.status }, data: { status, ...(status === 'REFUNDED' ? { refundedAmountCents: current.amountCents } : {}), ...(paidAt ? { paidAt } : {}) } });
+      if (!claimed.count) return false;
       await enqueuePaymentDeliveries(transaction, checkoutSessionId, status);
       if (status === 'PAID') {
-        const completed = await transaction.checkoutSession.updateMany({ where: { id: checkoutSessionId, status: 'OPEN' }, data: { status: 'COMPLETED', completedAt: paidAt ?? new Date() } });
+        const completed = await transaction.checkoutSession.updateMany({ where: { id: checkoutSessionId, status: { in: ['OPEN', 'EXPIRED', 'CANCELLED'] } }, data: { status: 'COMPLETED', completedAt: paidAt ?? new Date() } });
         if (completed.count) { const session = await transaction.checkoutSession.findUnique({ where: { id: checkoutSessionId }, select: { couponId: true } }); if (session?.couponId) await transaction.coupon.update({ where: { id: session.couponId }, data: { redemptionCount: { increment: 1 } } }); }
       }
       const ownerId = current.session.checkout.store.members[0]?.userId;
-      if (ownerId && (status === 'PAID' || status === 'REFUNDED')) {
+      if (ownerId && status === 'PAID') {
         const billing = await transaction.billingSubscription.upsert({ where: { userId: ownerId }, create: { userId: ownerId }, update: {} });
-        const originalFee = status === 'REFUNDED'
-          ? await transaction.billingLedgerEntry.findUnique({ where: { paymentAttemptId_type: { paymentAttemptId: attemptId, type: 'TRANSACTION_FEE' } } })
-          : null;
-        const feeBasisPoints = originalFee?.feeBasisPoints ?? effectiveBilling(billing).feeBasisPoints;
-        const feeCents = originalFee?.amountCents ?? Math.round(current.amountCents * feeBasisPoints / 10_000);
+        const feeBasisPoints = effectiveBilling(billing).feeBasisPoints;
         await transaction.billingLedgerEntry.upsert({
-          where: { paymentAttemptId_type: { paymentAttemptId: attemptId, type: status === 'PAID' ? 'TRANSACTION_FEE' : 'REFUND_CREDIT' } },
-          create: { userId: ownerId, paymentAttemptId: attemptId, type: status === 'PAID' ? 'TRANSACTION_FEE' : 'REFUND_CREDIT', grossAmountCents: current.amountCents, feeBasisPoints, amountCents: status === 'PAID' ? feeCents : -feeCents, occurredAt: paidAt ?? new Date() },
-          update: {},
+          where: { paymentAttemptId_type_sequence: { paymentAttemptId: attemptId, type: 'TRANSACTION_FEE', sequence: 0 } },
+          create: { userId: ownerId, paymentAttemptId: attemptId, type: 'TRANSACTION_FEE', grossAmountCents: current.amountCents, feeBasisPoints, amountCents: Math.round(current.amountCents * feeBasisPoints / 10000), occurredAt: paidAt ?? new Date() }, update: {},
         });
       }
+      if (status === 'REFUNDED') await creditRefundFee(transaction, attemptId, current.amountCents, current.amountCents, current.refundedAmountCents ?? 0);
       const webhookEvent = status === 'PAID' ? 'order.paid' : status === 'REFUNDED' ? 'order.refunded' : status === 'CANCELLED' || status === 'EXPIRED' ? 'order.cancelled' : 'payment.failed';
       await enqueueStoreWebhookEvent(transaction, current.session.checkout.storeId, webhookEvent, { order: { id: current.session.publicId, paymentId: current.publicId, status, totalCents: current.amountCents, currency: 'BRL', paidAt: paidAt?.toISOString() ?? null } }, `${current.publicId}:${status}`);
       return true;
     });
     return transitioned;
+  }
+
+  async recordPartialRefund(attemptId: string, checkoutSessionId: string, refundedAmountCents?: number): Promise<void> {
+    await this.confirmPayment(attemptId, checkoutSessionId, 'PAID');
+    await this.database.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM payment_attempts WHERE id = ${attemptId}::uuid FOR UPDATE`;
+      const attempt = await tx.paymentAttempt.findUniqueOrThrow({ where: { id: attemptId }, include: { session: { include: { checkout: true } } } });
+      if (attempt.status !== 'PAID') return;
+      const verified = Number.isSafeInteger(refundedAmountCents) && refundedAmountCents! > 0 && refundedAmountCents! < attempt.amountCents;
+      if (!verified) {
+        if (attempt.partialRefundAt) return;
+        await tx.paymentAttempt.update({ where: { id: attemptId }, data: { partialRefundAt: new Date() } });
+        await tx.auditLog.create({ data: { storeId: attempt.session.checkout.storeId, actorType: 'SYSTEM', action: 'payment.partial_refund_review_required', targetType: 'payment_attempt', targetId: attempt.publicId, metadata: { reason: 'No verified cumulative refund amount in cents.' } } });
+        return;
+      }
+      const cumulative = refundedAmountCents!;
+      if (cumulative <= (attempt.refundedAmountCents ?? 0)) return;
+      await tx.paymentAttempt.update({ where: { id: attemptId }, data: { partialRefundAt: attempt.partialRefundAt ?? new Date(), refundedAmountCents: cumulative } });
+      await creditRefundFee(tx, attemptId, attempt.amountCents, cumulative, attempt.refundedAmountCents ?? 0);
+      await tx.auditLog.create({ data: { storeId: attempt.session.checkout.storeId, actorType: 'SYSTEM', action: 'payment.partial_refund_verified', targetType: 'payment_attempt', targetId: attempt.publicId, metadata: { refundedAmountCents: cumulative } } });
+      await enqueueStoreWebhookEvent(tx, attempt.session.checkout.storeId, 'order.refunded', { order: { id: attempt.session.publicId, paymentId: attempt.publicId, status: 'PARTIALLY_REFUNDED', totalCents: attempt.amountCents, refundedAmountCents: cumulative, currency: 'BRL' } }, `${attempt.publicId}:partial-refund:${cumulative}`);
+    });
   }
 
   async billingAccessAllowed(storeId: string): Promise<boolean> {

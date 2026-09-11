@@ -433,10 +433,12 @@ model MediaAsset {
   filename  String   @unique @db.VarChar(64)
   content   Bytes
   sizeBytes Int      @map("size_bytes")
+  contentHash String? @map("content_hash") @db.Char(64)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   store     Store?   @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@index([storeId, createdAt])
+  @@index([storeId, contentHash])
   @@map("media_assets")
 }
 
@@ -754,6 +756,11 @@ model PaymentAttempt {
   amountCents           Int           @map("amount_cents")
   status                PaymentStatus @default(PENDING)
   pixCodeEncrypted      String?       @map("pix_code_encrypted") @db.Text
+  creationState         String        @default("READY") @map("creation_state") @db.VarChar(16)
+  nextVerificationAt    DateTime      @default(now()) @map("next_verification_at") @db.Timestamptz(3)
+  verificationFailures  Int           @default(0) @map("verification_failures")
+  partialRefundAt       DateTime?     @map("partial_refund_at") @db.Timestamptz(3)
+  refundedAmountCents   Int?          @map("refunded_amount_cents")
   expiresAt             DateTime?     @map("expires_at") @db.Timestamptz(3)
   paidAt                DateTime?     @map("paid_at") @db.Timestamptz(3)
   createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -764,6 +771,7 @@ model PaymentAttempt {
   @@index([checkoutSessionId, createdAt(sort: Desc)])
   @@index([status, expiresAt])
   @@index([status, paidAt, checkoutSessionId])
+  @@index([provider, status, nextVerificationAt])
   @@map("payment_attempts")
 }
 
@@ -823,6 +831,7 @@ model BillingLedgerEntry {
   userId           String           @map("user_id") @db.Uuid
   paymentAttemptId String           @map("payment_attempt_id") @db.Uuid
   type             BillingEntryType
+  sequence         Int              @default(0)
   grossAmountCents Int              @map("gross_amount_cents")
   feeBasisPoints   Int              @map("fee_basis_points")
   amountCents      Int              @map("amount_cents")
@@ -833,7 +842,7 @@ model BillingLedgerEntry {
   user             User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   paymentAttempt   PaymentAttempt   @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict)
 
-  @@unique([paymentAttemptId, type])
+  @@unique([paymentAttemptId, type, sequence])
   @@index([userId, billedAt, occurredAt])
   @@map("billing_ledger_entries")
 }

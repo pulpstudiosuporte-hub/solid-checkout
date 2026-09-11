@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Download, Filter, MessageCircle, RefreshCw, Search, ShoppingCart } from 'lucide-react';
 import { getAbandonedCarts } from './api';
 import './abandoned-carts-page.css';

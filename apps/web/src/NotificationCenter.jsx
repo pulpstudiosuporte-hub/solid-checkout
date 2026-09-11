@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Bell, Check, CheckCircle2, LoaderCircle, RefreshCw, Volume2, VolumeX, XCircle } from 'lucide-react';
 import { getNotifications, getPushConfig, markNotificationsRead, savePushSubscription } from './api';
 import {

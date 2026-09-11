@@ -366,6 +366,7 @@ function TransactionsTab({ order }) {
                       <td>{money.format((attempt.amountCents || 0) / 100)}</td>
                       <td>
                         <StatusPill value={attempt.status} />
+                        {attempt.partialRefundAt && <small className="ow-refund-note">{attempt.refundedAmountCents != null ? `Estorno parcial: ${money.format(attempt.refundedAmountCents / 100)}` : 'Estorno parcial informado · valor em conferência'}</small>}
                       </td>
                       <td>{dateTime(attempt.updatedAt)}</td>
                     </tr>

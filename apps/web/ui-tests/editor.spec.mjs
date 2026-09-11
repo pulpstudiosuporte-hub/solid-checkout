@@ -39,22 +39,22 @@ async function mockWrites(page, { saveStatus = 200, publishStatus = 200, delay =
 test('editor: revisão de desktop e celular', async ({ page }) => {
   await mockAdmin(page);
   await openEditor(page);
-  await page.screenshot({ path: output('editor-desktop.png'), fullPage: true });
+  await page.screenshot({ path: output('editor-desktop.png'), fullPage: true, animations: 'disabled' });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: output('editor-mobile.png'), fullPage: true });
+  await page.screenshot({ path: output('editor-mobile.png'), fullPage: true, animations: 'disabled' });
   await page.getByRole('button', { name: 'Prévia', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Prévia', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: 'Personalizar', exact: true })).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByRole('button', { name: 'Prévia', exact: true })).toHaveCSS('background-color', 'rgb(242, 234, 250)');
   await expect(page.getByRole('main', { name: 'Prévia do checkout' })).toBeVisible();
-  await page.screenshot({ path: output('editor-mobile-preview.png'), fullPage: true });
+  await page.screenshot({ path: output('editor-mobile-preview.png'), fullPage: true, animations: 'disabled' });
   for (const width of [320, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     expect(await page.locator('.solid-editor').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
     await expect(page.getByRole('button', { name: 'Publicar', exact: true })).toBeInViewport();
   }
   await section(page, 'Cores');
-  await page.screenshot({ path: output('editor-colors.png'), fullPage: true });
+  await page.screenshot({ path: output('editor-colors.png'), fullPage: true, animations: 'disabled' });
 });
 
 test('editor: search, all settings and atomic template undo/redo', async ({ page }) => {
@@ -150,7 +150,7 @@ test('editor: invalid hex and cancelled new element leave configuration intact',
   await page.locator('.element-row-copy').filter({ hasText: /^Texto/ }).click();
   await expect(page.locator('.element-config-sheet')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Voltar aos elementos' })).toBeInViewport();
-  await page.screenshot({ path: output('editor-element.png'), fullPage: true });
+  await page.screenshot({ path: output('editor-element.png'), fullPage: true, animations: 'disabled' });
   await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
   await expect(page.locator('.element-config-sheet')).toHaveCount(0);
   await expect(page.locator('.editor-save-state')).toHaveText('Rascunho salvo');
@@ -198,14 +198,14 @@ test('editor: touch controls, tablet split layout and mobile fixed actions', asy
       const canvas = await page.locator('.editor-canvas').boundingBox();
       expect(canvas.x).toBeGreaterThanOrEqual(panel.x + panel.width);
     }
-    if ([390,768,1024].includes(width)) await page.screenshot({ path: output(`responsive-editor-${width}.png`), fullPage: true });
+    if ([390,768,1024].includes(width)) await page.screenshot({ path: output(`responsive-editor-${width}.png`), fullPage: true, animations: 'disabled' });
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await section(page, 'Elementos');
   await page.locator('.element-row-copy').filter({ hasText: /^Texto/ }).click();
   await expect(page.getByRole('button', { name: 'Voltar aos elementos' })).toBeInViewport();
   await expect(page.getByRole('button', { name: 'Aplicar ao rascunho' })).toBeInViewport();
-  await page.screenshot({ path: output('responsive-editor-block-mobile.png'), fullPage: true });
+  await page.screenshot({ path: output('responsive-editor-block-mobile.png'), fullPage: true, animations: 'disabled' });
   await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
   await editTitle(page, 'Edição no celular');
   await page.getByRole('button', { name: 'Prévia', exact: true }).click();
@@ -214,7 +214,7 @@ test('editor: touch controls, tablet split layout and mobile fixed actions', asy
   await expect(page.getByRole('button', { name: 'Voltar para checkouts' })).toBeInViewport();
   expect((await page.locator('.editor-top').boundingBox()).y).toBeGreaterThanOrEqual(0);
   await expect(page.getByRole('button', { name: 'Prévia', exact: true })).toHaveCSS('background-color', 'rgb(242, 234, 250)');
-  await page.screenshot({ path: output('responsive-editor-preview-mobile.png'), fullPage: true });
+  await page.screenshot({ path: output('responsive-editor-preview-mobile.png'), fullPage: true, animations: 'disabled' });
   await page.getByRole('button', { name: 'Salvar rascunho' }).click();
   await expect(page.locator('.editor-toast')).toContainText('Rascunho salvo');
   await expect(page.getByRole('button', { name: 'Publicar', exact: true })).toBeInViewport();
@@ -225,5 +225,5 @@ test('editor: touch controls, tablet split layout and mobile fixed actions', asy
   await page.getByRole('button', { name: 'Voltar para checkouts' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button', { name: 'Continuar editando' }).click();
-  await page.screenshot({ path: output('responsive-editor-landscape.png'), fullPage: true });
+  await page.screenshot({ path: output('responsive-editor-landscape.png'), fullPage: true, animations: 'disabled' });
 });

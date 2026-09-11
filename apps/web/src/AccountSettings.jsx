@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle2, Copy, Eye, EyeOff, KeyRound, LoaderCircle, LogOut, Monitor, ShieldCheck, Smartphone, Trash2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { beginMfaSetup, changePassword, disableMfa, enableMfa, getMfaStatus, getSessions, revokeOtherSessions, revokeSession } from './api';

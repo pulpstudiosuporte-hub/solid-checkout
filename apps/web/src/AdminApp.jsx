@@ -1,11 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ArrowRight, BarChart3, Box, Check, CheckCircle2,
-  CircleDollarSign, Clock3, Copy, CreditCard, Eye, FileText,
-  Globe2, Home, LayoutTemplate, Menu, Package, PanelLeftClose, PanelLeftOpen, Plug, Plus,
-  Search, Settings, ShieldCheck, ShoppingBag, ShoppingCart, Sparkles, Store,
-  Tag, TrendingUp, Truck, Users, X, Zap, LogOut, ServerCog, Webhook, Megaphone, ScanSearch
-} from 'lucide-react';
+import { ArrowRight, BarChart3, Box, Check, CheckCircle2, Clock3, Copy, CreditCard, Eye, Globe2, Home, LayoutTemplate, Menu, Package, PanelLeftClose, PanelLeftOpen, Plug, Plus, Search, Settings, ShieldCheck, ShoppingBag, ShoppingCart, Sparkles, Store, Tag, TrendingUp, Truck, Users, X, Zap, LogOut, ServerCog, Webhook, Megaphone, ScanSearch } from 'lucide-react';
 import './admin-styles.css';
 import './admin-refresh.css';
 import { defaultCheckoutConfig } from './checkout-config';
@@ -18,7 +12,7 @@ import StoreSwitcher from './StoreSwitcher';
 const CheckoutsPage = lazy(() => import('./CheckoutsPage'));
 import LogisticsPage from './LogisticsPage';
 import PageErrorBoundary from './PageErrorBoundary';
-import OrdersPage, { RecentOrders } from './OrdersPage';
+import OrdersPage, {  } from './OrdersPage';
 import AdminUsersPage from './AdminUsersPage';
 import NotificationCenter from './NotificationCenter';
 import InstallAppPrompt from './InstallAppPrompt';
@@ -163,32 +157,8 @@ function StoresUnavailable() {
   return <main className="first-store-page"><section className="first-store-card" role="alert"><div className="first-store-icon"><Store size={27}/></div><h1>Não foi possível carregar suas lojas</h1><p className="first-store-lead">A conexão com o cadastro da conta falhou. Nenhuma alteração foi feita.</p><button className="secondary" type="button" onClick={() => window.location.reload()}>Tentar novamente</button></section></main>;
 }
 
-function Metric({ icon: Icon, label, value, delta, tone }) {
-  return <div className="metric card"><div className={`metric-icon ${tone}`}><Icon size={20}/></div><div className="metric-copy"><span>{label}</span><strong>{value}</strong><small><TrendingUp size={13}/> {delta} <i>vs. período anterior</i></small></div></div>;
-}
-
 function Dashboard(props) {
   return <DashboardPage {...props}/>;
-}
-
-function LegacyDashboard({ setPage, storeKey }) {
-  const [period, setPeriod] = useState('Últimos 7 dias');
-  return <main className="page dashboard">
-    <section className="page-title"><div><p className="eyebrow">VISÃO GERAL</p><h1>Olá, Ragnar <span>👋</span></h1><p>Acompanhe o desempenho da sua operação hoje.</p></div><div className="title-actions"><select value={period} onChange={e=>setPeriod(e.target.value)}><option>Hoje</option><option>Últimos 7 dias</option><option>Este mês</option></select><button className="secondary"><FileText size={17}/> Exportar</button></div></section>
-    <section className="metrics">
-      <Metric icon={CircleDollarSign} label="Receita confirmada" value="R$ 12.480,90" delta="18,2%" tone="purple"/>
-      <Metric icon={ShoppingCart} label="Pedidos pagos" value="84" delta="12,5%" tone="blue"/>
-      <Metric icon={TrendingUp} label="Conversão" value="4,8%" delta="0,7%" tone="green"/>
-      <Metric icon={Clock3} label="Aguardando Pix" value="12" delta="3 novos" tone="orange"/>
-    </section>
-    <section className="grid-main">
-      <div className="card chart-card"><div className="card-head"><div><h2>Receita e pedidos</h2><p>Valores confirmados no período</p></div><div className="legend"><span><i className="dot purple"/>Receita</span><span><i className="dot pale"/>Pedidos</span></div></div><div className="chart-wrap"><div className="y-labels"><span>R$ 4k</span><span>R$ 3k</span><span>R$ 2k</span><span>R$ 1k</span><span>R$ 0</span></div><div className="chart"><svg viewBox="0 0 680 230" preserveAspectRatio="none" aria-label="Gráfico de receita"><defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#7357e9" stopOpacity=".22"/><stop offset="1" stopColor="#7357e9" stopOpacity="0"/></linearGradient></defs><g className="gridlines"><line x1="0" y1="15" x2="680" y2="15"/><line x1="0" y1="65" x2="680" y2="65"/><line x1="0" y1="115" x2="680" y2="115"/><line x1="0" y1="165" x2="680" y2="165"/><line x1="0" y1="215" x2="680" y2="215"/></g><path className="area" d="M0,184 C55,172 72,139 113,145 S176,170 226,118 S295,142 340,94 S410,132 453,79 S520,99 567,54 S627,78 680,29 L680,215 L0,215Z"/><path className="line" d="M0,184 C55,172 72,139 113,145 S176,170 226,118 S295,142 340,94 S410,132 453,79 S520,99 567,54 S627,78 680,29"/></svg><div className="x-labels"><span>07 Ago</span><span>08 Ago</span><span>09 Ago</span><span>10 Ago</span><span>11 Ago</span><span>12 Ago</span><span>Hoje</span></div></div></div></div>
-      <div className="card progress-card"><div className="card-head"><div><h2>Comece por aqui</h2><p>Prepare sua loja para vender</p></div><Badge tone="purple">3 de 5</Badge></div><div className="progress"><span style={{width:'60%'}}/></div>{[
-        ['Criar sua loja Solid', true], ['Adicionar primeiro produto', true], ['Personalizar o checkout', true], ['Conectar gateway Pix', false], ['Publicar e testar', false]
-      ].map(([t, done], i)=><button key={t} className={`task ${done?'done':''}`} onClick={()=>!done && setPage(i===3?'Integrações':'Checkouts')}><span>{done?<Check size={15}/>:i+1}</span><b>{t}</b>{!done&&<ArrowRight size={16}/>}</button>)}</div>
-    </section>
-    <RecentOrders storeKey={storeKey} onViewAll={()=>setPage('Pedidos')}/>
-  </main>;
 }
 
 function SimplePage({ page, onCheckout, onEdit, csrfToken, storeKey, storeSlug }) {

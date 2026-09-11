@@ -11,13 +11,13 @@
     "test": "vitest run --dir test"
   },
   "dependencies": {
-    "dotted-map": "3.1.0",
     "lucide-react": "1.31.0",
     "qrcode.react": "4.2.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@playwright/test": "1.62.1",
     "@types/react": "19.2.13",
     "@types/react-dom": "19.2.3",

@@ -35,7 +35,7 @@ export async function testRoas(credentials: RoasCredentials): Promise<void> {
   await responseJson<unknown>(response);
 }
 
-export type RoasPix = Readonly<{ id: string; status: string; amount: number; externalRef?: string; pixCode?: string; expiresAt?: string }>;
+export type RoasPix = Readonly<{ id: string; status: string; amount: number; externalRef?: string; pixCode?: string; expiresAt?: string; refundedAmountCents?: number }>;
 const valueOf = (source: Record<string, unknown> | null, ...keys: string[]): unknown => keys.map(key => source?.[key]).find(value => value !== undefined && value !== null);
 
 function normalizePix(raw: unknown): RoasPix | null {
@@ -46,7 +46,9 @@ function normalizePix(raw: unknown): RoasPix | null {
   const pixCode = valueOf(pix, 'qrcode', 'qr_code', 'copy_paste', 'copyPaste', 'emv') ?? valueOf(item, 'qrcode', 'qr_code', 'copy_paste');
   const expiresAt = valueOf(pix, 'expires_at', 'expiresAt', 'expiration_date') ?? valueOf(item, 'expires_at', 'expiresAt');
   const externalRef = valueOf(item, 'external_ref', 'externalRef', 'external_id', 'externalId');
-  return { id: String(id), status, amount, ...(typeof pixCode === 'string' ? { pixCode } : {}), ...(typeof expiresAt === 'string' ? { expiresAt } : {}), ...(typeof externalRef === 'string' ? { externalRef } : {}) };
+  // Do not guess whether an ambiguous refund_amount is BRL or cents.
+  const refundedAmountCents = valueOf(item, 'refunded_amount_cents', 'refundedAmountCents');
+  return { id: String(id), status, amount, ...(typeof refundedAmountCents === 'number' && Number.isSafeInteger(refundedAmountCents) ? { refundedAmountCents } : {}), ...(typeof pixCode === 'string' ? { pixCode } : {}), ...(typeof expiresAt === 'string' ? { expiresAt } : {}), ...(typeof externalRef === 'string' ? { externalRef } : {}) };
 }
 
 export async function createRoasPix(credentials: RoasCredentials, payload: Record<string, unknown>): Promise<RoasPix> {

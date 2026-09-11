@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ArrowRight, Bug, CheckCircle2, Heart, Lightbulb, LoaderCircle, Plus, Rocket, Send, Sparkles, X } from 'lucide-react';
 import { createProductFeedback, getPlatformContent, getProductFeedback, toggleProductFeedbackVote } from './api';
-import { normalizePlatformReleases, releaseCategoryMap, releaseVideoSource } from './platform-content';
+import { normalizePlatformReleases, releaseVideoSource } from './platform-content';
 
 const updateFilters = ['Todos', 'Novidades', 'Melhorias', 'Correções', 'Integrações', 'Segurança'];
 const columns = [

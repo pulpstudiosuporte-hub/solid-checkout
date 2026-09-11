@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Download, Share2, X } from 'lucide-react';
 const DISMISSED_KEY = 'solid:pwa-install-dismissed';
 export default function InstallAppPrompt() {

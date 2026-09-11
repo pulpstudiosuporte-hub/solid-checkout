@@ -68,7 +68,6 @@ export default function CommandPalette({ open, onClose, onNavigate, platformAdmi
   };
 
   // Backdrop click is supplementary; Escape and the explicit close button provide keyboard access.
-  // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
   return <div className="command-overlay" role="presentation" onMouseDown={event => event.target === event.currentTarget && onClose()}>
     <dialog open className="command-palette" aria-modal="true" aria-labelledby="command-title" onKeyDown={onKeyDown}>
       <h2 id="command-title" className="sr-only">Busca avançada do painel</h2>

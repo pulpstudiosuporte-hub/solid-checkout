@@ -1,5 +1,4 @@
-import React, { useId, useMemo } from 'react';
-import DottedMap from 'dotted-map';
+import { useEffect, useId, useRef, useState } from 'react';
 import './world-map.css';
 
 const projectPoint = (latitude, longitude) => ({
@@ -15,18 +14,21 @@ const curvedPath = (start, end) => {
 
 export function WorldMap({ locations = [], lineColor = '#7657ed' }) {
   const gradientId = useId().replace(/:/g, '');
-  const mapSource = useMemo(() => {
-    const map = new DottedMap({ height: 100, grid: 'diagonal' });
-    const svg = map.getSVG({ radius: 0.22, color: '#a9bfd6', shape: 'circle', backgroundColor: '#eef4fa' });
-    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  const container = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting));
+    observer.observe(container.current);
+    return () => observer.disconnect();
   }, []);
+  const mapSource = '/illustrations/world-map.svg';
   const detailedLocations = locations.some(location => location.city) ? locations.filter(location => location.city) : locations;
   const points = detailedLocations
-    .filter(location => Number.isFinite(Number(location.latitude)) && Number.isFinite(Number(location.longitude)))
+    .filter(location => location.latitude != null && location.longitude != null && Number.isFinite(Number(location.latitude)) && Number.isFinite(Number(location.longitude)))
     .map(location => ({ ...location, point: projectPoint(location.latitude, location.longitude) }));
   const origin = points[0];
 
-  return <div className="world-map-visual" role="img" aria-label={points.length ? `Mapa com ${points.length} localizações de visitantes` : 'Mapa-múndi sem visitas no período'}>
+  return <div ref={container} data-paused={!visible} className="world-map-visual" role="img" aria-label={points.length ? `Mapa com ${points.length} localizações de visitantes` : 'Mapa-múndi sem visitas no período'}>
     <img src={mapSource} alt="" draggable="false"/>
     <svg viewBox="0 0 800 400" preserveAspectRatio="none" aria-hidden="true">
       <defs>

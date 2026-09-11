@@ -2,32 +2,8 @@ const fallbackApiUrl = 'http://127.0.0.1:3333';
 
 export const apiBaseUrl = (import.meta.env.VITE_API_URL || fallbackApiUrl).replace(/\/$/, '');
 
-const tabUserKey = 'solid-tab-user-context';
-
-export function bindTabToUser(userId) {
-  if (userId) sessionStorage.setItem(tabUserKey, userId);
-}
-
-export function clearTabUser() {
-  sessionStorage.removeItem(tabUserKey);
-}
-
-async function fetch(input, init = {}) {
-  const headers = new Headers(init.headers || {});
-  const expectedUser = sessionStorage.getItem(tabUserKey);
-  const url = String(input);
-  const establishesSession = /\/auth\/(csrf|login|register|verify-email|forgot-password|reset-password)$/.test(url);
-  if (init.credentials === 'include' && expectedUser && !establishesSession) headers.set('x-solid-user-context', expectedUser);
-  const response = await globalThis.fetch(input, { ...init, headers });
-  if (response.status === 409) {
-    const clone = response.clone();
-    const body = await clone.json().catch(() => null);
-    if (body?.error?.code === 'SESSION_CONTEXT_CHANGED') {
-      window.dispatchEvent(new CustomEvent('solid:session-conflict'));
-    }
-  }
-  return response;
-}
+import { request as fetch } from './api-request';
+export { bindTabToUser, clearTabUser } from './api-request';
 
 // Imagens enviadas pelo painel são armazenadas e servidas pela API.  Mantemos
 // esse caminho centralizado para que registros antigos, que eventualmente
@@ -36,6 +12,15 @@ export function resolveMediaUrl(value) {
   if (typeof value !== 'string' || !value) return value;
   const match = value.match(/\/media\/([0-9a-f-]{36}\.webp)(?:[?#].*)?$/i);
   return match ? `${apiBaseUrl}/media/${match[1]}` : value;
+}
+
+export async function listMediaImages(cursor) {
+  return readJson(await fetch(`${apiBaseUrl}/media/images${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`, { credentials: 'include' }));
+}
+
+export async function deleteMediaImage(filename, csrfToken) {
+  const response = await fetch(`${apiBaseUrl}/media/images/${encodeURIComponent(filename)}`, { method: 'DELETE', credentials: 'include', headers: { 'x-csrf-token': csrfToken } });
+  if (!response.ok) await readJson(response);
 }
 
 export async function getApiHealth() {

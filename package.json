@@ -21,13 +21,17 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "lint": "eslint .",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "check": "npm run lint && npm run typecheck && npm run test:security && npm run test && npm run build && npm run check:bundles",
     "audit:prod": "node scripts/audit-production.mjs",
     "db:generate": "npm run generate --workspace=@solid/database",
     "db:migrate": "npm run db:migrate --workspace=@solid/database",
     "db:deploy": "npm run db:deploy --workspace=@solid/database",
     "db:seed": "npm run db:seed --workspace=@solid/database",
-    "test:ui": "npm run build --workspace=@solid/web && playwright test --config scripts/admin-ui.config.mjs"
+    "test:ui": "npm run build --workspace=@solid/web && playwright test --config scripts/admin-ui.config.mjs",
+    "test:security": "node --test scripts/audit-policy.test.mjs",
+    "test:integration": "vitest run --dir apps/api/integration",
+    "check:headers": "node scripts/check-web-headers.mjs",
+    "check:bundles": "node scripts/check-web-budgets.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.39.2",
@@ -44,6 +48,8 @@
     "vitest": "4.1.10"
   },
   "overrides": {
-    "esbuild": "0.28.1"
+    "esbuild": "0.28.1",
+    "fast-uri@^3": "3.1.7",
+    "fast-uri@^4": "4.1.4"
   }
 }

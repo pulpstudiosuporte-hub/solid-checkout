@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, EllipsisVertical, ExternalLink, Link2, LoaderCircle, Plus, Send, Trash2, Webhook, X } from 'lucide-react';
 import { createStoreWebhook, deleteStoreWebhook, getStoreWebhooks, testStoreWebhook, updateStoreWebhook } from './api';
 import './webhooks-page.css';

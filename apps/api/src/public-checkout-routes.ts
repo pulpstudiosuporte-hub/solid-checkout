@@ -228,7 +228,12 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       const encryptedCredentials = await gateways.credentials(context.checkout.storeId, provider); if (!encryptedCredentials) continue;
       const westpayCredentials = { apiKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) };
       const roasCredentials = { secretKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) };
-      let attempt = await gateways.latestAttempt(context.id, provider); if (!attempt || attempt.status !== 'PENDING') attempt = await gateways.createAttempt(context.id, provider, amountCents, `${provider.toLowerCase()}:${context.id}:${Date.now()}`);
+      const reservation = await gateways.claimPaymentCreation(context.id, provider, amountCents);
+      const attempt = reservation.attempt;
+      if (!reservation.claimed) {
+        if (attempt.pixCodeEncrypted && attempt.status === 'PENDING') return reply.header('cache-control', 'no-store').send({ payment: { publicId: attempt.publicId, status: 'pending', amountCents: attempt.amountCents, pixCode: decryptSecret(attempt.pixCodeEncrypted, environment.APP_ENCRYPTION_KEY), expiresAt: attempt.expiresAt } });
+        return reply.header('Retry-After', '5').code(409).send(errorBody(request, 'PAYMENT_PROCESSING', 'Seu pagamento está sendo confirmado. Aguarde antes de tentar novamente.'));
+      }
       const externalRef = `solid-${attempt.publicId}`;
       let providerCreated = false;
       try {
@@ -236,7 +241,9 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
         const transaction = await createRoasPix(roasCredentials, { payment_method: 'pix', customer: { document: { type: digits(customer.document).length === 14 ? 'cnpj' : 'cpf', number: digits(customer.document) }, name: customer.name, email: customer.email, phone: digits(customer.phone).startsWith('55') ? digits(customer.phone) : `55${digits(customer.phone)}` }, items: paymentItems.map(item => ({ title: item.titleSnapshot, unit_price: item.unitPriceCents, quantity: item.quantity })), amount: amountCents, postback_url: `${environment.API_PUBLIC_URL.replace(/\/$/, '')}/webhooks/roas`, metadata: { provider_name: 'SOLID Checkout', checkout_session: context.publicId } });
         if (!transaction.id || !transaction.pixCode) throw new Error('Roas returned an incomplete PIX response');
         providerCreated = true;
-        const expiresAt = transaction.expiresAt ? new Date(transaction.expiresAt) : null; const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pixCode, environment.APP_ENCRYPTION_KEY), expiresAt);
+        const expiresAt = transaction.expiresAt ? new Date(transaction.expiresAt) : null;
+        await gateways.saveProviderResponse(attempt.id, transaction.id, encryptSecret(transaction.pixCode, environment.APP_ENCRYPTION_KEY), expiresAt);
+        const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pixCode, environment.APP_ENCRYPTION_KEY), expiresAt);
         return reply.header('cache-control', 'no-store').code(201).send({ payment: { ...saved, status: 'pending', pixCode: transaction.pixCode } });
       }
       let transaction = await findWestPayPix(westpayCredentials, externalRef);
@@ -254,19 +261,26 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
       });
       if (!transaction.id || !transaction.pix?.qrcode) throw new Error('WestPay returned an incomplete PIX response');
       providerCreated = true;
-      const expiresAt = transaction.pix.expiresAt ? new Date(transaction.pix.expiresAt) : null; const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pix.qrcode, environment.APP_ENCRYPTION_KEY), expiresAt);
+      const expiresAt = transaction.pix.expiresAt ? new Date(transaction.pix.expiresAt) : null;
+      await gateways.saveProviderResponse(attempt.id, transaction.id, encryptSecret(transaction.pix.qrcode, environment.APP_ENCRYPTION_KEY), expiresAt);
+      const saved = await gateways.completeAttempt(attempt.id, transaction.id, encryptSecret(transaction.pix.qrcode, environment.APP_ENCRYPTION_KEY), expiresAt);
       return reply.header('cache-control', 'no-store').code(201).send({ payment: { ...saved, status: 'pending', pixCode: transaction.pix.qrcode } });
       } catch (error) {
         request.log.warn({ err: error, provider, checkoutSession: context.publicId }, 'pix_creation_failed');
         // A persistence failure after creation must not generate another Pix at a fallback gateway.
         if (providerCreated) return reply.code(503).send(errorBody(request, 'PAYMENT_SAVE_FAILED', 'Não foi possível salvar o pagamento. Aguarde e consulte o status novamente.'));
+        const rejected = (error instanceof WestPayRequestError || error instanceof RoasRequestError) && [400, 401, 403, 422].includes(error.status);
+        if (!rejected) {
+          await gateways.markCreationUncertain(attempt.id);
+          return reply.code(503).send(errorBody(request, 'PAYMENT_PROCESSING', 'O gateway ainda não confirmou a criação. Aguarde a verificação do pagamento.'));
+        }
+        await gateways.failAttempt(attempt.id);
         if (error instanceof WestPayRequestError && error.status === 422) {
           const detail = error.details.find(value => /m[ií]nim|minimum|amount|valor/i.test(value)) ?? '';
           const amount = detail.match(/R\$\s*\d+(?:[.,]\d{1,2})?/i)?.[0];
           const message = amount ? `O valor mínimo permitido pela WestPay para este Pix é ${amount}.` : 'O valor ou os dados do pagamento não foram aceitos pela WestPay.';
           return reply.code(422).send(errorBody(request, 'WESTPAY_VALIDATION_ERROR', message));
         }
-        await gateways.failAttempt(attempt.id);
       }
     }
     return reply.code(502).send(errorBody(request, 'GATEWAY_UNAVAILABLE', 'Os gateways configurados estão temporariamente indisponíveis. Tente novamente.'));
@@ -309,6 +323,10 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     try {
       const official = await getWestPayPix({ apiKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) }, objectId);
       if (!official || official.id !== objectId || !westPayAmountMatches(official.amount, context.amountCents) || official.externalRef && official.externalRef !== `solid-${context.publicId}`) return reply.code(200).send({ received: true });
+      if (official.status.toUpperCase() === 'PARTIALLY_REFUNDED') {
+        await gateways.recordPartialRefund(context.id, context.checkoutSessionId, official.refundedAmountCents);
+        return reply.code(200).send({ received: true });
+      }
       const mapped = westPayPaymentStatus(official.status);
       if (mapped) {
         try { await gateways.recordWebhookEvent(context, 'WESTPAY', official.status, request.id); }
@@ -331,6 +349,10 @@ export function registerPublicCheckoutRoutes(app: FastifyInstance, environment: 
     try {
       const official = await getRoasPix({ secretKey: decryptSecret(encryptedCredentials.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY), publicKey: decryptSecret(encryptedCredentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) }, objectId);
       if (!official || official.id !== objectId || !roasAmountMatches(official.amount, context.amountCents)) return reply.code(200).send({ received: true });
+      if (official.status.toUpperCase() === 'PARTIALLY_REFUNDED') {
+        await gateways.recordPartialRefund(context.id, context.checkoutSessionId, official.refundedAmountCents);
+        return reply.code(200).send({ received: true });
+      }
       const mapped = westPayPaymentStatus(official.status);
       if (mapped) { try { await gateways.recordWebhookEvent(context, 'ROAS', official.status, request.id); } catch (auditError) { request.log.warn({ err: auditError, providerTransactionId: objectId }, 'roas_webhook_audit_failed'); } await gateways.confirmPayment(context.id, context.checkoutSessionId, mapped, mapped === 'PAID' ? new Date() : undefined); }
       return reply.code(200).send({ received: true });

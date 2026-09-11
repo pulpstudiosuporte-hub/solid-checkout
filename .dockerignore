@@ -8,6 +8,7 @@ node_modules
 dist
 **/dist
 coverage
+.visual-check
 *.log
 Captura de tela*.png
 desktop.ini

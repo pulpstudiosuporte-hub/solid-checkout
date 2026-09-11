@@ -2,7 +2,7 @@ const baseUrl = 'https://api.gw.westpay.com.br';
 const userAgent = 'SOLID-Checkout/0.1 (+suporte@solidcheckout.xyz)';
 
 export type WestPayCredentials = Readonly<{ apiKey: string; publicKey: string }>;
-export type WestPayPix = Readonly<{ id: string; status: string; amount: number; externalRef?: string; pix?: { qrcode?: string; expiresAt?: string } }>;
+export type WestPayPix = Readonly<{ id: string; status: string; amount: number; externalRef?: string; refundedAmountCents?: number; pix?: { qrcode?: string; expiresAt?: string } }>;
 
 export class WestPayRequestError extends Error {
   constructor(readonly status: number, readonly details: readonly string[]) {

@@ -18,6 +18,12 @@ async function fits(page) {
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   const shell = page.locator('.main-shell');
   if (await shell.count() && page.viewportSize().width <= 900) await expect.poll(async () => (await shell.boundingBox()).width).toBe(page.viewportSize().width);
+  if (await shell.count() && page.viewportSize().width > 900) {
+    await expect.poll(async () => {
+      const sidebar = await page.locator('.sidebar').boundingBox();
+      return (await shell.boundingBox()).x - (sidebar.x + sidebar.width);
+    }).toBeGreaterThanOrEqual(-1);
+  }
 }
 
 test('visão geral mostra dados de teste da API e gráfico explorável', async ({ page }) => {
@@ -30,11 +36,11 @@ test('visão geral mostra dados de teste da API e gráfico explorável', async (
   await page.getByLabel('Período da receita').selectOption('month');
   await expect(page.locator('.admin-revenue-card')).toHaveAttribute('aria-busy', 'false');
   await page.mouse.move(0, 0);
-  await page.screenshot({ path: output('admin-dashboard-desktop.png'), fullPage: true });
+  await page.screenshot({ path: output('admin-dashboard-desktop.png'), fullPage: true, animations: 'disabled' });
   await fits(page); expect(errors).toEqual([]); expect(mock.unexpected).toEqual([]); expect(mock.mutations).toEqual([]);
   await page.setViewportSize({ width: 390, height: 844 });
   await fits(page);
-  await page.screenshot({ path: output('admin-dashboard-mobile.png'), fullPage: true });
+  await page.screenshot({ path: output('admin-dashboard-mobile.png'), fullPage: true, animations: 'disabled' });
 });
 
 for (const [name, selector, file] of [['Produtos', '.products-table', 'produtos'], ['Pedidos', '.orders-page', 'pedidos'], ['Checkouts', '.checkout-card', 'checkouts'], ['Configurações', '.settings-hub-panel', 'configuracoes'], ['Análises', '.analytics-page', 'analises'], ['Gateways', '.gateway-catalog-card', 'gateways'], ['Logística', '.logistics-page', 'logistica'], ['Order bumps', '.order-bumps-page', 'ofertas'], ['Cupons', '.coupons-page', 'cupons']]) {
@@ -43,11 +49,11 @@ for (const [name, selector, file] of [['Produtos', '.products-table', 'produtos'
     const errors = []; page.on('pageerror', error => errors.push(error.message));
     await page.goto('/'); await ready(page); await openPage(page, name);
     await expect(page.locator(selector).first()).toBeVisible();
-    await page.screenshot({ path: output(`admin-${file}-desktop.png`), fullPage: true });
+    await page.screenshot({ path: output(`admin-${file}-desktop.png`), fullPage: true, animations: 'disabled' });
     await fits(page);
     await page.setViewportSize({ width: 390, height: 844 });
     await fits(page);
-    await page.screenshot({ path: output(`admin-${file}-mobile.png`), fullPage: true });
+    await page.screenshot({ path: output(`admin-${file}-mobile.png`), fullPage: true, animations: 'disabled' });
     await fits(page); expect(errors).toEqual([]); expect(mock.unexpected).toEqual([]); expect(mock.mutations).toEqual([]);
   });
 }
@@ -82,7 +88,7 @@ test('login, cadastro e recuperação com viewport real', async ({ page }) => {
   const mock = await mockAdmin(page, { anonymous: true });
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Bem-vindo de volta' })).toBeVisible();
-  await page.screenshot({ path: output('admin-login-desktop.png'), fullPage: true });
+  await page.screenshot({ path: output('admin-login-desktop.png'), fullPage: true, animations: 'disabled' });
   await page.getByLabel('Senha', { exact: true }).fill('senha-ficticia');
   await page.getByRole('button', { name: 'Mostrar senha', exact: true }).click();
   await expect(page.getByLabel('Senha', { exact: true })).toHaveAttribute('type', 'text');
@@ -91,7 +97,7 @@ test('login, cadastro e recuperação com viewport real', async ({ page }) => {
   await page.getByRole('button', { name: 'Voltar para o login' }).click();
   for (const width of [320, 390, 768]) { await page.setViewportSize({ width, height: 844 }); await fits(page); }
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: output('admin-login-mobile.png'), fullPage: true });
+  await page.screenshot({ path: output('admin-login-mobile.png'), fullPage: true, animations: 'disabled' });
   await page.getByRole('button', { name: 'Criar conta', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Crie sua conta' })).toBeVisible();
   await fits(page); expect(mock.mutations).toEqual([]);
@@ -105,7 +111,7 @@ test('painel se adapta de 320 a 1440 pixels e receita apresenta erro recuperáve
   await expect(page.locator('.admin-revenue-card')).toHaveAttribute('aria-busy', 'false');
   for (const width of [320, 390, 768, 1024, 1440]) { await page.setViewportSize({ width, height: 900 }); await fits(page); }
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: output('admin-dashboard-error-mobile.png'), fullPage: true });
+  await page.screenshot({ path: output('admin-dashboard-error-mobile.png'), fullPage: true, animations: 'disabled' });
 });
 
 test('estado sem vendas e sem produtos mantém ações claras', async ({ page }) => {

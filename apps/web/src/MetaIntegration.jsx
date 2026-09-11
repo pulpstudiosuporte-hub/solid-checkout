@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BarChart3, CheckCircle2, KeyRound, LoaderCircle, ShieldCheck, Unplug } from 'lucide-react';
 import { disconnectMeta, getMetaStatus, saveMeta } from './api';
 

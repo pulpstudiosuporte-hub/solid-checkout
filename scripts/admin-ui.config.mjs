@@ -17,8 +17,8 @@ export default defineConfig({
     bypassCSP: true,
     screenshot: 'only-on-failure',
   },
-  webServer: {
-    command: 'npm run preview --workspace=@solid/web -- --port 4176 --strictPort',
+  webServer: process.env.VISUAL_SERVER_EXTERNAL === '1' ? undefined : {
+    command: 'node node_modules/vite/bin/vite.js preview apps/web --host 127.0.0.1 --port 4176 --strictPort',
     cwd: fileURLToPath(new URL('../', import.meta.url)),
     url: 'http://127.0.0.1:4176',
     reuseExistingServer: false,

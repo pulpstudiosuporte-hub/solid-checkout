@@ -1,0 +1,40 @@
+// @ts-check
+class RequestTimeoutError extends Error { code = 'REQUEST_TIMEOUT'; }
+const tabUserKey = 'solid-tab-user-context';
+
+/** @param {string | undefined} userId */
+export function bindTabToUser(userId) {
+  if (userId) sessionStorage.setItem(tabUserKey, userId);
+}
+
+export function clearTabUser() {
+  sessionStorage.removeItem(tabUserKey);
+}
+
+/** @param {RequestInfo | URL} input @param {RequestInit} init */
+export async function request(input, init = {}) {
+  const headers = new Headers(init.headers || {});
+  const expectedUser = sessionStorage.getItem(tabUserKey);
+  const url = String(input);
+  const establishesSession = /\/auth\/(csrf|login|register|verify-email|forgot-password|reset-password)$/.test(url);
+  if (init.credentials === 'include' && expectedUser && !establishesSession) headers.set('x-solid-user-context', expectedUser);
+  const timeout = AbortSignal.timeout(30_000);
+  const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+  let response;
+  try { response = await globalThis.fetch(input, { ...init, headers, signal }); }
+  catch (cause) {
+    if (timeout.aborted) {
+      const error = new RequestTimeoutError('A conexão demorou mais que o esperado. Confira o resultado antes de repetir a ação.');
+      throw error;
+    }
+    throw cause;
+  }
+  if (response.status === 409) {
+    const clone = response.clone();
+    const body = await clone.json().catch(() => null);
+    if (body?.error?.code === 'SESSION_CONTEXT_CHANGED') {
+      window.dispatchEvent(new CustomEvent('solid:session-conflict'));
+    }
+  }
+  return response;
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowRight, Check, Copy, CreditCard, LoaderCircle, QrCode, ReceiptText, ShieldCheck, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { getBilling, getBillingPix, openBillingPortal, startBillingCheckout, startBillingPix } from './api';
