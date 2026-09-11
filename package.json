@@ -28,6 +28,7 @@
     "db:deploy": "npm run db:deploy --workspace=@solid/database",
     "db:seed": "npm run db:seed --workspace=@solid/database",
     "test:ui": "npm run build --workspace=@solid/web && playwright test --config scripts/admin-ui.config.mjs",
+    "test:checkout": "playwright test --config scripts/checkout-ui.config.mjs",
     "test:security": "node --test scripts/audit-policy.test.mjs",
     "test:integration": "vitest run --dir apps/api/integration",
     "check:headers": "node scripts/check-web-headers.mjs",

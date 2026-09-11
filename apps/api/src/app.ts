@@ -16,6 +16,7 @@ import { registerStoreRoutes } from './store-routes.js';
 import type { ShopifyRepository } from './shopify-repository.js';
 import { registerShopifyRoutes } from './shopify-routes.js';
 import { registerPublicCheckoutRoutes } from './public-checkout-routes.js';
+import { registerPaymentReceiptRoutes } from './payment-receipt-routes.js';
 import { registerGatewayRoutes } from './gateway-routes.js';
 import type { PrismaGatewayRepository } from './gateway-repository.js';
 import type { OrderRepository } from './order-repository.js';
@@ -131,6 +132,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
   if (dependencies.authRepository && dependencies.database) registerChromaSenseRoutes(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.database) registerSettingsRoutes(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.catalogRepository) registerPublicCheckoutRoutes(app, environment, dependencies.catalogRepository, dependencies.gatewayRepository, dependencies.shopifyRepository, dependencies.database);
+  if (dependencies.authRepository && dependencies.catalogRepository && dependencies.database) registerPaymentReceiptRoutes(app, environment, dependencies.authRepository, dependencies.catalogRepository, dependencies.database);
 
   app.get<{ Reply: HealthResponse }>('/health/live', () => ({ status: 'ok', service: 'solid-api', version: '0.1.0', timestamp: new Date().toISOString() }));
   app.get('/health/ready', async (_request, reply) => {

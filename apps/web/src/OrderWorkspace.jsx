@@ -24,6 +24,7 @@ import {
   Truck,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import OrderPaymentReceipts from "./OrderPaymentReceipts";
 import {
   getOrder,
   saveOrderTracking,
@@ -287,6 +288,7 @@ function TransactionsTab({ order }) {
   const [showPix, setShowPix] = useState(false);
   return (
     <div className="ow-stack">
+      <OrderPaymentReceipts key={order.publicId} orderId={order.publicId} />
       <section className="card ow-card-section">
         <header>
           <div>

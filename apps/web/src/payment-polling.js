@@ -1,5 +1,15 @@
 // Schedule only after the previous request settles, including slow requests.
 // Hidden tabs stop polling and resume immediately when visible again.
+export function mergePaymentUpdate(current, incoming) {
+  if (!incoming) return current;
+  if (!current) return incoming;
+  const status = String(current.status).toUpperCase();
+  const nextStatus = String(incoming.status).toUpperCase();
+  // Manual refresh and the background poll may finish out of order.
+  if (status === 'REFUNDED' || (status === 'PAID' && nextStatus !== 'REFUNDED')) return current;
+  return { ...current, ...incoming };
+}
+
 export function pollPaymentStatus({ fetchStatus, onPayment, visibility = document, intervalMs = 5000 }) {
   let stopped = false;
   let running = false;

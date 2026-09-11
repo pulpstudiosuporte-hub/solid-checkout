@@ -767,12 +767,27 @@ model PaymentAttempt {
   updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
   session               CheckoutSession @relation(fields: [checkoutSessionId], references: [id], onDelete: Restrict)
   billingEntries        BillingLedgerEntry[]
+  receipt               PaymentReceipt?
 
   @@index([checkoutSessionId, createdAt(sort: Desc)])
   @@index([status, expiresAt])
   @@index([status, paidAt, checkoutSessionId])
   @@index([provider, status, nextVerificationAt])
   @@map("payment_attempts")
+}
+
+model PaymentReceipt {
+  id               String         @id @default(uuid()) @db.Uuid
+  paymentAttemptId String         @unique @map("payment_attempt_id") @db.Uuid
+  contentEncrypted String         @map("content_encrypted") @db.Text
+  contentHash      String         @map("content_hash") @db.Char(64)
+  mimeType         String         @map("mime_type") @db.VarChar(64)
+  sizeBytes        Int            @map("size_bytes")
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  payment          PaymentAttempt @relation(fields: [paymentAttemptId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@map("payment_receipts")
 }
 
 model BillingSubscription {

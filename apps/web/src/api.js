@@ -191,6 +191,25 @@ export async function setPublicCheckoutQuantity(sessionId, token, quantity) { re
 export async function applyPublicCoupon(sessionId, token, code) { return readJson(await fetch(`${apiBaseUrl}/public/checkout-sessions/${encodeURIComponent(sessionId)}/coupon`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ code }) })); }
 export async function createWestPayPix(sessionId, token) { return readJson(await fetch(`${apiBaseUrl}/public/checkout-sessions/${encodeURIComponent(sessionId)}/payments/westpay/pix`, { method: 'POST', headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } })); }
 export async function getLatestPublicPayment(sessionId, token, signal) { return readJson(await fetch(`${apiBaseUrl}/public/checkout-sessions/${encodeURIComponent(sessionId)}/payments/latest`, { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` }, signal })); }
+const paymentReceiptUrl = (sessionId, paymentId) => `${apiBaseUrl}/public/checkout-sessions/${encodeURIComponent(sessionId)}/payments/${encodeURIComponent(paymentId)}/receipt`;
+export async function getPublicPaymentReceipt(sessionId, paymentId, token, signal) {
+  return readJson(await fetch(paymentReceiptUrl(sessionId, paymentId), { credentials: 'omit', headers: { Authorization: `Bearer ${token}` }, signal }));
+}
+export async function uploadPublicPaymentReceipt(sessionId, paymentId, token, file) {
+  return readJson(await fetch(paymentReceiptUrl(sessionId, paymentId), { method: 'PUT', credentials: 'omit', headers: { Authorization: `Bearer ${token}`, 'Content-Type': file.type }, body: file }));
+}
+export async function getOrderPaymentReceipts(orderId, signal) {
+  return readJson(await fetch(`${apiBaseUrl}/orders/${encodeURIComponent(orderId)}/payment-receipts`, { credentials: 'include', signal }));
+}
+export async function downloadOrderPaymentReceipt(orderId, paymentId, mimeType) {
+  const response = await fetch(`${apiBaseUrl}/orders/${encodeURIComponent(orderId)}/payment-receipts/${encodeURIComponent(paymentId)}`, { credentials: 'include' });
+  if (!response.ok) await readJson(response);
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url; link.download = `comprovante-${paymentId}.${mimeType === 'application/pdf' ? 'pdf' : 'webp'}`;
+  document.body.appendChild(link); link.click(); link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
 export async function getWestPayStatus() { return readJson(await fetch(`${apiBaseUrl}/integrations/westpay/status`, { credentials: 'include', headers: { Accept: 'application/json' } })); }
 export async function saveWestPay(input, csrfToken) { return readJson(await fetch(`${apiBaseUrl}/integrations/westpay`, { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(input) })); }
 export async function getRoasStatus() { return readJson(await fetch(`${apiBaseUrl}/integrations/roas/status`, { credentials: 'include', headers: { Accept: 'application/json' } })); }

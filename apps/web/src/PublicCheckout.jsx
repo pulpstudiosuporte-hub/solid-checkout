@@ -1,11 +1,10 @@
-import { pollPaymentStatus } from './payment-polling';
+import { mergePaymentUpdate, pollPaymentStatus } from './payment-polling';
 import { Component, useCallback, useEffect, useRef, useState } from "react";
-import { QRCodeSVG } from "qrcode.react";
+import PixPaymentPanel from "./PixPaymentPanel";
 import {
   ArrowRight,
   Check,
   CheckCircle2,
-  Copy,
   Clock3,
   CreditCard,
   ChevronDown,
@@ -15,7 +14,6 @@ import {
   ShieldCheck,
   ShoppingBag,
   Truck,
-  Upload,
   UserRound,
 } from "lucide-react";
 import {
@@ -536,16 +534,12 @@ export default function PublicCheckout({ storeSlug, checkoutSlug }) {
 }
 
 function useExpiry(expiresAt) {
-  const calculate = useCallback(() =>
-    Math.max(
-      0,
-      Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000),
-    ), [expiresAt]);
-  const [remaining, setRemaining] = useState(calculate);
+  const [now, setNow] = useState(Date.now);
   useEffect(() => {
-    const interval = window.setInterval(() => setRemaining(calculate()), 1000);
+    const interval = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(interval);
-  }, [calculate]);
+  }, []);
+  const remaining = Math.max(0, Math.floor((new Date(expiresAt).getTime() - now) / 1000));
   return {
     remaining,
     label: `${String(Math.floor(remaining / 3600)).padStart(2, "0")} : ${String(Math.floor((remaining % 3600) / 60)).padStart(2, "0")} : ${String(remaining % 60).padStart(2, "0")}`,
@@ -603,13 +597,11 @@ function SessionContent({ session: initialSession, token }) {
   const [payment, setPayment] = useState(null);
   const [metaPixelId, setMetaPixelId] = useState('');
   const [delivery, setDelivery] = useState(null);
-  const [copied, setCopied] = useState(false);
   const [couponCode, setCouponCode] = useState(session.couponCode || "");
   const [couponMessage, setCouponMessage] = useState("");
   const [couponOpen, setCouponOpen] = useState(Boolean(session.couponCode));
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [emailSuggestionOpen, setEmailSuggestionOpen] = useState(false);
-  const [receiptName, setReceiptName] = useState("");
   const [socialProofMessages, setSocialProofMessages] = useState([]);
   const [postalStatus, setPostalStatus] = useState({
     type: "idle",
@@ -803,7 +795,7 @@ function SessionContent({ session: initialSession, token }) {
     if (!paymentPublicId || paymentStatus !== 'PENDING') return;
     return pollPaymentStatus({
       fetchStatus: signal => getLatestPublicPayment(session.publicId, token, signal),
-      onPayment: payment => setPayment(current => current ? { ...current, ...payment } : payment),
+      onPayment: payment => setPayment(current => mergePaymentUpdate(current, payment)),
     });
   }, [paymentPublicId, paymentStatus, session.publicId, token]);
   useEffect(() => {
@@ -829,7 +821,12 @@ function SessionContent({ session: initialSession, token }) {
     catch (requestError) { setError(requestError.message); }
     finally { setBusy(false); }
   };
-  const copyPix = async () => { await navigator.clipboard.writeText(payment.pixCode); setCopied(true); window.setTimeout(() => setCopied(false), 1800); };
+  const refreshPayment = async () => {
+    const result = await getLatestPublicPayment(session.publicId, token);
+    if (!result.payment) throw new Error("Ainda não foi possível localizar o pagamento. Tente novamente.");
+    setPayment(current => mergePaymentUpdate(current, result.payment));
+    return result.payment;
+  };
   if (String(payment?.status).toUpperCase() === "PAID") {
     return <ThankYouPage session={session} items={items} itemCount={itemCount} selectedShipping={selectedShipping} payment={payment} config={config} delivery={delivery} />;
   }
@@ -1201,32 +1198,7 @@ function SessionContent({ session: initialSession, token }) {
             </div>
           ) : (
             <div className={`next-step-placeholder payment-step ${payment ? "payment-step-generated" : "payment-step-checkout"}`}>
-              {String(payment?.status).toUpperCase() === 'PAID' ? <><h1>{copy.paymentConfirmed}</h1><div className="payment-confirmed" role="status"><CheckCircle2 size={38}/><p>{copy.paymentReceived}</p>{config.successUrl && config.successUrl !== '#' && <a className="customer-continue" href={config.successUrl}>{copy.continue} <ArrowRight size={19}/></a>}</div></> : payment ? <div className="pix-payment-panel">
-                <section className="pix-payment-intro">
-                  <h1>Quase lá...</h1>
-                  <p>Pague seu Pix dentro de <strong>{paymentExpiry.label}</strong><br/>para garantir sua compra.</p>
-                  <span className="pix-status-pill">Aguardando pagamento <i/><i/><i/></span>
-                </section>
-                <section className="pix-payment-card">
-                  <div className="pix-desktop-qr">
-                    <p>Abra seu aplicativo de pagamento e escolha <b>Ler QR Code</b></p>
-                    <span><QrCode size={16}/> Aponte a câmera do seu celular</span>
-                    <div className="pix-qr-code"><QRCodeSVG value={payment.pixCode} size={226} level="M" includeMargin aria-label="QR Code para pagamento Pix" /></div>
-                  </div>
-                  <p className="pix-payment-value">Valor do Pix: <strong>{money.format(payment.amountCents / 100)}</strong></p>
-                  <div className="pix-mobile-instructions">
-                    <button type="button" className="customer-continue pix-copy-button" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? copy.copied : copy.copyPix}</button>
-                    <p className="pix-bank-warning">Alguns bancos podem exibir alertas de segurança ao pagar via Pix para novos recebedores. Essa é uma medida preventiva e não indica problema na transação.</p>
-                    <div className="pix-how-to"><h2>Como pagar o Pix:</h2><ol><li><b>1</b> Copie o código Pix</li><li><b>2</b> Abra seu banco e escolha Pix Copia e Cola</li><li><b>3</b> Cole o código e confirme o pagamento de {money.format(payment.amountCents / 100)}</li></ol></div>
-                  </div>
-                  <div className="pix-processor"><small>Pix processado por</small><strong>Pagamento seguro</strong></div>
-                  <details className="pix-receipt"><summary>Já pagou o Pix? <span><Upload size={16}/> Enviar comprovante <ChevronDown size={15}/></span></summary><label><input type="file" aria-label="Selecionar comprovante de pagamento" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(event) => setReceiptName(event.target.files?.[0]?.name || "")}/><span>{receiptName || "Selecionar comprovante"}</span><small>O pagamento continua sendo confirmado automaticamente.</small></label></details>
-                </section>
-                <section className="pix-copy-alternative">
-                  <p>Você também pode pagar escolhendo a opção <b>Pix Copia e Cola</b> no seu aplicativo de pagamento ou Internet Banking. Copie o código no botão abaixo:</p>
-                  <button type="button" onClick={copyPix}>{copied ? <Check size={18}/> : <Copy size={18}/>} {copied ? copy.copied : "Copiar código"}</button>
-                </section>
-              </div> : <>
+              {String(payment?.status).toUpperCase() === 'PAID' ? <><h1>{copy.paymentConfirmed}</h1><div className="payment-confirmed" role="status"><CheckCircle2 size={38}/><p>{copy.paymentReceived}</p>{config.successUrl && config.successUrl !== '#' && <a className="customer-continue" href={config.successUrl}>{copy.continue} <ArrowRight size={19}/></a>}</div></> : payment ? <PixPaymentPanel key={payment.publicId} payment={payment} expiry={paymentExpiry} copy={copy} sessionId={session.publicId} token={token} onRefresh={refreshPayment} /> : <>
                 <header className="payment-section-heading">
                   <div>
                     <h1>{copy.payment}</h1>
