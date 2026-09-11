@@ -120,17 +120,24 @@ function CheckoutSurface({ points, type, scroll, checkout }) {
   );
 }
 
-export default function ChromaSensePage({ storeKey }) {
+export default function ChromaSensePage(props) {
+  return <ChromaSenseWorkspace key={props.storeKey} {...props}/>;
+}
+
+function ChromaSenseWorkspace({ storeKey }) {
   const [period, setPeriod] = useState("7d");
   const [checkoutId, setCheckoutId] = useState("");
   const [tab, setTab] = useState("heatmap");
   const [view, setView] = useState("click");
   const [state, setState] = useState({ ...empty, loading: true, error: "" });
-  const load = () => {
+  const [revision, setRevision] = useState(0);
+  const load = () => setRevision(value => value + 1);
+  useEffect(() => {
     const controller = new AbortController();
-    setState((current) => ({ ...current, loading: true, error: "" }));
+    setState(current => ({ ...empty, checkouts: current.checkouts, loading: true, error: "" }));
     getChromaSense({ period, checkoutId, device: "mobile" }, controller.signal)
       .then((result) => {
+        if (controller.signal.aborted) return;
         setState({
           ...empty,
           ...result,
@@ -140,23 +147,19 @@ export default function ChromaSensePage({ storeKey }) {
           loading: false,
           error: "",
         });
-        if (!checkoutId && result.checkouts?.[0]?.publicId)
+        if (!result.checkouts?.some(checkout => checkout.publicId === checkoutId) && result.checkouts?.[0]?.publicId)
           setCheckoutId(result.checkouts[0].publicId);
       })
       .catch((error) => {
-        if (error.name !== "AbortError")
+        if (!controller.signal.aborted && error.name !== "AbortError")
           setState((current) => ({
             ...current,
             loading: false,
             error: error.message,
           }));
       });
-    return controller;
-  };
-  useEffect(() => {
-    const controller = load();
     return () => controller.abort();
-  }, [period, checkoutId, storeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [period, checkoutId, storeKey, revision]);
   const points = useMemo(
     () => (Array.isArray(state.points?.[view]) ? state.points[view] : []),
     [state.points, view],
@@ -177,7 +180,7 @@ export default function ChromaSensePage({ storeKey }) {
           <p className="eyebrow">COMPORTAMENTO</p>
           <h1>ChromaSense</h1>
           <p>
-            Mapas de calor e insights sobre o comportamento real no checkout.
+            Mapas de calor e insights sobre acessos ao checkout em celulares.
           </p>
         </div>
         <button className="secondary" onClick={load} disabled={state.loading}>
@@ -493,6 +496,7 @@ export default function ChromaSensePage({ storeKey }) {
                 por checkout e dispositivo. O rastreamento não registra teclas,
                 valores de campos, CPF, e-mail ou conteúdo sensível.
               </p>
+              <p>O mapa é uma aproximação sobre o layout publicado atual. Mudanças de etapa, tamanho da tela ou versão do checkout podem deslocar os pontos; esta visualização não reproduz a tela original de cada visita.</p>
               <ul>
                 <li>
                   <b>Cliques:</b> mostra os pontos e controles mais acionados.

@@ -2,13 +2,14 @@ import { useEffect } from "react";
 import { sendChromaSenseEvents } from "./api";
 
 const coordinate = (value, maximum) => Math.round(Math.min(1, Math.max(0, value / Math.max(1, maximum))) * 10_000) / 10_000;
+export const chromaScrollDepth = (offset, viewportHeight, pageHeight) => Math.round(Math.min(100, Math.max(0, ((offset + viewportHeight) / Math.max(1, pageHeight, viewportHeight)) * 100)));
 const pagePoint = (event) => ({
   x: coordinate(event.clientX, window.innerWidth),
   y: coordinate(event.clientY + window.scrollY, Math.max(document.documentElement.scrollHeight, window.innerHeight)),
 });
 const deviceType = () => window.innerWidth < 640 ? "mobile" : window.innerWidth < 1024 ? "tablet" : "desktop";
 const safeClass = (element) => [...(element?.classList || [])].filter((name) => /^[a-zA-Z][\w-]{0,48}$/.test(name)).slice(0, 2).join(".");
-const describeTarget = (rawTarget) => {
+export const describeTarget = (rawTarget) => {
   const target = rawTarget instanceof Element ? rawTarget : null;
   if (!target) return { target: "unknown", targetLabel: "Área do checkout", interactive: null };
   const control = target.closest('button,a,input,select,textarea,label,[role="button"],[data-chroma-label]');
@@ -22,7 +23,7 @@ const describeTarget = (rawTarget) => {
   return {
     target: targetName,
     targetLabel: (explicitLabel || labelByTag[element.tagName] || "Área do checkout").slice(0, 120),
-    interactive: control ? true : null,
+    interactive: Boolean(control),
   };
 };
 
@@ -46,7 +47,7 @@ export function useChromaSense(sessionId, token) {
       catch { queue = [...events, ...queue].slice(-200); }
       finally { sending = false; }
     };
-    const enqueue = (event) => { queue.push(event); if (queue.length >= 50) void flush(false); };
+    const enqueue = (event) => { queue.push(event); if (queue.length > 200) queue.shift(); if (queue.length >= 50) void flush(false); };
     const onClick = (event) => {
       const point = pagePoint(event);
       lastPoint = point;
@@ -71,8 +72,7 @@ export function useChromaSense(sessionId, token) {
       lastInteractionAt = now;
       if (now - lastScrollAt < 700) return;
       lastScrollAt = now;
-      const available = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-      enqueue({ type: "SCROLL", scrollPercent: Math.round(Math.min(100, Math.max(0, (window.scrollY / available) * 100))) });
+      enqueue({ type: "SCROLL", scrollPercent: chromaScrollDepth(window.scrollY, window.innerHeight, document.documentElement.scrollHeight) });
     };
     const attention = window.setInterval(() => {
       if (document.visibilityState === "visible" && lastPoint && Date.now() - lastInteractionAt <= 15_000) enqueue({ type: "ATTENTION", ...lastPoint, durationMs: 5000 });
@@ -85,6 +85,7 @@ export function useChromaSense(sessionId, token) {
     window.addEventListener("scroll", onScroll, { passive: true });
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", onPageHide);
+    onScroll();
     void flush(false);
     return () => {
       document.removeEventListener("click", onClick, true);

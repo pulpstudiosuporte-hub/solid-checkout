@@ -163,7 +163,7 @@ export function registerChromaSenseRoutes(
           .code(401)
           .send(errorBody(request, "INVALID_SESSION", "Sessão inválida."));
       const checkoutSession = await db.checkoutSession.findFirst({
-        where: { publicId: id, tokenHash: sha256(token) },
+        where: { publicId: id, tokenHash: sha256(token), expiresAt: { gt: new Date() } },
         select: {
           id: true,
           checkoutId: true,
@@ -202,73 +202,80 @@ export function registerChromaSenseRoutes(
         return reply.code(400).send(errorBody(request, "INVALID_VISIT", "Identificador da visita inválido."));
       const width = Math.round(clamp(viewport.width, 240, 7680, 1280));
       const height = Math.round(clamp(viewport.height, 240, 4320, 720));
-      const previous = await db.chromaSenseSession.findUnique({
-        where: { visitId: currentVisitId },
-        select: { maxScrollPercent: true, eventCount: true },
+      const result = await db.$transaction(async tx => {
+        await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`chromasense:${currentVisitId}`}, 0))`;
+        const previous = await tx.chromaSenseSession.findUnique({
+          where: { visitId: currentVisitId },
+          select: { checkoutSessionId: true, maxScrollPercent: true, eventCount: true },
+        });
+        if (previous && previous.checkoutSessionId !== checkoutSession.id) return { conflict: true } as const;
+        if ((previous?.eventCount ?? 0) >= 10_000) return { accepted: 0 };
+        const acceptedEvents = events.slice(
+          0,
+          Math.max(0, 10_000 - (previous?.eventCount ?? 0)),
+        );
+        const maxScroll = acceptedEvents.reduce(
+          (max, event) => Math.max(max, event.scrollPercent ?? 0),
+          0,
+        );
+        const attention = acceptedEvents
+          .filter((event) => event.type === "ATTENTION")
+          .reduce((sum, event) => sum + (event.durationMs ?? 0), 0);
+        const rageClicks = acceptedEvents.filter((event) => event.rage).length;
+        const deadClicks = acceptedEvents.filter(
+          (event) => event.type === "CLICK" && event.interactive === false,
+        ).length;
+        const retainedMaxScroll = Math.max(
+          previous?.maxScrollPercent ?? 0,
+          maxScroll,
+        );
+        const analyticsSession = await tx.chromaSenseSession.upsert({
+          where: { visitId: currentVisitId },
+          create: {
+            storeId: checkoutSession.checkout.storeId,
+            checkoutId: checkoutSession.checkoutId,
+            checkoutSessionId: checkoutSession.id,
+            visitId: currentVisitId,
+            pageKey,
+            deviceType: device,
+            viewportWidth: width,
+            viewportHeight: height,
+            eventCount: acceptedEvents.length,
+            activeMs: attention,
+            visibleMs: attention,
+            maxScrollPercent: maxScroll,
+            rageClickCount: rageClicks,
+            deadClickCount: deadClicks,
+          },
+          update: {
+            pageKey,
+            deviceType: device,
+            viewportWidth: width,
+            viewportHeight: height,
+            eventCount: { increment: acceptedEvents.length },
+            activeMs: { increment: attention },
+            visibleMs: { increment: attention },
+            maxScrollPercent: retainedMaxScroll,
+            rageClickCount: { increment: rageClicks },
+            deadClickCount: { increment: deadClicks },
+            lastSeenAt: new Date(),
+          },
+          select: { id: true },
+        });
+        await tx.chromaSenseEvent.createMany({
+          data: acceptedEvents.map((event) => ({
+            ...event,
+            sessionId: analyticsSession.id,
+          })),
+        });
+        return { accepted: acceptedEvents.length };
       });
-      if ((previous?.eventCount ?? 0) >= 10_000) return reply.code(204).send();
-      const acceptedEvents = events.slice(
-        0,
-        Math.max(0, 10_000 - (previous?.eventCount ?? 0)),
-      );
-      const maxScroll = acceptedEvents.reduce(
-        (max, event) => Math.max(max, event.scrollPercent ?? 0),
-        0,
-      );
-      const attention = acceptedEvents
-        .filter((event) => event.type === "ATTENTION")
-        .reduce((sum, event) => sum + (event.durationMs ?? 0), 0);
-      const rageClicks = acceptedEvents.filter((event) => event.rage).length;
-      const deadClicks = acceptedEvents.filter(
-        (event) => event.type === "CLICK" && event.interactive === false,
-      ).length;
-      const retainedMaxScroll = Math.max(
-        previous?.maxScrollPercent ?? 0,
-        maxScroll,
-      );
-      const analyticsSession = await db.chromaSenseSession.upsert({
-        where: { visitId: currentVisitId },
-        create: {
-          storeId: checkoutSession.checkout.storeId,
-          checkoutId: checkoutSession.checkoutId,
-          checkoutSessionId: checkoutSession.id,
-          visitId: currentVisitId,
-          pageKey,
-          deviceType: device,
-          viewportWidth: width,
-          viewportHeight: height,
-          eventCount: acceptedEvents.length,
-          activeMs: attention,
-          visibleMs: attention,
-          maxScrollPercent: maxScroll,
-          rageClickCount: rageClicks,
-          deadClickCount: deadClicks,
-        },
-        update: {
-          pageKey,
-          deviceType: device,
-          viewportWidth: width,
-          viewportHeight: height,
-          eventCount: { increment: acceptedEvents.length },
-          activeMs: { increment: attention },
-          visibleMs: { increment: attention },
-          maxScrollPercent: retainedMaxScroll,
-          rageClickCount: { increment: rageClicks },
-          deadClickCount: { increment: deadClicks },
-          lastSeenAt: new Date(),
-        },
-        select: { id: true },
-      });
-      await db.chromaSenseEvent.createMany({
-        data: acceptedEvents.map((event) => ({
-          ...event,
-          sessionId: analyticsSession.id,
-        })),
-      });
+      if ('conflict' in result) return reply.code(409).send(errorBody(request, 'VISIT_CONFLICT', 'A visita pertence a outra sessão de checkout.'));
+      if (!result.accepted) return reply.code(204).send();
       return reply
         .header("cache-control", "no-store")
         .code(202)
-        .send({ accepted: acceptedEvents.length });
+        .send({ accepted: result.accepted });
     },
   );
 
@@ -343,7 +350,7 @@ export function registerChromaSenseRoutes(
               sessionId: { in: sessions.map((session) => session.id) },
               createdAt: { gte: start },
             },
-            orderBy: { createdAt: "asc" },
+            orderBy: { createdAt: "desc" },
             take: 25_000,
             select: {
               sessionId: true,
@@ -503,7 +510,7 @@ export function registerChromaSenseRoutes(
                 (event) =>
                   event.type === type && event.x !== null && event.y !== null,
               )
-              .slice(-4000)
+              .slice(0, 4000)
               .map((event) => ({
                 x: event.x,
                 y: event.y,
@@ -525,7 +532,7 @@ export function registerChromaSenseRoutes(
             : 0,
           distribution: [25, 50, 75, 100].map(
             (limit) =>
-              sessions.filter((session) => session.maxScrollPercent <= limit)
+              sessions.filter((session) => session.maxScrollPercent >= limit)
                 .length,
           ),
         },

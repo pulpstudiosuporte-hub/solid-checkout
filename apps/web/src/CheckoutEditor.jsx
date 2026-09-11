@@ -1861,7 +1861,7 @@ export function CheckoutDesignPreview({ config, onClose }) {
 export function CheckoutAnalyticsPreview({ config, product }) {
   const noop = () => {};
   return (
-    <div className="checkout-analytics-render" aria-hidden="true" inert="">
+    <div className="checkout-analytics-render" aria-hidden="true" inert>
       <Preview
         c={{ ...defaultCheckoutConfig, ...config }}
         device="mobile"

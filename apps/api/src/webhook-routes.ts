@@ -34,27 +34,36 @@ export async function resolveSafeWebhookUrl(value: unknown): Promise<ResolvedWeb
   let url: URL;
   try { url = new URL(value); } catch { throw new Error('Informe uma URL válida.'); }
   if (url.protocol !== 'https:' || url.username || url.password || url.port) throw new Error('Use uma URL HTTPS pública, sem credenciais ou porta personalizada.');
-  const results = isIP(url.hostname) ? [{ address: url.hostname, family: isIP(url.hostname) as 4 | 6 }] : await lookup(url.hostname, { all: true, verbatim: true });
+  const hostname = url.hostname.replace(/^\[|\]$/g, '');
+  const results = isIP(hostname) ? [{ address: hostname, family: isIP(hostname) as 4 | 6 }] : await lookup(hostname, { all: true, verbatim: true });
   if (!results.length || results.some(result => !publicAddress(result.address))) throw new Error('A URL deve apontar para um servidor público.');
   const selected = results[0]!;
   return { url, address: selected.address, family: selected.family as 4 | 6 };
 }
 
-function validEvents(value: unknown): WebhookEvent[] {
+export function validEvents(value: unknown): WebhookEvent[] {
   if (!Array.isArray(value) || !value.length || value.length > webhookEvents.length) throw new Error('Selecione pelo menos um evento.');
-  const events = [...new Set(value.filter((item): item is string => typeof item === 'string'))];
-  if (events.some(event => !webhookEvents.includes(event as WebhookEvent))) throw new Error('Evento inválido.');
-  return events as WebhookEvent[];
+  if (value.some(item => typeof item !== 'string' || !webhookEvents.includes(item as WebhookEvent))) throw new Error('Evento inválido.');
+  const events = [...new Set(value as WebhookEvent[])];
+  return events;
 }
 
-async function postPinnedWebhook(resolved: ResolvedWebhook, body: string, headers: Record<string, string>): Promise<number> {
+export async function postPinnedWebhook(resolved: ResolvedWebhook, body: string, headers: Record<string, string>): Promise<number> {
   return new Promise((resolve, reject) => {
+    const hostname = resolved.url.hostname.replace(/^\[|\]$/g, '');
     const request = httpsRequest({
-      protocol: 'https:', hostname: resolved.url.hostname, servername: resolved.url.hostname,
+      protocol: 'https:', hostname, ...(isIP(hostname) ? {} : { servername: hostname }),
       path: `${resolved.url.pathname}${resolved.url.search}`, method: 'POST', headers,
       lookup: (_hostname, _options, callback) => callback(null, resolved.address, resolved.family),
       timeout: 10_000,
-    }, response => { response.resume(); response.once('end', () => resolve(response.statusCode ?? 0)); });
+    }, response => {
+      response.once('error', reject);
+      response.once('aborted', () => reject(new Error('Resposta interrompida.')));
+      response.resume(); response.once('end', () => resolve(response.statusCode ?? 0));
+    });
+    const deadline = setTimeout(() => request.destroy(new Error('Tempo limite excedido.')), 10_000);
+    deadline.unref();
+    request.once('close', () => clearTimeout(deadline));
     request.once('timeout', () => request.destroy(new Error('Tempo limite excedido.')));
     request.once('error', reject);
     request.end(body);
@@ -105,14 +114,15 @@ export function startWebhookDelivery(environment: AppEnvironment, database: Pris
         const claimed = await database.webhookDelivery.updateMany({ where: { id: candidate.id, OR: [{ status: 'PENDING' }, { status: 'PROCESSING', claimedAt: { lte: stale } }] }, data: { status: 'PROCESSING', claimedAt: now } });
         if (!claimed.count) return;
         if (!candidate.webhookEndpoint.active) { await database.webhookDelivery.update({ where: { id: candidate.id }, data: { status: 'DEAD', claimedAt: null, error: 'Endpoint inativo.' } }); return; }
+        let result: { statusCode: number; durationMs: number } | null = null;
         try {
-          const result = await sendWebhook(candidate.webhookEndpoint.url, candidate.webhookEndpoint.secretEncrypted, environment.APP_ENCRYPTION_KEY!, candidate.event, candidate.payload);
+          result = await sendWebhook(candidate.webhookEndpoint.url, candidate.webhookEndpoint.secretEncrypted, environment.APP_ENCRYPTION_KEY!, candidate.event, candidate.payload);
           if (result.statusCode < 200 || result.statusCode >= 300) throw new Error(`HTTP ${result.statusCode}`);
-          await database.webhookDelivery.update({ where: { id: candidate.id }, data: { status: 'DELIVERED', success: true, statusCode: result.statusCode, durationMs: result.durationMs, deliveredAt: new Date(), claimedAt: null, nextAttemptAt: null, error: null } });
+          await database.webhookDelivery.update({ where: { id: candidate.id }, data: { status: 'DELIVERED', success: true, attempts: candidate.attempts + 1, statusCode: result.statusCode, durationMs: result.durationMs, deliveredAt: new Date(), claimedAt: null, nextAttemptAt: null, error: null } });
         } catch (error) {
           const attempts = candidate.attempts + 1;
           const dead = attempts >= MAX_ATTEMPTS;
-          await database.webhookDelivery.update({ where: { id: candidate.id }, data: { status: dead ? 'DEAD' : 'PENDING', success: false, attempts, claimedAt: null, nextAttemptAt: dead ? null : new Date(Date.now() + Math.min(360, 2 ** attempts) * 60_000), error: (error instanceof Error ? error.message : 'Falha no envio').slice(0, 500) } });
+          await database.webhookDelivery.update({ where: { id: candidate.id }, data: { status: dead ? 'DEAD' : 'PENDING', success: false, attempts, statusCode: result?.statusCode ?? null, durationMs: result?.durationMs ?? null, claimedAt: null, nextAttemptAt: dead ? null : new Date(Date.now() + Math.min(360, 2 ** attempts) * 60_000), error: (error instanceof Error ? error.message : 'Falha no envio').slice(0, 500) } });
         }
       }));
     } catch (error) { logger.error({ err: error }, 'webhook_delivery_failed'); }
@@ -134,7 +144,29 @@ export function registerWebhookRoutes(app: FastifyInstance, environment: AppEnvi
     return member ? { storeId: active.activeStoreId, writable: ['OWNER', 'ADMIN'].includes(member.role) } : null;
   };
   app.get('/store-webhooks', async (request, reply) => { const ctx = await context(request); if (!ctx) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.')); const items = await database.webhookEndpoint.findMany({ where: { storeId: ctx.storeId }, orderBy: { createdAt: 'desc' }, take: MAX_ENDPOINTS_PER_STORE, select: { publicId: true, name: true, description: true, url: true, active: true, events: true, createdAt: true, updatedAt: true, _count: { select: { deliveries: true } }, deliveries: { orderBy: { createdAt: 'desc' }, take: 1, select: { success: true, status: true, statusCode: true, createdAt: true, error: true } } } }); return reply.header('cache-control', 'private, no-store').send({ items, writable: ctx.writable, events: webhookEvents, limit: MAX_ENDPOINTS_PER_STORE }); });
-  app.post<{ Body: { name?: unknown; description?: unknown; url?: unknown; secret?: unknown; active?: unknown; events?: unknown } }>('/store-webhooks', async (request, reply) => { const ctx = await context(request, true); if (!ctx?.writable) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.')); if (!environment.APP_ENCRYPTION_KEY) return reply.code(503).send(errorBody(request, 'SERVICE_UNAVAILABLE', 'Criptografia indisponível.')); if (await database.webhookEndpoint.count({ where: { storeId: ctx.storeId } }) >= MAX_ENDPOINTS_PER_STORE) return reply.code(409).send(errorBody(request, 'LIMIT_REACHED', `Limite de ${MAX_ENDPOINTS_PER_STORE} webhooks por loja atingido.`)); try { const name = typeof request.body?.name === 'string' ? request.body.name.trim() : ''; if (name.length < 2 || name.length > 120) throw new Error('Informe um nome entre 2 e 120 caracteres.'); const description = typeof request.body.description === 'string' ? request.body.description.trim().slice(0, 240) : null; const resolved = await resolveSafeWebhookUrl(request.body.url); const events = validEvents(request.body.events); const secret = typeof request.body.secret === 'string' && request.body.secret.trim().length >= 16 ? request.body.secret.trim() : randomBytes(32).toString('hex'); const item = await database.webhookEndpoint.create({ data: { storeId: ctx.storeId, name, description: description || null, url: resolved.url.toString(), active: request.body.active !== false, events, secretEncrypted: encryptSecret(secret, environment.APP_ENCRYPTION_KEY) }, select: { publicId: true, name: true, description: true, url: true, active: true, events: true } }); return reply.code(201).send({ item, secret }); } catch (error) { return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', error instanceof Error ? error.message : 'Dados inválidos.')); } });
+  app.post<{ Body: { name?: unknown; description?: unknown; url?: unknown; secret?: unknown; active?: unknown; events?: unknown } }>('/store-webhooks', async (request, reply) => {
+    const ctx = await context(request, true);
+    if (!ctx?.writable) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
+    if (!environment.APP_ENCRYPTION_KEY) return reply.code(503).send(errorBody(request, 'SERVICE_UNAVAILABLE', 'Criptografia indisponível.'));
+    try {
+      const name = typeof request.body?.name === 'string' ? request.body.name.trim() : '';
+      if (name.length < 2 || name.length > 120) throw new Error('Informe um nome entre 2 e 120 caracteres.');
+      const description = typeof request.body.description === 'string' ? request.body.description.trim().slice(0, 240) : null;
+      const resolved = await resolveSafeWebhookUrl(request.body.url);
+      const events = validEvents(request.body.events);
+      const suppliedSecret = typeof request.body.secret === 'string' ? request.body.secret.trim() : '';
+      if (suppliedSecret && (suppliedSecret.length < 16 || suppliedSecret.length > 256)) throw new Error('A chave deve ter entre 16 e 256 caracteres.');
+      const secret = suppliedSecret || randomBytes(32).toString('hex');
+      const secretEncrypted = encryptSecret(secret, environment.APP_ENCRYPTION_KEY);
+      const item = await database.$transaction(async tx => {
+        await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`webhook-endpoints:${ctx.storeId}`}, 0))`;
+        if (await tx.webhookEndpoint.count({ where: { storeId: ctx.storeId } }) >= MAX_ENDPOINTS_PER_STORE) return null;
+        return tx.webhookEndpoint.create({ data: { storeId: ctx.storeId, name, description: description || null, url: resolved.url.toString(), active: request.body.active !== false, events, secretEncrypted }, select: { publicId: true, name: true, description: true, url: true, active: true, events: true } });
+      });
+      if (!item) return reply.code(409).send(errorBody(request, 'LIMIT_REACHED', `Limite de ${MAX_ENDPOINTS_PER_STORE} webhooks por loja atingido.`));
+      return reply.header('cache-control', 'private, no-store').code(201).send({ item, secret });
+    } catch (error) { return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', error instanceof Error ? error.message : 'Dados inválidos.')); }
+  });
   app.patch<{ Params: { id: string }; Body: { name?: unknown; description?: unknown; url?: unknown; active?: unknown; events?: unknown } }>('/store-webhooks/:id', async (request, reply) => { const ctx = await context(request, true); if (!ctx?.writable) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.')); const existing = await database.webhookEndpoint.findFirst({ where: { publicId: request.params.id, storeId: ctx.storeId } }); if (!existing) return reply.code(404).send(errorBody(request, 'NOT_FOUND', 'Webhook não encontrado.')); try { const data: { name?: string; description?: string | null; url?: string; active?: boolean; events?: string[] } = {}; if (request.body.name !== undefined) { const name = typeof request.body.name === 'string' ? request.body.name.trim() : ''; if (name.length < 2 || name.length > 120) throw new Error('Nome inválido.'); data.name = name; } if (request.body.description !== undefined) data.description = typeof request.body.description === 'string' ? request.body.description.trim().slice(0, 240) || null : null; if (request.body.url !== undefined) data.url = (await resolveSafeWebhookUrl(request.body.url)).url.toString(); if (typeof request.body.active === 'boolean') data.active = request.body.active; if (request.body.events !== undefined) data.events = validEvents(request.body.events); const item = await database.webhookEndpoint.update({ where: { id: existing.id }, data, select: { publicId: true, name: true, description: true, url: true, active: true, events: true } }); return reply.send({ item }); } catch (error) { return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', error instanceof Error ? error.message : 'Dados inválidos.')); } });
   app.delete<{ Params: { id: string } }>('/store-webhooks/:id', async (request, reply) => { const ctx = await context(request, true); if (!ctx?.writable) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.')); const result = await database.webhookEndpoint.deleteMany({ where: { publicId: request.params.id, storeId: ctx.storeId } }); return result.count ? reply.code(204).send() : reply.code(404).send(errorBody(request, 'NOT_FOUND', 'Webhook não encontrado.')); });
   app.post<{ Params: { id: string }; Body: { event?: unknown } }>(
@@ -158,12 +190,13 @@ export function registerWebhookRoutes(app: FastifyInstance, environment: AppEnvi
           );
       const endpoint = await database.webhookEndpoint.findFirst({
         where: { publicId: request.params.id, storeId: ctx.storeId },
-        select: { id: true },
+        select: { id: true, active: true },
       });
       if (!endpoint)
         return reply
           .code(404)
           .send(errorBody(request, 'NOT_FOUND', 'Webhook não encontrado.'));
+      if (!endpoint.active) return reply.code(409).send(errorBody(request, 'ENDPOINT_INACTIVE', 'Ative o webhook antes de enviar um teste.'));
       const event =
         typeof request.body?.event === 'string'
           ? request.body.event

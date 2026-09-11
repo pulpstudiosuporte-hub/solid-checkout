@@ -1,11 +1,23 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AppEnvironment } from '@solid/config';
 import type { Prisma, PrismaClient } from '@solid/database';
-import { createStoreWebhookDispatcher, resolveSafeWebhookUrl } from '../src/webhook-routes.js';
+import { createStoreWebhookDispatcher, resolveSafeWebhookUrl, validEvents } from '../src/webhook-routes.js';
 
 const environment = { APP_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64') } as AppEnvironment;
 
 describe('store webhooks', () => {
+  it.each([[null], [123], ['order.created', null], ['unknown'], []])('rejects malformed event lists %j', (...events) => {
+    expect(() => validEvents(events)).toThrow();
+  });
+  it('deduplicates valid event subscriptions', () => {
+    expect(validEvents(['order.created', 'order.created'])).toEqual(['order.created']);
+  });
+  it.each(['https://[::1]/hook', 'https://[::ffff:7f00:1]/hook', 'https://[fc00::1]/hook'])('rejects private IPv6 %s', async url => {
+    await expect(resolveSafeWebhookUrl(url)).rejects.toThrow('servidor público');
+  });
+  it('accepts a public IPv6 literal', async () => {
+    expect((await resolveSafeWebhookUrl('https://[2606:4700:4700::1111]/hook')).family).toBe(6);
+  });
   it.each(['https://127.0.0.1/hook', 'https://10.0.0.1/hook', 'https://169.254.169.254/latest', 'https://100.64.0.1/hook', 'http://1.1.1.1/hook'])('rejects unsafe endpoint %s', async url => {
     await expect(resolveSafeWebhookUrl(url)).rejects.toThrow();
   });
