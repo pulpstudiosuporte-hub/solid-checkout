@@ -41,13 +41,15 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   const inputRadius = input.inputRadius === undefined ? Math.min(radius, 14) : integer(input.inputRadius, 0, 28); if (inputRadius === null) return null; result.inputRadius = inputRadius;
   const timerRadius = input.timerRadius === undefined ? 14 : integer(input.timerRadius, 0, 30); if (timerRadius === null) return null; result.timerRadius = timerRadius;
   const timerStyle = input.timerStyle ?? 'bar'; if (typeof timerStyle !== 'string' || !['bar', 'pill', 'outline'].includes(timerStyle)) return null; result.timerStyle = timerStyle;
-  for (const [key, fallback] of [['exitOfferEnabled', false], ['exitOfferCountdown', true], ['exitOfferMobile', true]] as const) { const candidate = input[key] ?? fallback; if (typeof candidate !== 'boolean') return null; result[key] = candidate; }
+  for (const [key, fallback] of [['exitOfferEnabled', false], ['exitOfferCountdown', true], ['exitOfferMobile', true], ['exitOfferTimedEnabled', true]] as const) { const candidate = input[key] ?? fallback; if (typeof candidate !== 'boolean') return null; result[key] = candidate; }
   const offerCode = input.exitOfferCouponCode ?? '';
   if (typeof offerCode !== 'string' || (offerCode !== '' && !/^[A-Za-z0-9_-]{3,40}$/.test(offerCode))) return null;
   if (result.exitOfferEnabled && !offerCode) return null;
   result.exitOfferCouponCode = offerCode.toUpperCase();
   const offerDelay = input.exitOfferDelaySeconds === undefined ? 10 : integer(input.exitOfferDelaySeconds, 5, 120);
   if (offerDelay === null) return null; result.exitOfferDelaySeconds = offerDelay;
+  const timedDelay = input.exitOfferTimedSeconds === undefined ? 30 : integer(input.exitOfferTimedSeconds, 5, 300);
+  if (timedDelay === null) return null; result.exitOfferTimedSeconds = timedDelay;
   for (const [key, fallback, max] of [['exitOfferTitle', 'Não vá embora ainda!', 100], ['exitOfferButtonText', 'Sim, quero aproveitar!', 60], ['exitOfferDismissText', 'Não, obrigado', 40]] as const) { const candidate = text(input[key] ?? fallback, max); if (!candidate) return null; result[key] = candidate; }
   for (const [key, fallback] of [['exitOfferAccent', '#f47e20'], ['exitOfferBackground', '#ffffff'], ['exitOfferTextColor', '#292938']] as const) { const candidate = hexColor(input[key], fallback); if (!candidate) return null; result[key] = candidate; }
   const socialProofEnabled = input.socialProofEnabled ?? false; const socialProofCloseButton = input.socialProofCloseButton ?? true;

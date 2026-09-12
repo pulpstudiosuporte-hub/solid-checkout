@@ -6,10 +6,10 @@ import { defaultCheckoutConfig } from '../src/checkout-config';
 import '../src/admin-styles.css';
 import '../src/admin-refresh.css';
 import '../src/public-checkout.css';
-const config = { ...defaultCheckoutConfig, timer: false, exitOfferEnabled: true, exitOfferCouponCode: 'FICA10', exitOfferDelaySeconds: 5, socialProofEnabled: false, showBump: false };
+const query = new URLSearchParams(location.search);
+const config = { ...defaultCheckoutConfig, timer: false, exitOfferEnabled: true, exitOfferCouponCode: 'FICA10', exitOfferDelaySeconds: 5, exitOfferTimedEnabled: query.has('timed'), exitOfferTimedSeconds: 8, socialProofEnabled: false, showBump: false };
 const expiry = new Date(Date.now() + 300000).toISOString();
 const session = { publicId: 'exit-review-session', status: 'OPEN', source: 'DIRECT', expiresAt: expiry, customerCaptured: false, quantity: 1, unitPriceCents: 10000, totalCents: 10000, discountCents: 0, shippingPriceCents: 0, checkout: { name: 'Loja de teste', product: { publicId: 'product-demo', checkoutTitle: 'Curso de fotografia', priceCents: 10000, fulfillmentType: 'DIGITAL' }, publishedConfig: config } };
-const query = new URLSearchParams(location.search);
 window.fetch = async (input, init = {}) => {
   const path = new URL(String(input), location.href).pathname;
   const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -23,6 +23,6 @@ window.fetch = async (input, init = {}) => {
 function Review() {
   const [saved, setSaved] = useState(false);
   if (query.has('buyer')) return <PublicSessionCheckout sessionId={session.publicId} token="local-fixture-token"/>;
-  return <><CheckoutEditor checkout={{ publicId: 'checkout-demo', name: 'Checkout de demonstração', draftConfig: config }} products={[]} onBack={() => {}} onSaveDraft={async () => { setSaved(true); }} onPublish={async () => {}}/>{saved && <output style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 99999 }}>Rascunho salvo no teste</output>}</>;
+  return <><CheckoutEditor checkout={{ publicId: 'checkout-demo', name: 'Checkout de demonstração', draftConfig: config }} products={[]} onBack={() => {}} onSaveDraft={async (savedConfig) => { setSaved(savedConfig); }} onPublish={async () => {}}/>{saved && <output style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 99999 }}>Rascunho salvo no teste{saved.exitOfferTimedEnabled && `: oferta após ${saved.exitOfferTimedSeconds}s`}</output>}</>;
 }
 createRoot(document.getElementById('root')).render(<Review/>);

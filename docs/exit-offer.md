@@ -4,7 +4,8 @@ Em **Personalização → Experiência de compra → Oferta de saída**, o lojis
 
 ## Comportamento
 
-- Computador: depois de interação e do tempo mínimo, detecta o cursor saindo pelo topo da página.
+- Por tempo: ativado por padrão nas ofertas habilitadas, abre após 30 segundos, mesmo sem interação. O lojista pode desativar ou ajustar entre 5 e 300 segundos em "Mostrar também por tempo". Funciona no computador e no celular; aguarda se houver outro diálogo aberto ou uma operação em andamento. Esse prazo é independente do tempo mínimo para detectar saída e da validade do desconto.
+- Computador: depois do tempo mínimo, detecta o cursor se aproximando dos 24 px superiores ou saindo pelo topo da página, sem exigir clique ou tecla antes.
 - Celular: depois do tempo mínimo, detecta a rolagem de mais de 250 px de volta para menos de 80 px do topo. Pode ser desativado pelo lojista.
 - Não altera o histórico, intercepta o botão Voltar ou impede fechar a aba. A aproximação do dedo ao botão Voltar não é exposta pelo navegador. Eventos de saída não permitem um popup personalizado confiável, especialmente em celulares; veja [MDN: beforeunload](https://developer.mozilla.org/en-US/docs/Web/API/Window/beforeunload_event).
 - Exibe uma vez por sessão de checkout e código de cupom, usando sessionStorage. Se o navegador bloquear esse armazenamento, evita repetição durante a montagem atual da página.

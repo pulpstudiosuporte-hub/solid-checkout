@@ -37,6 +37,7 @@ export default function ExitOffer({ config, sessionId, token, enabled, onApply }
   const [offer, setOffer] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const enabledRef = useRef(enabled); enabledRef.current = enabled;
   const shown = useRef(new Set());
+  const startedAt = useRef(new Map());
   const code = config.exitOfferCouponCode;
   useEffect(() => {
     if (!config.exitOfferEnabled || !enabled || !sessionId || !code) return;
@@ -44,25 +45,37 @@ export default function ExitOffer({ config, sessionId, token, enabled, onApply }
     if (shown.current.has(key)) return;
     try { if (sessionStorage.getItem(key)) return; } catch { /* Storage may be disabled in private contexts. */ }
     const controller = new AbortController();
-    const started = Date.now(); let interacted = false, attempted = false, peak = window.scrollY;
-    const interact = () => { interacted = true; };
-    const show = async () => {
-      if (attempted || !interacted || Date.now() - started < (config.exitOfferDelaySeconds ?? 10) * 1000 || !enabledRef.current || document.visibilityState !== 'visible' || document.querySelector('dialog[open]')) return;
+    if (!startedAt.current.has(key)) startedAt.current.set(key, Date.now());
+    const started = startedAt.current.get(key);
+    let attempted = false, peak = window.scrollY, previousY = null;
+    const available = () => !controller.signal.aborted && enabledRef.current && document.visibilityState === 'visible' && !document.querySelector('dialog[open]');
+    const show = async (delaySeconds) => {
+      if (attempted || shown.current.has(key) || Date.now() - started < delaySeconds * 1000 || !available()) return;
       attempted = true;
       try {
         const result = await getPublicExitOffer(sessionId, token, controller.signal);
-        if (!controller.signal.aborted && enabledRef.current && result.offer) {
+        if (result.offer && !available()) { attempted = false; return; }
+        if (result.offer) {
           shown.current.add(key);
           try { sessionStorage.setItem(key, 'shown'); } catch { /* The in-memory guard still prevents repeats on this page. */ }
           setError(''); setOffer(result.offer);
         }
       } catch { /* An unavailable offer must never interrupt checkout. */ }
     };
-    const leave = event => { if (event.clientY <= 8 && window.matchMedia('(pointer: fine)').matches) void show(); };
-    const scroll = () => { peak = Math.max(peak, window.scrollY); if (config.exitOfferMobile !== false && window.matchMedia('(pointer: coarse)').matches && peak > 250 && window.scrollY < 80) { interacted = true; void show(); } };
-    document.addEventListener('pointerdown', interact, { passive: true }); document.addEventListener('keydown', interact); document.documentElement.addEventListener('mouseleave', leave); window.addEventListener('scroll', scroll, { passive: true });
-    return () => { controller.abort(); document.removeEventListener('pointerdown', interact); document.removeEventListener('keydown', interact); document.documentElement.removeEventListener('mouseleave', leave); window.removeEventListener('scroll', scroll); };
-  }, [config.exitOfferEnabled, config.exitOfferDelaySeconds, config.exitOfferMobile, code, sessionId, token, enabled]);
+    const showOnExit = () => void show(config.exitOfferDelaySeconds ?? 10);
+    const leave = event => { if (event.clientY <= 8 && window.matchMedia('(pointer: fine)').matches) showOnExit(); };
+    const move = event => {
+      if (window.matchMedia('(pointer: fine)').matches && previousY !== null && previousY > 24 && event.clientY <= 24) showOnExit();
+      previousY = event.clientY;
+    };
+    const scroll = () => { peak = Math.max(peak, window.scrollY); if (config.exitOfferMobile !== false && window.matchMedia('(pointer: coarse)').matches && peak > 250 && window.scrollY < 80) showOnExit(); };
+    // Keep checking so a deadline reached during another dialog or operation is not lost.
+    const timer = config.exitOfferTimedEnabled !== false
+      ? window.setInterval(() => void show(config.exitOfferTimedSeconds ?? 30), 1000)
+      : null;
+    document.addEventListener('pointermove', move, { passive: true }); document.documentElement.addEventListener('mouseleave', leave); window.addEventListener('scroll', scroll, { passive: true });
+    return () => { controller.abort(); window.clearInterval(timer); document.removeEventListener('pointermove', move); document.documentElement.removeEventListener('mouseleave', leave); window.removeEventListener('scroll', scroll); };
+  }, [config.exitOfferEnabled, config.exitOfferDelaySeconds, config.exitOfferTimedEnabled, config.exitOfferTimedSeconds, config.exitOfferMobile, code, sessionId, token, enabled]);
   if (!offer || (!enabled && !busy)) return null;
   const apply = async () => { setBusy(true); setError(''); try { await onApply(offer.code); setOffer(null); } catch (cause) { setError(cause.message || 'Não foi possível aplicar o desconto.'); } finally { setBusy(false); } };
   return <ExitOfferDialog config={config} offer={offer} busy={busy} error={error} onAccept={() => void apply()} onClose={() => setOffer(null)}/>;

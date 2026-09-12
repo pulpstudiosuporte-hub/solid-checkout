@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: "auto-20260912-exit-offer-timer",
+    category: "IMPROVEMENT" as const,
+    title: "Oferta de desconto também por tempo",
+    description: "O popup de desconto agora pode abrir automaticamente após o prazo definido na personalização, no computador e no celular. A aproximação do mouse ao topo também pode acionar a oferta, sem exigir um clique antes, mantendo uma exibição por sessão.",
+    publishedAt: new Date("2026-09-12T12:00:00.000Z"),
+  },
+  {
     publicId: "auto-20260912-marketing-site",
     category: "NEWS" as const,
     title: "Conheça o site da SOLID",
