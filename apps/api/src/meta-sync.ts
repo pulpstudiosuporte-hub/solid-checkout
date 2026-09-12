@@ -9,6 +9,7 @@ const hash = (value: string | undefined) => value ? createHash('sha256').update(
 export async function syncMetaEvent(environment: AppEnvironment, repository: PrismaGatewayRepository, checkoutSessionId: string, eventName: MetaEventName, log: FastifyBaseLogger, persistentRetry = false): Promise<void> {
   if (!environment.APP_ENCRYPTION_KEY) return; const context = await repository.utmifyOrderContext(checkoutSessionId); if (!context?.customerDataEncrypted) return;
   const credentials = await repository.credentials(context.checkout.storeId, 'META'); if (!credentials) { if (persistentRetry) await repository.markIntegrationDeliveryFailure(context.checkout.storeId, checkoutSessionId, 'META', eventName, 'Integração Meta desconectada'); return; }
+  if (!credentials.apiKeyEncrypted) { if (persistentRetry) await repository.discardIntegrationDeliveryBySession(checkoutSessionId, 'META', eventName); return; }
   try {
     const customer = JSON.parse(decryptSecret(context.customerDataEncrypted, environment.APP_ENCRYPTION_KEY)) as Record<string, string>;
     const tracking = typeof context.trackingParameters === 'object' && context.trackingParameters !== null ? context.trackingParameters as Record<string, unknown> : {};

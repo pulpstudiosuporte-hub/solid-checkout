@@ -7,9 +7,9 @@ const csp = [
   "img-src 'self' data: blob: https:", "font-src 'self' https://fonts.gstatic.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   // Vite React Refresh injects a small inline preamble in development.
-  "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://www.googletagmanager.com https://www.googleadservices.com https://www.google.com https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net",
+  "script-src 'self' https://connect.facebook.net 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://www.googletagmanager.com https://www.googleadservices.com https://www.google.com https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net",
   "frame-src https://challenges.cloudflare.com https://www.googletagmanager.com",
-  "connect-src 'self' https://challenges.cloudflare.com https://cloudflareinsights.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://pagead2.googlesyndication.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://ad.doubleclick.net https://www.google.com https://google.com https://www.google.com.br https://stats.g.doubleclick.net http://127.0.0.1:3333 ws://127.0.0.1:5173 ws://localhost:5173"
+  "connect-src 'self' https://connect.facebook.net https://www.facebook.com https://challenges.cloudflare.com https://cloudflareinsights.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://pagead2.googlesyndication.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://ad.doubleclick.net https://www.google.com https://google.com https://www.google.com.br https://stats.g.doubleclick.net http://127.0.0.1:3333 ws://127.0.0.1:5173 ws://localhost:5173"
 ].join('; ');
 
 export default defineConfig({

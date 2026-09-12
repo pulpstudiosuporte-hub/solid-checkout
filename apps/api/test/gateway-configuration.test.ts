@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import type { AppEnvironment } from '@solid/config';
+import { encryptSecret, decryptSecret } from '../src/shopify-crypto.js';
 import { buildApp } from '../src/app.js';
 import type { AuthRepository, LoginUser, SessionUser } from '../src/auth-repository.js';
 import type { PrismaGatewayRepository } from '../src/gateway-repository.js';
@@ -56,7 +57,7 @@ describe('conexão Meta', () => {
   const credentials = { pixelId: '123456789012345', accessToken: 'test-meta-token-with-enough-characters' };
   const metaEnv = { ...env, APP_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64') };
   it.each([
-    [400, { error: { code: 100 } }, 422, 'META_TEST_CODE_REQUIRED'],
+    [400, { error: { code: 100 } }, 422, 'META_VALIDATION_FAILED'],
     [400, { error: { code: 190 } }, 422, 'META_TOKEN_INVALID'],
     [503, { error: { code: 2 } }, 503, 'META_UNAVAILABLE'],
   ])('não salva conexão rejeitada: %s %j', async (status, body, expectedStatus, code) => {
@@ -64,10 +65,44 @@ describe('conexão Meta', () => {
     const app = buildApp(metaEnv, { authRepository: new GatewayAuth(), gatewayRepository: gateway as unknown as PrismaGatewayRepository });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status })));
     try {
-      const response = await app.inject({ method: 'PUT', url: '/integrations/meta', headers: authenticated, payload: credentials });
+      const response = await app.inject({ method: 'PUT', url: '/integrations/meta', headers: authenticated, payload: { ...credentials, testEventCode: 'TEST12345' } });
       expect(response.statusCode).toBe(expectedStatus); expect(response.json<{ error: { code: string } }>().error.code).toBe(code);
       expect(gateway.save).not.toHaveBeenCalled(); expect(response.body).not.toContain(credentials.accessToken);
     } finally { vi.unstubAllGlobals(); await app.close(); }
+  });
+  it.each([false, true])('salva sem chamadas à Meta, servidor=%s', async serverEnabled => {
+    const gateway = { ...repository(), save: vi.fn().mockResolvedValue({ active: true, verifiedAt: null }) };
+    const app = buildApp(metaEnv, { authRepository: new GatewayAuth(), gatewayRepository: gateway as unknown as PrismaGatewayRepository });
+    const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
+    try {
+      const response = await app.inject({ method: 'PUT', url: '/integrations/meta', headers: authenticated, payload: { pixelId: credentials.pixelId, ...(serverEnabled && { accessToken: credentials.accessToken }), serverEnabled } });
+      expect(response.statusCode).toBe(200); expect(response.json()).toMatchObject({ connected: true, serverEnabled, serverVerified: false });
+      expect(fetcher).not.toHaveBeenCalled();
+      expect(gateway.save).toHaveBeenCalledWith('store-a', 'META', serverEnabled ? expect.stringMatching(/^v1\./) : '', expect.stringMatching(/^v1\./), false);
+    } finally { vi.unstubAllGlobals(); await app.close(); }
+  });
+  it.each([false, true])('preserva token somente para o mesmo Pixel: troca=%s', async changed => {
+    const gateway = { ...repository(), credentials: vi.fn().mockResolvedValue({ apiKeyEncrypted: encryptSecret(credentials.accessToken, metaEnv.APP_ENCRYPTION_KEY), publicKeyEncrypted: encryptSecret(credentials.pixelId, metaEnv.APP_ENCRYPTION_KEY) }), save: vi.fn().mockResolvedValue({ active: true }) };
+    const app = buildApp(metaEnv, { authRepository: new GatewayAuth(), gatewayRepository: gateway as unknown as PrismaGatewayRepository });
+    try {
+      const response = await app.inject({ method: 'PUT', url: '/integrations/meta', headers: authenticated, payload: { pixelId: changed ? '99999999999' : credentials.pixelId, serverEnabled: true, accessToken: '' } });
+      expect(response.statusCode).toBe(changed ? 400 : 200);
+      if (changed) expect(gateway.save).not.toHaveBeenCalled();
+      else expect(decryptSecret(gateway.save.mock.calls[0]![2] as string, metaEnv.APP_ENCRYPTION_KEY)).toBe(credentials.accessToken);
+      expect(response.body).not.toContain(credentials.accessToken);
+    } finally { await app.close(); }
+  });
+  it('retorna o ID configurado sem expor o token nem afirmar valida��o externa', async () => {
+    const gateway = { ...repository(), status: vi.fn().mockResolvedValue({ active: true, verifiedAt: null }), credentials: vi.fn().mockResolvedValue({ apiKeyEncrypted: encryptSecret(credentials.accessToken, metaEnv.APP_ENCRYPTION_KEY), publicKeyEncrypted: encryptSecret(credentials.pixelId, metaEnv.APP_ENCRYPTION_KEY) }) };
+    const app = buildApp(metaEnv, { authRepository: new GatewayAuth(), gatewayRepository: gateway as unknown as PrismaGatewayRepository });
+    try {
+      const response = await app.inject({ method: 'GET', url: '/integrations/meta/status', headers: authenticated });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ connected: true, pixelId: credentials.pixelId, serverEnabled: true, serverVerified: false });
+      expect(response.body).not.toContain(credentials.accessToken);
+      expect(response.body).not.toContain('apiKeyEncrypted');
+      expect(response.headers['cache-control']).toBe('private, no-store');
+    } finally { await app.close(); }
   });
   it('salva credenciais criptografadas após confirmar o evento de teste', async () => {
     const gateway = { ...repository(), save: vi.fn().mockResolvedValue({ active: true }) };
@@ -79,7 +114,7 @@ describe('conexão Meta', () => {
       expect(response.statusCode).toBe(200); expect(response.json<{ connected: boolean }>().connected).toBe(true);
       const sent = JSON.parse(fetcher.mock.calls[0]![1]?.body as string) as { test_event_code: string };
       expect(sent.test_event_code).toBe('TEST12345');
-      expect(gateway.save).toHaveBeenCalledWith('store-a', 'META', expect.stringMatching(/^v1\./), expect.stringMatching(/^v1\./));
+      expect(gateway.save).toHaveBeenCalledWith('store-a', 'META', expect.stringMatching(/^v1\./), expect.stringMatching(/^v1\./), true);
       expect(JSON.stringify(gateway.save.mock.calls)).not.toContain('TEST12345');
       expect(JSON.stringify(gateway.save.mock.calls)).not.toContain(credentials.accessToken);
     } finally { vi.unstubAllGlobals(); await app.close(); }

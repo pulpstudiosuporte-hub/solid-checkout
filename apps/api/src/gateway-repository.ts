@@ -35,10 +35,10 @@ export class PrismaGatewayRepository {
     return this.database.gatewayConnection.findUnique({ where: { storeId_provider: { storeId, provider } }, select: { active: true, priority: true, verifiedAt: true, updatedAt: true } });
   }
 
-  async save(storeId: string, provider: IntegrationProvider, apiKeyEncrypted: string, publicKeyEncrypted: string): Promise<GatewayStatus> {
+  async save(storeId: string, provider: IntegrationProvider, apiKeyEncrypted: string, publicKeyEncrypted: string, verified = true): Promise<GatewayStatus> {
     const paymentProvider = provider === 'ROAS' || provider === 'WESTPAY';
     const activePayments = paymentProvider ? await this.database.gatewayConnection.count({ where: { storeId, active: true, verifiedAt: { not: null }, provider: { in: ['ROAS', 'WESTPAY'] } } }) : 1;
-    return this.database.gatewayConnection.upsert({ where: { storeId_provider: { storeId, provider } }, create: { storeId, provider, apiKeyEncrypted, publicKeyEncrypted, active: true, priority: activePayments ? 100 : 0, verifiedAt: new Date() }, update: { apiKeyEncrypted, publicKeyEncrypted, active: true, verifiedAt: new Date(), ...(paymentProvider && !activePayments ? { priority: 0 } : {}) }, select: { active: true, priority: true, verifiedAt: true, updatedAt: true } });
+    return this.database.gatewayConnection.upsert({ where: { storeId_provider: { storeId, provider } }, create: { storeId, provider, apiKeyEncrypted, publicKeyEncrypted, active: true, priority: activePayments ? 100 : 0, verifiedAt: verified ? new Date() : null }, update: { apiKeyEncrypted, publicKeyEncrypted, active: true, verifiedAt: verified ? new Date() : null, ...(paymentProvider && !activePayments ? { priority: 0 } : {}) }, select: { active: true, priority: true, verifiedAt: true, updatedAt: true } });
   }
 
   credentials(storeId: string, provider: IntegrationProvider = 'WESTPAY'): Promise<GatewayCredentials | null> {
@@ -109,6 +109,10 @@ export class PrismaGatewayRepository {
       if (updated.count) claimed.push(candidate);
     }
     return claimed;
+  }
+
+  async discardIntegrationDeliveryBySession(checkoutSessionId: string, provider: DeliveryProvider, event: string): Promise<void> {
+    await this.database.integrationDeliveryJob.updateMany({ where: { checkoutSessionId, provider, event }, data: { status: 'DEAD', claimedAt: null, nextAttemptAt: null, lastError: 'Envio pelo servidor desativado' } });
   }
 
   async discardIntegrationDelivery(publicId: string, error: string): Promise<void> {

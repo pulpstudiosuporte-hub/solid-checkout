@@ -1,3 +1,4 @@
+import { loadMetaPixel, trackMeta } from './meta-pixel';
 import ExitOffer from './ExitOffer';
 import { mergePaymentUpdate, pollPaymentStatus } from './payment-polling';
 import { Component, useCallback, useEffect, useRef, useState } from "react";
@@ -98,12 +99,6 @@ const checkoutVisitorId = () => {
   }
 };
 const cookieValue = (name) => document.cookie.split(';').map(value => value.trim()).find(value => value.startsWith(`${name}=`))?.slice(name.length + 1) || '';
-const loadMetaPixel = (pixelId) => {
-  if (!pixelId || typeof window === 'undefined') return;
-  if (!window.fbq) { const fbq = function(){ fbq.callMethod ? fbq.callMethod.apply(fbq, arguments) : fbq.queue.push(arguments); }; fbq.queue = []; fbq.loaded = true; fbq.version = '2.0'; window.fbq = fbq; const script = document.createElement('script'); script.async = true; script.src = 'https://connect.facebook.net/en_US/fbevents.js'; document.head.appendChild(script); }
-  window.fbq('init', pixelId);
-};
-const trackMeta = (eventName, data = {}, eventId) => { if (!window.fbq) return; const key = eventId ? `solid-meta:${eventId}` : ''; if (key && sessionStorage.getItem(key)) return; window.fbq('track', eventName, data, eventId ? { eventID: eventId } : undefined); if (key) sessionStorage.setItem(key, '1'); };
 const publicConfig = (value) => ({
   primary: "#7357e9",
   buttonBgColor: "#7357e9",
@@ -668,7 +663,24 @@ function SessionContent({ session: initialSession, token }) {
     : primaryItem ? [primaryItem, ...storedItems] : storedItems;
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const metaData = { value: session.totalCents / 100, currency: session.currency || 'BRL', content_type: 'product', content_ids: items.map(item => item.product?.publicId || item.productId).filter(Boolean), contents: items.map(item => ({ id: item.product?.publicId || item.productId || item.titleSnapshot, quantity: item.quantity, item_price: item.unitPriceCents / 100 })), num_items: itemCount };
-  useEffect(() => { const controller = new AbortController(); getPublicMetaConfig(session.publicId, token, controller.signal).then(({ pixelId }) => { if (!pixelId) return; setMetaPixelId(pixelId); loadMetaPixel(pixelId); trackMeta('PageView', {}, `${session.publicId}:PageView`); trackMeta('ViewContent', metaData, `${session.publicId}:ViewContent`); trackMeta('InitiateCheckout', metaData, `${session.publicId}:InitiateCheckout`); }).catch(() => {}); return () => controller.abort(); }, [session.publicId, token]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const controller = new AbortController(); let retry;
+    setMetaPixelId('');
+    const start = async (attempt = 0) => {
+      try {
+        const { pixelId } = await getPublicMetaConfig(session.publicId, token, controller.signal);
+        if (!pixelId || controller.signal.aborted) return;
+        await loadMetaPixel(pixelId);
+        if (controller.signal.aborted) return;
+        setMetaPixelId(pixelId);
+        trackMeta(pixelId, 'PageView');
+        trackMeta(pixelId, 'ViewContent', metaData);
+        trackMeta(pixelId, 'InitiateCheckout', metaData, `${session.publicId}:InitiateCheckout`);
+      } catch { if (!controller.signal.aborted && attempt < 1) retry = setTimeout(() => { void start(attempt + 1); }, 1500); }
+    };
+    void start();
+    return () => { controller.abort(); clearTimeout(retry); };
+  }, [session.publicId, token]); // eslint-disable-line react-hooks/exhaustive-deps
   const config = publicConfig(session.checkout?.publishedConfig);
   const availableOrderBumps = config.showBump
     ? (session.orderBumps || (session.orderBump ? [session.orderBump] : []))
@@ -813,7 +825,8 @@ function SessionContent({ session: initialSession, token }) {
     getPaidDigitalDelivery(session.publicId, token, controller.signal).then(result => setDelivery(result.delivery)).catch(() => {});
     return () => controller.abort();
   }, [fulfillmentType, paymentStatus, session.publicId, token]);
-  useEffect(() => { if (metaPixelId && String(payment?.status).toUpperCase() === 'PAID') trackMeta('Purchase', { ...metaData, value: payment.amountCents / 100, order_id: session.publicId }, `${session.publicId}:Purchase`); }, [metaPixelId, payment?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (metaPixelId && payment?.publicId && ['PENDING', 'PAID'].includes(String(payment.status).toUpperCase())) trackMeta(metaPixelId, 'AddPaymentInfo', { ...metaData, value: payment.amountCents / 100 }, `${session.publicId}:AddPaymentInfo`); }, [metaPixelId, payment?.publicId, payment?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (metaPixelId && String(payment?.status).toUpperCase() === 'PAID') trackMeta(metaPixelId, 'Purchase', { ...metaData, value: payment.amountCents / 100, order_id: session.publicId }, `${session.publicId}:Purchase`); }, [metaPixelId, payment?.status]); // eslint-disable-line react-hooks/exhaustive-deps
   const chooseShipping = async (method) => {
     setBusy(true); setError("");
     try { const result = await selectPublicShippingMethod(session.publicId, token, method.publicId); setSelectedShipping(result); setStep(4); }
@@ -826,7 +839,7 @@ function SessionContent({ session: initialSession, token }) {
       return;
     }
     setBusy(true); setError("");
-    try { await savePublicCheckoutCustomer(session.publicId, token, form); const result = await createWestPayPix(session.publicId, token); setPayment(result.payment); if (metaPixelId) trackMeta('AddPaymentInfo', { ...metaData, value: result.payment.amountCents / 100 }, `${session.publicId}:AddPaymentInfo`); }
+    try { await savePublicCheckoutCustomer(session.publicId, token, form); const result = await createWestPayPix(session.publicId, token); setPayment(result.payment); if (metaPixelId) trackMeta(metaPixelId, 'AddPaymentInfo', { ...metaData, value: result.payment.amountCents / 100 }, `${session.publicId}:AddPaymentInfo`); }
     catch (requestError) { setError(requestError.message); }
     finally { setBusy(false); }
   };

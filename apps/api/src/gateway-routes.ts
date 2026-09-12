@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
 import type { AuthRepository, SessionUser } from './auth-repository.js';
 import type { PrismaGatewayRepository } from './gateway-repository.js';
-import { encryptSecret } from './shopify-crypto.js';
+import { decryptSecret, encryptSecret } from './shopify-crypto.js';
 import { testWestPay } from './westpay-client.js';
 import { testRoas } from './roas-client.js';
 import { testUtmifyToken } from './utmify-client.js';
@@ -45,7 +45,10 @@ export function registerGatewayRoutes(app: FastifyInstance, environment: AppEnvi
   app.get('/integrations/meta/status', async (request, reply) => {
     const current = await session(request); if (!current) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     const context = await repository.context(current.userId, current.sessionId); if (!context) return reply.code(409).send(errorBody(request, 'STORE_REQUIRED', 'Selecione uma loja.'));
-    const status = await repository.status(context.storeId, 'META'); return reply.send({ connected: Boolean(status?.active && status.verifiedAt), ...status });
+    const status = await repository.status(context.storeId, 'META');
+    const credentials = await repository.credentials(context.storeId, 'META');
+    const pixelId = credentials && environment.APP_ENCRYPTION_KEY ? decryptSecret(credentials.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) : '';
+    return reply.header('cache-control', 'private, no-store').send({ ...status, connected: Boolean(status?.active && pixelId), pixelId, serverEnabled: Boolean(credentials?.apiKeyEncrypted), serverVerified: Boolean(credentials?.apiKeyEncrypted && status?.verifiedAt) });
   });
 
   app.get('/integrations/diagnostics', async (request, reply) => {
@@ -53,7 +56,7 @@ export function registerGatewayRoutes(app: FastifyInstance, environment: AppEnvi
     const context = await repository.context(current.userId, current.sessionId); if (!context) return reply.code(409).send(errorBody(request, 'STORE_REQUIRED', 'Selecione uma loja.'));
     const data = await repository.diagnostics(context.storeId); const byProvider = new Map(data.connections.map(item => [item.provider, item]));
     const latestEvent = (provider: string) => data.events.find(item => item.targetId === provider || typeof item.metadata === 'object' && item.metadata !== null && (item.metadata as Record<string, unknown>).provider === provider);
-    const tracker = (provider: 'UTMIFY' | 'META', name: string) => { const connection = byProvider.get(provider); const event = latestEvent(provider); return { provider, name, connected: Boolean(connection?.active && connection.verifiedAt), status: connection?.active && connection.verifiedAt ? event?.action === 'integration.event_failed' ? 'warning' : 'healthy' : 'disconnected', verifiedAt: connection?.verifiedAt ?? null, updatedAt: connection?.updatedAt ?? null, lastEvent: event ? { success: event.action !== 'integration.event_failed', event: typeof event.metadata === 'object' && event.metadata !== null ? (event.metadata as Record<string, unknown>).event ?? null : null, at: event.createdAt } : null }; };
+    const tracker = (provider: 'UTMIFY' | 'META', name: string) => { const connection = byProvider.get(provider); const event = latestEvent(provider); return { provider, name, connected: Boolean(connection?.active && (provider === 'META' || connection.verifiedAt)), status: connection?.active && (provider === 'META' || connection.verifiedAt) ? event?.action === 'integration.event_failed' ? 'warning' : 'healthy' : 'disconnected', verifiedAt: connection?.verifiedAt ?? null, updatedAt: connection?.updatedAt ?? null, lastEvent: event ? { success: event.action !== 'integration.event_failed', event: typeof event.metadata === 'object' && event.metadata !== null ? (event.metadata as Record<string, unknown>).event ?? null : null, at: event.createdAt } : null }; };
     const gateway = (provider: 'ROAS' | 'WESTPAY', name: string) => { const connection = byProvider.get(provider); const event = latestEvent(provider); return { provider, name, connected: Boolean(connection?.active && connection.verifiedAt), status: connection?.active && connection.verifiedAt ? 'healthy' : 'disconnected', verifiedAt: connection?.verifiedAt ?? null, updatedAt: connection?.updatedAt ?? null, lastEvent: event ? { success: true, event: 'webhook', at: event.createdAt } : data.latestPayment?.provider === provider ? { success: ['PAID', 'PENDING'].includes(data.latestPayment.status), event: data.latestPayment.status, at: data.latestPayment.updatedAt } : null }; };
     const shopify = data.shopify; const shopifyConnected = Boolean(shopify && !shopify.revokedAt && !shopify.reconnectRequiredAt);
     return reply.send({ checkedAt: new Date(), integrations: [{ provider: 'SHOPIFY', name: 'Shopify', connected: shopifyConnected, status: shopify?.reconnectRequiredAt ? 'warning' : shopifyConnected ? 'healthy' : 'disconnected', verifiedAt: shopify?.updatedAt ?? null, updatedAt: shopify?.updatedAt ?? null, detail: shopify?.reconnectReason ?? shopify?.shopDomain ?? null, lastEvent: shopify?.lastSyncedAt ? { success: true, event: 'catalog_sync', at: shopify.lastSyncedAt } : null }, gateway('ROAS', 'Roas'), gateway('WESTPAY', 'WestPay'), tracker('UTMIFY', 'UTMify'), tracker('META', 'Meta Pixel')] });
@@ -122,20 +125,32 @@ export function registerGatewayRoutes(app: FastifyInstance, environment: AppEnvi
     const context = await repository.context(current.userId, current.sessionId); if (!context || context.role === 'ANALYST') return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
     await repository.disconnect(context.storeId, 'UTMIFY'); return reply.code(204).send();
   });
-  app.put<{ Body: { pixelId?: unknown; accessToken?: unknown; testEventCode?: unknown } }>('/integrations/meta', { config: { rateLimit: { max: 5, timeWindow: '5 minutes' } } }, async (request, reply) => {
+  app.put<{ Body: { pixelId?: unknown; accessToken?: unknown; testEventCode?: unknown; serverEnabled?: unknown } }>('/integrations/meta', { config: { rateLimit: { max: 5, timeWindow: '5 minutes' } } }, async (request, reply) => {
     const current = await session(request); if (!current || !csrfValid(request, current)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
     const context = await repository.context(current.userId, current.sessionId); if (!context || context.role === 'ANALYST') return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Somente proprietários e administradores podem conectar rastreadores.'));
     if (!environment.APP_ENCRYPTION_KEY) return reply.code(503).send(errorBody(request, 'SERVICE_UNAVAILABLE', 'Criptografia indisponível.'));
     const pixelId = typeof request.body?.pixelId === 'string' ? request.body.pixelId.trim() : ''; const accessToken = typeof request.body?.accessToken === 'string' ? request.body.accessToken.trim() : '';
-    if (!/^\d{5,32}$/.test(pixelId) || accessToken.length < 20 || accessToken.length > 2048 || /\s/.test(accessToken)) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Confira o ID do Pixel e o token da API de Conversões.'));
-    const testEventCode = typeof request.body?.testEventCode === 'string' ? request.body.testEventCode.trim() : '';
-    if (testEventCode && !/^TEST[A-Za-z0-9_-]{1,60}$/.test(testEventCode)) return reply.code(400).send(errorBody(request, 'META_TEST_CODE_INVALID', 'Copie o código TEST da aba Eventos de teste na Meta.'));
-    try { await validateMetaCredentials(pixelId, accessToken, testEventCode || undefined); } catch (error) {
-      const failure = error instanceof MetaApiError ? error : new MetaApiError('META_UNAVAILABLE', 'Não foi possível consultar a Meta agora. Tente novamente em instantes.', 503);
-      request.log.warn({ code: failure.code, metaCode: failure.metaCode }, 'meta_validation_failed');
-      return reply.code(failure.status).send(errorBody(request, failure.code, failure.message));
+    if (!/^\d{5,32}$/.test(pixelId) || (accessToken && (accessToken.length < 20 || accessToken.length > 2048 || /\s/.test(accessToken)))) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Confira o ID do Pixel e, se preenchido, o token da API de Conversões.'));
+    const serverEnabled = request.body.serverEnabled === true || (request.body.serverEnabled !== false && Boolean(accessToken));
+    let token = serverEnabled ? accessToken : '';
+    if (serverEnabled && !token) {
+      const previous = await repository.credentials(context.storeId, 'META');
+      if (previous?.apiKeyEncrypted && decryptSecret(previous.publicKeyEncrypted, environment.APP_ENCRYPTION_KEY) === pixelId) token = decryptSecret(previous.apiKeyEncrypted, environment.APP_ENCRYPTION_KEY);
+      if (!token) return reply.code(400).send(errorBody(request, 'META_TOKEN_REQUIRED', 'Informe o token para enviar eventos pelo servidor ou desative essa opção para usar somente o Pixel.'));
     }
-    const value = await repository.save(context.storeId, 'META', encryptSecret(accessToken, environment.APP_ENCRYPTION_KEY), encryptSecret(pixelId, environment.APP_ENCRYPTION_KEY)); return reply.send({ connected: true, ...value });
+    // Saving a browser pixel never depends on a Graph metadata read. CAPI is
+    // configured independently; only an explicitly requested test verifies it.
+    const testEventCode = typeof request.body.testEventCode === 'string' ? request.body.testEventCode.trim() : '';
+    if (testEventCode && (!token || !/^TEST[A-Za-z0-9_-]{1,60}$/.test(testEventCode))) return reply.code(400).send(errorBody(request, 'META_TEST_CODE_INVALID', 'Informe o token e um código TEST válido para testar a API de Conversões.'));
+    if (testEventCode) {
+      try { await validateMetaCredentials(pixelId, token, testEventCode); } catch (error) {
+        const failure = error instanceof MetaApiError ? error : new MetaApiError('META_UNAVAILABLE', 'Não foi possível consultar a Meta agora. Tente novamente em instantes.', 503);
+        request.log.warn({ code: failure.code, metaCode: failure.metaCode }, 'meta_validation_failed');
+        return reply.code(failure.status).send(errorBody(request, failure.code, failure.message));
+      }
+    }
+    const value = await repository.save(context.storeId, 'META', token ? encryptSecret(token, environment.APP_ENCRYPTION_KEY) : '', encryptSecret(pixelId, environment.APP_ENCRYPTION_KEY), Boolean(testEventCode));
+    return reply.send({ ...value, connected: true, pixelId, serverEnabled: Boolean(token), serverVerified: Boolean(testEventCode) });
   });
   app.delete('/integrations/meta', async (request, reply) => {
     const current = await session(request); if (!current || !csrfValid(request, current)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));

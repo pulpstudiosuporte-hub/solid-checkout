@@ -7,7 +7,7 @@ export type DeliveryProvider = 'UTMIFY' | 'META' | 'SHOPIFY' | 'SOLID';
 export async function enqueuePaymentDeliveries(transaction: Prisma.TransactionClient, checkoutSessionId: string, phase: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED'): Promise<void> {
   const session = await transaction.checkoutSession.findUniqueOrThrow({
     where: { id: checkoutSessionId },
-    select: { source: true, checkout: { select: { storeId: true, store: { select: { gatewayConnections: { where: { active: true, provider: { in: ['UTMIFY', 'META'] } }, select: { provider: true } } } } } } }
+    select: { source: true, checkout: { select: { storeId: true, store: { select: { gatewayConnections: { where: { active: true, OR: [{ provider: 'UTMIFY' }, { provider: 'META', apiKeyEncrypted: { not: '' } }] }, select: { provider: true } } } } } } }
   });
   const active = new Set(session.checkout.store.gatewayConnections.map(connection => connection.provider));
   const events: { provider: DeliveryProvider; event: string }[] = [];

@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260912-meta-browser-pixel',
+    category: 'FIX' as const,
+    title: 'Pixel da Meta com configuração simplificada',
+    description: 'Ative o Pixel em todos os checkouts da loja usando apenas o ID. O token é opcional, sem teste obrigatório. Corrigimos o bloqueio do script e melhoramos o carregamento dos eventos de navegação e pagamento.',
+    publishedAt: new Date('2026-09-12T21:00:00.000Z'),
+  },
+  {
     publicId: 'auto-20260912-meta-connection-validation',
     category: 'FIX' as const,
     title: 'Validação da conexão com a Meta mais clara',
