@@ -77,6 +77,7 @@ test('timer can be disabled and approaching the top works without a click', asyn
   await page.mouse.move(300, 300);
   await page.mouse.move(300, 12);
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.mouse.move(300, 300);
   await page.clock.fastForward(60000);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.mouse.move(300, 300);
@@ -103,6 +104,33 @@ test('approaching Back opens inside the page after the minimum delay, once per s
   await page.mouse.move(350, 250);
   await page.mouse.move(140, 70);
   await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('exit intent waits for its minimum delay while the cursor stays near Back', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-09-12T12:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-09-12T12:00:01Z'));
+  await page.goto(`${path}?buyer`);
+  await expect(page.getByRole('textbox', { name: 'Nome completo' })).toBeVisible();
+  await page.mouse.move(350, 250);
+  await page.mouse.move(140, 70);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.clock.fastForward(6000);
+  await expect(page.getByRole('dialog')).toBeVisible();
+});
+
+test('mouse already inside Back area triggers without crossing its boundary or bubbling', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-09-12T12:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-09-12T12:00:01Z'));
+  await page.goto(`${path}?buyer`);
+  await expect(page.getByRole('textbox', { name: 'Nome completo' })).toBeVisible();
+  await page.clock.fastForward(6000);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  // The first movement can already be near Back; child handlers must not swallow it.
+  await page.evaluate(() => {
+    document.body.addEventListener('pointermove', event => event.stopPropagation());
+    document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse', clientX: 100, clientY: 50 }));
+  });
+  await expect(page.getByRole('dialog')).toBeVisible();
 });
 
 test('timer waits for another dialog to close', async ({ page }) => {

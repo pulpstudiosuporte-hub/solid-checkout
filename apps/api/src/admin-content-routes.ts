@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: "auto-20260912-exit-offer-pointer-detection",
+    category: "FIX" as const,
+    title: "Detecção de saída mais consistente",
+    description: "A oferta agora reconhece o mouse mesmo quando ele já está perto do Voltar. Ao chegar antes do tempo mínimo, o popup aguarda esse prazo enquanto o cursor permanecer nessa região, mantendo o limite de uma exibição por sessão.",
+    publishedAt: new Date("2026-09-12T18:00:00.000Z"),
+  },
+  {
     publicId: "auto-20260912-exit-offer-back-approach",
     category: "IMPROVEMENT" as const,
     title: "Oferta antecipada ao aproximar do Voltar",

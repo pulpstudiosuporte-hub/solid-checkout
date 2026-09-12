@@ -47,7 +47,7 @@ export default function ExitOffer({ config, sessionId, token, enabled, onApply }
     const controller = new AbortController();
     if (!startedAt.current.has(key)) startedAt.current.set(key, Date.now());
     const started = startedAt.current.get(key);
-    let attempted = false, peak = window.scrollY, previousPointer = null;
+    let attempted = false, peak = window.scrollY, previousPointer = null, pointerNearExit = false;
     const available = () => !controller.signal.aborted && enabledRef.current && document.visibilityState === 'visible' && !document.querySelector('dialog[open]');
     const show = async (delaySeconds) => {
       if (attempted || shown.current.has(key) || Date.now() - started < delaySeconds * 1000 || !available()) return;
@@ -63,26 +63,31 @@ export default function ExitOffer({ config, sessionId, token, enabled, onApply }
       } catch { /* An unavailable offer must never interrupt checkout. */ }
     };
     const showOnExit = () => void show(config.exitOfferDelaySeconds ?? 10);
-    const leave = event => { if (event.clientY <= 8 && window.matchMedia('(pointer: fine)').matches) showOnExit(); };
+    const hasMouse = event => event.pointerType === 'mouse' || (!event.pointerType && window.matchMedia('(any-pointer: fine)').matches);
+    const leave = event => {
+      if (!hasMouse(event)) return;
+      pointerNearExit = event.clientY <= 8;
+      if (pointerNearExit) showOnExit();
+    };
+    const out = event => { if (event.relatedTarget === null) leave(event); };
     // Anticipate the browser's Back control while the pointer is still in the page.
     const nearBack = point => point.x <= Math.min(200, window.innerWidth * 0.35) && point.y <= 100;
     const move = event => {
       const point = { x: event.clientX, y: event.clientY };
-      if (window.matchMedia('(pointer: fine)').matches && previousPointer) {
-        const approachingBack = nearBack(point) && !nearBack(previousPointer)
-          && (point.y < previousPointer.y || point.x < previousPointer.x);
-        const approachingTop = previousPointer.y > 24 && point.y <= 24;
-        if (approachingBack || approachingTop) showOnExit();
-      }
+      if (!hasMouse(event)) return;
+      pointerNearExit = nearBack(point) || point.y <= 24;
+      const approaching = !previousPointer || point.y < previousPointer.y || point.x < previousPointer.x;
+      if (pointerNearExit && approaching) showOnExit();
       previousPointer = point;
     };
     const scroll = () => { peak = Math.max(peak, window.scrollY); if (config.exitOfferMobile !== false && window.matchMedia('(pointer: coarse)').matches && peak > 250 && window.scrollY < 80) showOnExit(); };
     // Keep checking so a deadline reached during another dialog or operation is not lost.
-    const timer = config.exitOfferTimedEnabled !== false
-      ? window.setInterval(() => void show(config.exitOfferTimedSeconds ?? 30), 1000)
-      : null;
-    document.addEventListener('pointermove', move, { passive: true }); document.documentElement.addEventListener('mouseleave', leave); window.addEventListener('scroll', scroll, { passive: true });
-    return () => { controller.abort(); window.clearInterval(timer); document.removeEventListener('pointermove', move); document.documentElement.removeEventListener('mouseleave', leave); window.removeEventListener('scroll', scroll); };
+    const timer = window.setInterval(() => {
+      if (pointerNearExit) showOnExit();
+      if (config.exitOfferTimedEnabled !== false) void show(config.exitOfferTimedSeconds ?? 30);
+    }, 1000);
+    document.addEventListener('pointermove', move, { passive: true, capture: true }); document.addEventListener('pointerout', out, { passive: true, capture: true }); document.documentElement.addEventListener('mouseleave', leave); window.addEventListener('scroll', scroll, { passive: true });
+    return () => { controller.abort(); window.clearInterval(timer); document.removeEventListener('pointermove', move, true); document.removeEventListener('pointerout', out, true); document.documentElement.removeEventListener('mouseleave', leave); window.removeEventListener('scroll', scroll); };
   }, [config.exitOfferEnabled, config.exitOfferDelaySeconds, config.exitOfferTimedEnabled, config.exitOfferTimedSeconds, config.exitOfferMobile, code, sessionId, token, enabled]);
   if (!offer || (!enabled && !busy)) return null;
   const apply = async () => { setBusy(true); setError(''); try { await onApply(offer.code); setOffer(null); } catch (cause) { setError(cause.message || 'Não foi possível aplicar o desconto.'); } finally { setBusy(false); } };
