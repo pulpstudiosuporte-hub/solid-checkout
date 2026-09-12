@@ -2,6 +2,40 @@ import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 const output = name => fileURLToPath(new URL(`../../../.visual-check/${name}`, import.meta.url));
 const path = '/ui-tests/exit-offer-review.html';
+
+test('missing coupon explains the error before saving or publishing and preserves edits', async ({ page }) => {
+  await page.goto(path);
+  await page.getByRole('button', { name: /Oferta de saída Cupom/ }).click();
+  await page.getByLabel('Título', { exact: true }).fill('Meu desconto especial');
+  await page.getByRole('combobox', { name: 'Cupom da oferta', exact: true }).selectOption('');
+  await page.getByRole('button', { name: 'Salvar rascunho', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Selecione um cupom em Oferta de saída');
+  await expect(page.getByRole('combobox', { name: 'Cupom da oferta', exact: true })).toHaveAttribute('aria-invalid', 'true');
+  await page.screenshot({ path: output('coupon-validation-desktop.png'), animations: 'disabled' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: output('coupon-validation-mobile.png'), animations: 'disabled' });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(page.getByText('Rascunho salvo no teste', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Publicar', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Selecione um cupom');
+  await expect(page.getByText('Publicado no teste', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Meu desconto especial');
+  await page.getByRole('combobox', { name: 'Cupom da oferta', exact: true }).selectOption('FICA10');
+  await expect(page.getByRole('combobox', { name: 'Cupom da oferta', exact: true })).toHaveAttribute('aria-invalid', 'false');
+  await page.getByRole('button', { name: 'Salvar rascunho', exact: true }).click();
+  await expect(page.getByText('Rascunho salvo no teste', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Publicar', exact: true }).click();
+  await expect(page.getByText('Publicado no teste', { exact: true })).toBeVisible();
+});
+
+test('disabled exit offer can be saved without a coupon', async ({ page }) => {
+  await page.goto(path);
+  await page.getByRole('button', { name: /Oferta de saída Cupom/ }).click();
+  await page.getByRole('combobox', { name: 'Cupom da oferta', exact: true }).selectOption('');
+  await page.getByLabel('Ativar oferta de saída', { exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Salvar rascunho', exact: true }).click();
+  await expect(page.getByText('Rascunho salvo no teste', { exact: true })).toBeVisible();
+});
 test('merchant customizes, previews and saves exit offer', async ({ page }) => {
   await page.goto(path);
   await page.getByRole('button', { name: /Oferta de saída Cupom/ }).click();

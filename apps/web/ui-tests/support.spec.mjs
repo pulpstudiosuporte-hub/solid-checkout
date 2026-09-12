@@ -2,6 +2,45 @@ import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 const output = name => fileURLToPath(new URL(`../../../.visual-check/${name}`, import.meta.url));
 const url = '/ui-tests/support-review.html#/admin/users';
+test('support explains missing fields instead of silently disabling entry', async ({ page }) => {
+  await page.goto(url);
+  await page.getByRole('button', { name: 'Acessar suporte' }).click();
+  const enter = page.getByRole('button', { name: 'Entrar na dashboard' });
+  await expect(enter).toBeEnabled();
+  await page.getByRole('textbox', { name: 'Motivo do acesso', exact: true }).fill('Consulta');
+  await enter.click();
+  await expect(page.getByRole('alert')).toContainText('10 a 240 caracteres');
+  await expect(page.getByRole('textbox', { name: 'Motivo do acesso', exact: true })).toBeFocused();
+  await page.getByRole('textbox', { name: 'Motivo do acesso', exact: true }).fill('Revisar configuração da loja');
+  await enter.click();
+  await expect(page.getByRole('alert')).toContainText('sua senha de administrador');
+  await expect(page.getByLabel('Sua senha de administrador', { exact: true })).toBeFocused();
+  await page.screenshot({ path: output('support-validation-desktop.png') });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: output('support-validation-mobile.png') });
+  await page.getByLabel('Sua senha de administrador', { exact: true }).fill('fixture-password');
+  await page.getByLabel('Código do autenticador, se ativado', { exact: true }).fill('123');
+  await enter.click();
+  await expect(page.getByRole('alert')).toContainText('6 números');
+  await page.getByLabel('Código do autenticador, se ativado', { exact: true }).fill('');
+  await enter.click();
+  await expect(page.getByLabel('Acesso de suporte ativo')).toContainText('Marina Oliveira');
+});
+
+test('API rejection is visible and permits retrying support access', async ({ page }) => {
+  await page.goto('/ui-tests/support-review.html?rejectSupport=1#/admin/users');
+  await page.getByRole('button', { name: 'Acessar suporte' }).click();
+  await page.getByRole('textbox', { name: 'Motivo do acesso', exact: true }).fill('Chamado 123 — revisar configuração da loja');
+  await page.getByLabel('Sua senha de administrador', { exact: true }).fill('incorrect-password');
+  await page.getByRole('button', { name: 'Entrar na dashboard' }).click();
+  await expect(page.getByRole('alert')).toContainText('Confirme sua senha de administrador');
+  await expect(page.getByRole('alert')).toBeFocused();
+  await expect(page.getByLabel('Sua senha de administrador', { exact: true })).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: 'Motivo do acesso', exact: true })).toHaveValue('Chamado 123 — revisar configuração da loja');
+  await page.getByLabel('Sua senha de administrador', { exact: true }).fill('fixture-password');
+  await page.getByRole('button', { name: 'Entrar na dashboard' }).click();
+  await expect(page.getByLabel('Acesso de suporte ativo')).toContainText('Marina Oliveira');
+});
 for (const mode of ['Consulta', 'Manutenção']) test(`${mode}: enter customer context, enforce controls and return to admin`, async ({ page }) => {
   await page.goto(url);
   await page.getByRole('button', { name: 'Acessar suporte' }).click();

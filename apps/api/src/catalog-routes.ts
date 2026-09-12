@@ -310,7 +310,14 @@ export function registerCatalogRoutes(app: FastifyInstance, environment: AppEnvi
   app.patch<{ Params: { checkoutId: string }; Body: Record<string, unknown> }>('/checkouts/:checkoutId/draft', async (request, reply) => {
     const context = await authenticate(request, true);
     if (!context || !canWrite(context)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
-    const checkoutId = text(request.params.checkoutId, 32); const config = checkoutConfig(request.body?.config);
+    const input = request.body?.config;
+    if (input && typeof input === 'object' && !Array.isArray(input)) {
+      const offer = input as Record<string, unknown>;
+      if (offer.exitOfferEnabled === true && (offer.exitOfferCouponCode == null || typeof offer.exitOfferCouponCode === 'string' && !offer.exitOfferCouponCode.trim())) {
+        return reply.code(400).send(errorBody(request, 'EXIT_OFFER_COUPON_REQUIRED', 'Selecione um cupom em Oferta de saída antes de salvar ou publicar. Crie o desconto em Marketing → Cupons, se necessário.'));
+      }
+    }
+    const checkoutId = text(request.params.checkoutId, 32); const config = checkoutConfig(input);
     if (!checkoutId || !config) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Personalização do checkout inválida.'));
     const checkout = await catalog.updateCheckoutDraft(context, checkoutId, config, request.id);
     if (!checkout) return reply.code(404).send(errorBody(request, 'CHECKOUT_NOT_FOUND', 'Checkout não encontrado.'));

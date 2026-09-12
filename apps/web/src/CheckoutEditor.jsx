@@ -1974,16 +1974,26 @@ export default function CheckoutEditor({
     const free = old.elementEditMode === "free" && item && (item.widthPercent || 100) === 100 && placement.horizontalAlign && placement.horizontalAlign !== "center";
     return { ...old, customElements: reorderCustomElements(old.customElements || [], id, slot, index, free ? { ...placement, widthPercent: 50 } : placement) };
   }), [replaceConfig]);
+  const validateOffer = useCallback(() => {
+    if (c.exitOfferEnabled && !c.exitOfferCouponCode?.trim()) {
+      setGroup("Oferta de saída");
+      msg("Selecione um cupom em Oferta de saída antes de salvar ou publicar. Crie o desconto em Marketing → Cupons, se necessário.", true);
+      return false;
+    }
+    return true;
+  }, [c.exitOfferEnabled, c.exitOfferCouponCode, msg]);
   const save = useCallback(async () => {
     if (operation.current || !onSaveDraft) return false;
+    if (!validateOffer()) return false;
     operation.current = true; setBusy(true);
     const snapshot = c;
     try { await onSaveDraft(snapshot); setSaved(snapshot); dispatch({ type: "checkpoint" }); msg("Rascunho salvo. Seu checkout publicado continua como estava."); return true; }
     catch (error) { msg(error.message || "Não foi possível salvar. Suas alterações continuam no editor.", true); return false; }
     finally { operation.current = false; setBusy(false); }
-  }, [c, onSaveDraft, msg]);
+  }, [c, onSaveDraft, msg, validateOffer]);
   const publish = async () => {
     if (operation.current || !onPublish || !onSaveDraft) return;
+    if (!validateOffer()) return;
     operation.current = true; setBusy(true);
     const snapshot = c;
     try {

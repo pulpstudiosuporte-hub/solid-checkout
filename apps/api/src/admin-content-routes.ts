@@ -66,6 +66,20 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: "auto-20260912-support-entry-validation",
+    category: "FIX" as const,
+    title: "Orientações no acesso de suporte",
+    description: "A entrada de suporte agora informa o que falta preencher no motivo, na senha e no código do autenticador. Mensagens de falha ficam visíveis e permitem corrigir os dados antes de tentar novamente.",
+    publishedAt: new Date("2026-09-12T14:30:00.000Z"),
+  },
+  {
+    publicId: "auto-20260912-exit-offer-coupon-validation",
+    category: "FIX" as const,
+    title: "Orientação ao ativar a oferta de saída",
+    description: "Ao ativar a oferta sem selecionar um cupom, o editor agora indica o campo pendente antes de salvar ou publicar. Suas alterações ficam preservadas enquanto você escolhe o desconto.",
+    publishedAt: new Date("2026-09-12T14:00:00.000Z"),
+  },
+  {
     publicId: "auto-20260912-exit-offer-timer",
     category: "IMPROVEMENT" as const,
     title: "Oferta de desconto também por tempo",

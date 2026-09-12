@@ -22,7 +22,8 @@ window.fetch = async (input, init = {}) => {
 };
 function Review() {
   const [saved, setSaved] = useState(false);
+  const [published, setPublished] = useState(false);
   if (query.has('buyer')) return <PublicSessionCheckout sessionId={session.publicId} token="local-fixture-token"/>;
-  return <><CheckoutEditor checkout={{ publicId: 'checkout-demo', name: 'Checkout de demonstração', draftConfig: config }} products={[]} onBack={() => {}} onSaveDraft={async (savedConfig) => { setSaved(savedConfig); }} onPublish={async () => {}}/>{saved && <output style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 99999 }}>Rascunho salvo no teste{saved.exitOfferTimedEnabled && `: oferta após ${saved.exitOfferTimedSeconds}s`}</output>}</>;
+  return <><CheckoutEditor checkout={{ publicId: 'checkout-demo', name: 'Checkout de demonstração', draftConfig: config }} products={[]} onBack={() => {}} onSaveDraft={async (savedConfig) => { setSaved(savedConfig); }} onPublish={async () => { setPublished(true); }}/>{saved && <output style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 99999 }}>Rascunho salvo no teste{saved.exitOfferTimedEnabled && `: oferta após ${saved.exitOfferTimedSeconds}s`}</output>}{published && <output>Publicado no teste</output>}</>;
 }
 createRoot(document.getElementById('root')).render(<Review/>);

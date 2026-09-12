@@ -142,7 +142,13 @@ describe('catálogo isolado por loja', () => {
     expect((await app.inject({ method: 'PATCH', url: '/checkouts/checkout-a/draft', headers: authenticatedHeaders, payload: { config: offer } })).statusCode).toBe(200);
     expect(catalog.checkouts[0]?.draftConfig).toMatchObject({ exitOfferEnabled: true, exitOfferCouponCode: 'FICA10', exitOfferDelaySeconds: 8, exitOfferTimedEnabled: false, exitOfferTimedSeconds: 45, exitOfferTitle: 'Espere!', exitOfferAccent: '#ab1234' });
     for (const invalid of [{ exitOfferCouponCode: '' }, { exitOfferDelaySeconds: 0 }, { exitOfferTimedEnabled: 'yes' }, { exitOfferTimedSeconds: 0 }, { exitOfferTimedSeconds: 301 }, { exitOfferTimedSeconds: 5.5 }, { exitOfferAccent: 'url(javascript:1)' }, { exitOfferMobile: 'yes' }]) {
-      expect((await app.inject({ method: 'PATCH', url: '/checkouts/checkout-a/draft', headers: authenticatedHeaders, payload: { config: { ...offer, ...invalid } } })).statusCode).toBe(400);
+      const rejected = await app.inject({ method: 'PATCH', url: '/checkouts/checkout-a/draft', headers: authenticatedHeaders, payload: { config: { ...offer, ...invalid } } });
+      expect(rejected.statusCode).toBe(400);
+      if ('exitOfferCouponCode' in invalid) {
+        expect(rejected.json<{ error: { code: string; message: string } }>().error).toMatchObject({ code: 'EXIT_OFFER_COUPON_REQUIRED' });
+        expect(rejected.json<{ error: { code: string; message: string } }>().error.message).toContain('Selecione um cupom');
+      }
+      expect(catalog.checkouts[0]?.draftConfig).toMatchObject({ exitOfferCouponCode: 'FICA10' });
     }
     await app.close();
   });

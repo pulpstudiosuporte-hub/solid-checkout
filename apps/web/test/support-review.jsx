@@ -6,6 +6,7 @@ const roleSeed = [{ publicId: 'technical', name: 'Equipe técnica', description:
 let roles = roleSeed;
 let members = [principal];
 let products = [];
+let supportAttempts = 0;
 const supportKey = 'support-review-grant';
 window.fetch = async (input, init = {}) => {
   const path = new URL(String(input), location.origin).pathname;
@@ -19,6 +20,7 @@ window.fetch = async (input, init = {}) => {
   if (path === '/auth/session') return json({ user: support ? customer : operator, support, csrfToken: 'local-csrf' });
   if (path === '/stores') return json({ items: [{ publicId: support ? 'client-store' : 'admin-store', name: support ? 'Loja Marina' : 'Operação SOLID', slug: 'marina', active: true, role: 'OWNER', onboardingCompleted: true }] });
   if (path === '/admin/users') return json({ users: [customer], pagination: { page: 1, pages: 1, total: 1 } });
+  if (path === '/admin/users/client/support' && new URLSearchParams(location.search).has('rejectSupport') && supportAttempts++ === 0) return json({ error: { code: 'REAUTH_REQUIRED', message: 'Confirme sua senha de administrador para continuar.' } }, 401);
   if (path === '/admin/users/client/support') { const grant = { actorName: principal.name, actorPublicId: principal.publicId, mode: body.mode, reason: body.reason, expiresAt: new Date(Date.now() + 1800000).toISOString() }; sessionStorage.setItem(supportKey, JSON.stringify(grant)); return json({ supportToken: 's'.repeat(43), targetUserId: customer.publicId, expiresAt: grant.expiresAt }, 201); }
   if (path === '/admin/support/end') { sessionStorage.removeItem(supportKey); return new Response(null, { status: 204 }); }
   if (path === '/admin/roles' && (!init.method || init.method === 'GET')) return json({ roles });
