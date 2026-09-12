@@ -7,7 +7,7 @@ import { encryptSecret } from './shopify-crypto.js';
 import { testWestPay } from './westpay-client.js';
 import { testRoas } from './roas-client.js';
 import { testUtmifyToken } from './utmify-client.js';
-import { validateMetaCredentials } from './meta-client.js';
+import { MetaApiError, validateMetaCredentials } from './meta-client.js';
 
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
 const equal = (a: string, b: string) => { const left = Buffer.from(a); const right = Buffer.from(b); return left.length === right.length && timingSafeEqual(left, right); };
@@ -122,13 +122,19 @@ export function registerGatewayRoutes(app: FastifyInstance, environment: AppEnvi
     const context = await repository.context(current.userId, current.sessionId); if (!context || context.role === 'ANALYST') return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
     await repository.disconnect(context.storeId, 'UTMIFY'); return reply.code(204).send();
   });
-  app.put<{ Body: { pixelId?: unknown; accessToken?: unknown } }>('/integrations/meta', { config: { rateLimit: { max: 5, timeWindow: '5 minutes' } } }, async (request, reply) => {
+  app.put<{ Body: { pixelId?: unknown; accessToken?: unknown; testEventCode?: unknown } }>('/integrations/meta', { config: { rateLimit: { max: 5, timeWindow: '5 minutes' } } }, async (request, reply) => {
     const current = await session(request); if (!current || !csrfValid(request, current)) return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Acesso negado.'));
     const context = await repository.context(current.userId, current.sessionId); if (!context || context.role === 'ANALYST') return reply.code(403).send(errorBody(request, 'FORBIDDEN', 'Somente proprietários e administradores podem conectar rastreadores.'));
     if (!environment.APP_ENCRYPTION_KEY) return reply.code(503).send(errorBody(request, 'SERVICE_UNAVAILABLE', 'Criptografia indisponível.'));
     const pixelId = typeof request.body?.pixelId === 'string' ? request.body.pixelId.trim() : ''; const accessToken = typeof request.body?.accessToken === 'string' ? request.body.accessToken.trim() : '';
     if (!/^\d{5,32}$/.test(pixelId) || accessToken.length < 20 || accessToken.length > 2048 || /\s/.test(accessToken)) return reply.code(400).send(errorBody(request, 'VALIDATION_ERROR', 'Confira o ID do Pixel e o token da API de Conversões.'));
-    try { await validateMetaCredentials(pixelId, accessToken); } catch (error) { request.log.warn({ err: error }, 'meta_credentials_rejected'); return reply.code(422).send(errorBody(request, 'META_CREDENTIALS_REJECTED', 'A Meta recusou essas credenciais. Confira o Pixel e o token.')); }
+    const testEventCode = typeof request.body?.testEventCode === 'string' ? request.body.testEventCode.trim() : '';
+    if (testEventCode && !/^TEST[A-Za-z0-9_-]{1,60}$/.test(testEventCode)) return reply.code(400).send(errorBody(request, 'META_TEST_CODE_INVALID', 'Copie o código TEST da aba Eventos de teste na Meta.'));
+    try { await validateMetaCredentials(pixelId, accessToken, testEventCode || undefined); } catch (error) {
+      const failure = error instanceof MetaApiError ? error : new MetaApiError('META_UNAVAILABLE', 'Não foi possível consultar a Meta agora. Tente novamente em instantes.', 503);
+      request.log.warn({ code: failure.code, metaCode: failure.metaCode }, 'meta_validation_failed');
+      return reply.code(failure.status).send(errorBody(request, failure.code, failure.message));
+    }
     const value = await repository.save(context.storeId, 'META', encryptSecret(accessToken, environment.APP_ENCRYPTION_KEY), encryptSecret(pixelId, environment.APP_ENCRYPTION_KEY)); return reply.send({ connected: true, ...value });
   });
   app.delete('/integrations/meta', async (request, reply) => {

@@ -50,3 +50,38 @@ describe('configuração dos gateways de pagamento', () => {
     expect(response.statusCode).toBe(403); expect(gateway.disconnect).not.toHaveBeenCalled();
   });
 });
+
+
+describe('conexão Meta', () => {
+  const credentials = { pixelId: '123456789012345', accessToken: 'test-meta-token-with-enough-characters' };
+  const metaEnv = { ...env, APP_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64') };
+  it.each([
+    [400, { error: { code: 100 } }, 422, 'META_TEST_CODE_REQUIRED'],
+    [400, { error: { code: 190 } }, 422, 'META_TOKEN_INVALID'],
+    [503, { error: { code: 2 } }, 503, 'META_UNAVAILABLE'],
+  ])('não salva conexão rejeitada: %s %j', async (status, body, expectedStatus, code) => {
+    const gateway = { ...repository(), save: vi.fn() };
+    const app = buildApp(metaEnv, { authRepository: new GatewayAuth(), gatewayRepository: gateway as unknown as PrismaGatewayRepository });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status })));
+    try {
+      const response = await app.inject({ method: 'PUT', url: '/integrations/meta', headers: authenticated, payload: credentials });
+      expect(response.statusCode).toBe(expectedStatus); expect(response.json<{ error: { code: string } }>().error.code).toBe(code);
+      expect(gateway.save).not.toHaveBeenCalled(); expect(response.body).not.toContain(credentials.accessToken);
+    } finally { vi.unstubAllGlobals(); await app.close(); }
+  });
+  it('salva credenciais criptografadas após confirmar o evento de teste', async () => {
+    const gateway = { ...repository(), save: vi.fn().mockResolvedValue({ active: true }) };
+    const app = buildApp(metaEnv, { authRepository: new GatewayAuth(), gatewayRepository: gateway as unknown as PrismaGatewayRepository });
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ events_received: 1 })));
+    vi.stubGlobal('fetch', fetcher);
+    try {
+      const response = await app.inject({ method: 'PUT', url: '/integrations/meta', headers: authenticated, payload: { ...credentials, testEventCode: 'TEST12345' } });
+      expect(response.statusCode).toBe(200); expect(response.json<{ connected: boolean }>().connected).toBe(true);
+      const sent = JSON.parse(fetcher.mock.calls[0]![1]?.body as string) as { test_event_code: string };
+      expect(sent.test_event_code).toBe('TEST12345');
+      expect(gateway.save).toHaveBeenCalledWith('store-a', 'META', expect.stringMatching(/^v1\./), expect.stringMatching(/^v1\./));
+      expect(JSON.stringify(gateway.save.mock.calls)).not.toContain('TEST12345');
+      expect(JSON.stringify(gateway.save.mock.calls)).not.toContain(credentials.accessToken);
+    } finally { vi.unstubAllGlobals(); await app.close(); }
+  });
+});

@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260912-meta-connection-validation',
+    category: 'FIX' as const,
+    title: 'Validação da conexão com a Meta mais clara',
+    description: 'Conecte o Pixel com validação por Eventos de teste e mensagens específicas para token, permissões e indisponibilidade da Meta.',
+    publishedAt: new Date('2026-09-12T20:00:00.000Z'),
+  },
+  {
     publicId: "auto-20260912-full-support-administrators",
     category: "IMPROVEMENT" as const,
     title: "Acesso completo de suporte e gestão de administradores",
