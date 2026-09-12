@@ -65,6 +65,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: "auto-20260911-geography",
+    category: "FIX" as const,
+    title: "Pontos do mapa geográfico corrigidos",
+    description: "Os marcadores agora seguem a mesma projeção dos continentes, no computador e no celular. Localizações sem coordenadas válidas deixam de receber pontos artificiais, e a lista de cidades e regiões volta a aparecer no alcance geográfico. A localização continua sendo aproximada por IP.",
+    publishedAt: new Date("2026-09-12T00:00:00.000Z"),
+  },
+  {
     publicId: "auto-20260911-roadmap",
     category: "IMPROVEMENT" as const,
     title: "Roadmap com gestão completa",

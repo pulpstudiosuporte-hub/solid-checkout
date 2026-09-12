@@ -1,0 +1,24 @@
+import { test, expect } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
+const output = name => fileURLToPath(new URL(`../../../.visual-check/${name}`, import.meta.url));
+test('geography keeps the background and valid city or region markers aligned on desktop and mobile', async ({ page }) => {
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/ui-tests/geography-review.html');
+  const map = page.locator('.home-geo');
+  await expect(map.locator('.world-map-visual g')).toHaveCount(6);
+  await expect(map.locator('.world-map-missing')).toContainText('1 localização sem ponto disponível');
+  await expect(map.locator('.geo-location-list')).toBeVisible();
+  const saoPaulo = map.locator('.world-map-visual g').filter({ has: page.locator('title', { hasText: 'São Paulo' }) }).locator('circle').first();
+  expect(Number(await saoPaulo.getAttribute('cx'))).toBeCloseTo(288.96833, 4);
+  expect(Number(await saoPaulo.getAttribute('cy'))).toBeCloseTo(297.45606, 4);
+  await expect(map.locator('.world-map-base')).toHaveAttribute('preserveAspectRatio', 'none');
+  await page.waitForFunction(() => [...document.images].every(img => img.complete));
+  await map.screenshot({ path: output('desktop.png'), animations: 'disabled' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await map.screenshot({ path: output('mobile.png'), animations: 'disabled' });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(Number(await saoPaulo.getAttribute('cx'))).toBeCloseTo(288.96833, 4);
+  await page.getByLabel('Período do alcance').selectOption('7d');
+  await expect(map.locator('.world-map-visual g')).toHaveCount(6);
+  expect(errors).toEqual([]);
+});

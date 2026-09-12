@@ -36,6 +36,14 @@ afterAll(async () => {
 });
 
 describe('PostgreSQL payment integrity', () => {
+  it('keeps coordinate pairs together and never invents a point for partial or missing geolocation', async () => {
+    for (const coordinates of [{ geo_latitude: '-23.55' }, { geo_longitude: '-46.63' }, { geo_latitude: '0', geo_longitude: '0' }, { geo_latitude: '999', geo_longitude: '-46' }]) {
+      const s = await session();
+      await db.checkoutSession.update({ where: { id: s.id }, data: { trackingParameters: { geo_country: 'BR', geo_region_code: 'SP', geo_city: 'Partial-coordinate-test', ...coordinates } } });
+    }
+    const report = await loadDashboardData(db, storeId, new Date(Date.now() - 60000), new Date(), new Date());
+    expect((report.analytics as { geography: { locations: unknown[] } }).geography.locations).toContainEqual(expect.objectContaining({ city: 'Partial-coordinate-test', latitude: null, longitude: null, visitors: 4 }));
+  });
   it('only one concurrent caller reserves creation, including callers using another provider', async () => {
     const s = await session();
     const results = await Promise.all(Array.from({ length: 12 }, (_, i) => repo.claimPaymentCreation(s.id, i % 2 ? 'ROAS' : 'WESTPAY', 10000)));

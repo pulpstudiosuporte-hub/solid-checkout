@@ -1,10 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import './world-map.css';
-
-const projectPoint = (latitude, longitude) => ({
-  x: (Number(longitude) + 180) * (800 / 360),
-  y: (90 - Number(latitude)) * (400 / 180),
-});
+import { projectPoint } from './world-map-projection';
 
 const curvedPath = (start, end) => {
   const middleX = (start.x + end.x) / 2;
@@ -22,15 +18,12 @@ export function WorldMap({ locations = [], lineColor = '#7657ed' }) {
     return () => observer.disconnect();
   }, []);
   const mapSource = '/illustrations/world-map.svg';
-  const detailedLocations = locations.some(location => location.city) ? locations.filter(location => location.city) : locations;
-  const points = detailedLocations
-    .filter(location => location.latitude != null && location.longitude != null && Number.isFinite(Number(location.latitude)) && Number.isFinite(Number(location.longitude)))
-    .map(location => ({ ...location, point: projectPoint(location.latitude, location.longitude) }));
+  const points = locations.map(location => ({ ...location, point: projectPoint(location.latitude, location.longitude) })).filter(location => location.point);
   const origin = points[0];
 
-  return <div ref={container} data-paused={!visible} className="world-map-visual" role="img" aria-label={points.length ? `Mapa com ${points.length} localizações de visitantes` : 'Mapa-múndi sem visitas no período'}>
-    <img src={mapSource} alt="" draggable="false"/>
-    <svg viewBox="0 0 800 400" preserveAspectRatio="none" aria-hidden="true">
+  return <div ref={container} data-paused={!visible} className="world-map-visual">
+    <svg viewBox="0 0 800 400" preserveAspectRatio="none" role="img" aria-label={points.length ? `Mapa com ${points.length} localizações aproximadas por IP` : 'Mapa sem coordenadas disponíveis'}>
+      <image className="world-map-base" href={mapSource} x="0" y="0" width="800" height="400" preserveAspectRatio="none"/>
       <defs>
         <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor={lineColor} stopOpacity="0"/>
@@ -50,9 +43,11 @@ export function WorldMap({ locations = [], lineColor = '#7657ed' }) {
         style={{ animationDelay: `${index * .12}s` }}
       />)}
       {points.map((location, index) => <g key={`point-${location.country}-${location.region}-${location.city}-${index}`}>
+        <title>{[location.city, location.region, location.country].filter(Boolean).join(' · ')}: {location.visitors} visitantes · Aproximado por IP</title>
         <circle cx={location.point.x} cy={location.point.y} r="4" fill={lineColor} stroke="#fff" strokeWidth="2"/>
         <circle className="world-map-pulse" cx={location.point.x} cy={location.point.y} r="4" fill="none" stroke={lineColor} strokeWidth="1.5" style={{ animationDelay: `${index * .15}s` }}/>
       </g>)}
     </svg>
+    {locations.length > points.length && <span className="world-map-missing">{locations.length - points.length} {locations.length - points.length === 1 ? 'localização sem ponto disponível' : 'localizações sem ponto disponível'}</span>}
   </div>;
 }

@@ -5,8 +5,13 @@
 @media (prefers-reduced-motion: reduce) { .world-map-visual * { animation: none !important; } }
 
 .home-geo .geo-location-list {
-  display: none;
+  display: flex;
+  max-width: 100%;
 }
+.home-geo{min-width:0}
+.world-map-visual .world-map-base{filter:contrast(.92) saturate(.8)}
+.world-map-visual .world-map-missing{position:absolute;bottom:10px;left:10px;right:10px;width:fit-content;max-width:calc(100% - 20px);padding:6px 10px;border-radius:7px;background:#fffffff0;color:#53566a;font-size:11px;line-height:1.4}
+.world-map-visual>svg g{pointer-events:auto}
 
 .analytics-bars.cities {
   min-height: 260px;

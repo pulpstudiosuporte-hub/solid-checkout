@@ -42,15 +42,23 @@ sold_items AS (
  FROM paid_sessions s JOIN checkout_session_items i ON i.checkout_session_id=s.id
 ),
 product_sales AS (SELECT product_id, max(title_snapshot) title, sum(quantity) quantity, COALESCE(sum(amount),0) amount FROM sold_items GROUP BY product_id ORDER BY amount DESC, product_id LIMIT 8),
+geo_coordinates AS (
+ SELECT sessions.*, CASE
+   WHEN tracking_parameters->>'geo_latitude' ~ '^[-]?[0-9]{1,3}([.][0-9]+)?$'
+    AND tracking_parameters->>'geo_longitude' ~ '^[-]?[0-9]{1,3}([.][0-9]+)?$'
+   THEN CASE WHEN abs((tracking_parameters->>'geo_latitude')::double precision) <= 90
+     AND abs((tracking_parameters->>'geo_longitude')::double precision) <= 180
+     AND NOT ((tracking_parameters->>'geo_latitude')::double precision = 0 AND (tracking_parameters->>'geo_longitude')::double precision = 0)
+     THEN ARRAY[(tracking_parameters->>'geo_latitude')::double precision, (tracking_parameters->>'geo_longitude')::double precision] END
+   END coordinates FROM sessions
+),
 geo AS (
  SELECT tracking_parameters->>'geo_country' country,
  COALESCE(tracking_parameters->>'geo_region_code',tracking_parameters->>'geo_region') region,
  tracking_parameters->>'geo_city' city,
- avg(CASE WHEN tracking_parameters->>'geo_latitude' ~ '^[-]?[0-9]{1,3}([.][0-9]+)?$'
- THEN CASE WHEN abs((tracking_parameters->>'geo_latitude')::double precision) <= 90 THEN (tracking_parameters->>'geo_latitude')::double precision END END) latitude,
- avg(CASE WHEN tracking_parameters->>'geo_longitude' ~ '^[-]?[0-9]{1,3}([.][0-9]+)?$'
- THEN CASE WHEN abs((tracking_parameters->>'geo_longitude')::double precision) <= 180 THEN (tracking_parameters->>'geo_longitude')::double precision END END) longitude,
- count(DISTINCT visitor_key) visitors FROM sessions WHERE tracking_parameters->>'geo_country' IS NOT NULL GROUP BY 1,2,3
+ avg(coordinates[1]) latitude,
+ avg(coordinates[2]) longitude,
+ count(DISTINCT visitor_key) visitors FROM geo_coordinates WHERE tracking_parameters->>'geo_country' IS NOT NULL GROUP BY 1,2,3
 ),
 state_sales AS (SELECT COALESCE(tracking_parameters->>'geo_region_code',tracking_parameters->>'geo_region') state, count(*) orders, sum(paid_amount) amount FROM paid_sessions GROUP BY 1),
 city_sales AS (SELECT COALESCE(tracking_parameters->>'geo_region_code',tracking_parameters->>'geo_region') state, tracking_parameters->>'geo_city' city, count(*) orders, sum(paid_amount) amount FROM paid_sessions GROUP BY 1,2),
@@ -79,10 +87,5 @@ SELECT jsonb_build_object(
  'checklist',jsonb_build_object('store',true,'product',EXISTS(SELECT 1 FROM products p,params a WHERE p.store_id=a.store_id AND p.active),'checkout',EXISTS(SELECT 1 FROM checkouts c,params a WHERE c.store_id=a.store_id AND c.archived_at IS NULL),'published',EXISTS(SELECT 1 FROM checkouts c,params a WHERE c.store_id=a.store_id AND c.archived_at IS NULL AND c.status='PUBLISHED'),'gateway',EXISTS(SELECT 1 FROM gateway_connections g,params a WHERE g.store_id=a.store_id AND g.active))
 ) payload FROM totals t CROSS JOIN revenue r`;
   const payload = rows[0]?.payload ?? {};
-  const centroids: Record<string, [number, number]> = { BR: [-14.235,-51.9253], US: [37.0902,-95.7129], PT: [39.3999,-8.2245], AR: [-38.4161,-63.6167], CL: [-35.6751,-71.543], CO: [4.5709,-74.2973], MX: [23.6345,-102.5528], CA: [56.1304,-106.3468], GB: [55.3781,-3.436] };
-  for (const location of payload.analytics?.geography?.locations ?? []) {
-    const fallback = centroids[location.country.toUpperCase()];
-    if (fallback) { location.latitude ??= fallback[0]; location.longitude ??= fallback[1]; }
-  }
   return payload;
 }
