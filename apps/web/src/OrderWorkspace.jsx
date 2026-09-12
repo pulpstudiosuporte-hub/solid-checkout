@@ -879,7 +879,7 @@ function AdditionalTab({ order }) {
 export default function OrderWorkspace({ orderId, onBack, csrfToken }) {
   const support = useSupportAccess();
   const { loading, error, order: sourceOrder, refresh } = useOrderWorkspace(orderId);
-  const order = useMemo(() => support && sourceOrder ? { ...sourceOrder, canManage: false } : sourceOrder, [support, sourceOrder]);
+  const order = useMemo(() => support && support.mode !== 'FULL_ACCESS' && sourceOrder ? { ...sourceOrder, canManage: false } : sourceOrder, [support, sourceOrder]);
   const [activeTab, setActiveTab] = useState("summary");
   const [notice, setNoticeState] = useState(null);
   const setNotice = (message, errorNotice = false) => {

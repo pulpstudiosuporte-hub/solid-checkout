@@ -2,7 +2,7 @@ import type { AppEnvironment } from '@solid/config';
 import type { PrismaClient } from '@solid/database';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AuthRepository } from './auth-repository.js';
-import { requirePlatformSession, validAdminMutation } from './admin-access.js';
+import { requirePlatformSession, validAdminMutation, verifyAdminCredentials } from './admin-access.js';
 import { platformPermissions } from './platform-permissions.js';
 
 const failure = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
@@ -87,6 +87,40 @@ export function registerPlatformRoleRoutes(app: FastifyInstance, environment: Ap
     });
     if (!result) return reply.code(409).send(failure(request, 'ROLE_ASSIGNMENT_INVALID', 'Escolha uma conta ativa de equipe e um perfil existente. Administradores principais não são alterados aqui.'));
     return reply.send({ updated: true });
+  });
+  app.put<{ Params: { publicId: string }; Body: { enabled?: unknown; currentPassword?: unknown; code?: unknown } }>('/admin/users/:publicId/platform-admin', { config: { rateLimit: { max: 5, timeWindow: '5 minutes' } } }, async (request, reply) => {
+    const session = await requirePlatformSession(request, environment, auth, 'roles.manage');
+    if (!session?.user.platformAdmin) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Somente administradores da plataforma podem conceder ou remover este acesso.'));
+    if (!validAdminMutation(request, session, environment)) return reply.code(403).send(failure(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
+    if (typeof request.body?.enabled !== 'boolean') return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Informe se o acesso de administrador deve ser ativado.'));
+    const enabled = request.body.enabled;
+    const credentialError = await verifyAdminCredentials(auth, environment, session, request.body);
+    if (credentialError) return reply.code(401).send(failure(request, credentialError.code, credentialError.message));
+    try {
+      const result = await db.$transaction(async transaction => {
+        // Recheck both parties in one serializable transaction, preventing concurrent
+        // demotions from removing the last administrator or granting stale authority.
+        const actor = await transaction.user.findUnique({ where: { id: session.userId }, select: { platformAdmin: true, disabledAt: true, accountStatus: true } });
+        if (!actor?.platformAdmin || actor.disabledAt || actor.accountStatus !== 'APPROVED') return 'forbidden';
+        const target = await transaction.user.findUnique({ where: { publicId: request.params.publicId }, select: { id: true, platformAdmin: true, disabledAt: true, accountStatus: true, platformRoleId: true } });
+        if (!target) return 'missing';
+        if (target.id === session.userId) return 'self';
+        if (enabled && (target.disabledAt || target.accountStatus !== 'APPROVED')) return 'inactive';
+        if (target.platformAdmin === enabled) return 'unchanged';
+        await transaction.user.update({ where: { id: target.id }, data: { platformAdmin: enabled, platformRoleId: null } });
+        await transaction.session.updateMany({ where: { revokedAt: null, OR: [{ userId: target.id }, { supportParent: { userId: target.id } }] }, data: { revokedAt: new Date() } });
+        await transaction.auditLog.create({ data: { actorType: 'USER', actorUserId: session.userId, action: enabled ? 'admin.role.admin_granted' : 'admin.role.admin_revoked', targetType: 'user', targetId: request.params.publicId, requestId: request.id, metadata: { platformAdmin: enabled, previousPlatformAdmin: target.platformAdmin, previousRoleId: target.platformRoleId } } });
+        return 'updated';
+      }, { isolationLevel: 'Serializable' });
+      if (result === 'forbidden') return reply.code(403).send(failure(request, 'FORBIDDEN', 'Seu acesso administrativo foi alterado. Entre novamente.'));
+      if (result === 'missing') return reply.code(404).send(failure(request, 'USER_NOT_FOUND', 'Conta não encontrada.'));
+      if (result === 'self') return reply.code(409).send(failure(request, 'ADMIN_SELF_CHANGE', 'Peça a outro administrador para alterar o seu acesso.'));
+      if (result === 'inactive') return reply.code(409).send(failure(request, 'ADMIN_TARGET_INACTIVE', 'Escolha uma conta aprovada e ativa.'));
+      return reply.send({ updated: result === 'updated' });
+    } catch (error) {
+      if (typeof error === 'object' && error && 'code' in error && error.code === 'P2034') return reply.code(409).send(failure(request, 'ADMIN_ACCESS_CONFLICT', 'A equipe foi alterada durante a solicitação. Atualize a página e tente novamente.'));
+      throw error;
+    }
   });
   app.get<{ Querystring: { page?: string } }>('/admin/access-audit', async (request, reply) => {
     if (!await requirePlatformSession(request, environment, auth, 'audit.read')) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Sem permissão para consultar a auditoria.'));

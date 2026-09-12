@@ -1,4 +1,4 @@
-import { canPlatformPage, supportPages } from './platform-access';
+import { canPlatformPage, canSupportPage } from './platform-access';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3, CreditCard, Globe2, Home, LayoutTemplate, Package, Plug,
@@ -39,7 +39,7 @@ export default function CommandPalette({ open, onClose, onNavigate, platformAdmi
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);
   const optionRefs = useRef([]);
-  const available = useMemo(() => items.filter(item => (!item.admin || canPlatformPage(user || { platformAdmin }, item.label)) && (!support || supportPages.includes(item.label))), [platformAdmin, user, support]);
+  const available = useMemo(() => items.filter(item => (!item.admin || canPlatformPage(user || { platformAdmin }, item.label)) && (!support || canSupportPage(support, item.label))), [platformAdmin, user, support]);
   const results = useMemo(() => {
     const term = normalize(query);
     if (!term) return available;

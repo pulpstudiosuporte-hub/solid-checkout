@@ -9,3 +9,4 @@ export const platformPagePermission = { 'Usuários': 'users.read', 'Operações'
 export const canPlatform = (user, permission) => Boolean(user?.platformAdmin || user?.platformPermissions?.includes(permission));
 export const canPlatformPage = (user, page) => Boolean(platformPagePermission[page] && canPlatform(user, platformPagePermission[page]));
 export const supportPages = ['Início', 'Análises', 'Pedidos', 'Carrinhos', 'ChromaSense', 'Produtos', 'Webhooks', 'Checkouts', 'Logística', 'Order bumps', 'Cupons', 'Configurações'];
+export const canSupportPage = (support, page) => supportPages.includes(page) || (support?.mode === 'FULL_ACCESS' && ['Domínios', 'Gateways', 'Integrações', 'Marketing', 'Meu plano', 'Novidades'].includes(page));

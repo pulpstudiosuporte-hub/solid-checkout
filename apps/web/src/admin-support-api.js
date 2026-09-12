@@ -14,4 +14,5 @@ export const getPlatformTeam = () => call('/admin/team');
 export const savePlatformRole = (roleId, values, csrfToken) => call(roleId ? `/admin/roles/${encodeURIComponent(roleId)}` : '/admin/roles', csrfToken, roleId ? 'PUT' : 'POST', values);
 export const deletePlatformRole = (roleId, csrfToken) => call(`/admin/roles/${encodeURIComponent(roleId)}`, csrfToken, 'DELETE');
 export const assignPlatformRole = (userId, rolePublicId, csrfToken) => call(`/admin/users/${encodeURIComponent(userId)}/platform-role`, csrfToken, 'PUT', { rolePublicId });
+export const setPlatformAdmin = (userId, values, csrfToken) => call(`/admin/users/${encodeURIComponent(userId)}/platform-admin`, csrfToken, 'PUT', values);
 export const getAccessAudit = (page = 1) => call(`/admin/access-audit?page=${page}`);

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getAccessAudit } from './admin-support-api';
 import './platform-team.css';
 
-const labels = { 'admin.support.started': 'Suporte iniciado', 'admin.support.ended': 'Suporte encerrado', 'admin.support.request': 'Acesso à dashboard', 'admin.support.result': 'Resultado da ação', 'admin.role.created': 'Perfil criado', 'admin.role.updated': 'Perfil atualizado', 'admin.role.deleted': 'Perfil excluído', 'admin.role.assigned': 'Perfil atribuído' };
+const labels = { 'admin.role.admin_granted': 'Administrador adicionado', 'admin.role.admin_revoked': 'Administrador removido', 'admin.support.started': 'Suporte iniciado', 'admin.support.ended': 'Suporte encerrado', 'admin.support.request': 'Acesso à dashboard', 'admin.support.result': 'Resultado da ação', 'admin.role.created': 'Perfil criado', 'admin.role.updated': 'Perfil atualizado', 'admin.role.deleted': 'Perfil excluído', 'admin.role.assigned': 'Perfil atribuído' };
 export default function AccessAuditPage() {
   const [page, setPage] = useState(1), [data, setData] = useState(null), [error, setError] = useState(''), [loading, setLoading] = useState(true), [refresh, setRefresh] = useState(0);
   useEffect(() => { let active = true; setLoading(true); setError(''); getAccessAudit(page).then(result => active && setData(result)).catch(cause => active && setError(cause.message)).finally(() => active && setLoading(false)); return () => { active = false; }; }, [page, refresh]);

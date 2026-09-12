@@ -7,6 +7,7 @@ let roles = roleSeed;
 let members = [principal];
 let products = [];
 let supportAttempts = 0;
+let savedStoreName = 'Loja Marina';
 const supportKey = 'support-review-grant';
 window.fetch = async (input, init = {}) => {
   const path = new URL(String(input), location.origin).pathname;
@@ -28,6 +29,11 @@ window.fetch = async (input, init = {}) => {
   if (path.startsWith('/admin/roles/') && init.method === 'PUT') { roles = roles.map(role => role.publicId === path.split('/').pop() ? { ...role, ...body } : role); return json({ updated: true }); }
   if (path.startsWith('/admin/roles/') && init.method === 'DELETE') { roles = roles.filter(role => role.publicId !== path.split('/').pop()); return new Response(null, { status: 204 }); }
   if (path === '/admin/team') return json({ members });
+  if (path.endsWith('/platform-admin')) {
+    if (body.currentPassword !== 'fixture-password') return json({ error: { code: 'REAUTH_REQUIRED', message: 'Confirme sua senha de administrador para continuar.' } }, 401);
+    members = [principal, ...(body.enabled ? [{ ...customer, platformAdmin: true }] : [])];
+    return json({ updated: true });
+  }
   if (path.endsWith('/platform-role')) { members = [principal, ...(body.rolePublicId ? [{ ...customer, platformRole: roles.find(role => role.publicId === body.rolePublicId) }] : [])]; return json({ updated: true }); }
   if (path === '/admin/access-audit') return json({ items: [{ id: '1', action: 'admin.support.started', actor: principal, targetId: 'client', createdAt: new Date().toISOString(), metadata: { targetName: customer.name, mode: 'READ_ONLY', reason: 'Chamado 123 — revisar configuração da loja' } }], pagination: { page: 1, pages: 1 } });
   if (path === '/dashboard') return json({ userName: customer.name, revenueCents: 0, paidOrders: 0, pendingPix: 0, conversionRate: 0, activeVisitors: 0, series: [], analytics: { sessions: 0, generatedRevenueCents: 0 }, checklist: {} });
@@ -36,7 +42,9 @@ window.fetch = async (input, init = {}) => {
   if (path === '/platform-content') return json({ releases: [] });
   if (path === '/notifications') return json({ items: [], unreadCount: 0 });
   if (path === '/notifications/push/config') return json({ enabled: false });
-  if (path === '/settings') return json({ store: { name: 'Loja Marina', profile: {} }, user: customer, members: [], role: 'OWNER', activation: { completed: true, missing: [] } });
+  if (path === '/settings' && init.method === 'PATCH') { savedStoreName = body.values.name; return json({ activation: { completed: true } }); }
+  if (path === '/settings') return json({ store: { name: savedStoreName, profile: {} }, user: customer, members: [], role: 'OWNER', activation: { completed: true, missing: [] } });
+  if (path === '/store-webhooks') return json({ items: [], writable: true, events: [], limit: 10 });
   return json({ items: [] });
 };
 createRoot(document.getElementById('root')).render(<AdminApp/>);

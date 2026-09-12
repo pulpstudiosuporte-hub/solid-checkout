@@ -4,7 +4,7 @@ import type { PlatformIdentity } from './platform-permissions.js';
 
 export type AccountStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export type LoginUser = Readonly<PlatformIdentity & { id: string; publicId: string; name: string; email: string; passwordHash: string | null; disabledAt: Date | null; accountStatus?: AccountStatus; mfaSecretEncrypted?: string | null; mfaEnabledAt?: Date | null }>;
-export type SupportContext = Readonly<{ parentSessionId: string; actorUserId: string; actorPublicId: string; actorName: string; mode: 'READ_ONLY' | 'MAINTENANCE'; reason: string; expiresAt: Date }>;
+export type SupportContext = Readonly<{ parentSessionId: string; actorUserId: string; actorPublicId: string; actorName: string; mode: 'READ_ONLY' | 'MAINTENANCE' | 'FULL_ACCESS'; reason: string; expiresAt: Date }>;
 export type SessionUser = Readonly<{ sessionId: string; userId: string; csrfTokenHash: string; mfaVerifiedAt?: Date | null; user: PlatformIdentity & { publicId: string; name: string; email: string; accountStatus?: AccountStatus; mfaEnabled?: boolean }; support?: SupportContext; expiresAt: Date; absoluteExpiresAt: Date }>;
 
 export interface AuthRepository {
@@ -37,7 +37,8 @@ export class PrismaAuthRepository implements AuthRepository {
       const parent = session.supportParent;
       if (!parent || parent.supportParentId || parent.revokedAt || parent.expiresAt <= now || parent.absoluteExpiresAt <= now || parent.user.disabledAt || parent.user.accountStatus !== 'APPROVED' || platformStaff(session.user)) return null;
       if (!hasPlatformPermission(parent.user, 'support.read') || (session.supportMode === 'MAINTENANCE' && !hasPlatformPermission(parent.user, 'support.write'))) return null;
-      if (session.supportMode !== 'READ_ONLY' && session.supportMode !== 'MAINTENANCE') return null;
+      if (session.supportMode === 'FULL_ACCESS' && !parent.user.platformAdmin) return null;
+      if (session.supportMode !== 'READ_ONLY' && session.supportMode !== 'MAINTENANCE' && session.supportMode !== 'FULL_ACCESS') return null;
       support = { parentSessionId: parent.id, actorUserId: parent.userId, actorPublicId: parent.user.publicId, actorName: parent.user.name, mode: session.supportMode, reason: session.supportReason ?? '', expiresAt: session.absoluteExpiresAt };
     }
     return { sessionId: session.id, userId: session.userId, csrfTokenHash: session.csrfTokenHash, mfaVerifiedAt: session.mfaVerifiedAt, expiresAt: session.expiresAt, absoluteExpiresAt: session.absoluteExpiresAt, ...(support ? { support } : {}), user: { publicId: session.user.publicId, name: session.user.name, email: session.user.email, accountStatus: session.user.accountStatus, platformAdmin: session.user.platformAdmin, platformRole: session.user.platformRole, platformPermissions: permissionsFor(session.user), mfaEnabled: Boolean(session.user.mfaEnabledAt) } };

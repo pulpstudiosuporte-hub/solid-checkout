@@ -32,6 +32,13 @@ describe('support grants in PostgreSQL', () => {
     await db.platformRole.update({ where: { id: roleId }, data: { permissions: ['users.read', 'support.read', 'support.write'] } });
     expect(await auth.findActiveSession(hashToken(childToken), new Date())).not.toBeNull();
     expect(await auth.findActiveSession(hashToken(childToken), new Date(expiry.getTime() + 1))).toBeNull();
+    await db.session.update({ where: { tokenHash: hashToken(childToken) }, data: { supportMode: 'FULL_ACCESS' } });
+    expect(await auth.findActiveSession(hashToken(childToken), new Date())).toBeNull();
+    await db.user.update({ where: { id: operatorId }, data: { platformAdmin: true } });
+    expect((await auth.findActiveSession(hashToken(childToken), new Date()))?.support?.mode).toBe('FULL_ACCESS');
+    await db.user.update({ where: { id: operatorId }, data: { platformAdmin: false } });
+    expect(await auth.findActiveSession(hashToken(childToken), new Date())).toBeNull();
+    await db.user.update({ where: { id: operatorId }, data: { platformAdmin: true } });
     await db.session.update({ where: { id: parentId }, data: { revokedAt: new Date() } });
     expect(await auth.findActiveSession(hashToken(childToken), new Date())).toBeNull();
   });

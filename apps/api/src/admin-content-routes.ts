@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: "auto-20260912-full-support-administrators",
+    category: "IMPROVEMENT" as const,
+    title: "Acesso completo de suporte e gestão de administradores",
+    description: "Administradores podem gerenciar as configurações e operações da loja durante o suporte e adicionar ou remover outros administradores em Equipe e permissões. A confirmação usa a senha do operador e mantém o histórico de acessos e alterações.",
+    publishedAt: new Date("2026-09-12T19:00:00.000Z"),
+  },
+  {
     publicId: "auto-20260912-exit-offer-pointer-detection",
     category: "FIX" as const,
     title: "Detecção de saída mais consistente",

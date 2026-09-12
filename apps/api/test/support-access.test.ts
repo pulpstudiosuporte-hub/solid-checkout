@@ -20,12 +20,12 @@ const child: SessionUser = { ...parent, sessionId: 'child-id', userId: 'client-i
 const normalHeaders = { cookie: 'solid_session=primary; solid_csrf=csrf', origin: env.CORS_ORIGINS[0]!, 'x-csrf-token': 'csrf' };
 const headers = { ...normalHeaders, 'x-solid-support-session': supportToken, 'x-solid-user-context': child.user.publicId };
 
-async function fixture(mode: 'READ_ONLY' | 'MAINTENANCE' = 'READ_ONLY') {
+async function fixture(mode: 'READ_ONLY' | 'MAINTENANCE' | 'FULL_ACCESS' = 'READ_ONLY') {
   let primary: SessionUser | null = structuredClone(parent);
   let support: SessionUser | null = { ...child, support: { ...child.support!, mode } };
   const auth = { findActiveSession: vi.fn((hash: string) => Promise.resolve(hash === hashToken('primary') ? primary : hash === hashToken(supportToken) ? support : null)), findUserByEmail: vi.fn(), touchSession: vi.fn() } as unknown as AuthRepository;
   const audit = vi.fn<(input: { data: Record<string, unknown> }) => Promise<object>>().mockResolvedValue({});
-  const database = { auditLog: { create: audit }, session: { count: vi.fn().mockResolvedValue(0), create: vi.fn<(input: { data: Record<string, unknown> }) => Promise<{ id: string }>>().mockResolvedValue({ id: 'child-id' }), findFirst: vi.fn().mockResolvedValue({ id: 'child-id', user: { publicId: 'client-public' } }), updateMany: vi.fn().mockResolvedValue({ count: 1 }) }, user: { findUnique: vi.fn().mockResolvedValue({ id: 'client-id', publicId: 'client-public', name: 'Cliente', disabledAt: null, accountStatus: 'APPROVED', platformAdmin: false, platformRole: null }) }, platformRole: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ publicId: 'new-role' }), findUnique: vi.fn().mockResolvedValue({ id: 'role-id', name: 'Equipe', permissions: ['support.read'] }), update: vi.fn().mockResolvedValue({ publicId: 'role-id' }) }, $transaction: (work: (tx: unknown) => unknown) => Promise.resolve(work(database)) };
+  const database = { auditLog: { create: audit }, session: { count: vi.fn().mockResolvedValue(0), create: vi.fn<(input: { data: Record<string, unknown> }) => Promise<{ id: string }>>().mockResolvedValue({ id: 'child-id' }), findFirst: vi.fn().mockResolvedValue({ id: 'child-id', user: { publicId: 'client-public' } }), updateMany: vi.fn().mockResolvedValue({ count: 1 }) }, user: { update: vi.fn().mockResolvedValue({}), findUnique: vi.fn().mockResolvedValue({ id: 'client-id', publicId: 'client-public', name: 'Cliente', disabledAt: null, accountStatus: 'APPROVED', platformAdmin: false, platformRole: null }) }, platformRole: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue({ publicId: 'new-role' }), findUnique: vi.fn().mockResolvedValue({ id: 'role-id', name: 'Equipe', permissions: ['support.read'] }), update: vi.fn().mockResolvedValue({ publicId: 'role-id' }) }, $transaction: (work: (tx: unknown) => unknown) => Promise.resolve(work(database)) };
   const db = database as unknown as PrismaClient;
   const app = Fastify();
   await app.register(cookie);
@@ -41,6 +41,11 @@ async function fixture(mode: 'READ_ONLY' | 'MAINTENANCE' = 'READ_ONLY') {
   app.patch('/settings', action);
   app.post('/store-webhooks', action);
   app.get('/auth/sessions', action);
+  app.get('/integrations/google', action);
+  app.put('/integrations/google', action);
+  app.put('/integrations/roas', action);
+  app.put('/store-domain', action);
+  app.patch('/orders/:orderId/status', action);
   return { app, auth, database, audit, action, revoke: () => { support = null; }, logout: () => { primary = null; }, changeParent: () => { primary = { ...parent, sessionId: 'different-parent' }; }, useStaff: () => { primary = { ...parent, user: { ...parent.user, platformAdmin: false, platformPermissions: ['users.read', 'support.read'] } }; } };
 }
 
@@ -171,5 +176,74 @@ describe('database support grant validation', () => {
     value.supportParent.expiresAt = future;
     value.user.platformAdmin = true;
     expect(await repository.findActiveSession('hash', new Date())).toBeNull();
+  });
+  it('revokes full access immediately when the operator is no longer a platform administrator', async () => {
+    const value = record();
+    value.supportMode = 'FULL_ACCESS'; value.supportParent.user.platformAdmin = true;
+    const repository = new PrismaAuthRepository({ session: { findFirst: vi.fn().mockResolvedValue(value) } } as unknown as PrismaClient);
+    expect((await repository.findActiveSession('hash', new Date()))?.support?.mode).toBe('FULL_ACCESS');
+    value.supportParent.user.platformAdmin = false;
+    expect(await repository.findActiveSession('hash', new Date())).toBeNull();
+  });
+});
+
+describe('full administration', () => {
+  it('permits operational changes in full access while denying authentication, administration and unknown routes', async () => {
+    const f = await fixture('FULL_ACCESS');
+    try {
+      for (const [method, url] of [['PATCH', '/settings'], ['POST', '/store-webhooks'], ['GET', '/integrations/google'], ['PUT', '/integrations/google'], ['PUT', '/integrations/roas'], ['PUT', '/store-domain'], ['PATCH', '/orders/order-1/status']] as const) {
+        expect((await f.app.inject({ method, url, headers })).statusCode, `${method} ${url}`).toBe(200);
+      }
+      for (const [method, url] of [['POST', '/auth/logout'], ['GET', '/auth/sessions'], ['GET', '/admin/roles'], ['PUT', '/admin/users/client-public/platform-admin'], ['POST', '/unknown-mutation']] as const) expect((await f.app.inject({ method, url, headers })).statusCode).toBe(403);
+      expect(f.action).toHaveBeenCalledTimes(7);
+      expect(f.audit.mock.calls[0]?.[0].data).toMatchObject({ actorUserId: parent.userId, metadata: expect.objectContaining({ mode: 'FULL_ACCESS' }) as object });
+    } finally { await f.app.close(); }
+  });
+  it('creates full support only for platform administrators after reauthentication', async () => {
+    const f = await fixture();
+    try {
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      vi.mocked(f.auth.findUserByEmail).mockResolvedValue({ id: parent.userId, ...parent.user, passwordHash: await hashPassword('correct-password'), disabledAt: null });
+      const payload = { mode: 'FULL_ACCESS', reason: 'Manutenção completa da loja', currentPassword: 'correct-password' };
+      expect((await f.app.inject({ method: 'POST', url: '/admin/users/client-public/support', headers: normalHeaders, payload })).statusCode).toBe(201);
+      expect(f.database.session.create.mock.calls[0]?.[0].data.supportMode).toBe('FULL_ACCESS');
+      f.useStaff();
+      expect((await f.app.inject({ method: 'POST', url: '/admin/users/client-public/support', headers: normalHeaders, payload })).statusCode).toBe(403);
+    } finally { await f.app.close(); }
+  });
+  it('promotes and demotes with MFA, audit and session revocation; blocks CSRF, self changes and staff escalation', async () => {
+    const f = await fixture();
+    const actor = { id: parent.userId, platformAdmin: true, accountStatus: 'APPROVED', disabledAt: null };
+    let target = { id: 'client-id', platformAdmin: false, accountStatus: 'APPROVED', disabledAt: null as Date | null, platformRoleId: 'old-role' };
+    f.database.user.findUnique.mockImplementation((input: { where: { id?: string } }) => Promise.resolve(input.where.id === parent.userId ? actor : target));
+    try {
+      const secret = generateTotpSecret();
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      vi.mocked(f.auth.findUserByEmail).mockResolvedValue({ id: parent.userId, ...parent.user, passwordHash: await hashPassword('correct-password'), disabledAt: null, mfaEnabledAt: new Date(), mfaSecretEncrypted: encryptSecret(secret, env.APP_ENCRYPTION_KEY!) });
+      const payload = { enabled: true, currentPassword: 'correct-password', code: totpCode(secret) };
+      const url = '/admin/users/client-public/platform-admin';
+      const run = (body = payload, requestHeaders = normalHeaders) => f.app.inject({ method: 'PUT', url, headers: requestHeaders, payload: body });
+      expect((await run({ ...payload, currentPassword: 'wrong' })).statusCode).toBe(401);
+      expect((await run({ ...payload, code: '' })).statusCode).toBe(401);
+      expect((await run(payload, { ...normalHeaders, 'x-csrf-token': 'wrong' })).statusCode).toBe(403);
+      expect((await run()).statusCode).toBe(200);
+      expect(f.database.user.update).toHaveBeenLastCalledWith({ where: { id: 'client-id' }, data: { platformAdmin: true, platformRoleId: null } });
+      expect(f.database.session.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { revokedAt: null, OR: [{ userId: 'client-id' }, { supportParent: { userId: 'client-id' } }] } }));
+      target.platformAdmin = true;
+      expect((await run({ ...payload, enabled: false })).statusCode).toBe(200);
+      expect(f.database.user.update).toHaveBeenLastCalledWith({ where: { id: 'client-id' }, data: { platformAdmin: false, platformRoleId: null } });
+      target = { ...target, id: parent.userId };
+      expect((await run({ ...payload, enabled: false })).json<{ error: { code: string } }>().error.code).toBe('ADMIN_SELF_CHANGE');
+      target = { ...target, id: 'client-id', disabledAt: new Date() };
+      expect((await run()).statusCode).toBe(409);
+      actor.platformAdmin = false;
+      expect((await run()).statusCode).toBe(403);
+      f.useStaff();
+      expect((await run()).statusCode).toBe(403);
+      expect(f.database.user.update).toHaveBeenCalledTimes(2);
+      expect(f.audit.mock.calls.map(([entry]) => entry.data.action)).toEqual(['admin.role.admin_granted', 'admin.role.admin_revoked']);
+      expect(JSON.stringify(f.audit.mock.calls)).not.toContain('correct-password');
+      expect(JSON.stringify(f.audit.mock.calls)).not.toContain(payload.code);
+    } finally { await f.app.close(); }
   });
 });

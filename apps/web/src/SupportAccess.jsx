@@ -51,6 +51,7 @@ export function SupportStartModal({ user, operator, csrfToken, onClose }) {
       <p>O acesso dura até 30 minutos. Seu nome, o motivo e as ações ficam registrados no histórico.</p>
       {error && <p ref={errorMessage} id="support-error" className="admin-users-error" role="alert" tabIndex={-1}>{error}</p>}
       <fieldset className="support-modes"><legend>Modo de acesso</legend>
+        {operator?.platformAdmin && <label><input type="radio" name="mode" value="FULL_ACCESS" checked={mode === 'FULL_ACCESS'} onChange={() => setMode('FULL_ACCESS')}/><span><b>Acesso completo</b><small>Configurações, pedidos, gateways, integrações, domínios e plano da loja. Ações registradas no histórico.</small></span></label>}
         <label><input type="radio" name="mode" value="READ_ONLY" checked={mode === 'READ_ONLY'} onChange={() => setMode('READ_ONLY')}/><span><b>Consulta</b><small>Visualizar dados e investigar problemas.</small></span></label>
         {canPlatform(operator, 'support.write') && <label><input type="radio" name="mode" value="MAINTENANCE" checked={mode === 'MAINTENANCE'} onChange={() => setMode('MAINTENANCE')}/><span><b>Manutenção</b><small>Editar catálogo, checkouts, fretes e cupons.</small></span></label>}
       </fieldset>
@@ -72,7 +73,7 @@ export function SupportBanner({ support, user, csrfToken }) {
     catch (cause) { setError(cause.message); setBusy(false); }
   };
   return <aside className="support-banner" aria-label="Acesso de suporte ativo">
-    <ShieldCheck size={21}/><div><b>{support.mode === 'MAINTENANCE' ? 'Manutenção' : 'Somente consulta'} · {user.name}</b><small>{support.actorName} · até {new Date(support.expiresAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</small>{error && <span role="alert">{error}</span>}</div>
+    <ShieldCheck size={21}/><div><b>{support.mode === 'FULL_ACCESS' ? 'Acesso completo' : support.mode === 'MAINTENANCE' ? 'Manutenção' : 'Somente consulta'} · {user.name}</b><small>{support.actorName} · até {new Date(support.expiresAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</small>{error && <span role="alert">{error}</span>}</div>
     <button type="button" onClick={stop} disabled={busy}>{busy ? 'Encerrando...' : 'Encerrar suporte'}</button>
   </aside>;
 }

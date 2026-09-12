@@ -4,11 +4,15 @@
 
 Em **Administração → Usuários**, busque um cliente ativo e escolha **Acessar suporte**. Informe motivo (10–240 caracteres), sua própria senha e o código TOTP, quando habilitado. Escolha consulta ou manutenção, conforme as permissões do seu perfil.
 
+Administradores da plataforma também podem escolher **Acesso completo**. Esse modo libera os dados da loja e do responsável, preferências, pedidos/rastreamento/bloqueio de visitante, recuperação de carrinhos, webhooks, gateways, Google/GA4, Meta, UTMify, Shopify por credenciais/sincronização, domínios, criação/arquivamento de lojas e plano/cobrança. O acesso continua restrito às lojas e permissões do cliente selecionado. As validações de dados, titularidade, cobrança e publicação continuam valendo. Senha, MFA, sessões de login do cliente e administração da plataforma não são acessíveis pela sessão de suporte. A autorização OAuth externa da Shopify deve ser concluída pelo titular; o fluxo de app próprio por credenciais está disponível no suporte.
+
 O aviso superior identifica o cliente, operador, modalidade e horário limite. **Encerrar suporte** revoga o acesso e volta à administração. A sessão administrativa original permanece no navegador. O acesso é limitado a 30 minutos e a três sessões simultâneas por sessão administrativa. Contas bloqueadas e membros da administração não podem ser alvos de suporte.
 
 Consulta permite ver as áreas de operação e alternar entre lojas às quais o cliente tem acesso. Manutenção também permite criar/excluir produtos manuais, criar/editar/publicar/excluir checkouts, enviar imagens, editar fretes, cupons e desconto Pix. As permissões de membro da loja continuam valendo. Alterações em senha, MFA, sessões, dados cadastrais, membros, cobrança, gateways, domínios e destinos de webhooks ficam bloqueadas nos dois modos. Publicações continuam sujeitas às validações existentes da loja.
 
 Em **Equipe e permissões**, o administrador principal cria, edita e exclui perfis, busca contas já cadastradas e atribui membros. Perfis com membros não podem ser excluídos. A migração inclui **Equipe técnica** (consulta, manutenção e consulta das operações) e **Compliance** (consulta e auditoria); não atribui usuários automaticamente. Somente `platformAdmin` pode administrar perfis e atribuições. Perfis personalizados nunca concedem `roles.manage`.
+
+Para adicionar outro administrador, busque uma conta aprovada e ativa em **Adicionar à equipe → Tornar administrador**. Confirme a identidade da pessoa, sua própria senha e seu TOTP, quando ativado. Ela passa a ter os mesmos poderes administrativos, inclusive gestão de outros administradores. A opção **Remover administrador** retira esse acesso e qualquer perfil anterior, preservando a conta de cliente. As sessões do usuário e os suportes iniciados por ele são revogados nas duas operações; será necessário entrar novamente. Ninguém altera o próprio acesso: a operação exige outro administrador ativo. A transação serializável revalida o operador e o alvo para evitar perda do último administrador por alterações concorrentes. As operações geram `admin.role.admin_granted` e `admin.role.admin_revoked`, sem registrar senha, TOTP ou tokens.
 
 O **Histórico de acessos** mostra operador, cliente, motivo de abertura, leituras e alterações solicitadas, resultado HTTP e mudanças nos perfis. O identificador da requisição relaciona a auditoria de suporte aos registros operacionais existentes. O encerramento explícito gera um evento; expiração por tempo e revogação da sessão principal invalidam o acesso sem criar um evento artificial de encerramento.
 
@@ -27,6 +31,8 @@ As fronteiras seguem os princípios de validação por requisição, negação p
 ## Deploy e validação
 
 A migração `20260912030000_platform_support_roles` precisa ser aplicada antes de iniciar a API nova: `npm run db:deploy` no ambiente de deploy, seguido do processo habitual de publicação da API e web. Em Windows, use `npm.cmd`. Ela adiciona tabela de perfis, relação no usuário, campos da sessão, índices e restrições de integridade; não altera senhas nem promove usuários.
+
+O modo completo também exige a migração **`20260912190000_full_support_access`**, que permite `FULL_ACCESS` na restrição das sessões. O processo de deploy deve executar `npm run db:deploy` antes da nova API. Essa migração não concede acesso a nenhuma conta. A entrada automática de Novidades é `auto-20260912-full-support-administrators`.
 
 - `npm run check`: lint, tipos, testes, build e limites dos bundles.
 - `npx playwright test --config scripts/support-ui.config.mjs`: fluxos de consulta/manutenção, retorno à administração, perfis, compliance e capturas desktop/mobile. API simulada, sem contas ou pagamentos reais.

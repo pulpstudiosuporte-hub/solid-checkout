@@ -3,11 +3,8 @@ import type { AppEnvironment } from '@solid/config';
 import type { PrismaClient } from '@solid/database';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AuthRepository } from './auth-repository.js';
-import { hashToken, requirePlatformSession, validAdminMutation } from './admin-access.js';
+import { hashToken, requirePlatformSession, validAdminMutation, verifyAdminCredentials } from './admin-access.js';
 import { hasPlatformPermission, platformStaff } from './platform-permissions.js';
-import { verifyPassword } from './password.js';
-import { decryptSecret } from './shopify-crypto.js';
-import { verifyTotp } from './totp.js';
 
 const failure = (request: FastifyRequest, code: string, message: string) => ({ error: { code, message, requestId: request.id } });
 
@@ -18,15 +15,11 @@ export function registerAdminSupportRoutes(app: FastifyInstance, environment: Ap
     if (!validAdminMutation(request, session, environment)) return reply.code(403).send(failure(request, 'CSRF_INVALID', 'Requisição não autorizada.'));
     const reason = typeof request.body?.reason === 'string' ? request.body.reason.trim().replace(/\s+/g, ' ') : '';
     const mode = request.body?.mode ?? 'READ_ONLY';
-    if (reason.length < 10 || reason.length > 240 || (mode !== 'READ_ONLY' && mode !== 'MAINTENANCE')) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Informe um motivo de 10 a 240 caracteres e um modo válido.'));
+    if (reason.length < 10 || reason.length > 240 || (mode !== 'READ_ONLY' && mode !== 'MAINTENANCE' && mode !== 'FULL_ACCESS')) return reply.code(400).send(failure(request, 'VALIDATION_ERROR', 'Informe um motivo de 10 a 240 caracteres e um modo válido.'));
+    if (mode === 'FULL_ACCESS' && !session.user.platformAdmin) return reply.code(403).send(failure(request, 'FORBIDDEN', 'O acesso completo é exclusivo de administradores da plataforma.'));
     if (mode === 'MAINTENANCE' && !hasPlatformPermission(session.user, 'support.write')) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Seu perfil permite apenas consulta.'));
-    const operator = await auth.findUserByEmail(session.user.email);
-    const password = typeof request.body?.currentPassword === 'string' ? request.body.currentPassword : '';
-    if (!operator?.passwordHash || password.length > 128 || !await verifyPassword(password, operator.passwordHash)) return reply.code(401).send(failure(request, 'REAUTH_REQUIRED', 'Confirme sua senha de administrador para continuar.'));
-    if (operator.mfaEnabledAt) {
-      const code = typeof request.body?.code === 'string' ? request.body.code : '';
-      if (!environment.APP_ENCRYPTION_KEY || !operator.mfaSecretEncrypted || !verifyTotp(code, decryptSecret(operator.mfaSecretEncrypted, environment.APP_ENCRYPTION_KEY))) return reply.code(401).send(failure(request, 'MFA_CODE_INVALID', 'Confirme o código atual do seu autenticador.'));
-    }
+    const credentialError = await verifyAdminCredentials(auth, environment, session, request.body);
+    if (credentialError) return reply.code(401).send(failure(request, credentialError.code, credentialError.message));
     const target = await db.user.findUnique({ where: { publicId: request.params.publicId }, select: { id: true, publicId: true, name: true, email: true, disabledAt: true, accountStatus: true, platformAdmin: true, platformRole: { select: { publicId: true, name: true, permissions: true } } } });
     if (!target || target.id === session.userId || target.disabledAt || target.accountStatus !== 'APPROVED' || platformStaff(target)) return reply.code(409).send(failure(request, 'SUPPORT_TARGET_INVALID', 'Escolha uma conta ativa de cliente, sem acesso à administração.'));
     const now = new Date();

@@ -101,6 +101,62 @@ test('compliance sees consultation and audit but cannot choose maintenance or ma
   await page.getByRole('button', { name: 'Usuários', exact: true }).click();
   await page.getByRole('button', { name: 'Acessar suporte' }).click();
   await expect(page.getByRole('radio', { name: /Manutenção/ })).toHaveCount(0);
+  await expect(page.getByRole('radio', { name: /Acesso completo/ })).toHaveCount(0);
+});
+
+test('full support edits customer settings and enables webhook management', async ({ page }) => {
+  await page.goto(url);
+  await page.getByRole('button', { name: 'Acessar suporte' }).click();
+  await page.getByRole('radio', { name: /Acesso completo/ }).check();
+  await page.getByRole('textbox', { name: 'Motivo do acesso', exact: true }).fill('Manutenção completa da loja');
+  await page.getByLabel('Sua senha de administrador', { exact: true }).fill('fixture-password');
+  await page.getByRole('button', { name: 'Entrar na dashboard' }).click();
+  await expect(page.getByLabel('Acesso de suporte ativo')).toContainText('Acesso completo');
+  await expect(page.getByRole('button', { name: 'Meu plano', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Configurações', exact: true }).click();
+  await page.getByLabel('Nome da loja', { exact: true }).fill('Loja atualizada pelo suporte');
+  await page.getByRole('button', { name: 'Salvar alterações', exact: true }).click();
+  await expect(page.getByLabel('Nome da loja', { exact: true })).toHaveValue('Loja atualizada pelo suporte');
+  await expect(page.getByText('Cadastro concluído. Sua loja está ativa.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Domínios', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Segurança', exact: true })).toHaveCount(0);
+  await page.screenshot({ path: output('full-support-desktop.png'), animations: 'disabled' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: output('full-support-mobile.png'), animations: 'disabled' });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByRole('button', { name: 'Webhooks', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Novo webhook', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Encerrar suporte' }).click();
+  await expect(page.getByRole('heading', { name: 'Usuários da plataforma' })).toBeVisible();
+});
+
+test('promotes and removes another admin with explicit confirmation and password feedback', async ({ page }) => {
+  await page.goto(url);
+  await page.getByRole('button', { name: 'Equipe e permissões', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Remover administrador', exact: true })).toHaveCount(0);
+  await page.getByLabel('Buscar conta por nome ou e-mail').fill('marina@example.com');
+  await page.getByRole('button', { name: 'Buscar conta', exact: true }).click();
+  await page.getByRole('button', { name: 'Tornar administrador', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Tornar administrador' });
+  await expect(dialog).toContainText('Marina Oliveira');
+  await dialog.getByRole('button', { name: 'Confirmar administrador' }).click();
+  await expect(dialog.getByRole('alert')).toContainText('Confirme sua senha');
+  await dialog.getByLabel('Sua senha de administrador', { exact: true }).fill('incorrect-password');
+  await dialog.getByRole('button', { name: 'Confirmar administrador' }).click();
+  await expect(dialog.getByLabel('Sua senha de administrador', { exact: true })).toHaveValue('');
+  await page.screenshot({ path: output('admin-promotion-desktop.png'), animations: 'disabled' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: output('admin-promotion-mobile.png'), animations: 'disabled' });
+  await dialog.getByLabel('Sua senha de administrador', { exact: true }).fill('fixture-password');
+  await dialog.getByRole('button', { name: 'Confirmar administrador' }).click();
+  await expect(page.getByText('Administrador adicionado. A pessoa deve entrar novamente.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Remover administrador', exact: true }).click();
+  const removal = page.getByRole('dialog', { name: 'Remover administrador' });
+  await removal.getByLabel('Sua senha de administrador', { exact: true }).fill('fixture-password');
+  await removal.getByRole('button', { name: 'Confirmar remoção' }).click();
+  await expect(page.getByRole('button', { name: 'Remover administrador', exact: true })).toHaveCount(0);
+  await expect(page.getByText('Acesso administrativo removido e sessões encerradas.', { exact: true })).toBeVisible();
 });
 
 test('assigns an existing user to a profile and removes their platform access', async ({ page }) => {
