@@ -92,7 +92,7 @@ describe('conexÃ£o Meta', () => {
       expect(response.body).not.toContain(credentials.accessToken);
     } finally { await app.close(); }
   });
-  it('retorna o ID configurado sem expor o token nem afirmar validação externa', async () => {
+  it('retorna o ID configurado sem expor o token nem afirmar validaÃ§Ã£o externa', async () => {
     const gateway = { ...repository(), status: vi.fn().mockResolvedValue({ active: true, verifiedAt: null }), credentials: vi.fn().mockResolvedValue({ apiKeyEncrypted: encryptSecret(credentials.accessToken, metaEnv.APP_ENCRYPTION_KEY), publicKeyEncrypted: encryptSecret(credentials.pixelId, metaEnv.APP_ENCRYPTION_KEY) }) };
     const app = buildApp(metaEnv, { authRepository: new GatewayAuth(), gatewayRepository: gateway as unknown as PrismaGatewayRepository });
     try {
