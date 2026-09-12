@@ -1,3 +1,4 @@
+import { canPlatformPage, supportPages } from './platform-access';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3, CreditCard, Globe2, Home, LayoutTemplate, Package, Plug,
@@ -6,6 +7,8 @@ import {
 } from 'lucide-react';
 
 const items = [
+  { label: 'Equipe e permissões', group: 'Administração', icon: Users, keywords: 'roles equipe compliance perfis', admin: true },
+  { label: 'Histórico de acessos', group: 'Administração', icon: ServerCog, keywords: 'auditoria suporte registros', admin: true },
   { label: 'Início', group: 'Gestão', icon: Home, keywords: 'home painel visão geral dashboard métricas' },
   { label: 'Novidades', group: 'Gestão', icon: Sparkles, keywords: 'atualizações roadmap sugestões ideias lançamentos melhorias' },
   { label: 'Análises', group: 'Gestão', icon: BarChart3, keywords: 'analytics indicadores receita conversão vendas métricas' },
@@ -31,12 +34,12 @@ const items = [
 
 const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
-export default function CommandPalette({ open, onClose, onNavigate, platformAdmin = false }) {
+export default function CommandPalette({ open, onClose, onNavigate, platformAdmin = false, user, support }) {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);
   const optionRefs = useRef([]);
-  const available = useMemo(() => items.filter(item => !item.admin || platformAdmin), [platformAdmin]);
+  const available = useMemo(() => items.filter(item => (!item.admin || canPlatformPage(user || { platformAdmin }, item.label)) && (!support || supportPages.includes(item.label))), [platformAdmin, user, support]);
   const results = useMemo(() => {
     const term = normalize(query);
     if (!term) return available;

@@ -64,12 +64,12 @@ export function registerSettingsRoutes(app: FastifyInstance, environment: AppEnv
   app.get('/settings', async (request, reply) => {
     const current = await context(request); if (!current) return reply.code(401).send(failure(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     const [store, user, members, state] = await Promise.all([
-      db.store.findUnique({ where: { id: current.storeId }, select: { publicId: true, name: true, profile: true, profileEncrypted: true } }),
+      db.store.findUnique({ where: { id: current.storeId }, select: { publicId: true, name: true, profile: true, profileEncrypted: true, onboardingCompletedAt: true } }),
       db.user.findUnique({ where: { id: current.session.userId }, select: { publicId: true, name: true, email: true, emailVerifiedAt: true, profile: true, profileEncrypted: true, mfaEnabledAt: true } }),
       db.storeMember.findMany({ where: { storeId: current.storeId }, orderBy: { createdAt: 'asc' }, select: { role: true, createdAt: true, user: { select: { publicId: true, name: true, email: true, disabledAt: true } } } }),
       db.notificationState.findUnique({ where: { userId_storeId: { userId: current.session.userId, storeId: current.storeId } }, select: { preferences: true } }),
     ]);
-    const activation = store && user ? await refreshStoreOnboarding(db, current.storeId, current.session.userId, environment.APP_ENCRYPTION_KEY) : { completed: false, completedAt: null, missing: ['store'] };
+    const activation = current.session.support ? { completed: Boolean(store?.onboardingCompletedAt), completedAt: store?.onboardingCompletedAt ?? null, missing: [] } : store && user ? await refreshStoreOnboarding(db, current.storeId, current.session.userId, environment.APP_ENCRYPTION_KEY) : { completed: false, completedAt: null, missing: ['store'] };
     const safeStore = store ? { publicId: store.publicId, name: store.name, profile: environment.APP_ENCRYPTION_KEY ? readStoreProfile(store.profile, store.profileEncrypted, environment.APP_ENCRYPTION_KEY) : store.profile } : null;
     const safeUser = user ? { publicId: user.publicId, name: user.name, email: user.email, emailVerifiedAt: user.emailVerifiedAt, profile: environment.APP_ENCRYPTION_KEY ? readUserProfile(user.profile, user.profileEncrypted, environment.APP_ENCRYPTION_KEY) : user.profile, mfaEnabledAt: user.mfaEnabledAt } : null;
     return reply.header('cache-control', 'private, no-store').send({ store: safeStore, user: safeUser, activation, members: members.map(item => ({ ...item.user, role: item.role, createdAt: item.createdAt, status: item.user.disabledAt ? 'DISABLED' : 'ACTIVE' })), preferences: state?.preferences ?? null, role: current.role });

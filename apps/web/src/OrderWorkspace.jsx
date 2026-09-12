@@ -1,3 +1,4 @@
+import { useSupportAccess } from './support-context';
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -876,7 +877,9 @@ function AdditionalTab({ order }) {
 }
 
 export default function OrderWorkspace({ orderId, onBack, csrfToken }) {
-  const { loading, error, order, refresh } = useOrderWorkspace(orderId);
+  const support = useSupportAccess();
+  const { loading, error, order: sourceOrder, refresh } = useOrderWorkspace(orderId);
+  const order = useMemo(() => support && sourceOrder ? { ...sourceOrder, canManage: false } : sourceOrder, [support, sourceOrder]);
   const [activeTab, setActiveTab] = useState("summary");
   const [notice, setNoticeState] = useState(null);
   const setNotice = (message, errorNotice = false) => {

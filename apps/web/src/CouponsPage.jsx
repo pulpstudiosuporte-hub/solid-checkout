@@ -1,3 +1,4 @@
+import { useSupportAccess } from './support-context';
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -365,6 +366,7 @@ function CouponModal({
 }
 
 export default function CouponsPage({ csrfToken, storeKey }) {
+  const support = useSupportAccess(); const readOnly = support?.mode === 'READ_ONLY';
   const [state, setState] = useState({ items: [], loading: true, error: "" });
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ ...empty });
@@ -468,7 +470,7 @@ export default function CouponsPage({ csrfToken, storeKey }) {
             <RefreshCw className={state.loading ? "spin" : ""} size={17} />{" "}
             Atualizar lista
           </button>
-          <button className="primary" onClick={() => open()}>
+          <button className="primary" disabled={readOnly} onClick={() => open()}>
             <Plus size={17} /> Criar cupom
           </button>
         </div>
@@ -525,7 +527,7 @@ export default function CouponsPage({ csrfToken, storeKey }) {
             <Clipboard size={34} />
             <h2>Nenhum cupom criado</h2>
             <p>Crie seu primeiro incentivo para aumentar a conversão.</p>
-            <button className="primary" onClick={() => open()}>
+            <button className="primary" disabled={readOnly} onClick={() => open()}>
               <Plus size={16} /> Criar cupom
             </button>
           </div>
@@ -604,13 +606,13 @@ export default function CouponsPage({ csrfToken, storeKey }) {
                           <MoreHorizontal size={18} />
                         </summary>
                         <div>
-                          <button type="button" onClick={() => open(item)}>
+                          <button type="button" disabled={readOnly} onClick={() => open(item)}>
                             <Pencil size={15} /> Editar
                           </button>
                           <button
                             type="button"
                             onClick={() => void setActive(item, !item.active)}
-                            disabled={busy}
+                            disabled={readOnly || busy}
                           >
                             {item.active ? (
                               <X size={15} />
@@ -623,7 +625,7 @@ export default function CouponsPage({ csrfToken, storeKey }) {
                             type="button"
                             className="danger"
                             onClick={() => void remove(item)}
-                            disabled={busy}
+                            disabled={readOnly || busy}
                           >
                             <Trash2 size={15} /> Excluir
                           </button>

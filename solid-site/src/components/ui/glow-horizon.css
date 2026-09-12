@@ -1,0 +1,19 @@
+.solid-site {
+  position: relative;
+  isolation: isolate;
+}
+
+.site-horizon-background {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 480px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: -1;
+  background: #050507;
+  mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+}
+
+@media (max-width: 720px) {
+  .site-horizon-background { height: 180px; }
+}

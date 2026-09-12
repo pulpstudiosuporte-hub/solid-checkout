@@ -1,3 +1,4 @@
+import ExitOffer from './ExitOffer';
 import { mergePaymentUpdate, pollPaymentStatus } from './payment-polling';
 import { Component, useCallback, useEffect, useRef, useState } from "react";
 import PixPaymentPanel from "./PixPaymentPanel";
@@ -742,6 +743,11 @@ function SessionContent({ session: initialSession, token }) {
     catch (requestError) { setCouponMessage(requestError.message); }
     finally { setBusy(false); }
   };
+  const acceptExitOffer = async code => {
+    setBusy(true);
+    try { const { coupon } = await applyPublicCoupon(session.publicId, token, code); setSession(current => ({ ...current, couponCode: coupon.code, discountCents: coupon.discountCents, paymentDiscountCents: coupon.paymentDiscountCents })); setCouponCode(coupon.code); setCouponOpen(true); setCouponMessage(`Cupom ${coupon.code} aplicado.`); setSelectedShipping(current => current ? { ...current, discountCents: coupon.discountCents, grandTotalCents: coupon.grandTotalCents } : current); }
+    finally { setBusy(false); }
+  };
   const valid =
     form.name.trim().length >= 3 &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) &&
@@ -830,7 +836,8 @@ function SessionContent({ session: initialSession, token }) {
     setPayment(current => mergePaymentUpdate(current, result.payment));
     return result.payment;
   };
-  const googleTracking = <GoogleCheckoutTracking sessionId={session.publicId} token={token} paymentStatus={paymentStatus} shippingSelected={Boolean(selectedShipping)} paymentCreated={Boolean(payment?.publicId)} checkoutRevision={`${session.totalCents}:${session.discountCents}:${selectedShipping?.shippingPriceCents ?? session.shippingPriceCents}`}/>;
+  const googleTracking = <><ExitOffer config={config} sessionId={session.publicId} token={token} enabled={!busy && !payment && session.status === 'OPEN' && expiry.remaining > 0 && !session.couponCode} onApply={acceptExitOffer}/>
+      <GoogleCheckoutTracking sessionId={session.publicId} token={token} paymentStatus={paymentStatus} shippingSelected={Boolean(selectedShipping)} paymentCreated={Boolean(payment?.publicId)} checkoutRevision={`${session.totalCents}:${session.discountCents}:${selectedShipping?.shippingPriceCents ?? session.shippingPriceCents}`}/></>;
   if (String(payment?.status).toUpperCase() === "PAID") {
     return <><ThankYouPage session={session} items={items} itemCount={itemCount} selectedShipping={selectedShipping} payment={payment} config={config} delivery={delivery} />{googleTracking}</>;
   }
@@ -862,22 +869,7 @@ function SessionContent({ session: initialSession, token }) {
           </span>
         </div>
       )}
-      {config.showProgress && <nav className={`checkout-progress style-${config.progressStyle || 'outline'} checkout-device-${config.progressDevice || 'all'}`} aria-label="Etapas do checkout" style={{order:layoutOrder('block','progress')}}>
-        <span className="active">
-          <i>{config.progressStyle === 'icons' ? <UserRound size={16} aria-hidden="true" /> : 1}</i>
-          {copy.identification}
-        </span>
-        <b />
-        {requiresShipping && <><span className={step >= 2 ? "active" : ""}>
-          <i>{config.progressStyle === 'icons' ? <MapPin size={16} aria-hidden="true" /> : 2}</i>
-          {copy.shipping}
-        </span>
-        <b /></>}
-          <span className={step >= 4 ? "active" : ""}>
-            <i>{config.progressStyle === 'icons' ? <CreditCard size={16} aria-hidden="true" /> : (requiresShipping ? 3 : 2)}</i>
-          {copy.payment}
-        </span>
-      </nav>}
+
       {buildCheckoutLayoutEntries(config)
         .filter((entry) => entry.kind === "custom")
         .map((entry) => (
@@ -894,6 +886,22 @@ function SessionContent({ session: initialSession, token }) {
         style={{order:layoutOrder('block','content')}}
       >
         <section className="customer-step">
+      {config.showProgress && <nav className={`checkout-progress style-${config.progressStyle || 'outline'} checkout-device-${config.progressDevice || 'all'}`} aria-label="Etapas do checkout">
+        <span className="active">
+          <i>{config.progressStyle === 'icons' ? <UserRound size={16} aria-hidden="true" /> : 1}</i>
+          {copy.identification}
+        </span>
+        <b />
+        {requiresShipping && <><span className={step >= 2 ? "active" : ""}>
+          <i>{config.progressStyle === 'icons' ? <MapPin size={16} aria-hidden="true" /> : 2}</i>
+          {copy.shipping}
+        </span>
+        <b /></>}
+          <span className={step >= 4 ? "active" : ""}>
+            <i>{config.progressStyle === 'icons' ? <CreditCard size={16} aria-hidden="true" /> : (requiresShipping ? 3 : 2)}</i>
+          {copy.payment}
+        </span>
+      </nav>}
           {step === 1 ? (
             <form onSubmit={advance} noValidate>
               <div className="checkout-primary-card">

@@ -1,3 +1,4 @@
+import { hasPlatformPermission } from './platform-permissions.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { AppEnvironment } from '@solid/config';
 import type { PrismaClient } from '@solid/database';
@@ -14,7 +15,7 @@ export function registerAdminOperationRoutes(app: FastifyInstance, environment: 
   const csrfCookie = secure ? '__Host-solid_csrf' : 'solid_csrf';
   const adminSession = async (request: FastifyRequest): Promise<SessionUser | null> => {
     const token = request.cookies[sessionCookie]; const session = token ? await auth.findActiveSession(sha256(token), new Date()) : null;
-    return session?.user.platformAdmin ? session : null;
+    return session && !session.support && hasPlatformPermission(session.user, request.method === 'GET' ? 'operations.read' : 'operations.manage') ? session : null;
   };
   const mutationAllowed = (request: FastifyRequest, session: SessionUser): boolean => {
     const origin = request.headers.origin; const header = request.headers['x-csrf-token']; const cookie = request.cookies[csrfCookie];
@@ -22,7 +23,8 @@ export function registerAdminOperationRoutes(app: FastifyInstance, environment: 
   };
 
   app.get('/admin/advanced/overview', async (request, reply) => {
-    if (!await adminSession(request)) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso administrativo necessário.'));
+    const session = await adminSession(request);
+    if (!session) return reply.code(403).send(failure(request, 'FORBIDDEN', 'Acesso administrativo necessário.'));
     const now = new Date();
     const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const since30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -67,7 +69,7 @@ export function registerAdminOperationRoutes(app: FastifyInstance, environment: 
         security: { activeSessions, mfaAdoptionPercent: users ? Math.round((mfaUsers / users) * 100) : 0, auditEvents24h },
         operations: { pending: pendingOperations, processing: processingOperations, dead: deadOperations }
       },
-      recentAudit: recentAudit.map(event => ({ ...event, id: event.id.toString() }))
+      recentAudit: hasPlatformPermission(session.user, 'audit.read') ? recentAudit.map(event => ({ ...event, id: event.id.toString() })) : []
     });
   });
 

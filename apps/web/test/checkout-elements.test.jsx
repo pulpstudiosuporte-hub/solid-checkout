@@ -184,7 +184,6 @@ describe("ordenação dos elementos do checkout", () => {
       "block:hero",
       "custom:notice",
       "block:timer",
-      "block:progress",
       "custom:faq",
     ]);
   });
@@ -207,7 +206,6 @@ describe("ordenação dos elementos do checkout", () => {
       "block:hero",
       "custom:notice",
       "block:timer",
-      "block:progress",
     ]);
   });
 
@@ -229,7 +227,6 @@ describe("ordenação dos elementos do checkout", () => {
       "block:hero",
       "custom:notice",
       "block:timer",
-      "block:progress",
     ]);
   });
 
@@ -245,10 +242,9 @@ describe("ordenação dos elementos do checkout", () => {
     expect(Object.fromEntries(positions)).toEqual({
       "custom:notice": 1,
       "block:timer": 2,
-      "block:progress": 3,
-      "block:hero": 4,
-      "custom:reviews": 5,
-      "block:content": 6,
+      "block:hero": 3,
+      "custom:reviews": 4,
+      "block:content": 5,
     });
   });
 
@@ -266,7 +262,6 @@ describe("ordenação dos elementos do checkout", () => {
       "block:hero",
       "custom:top",
       "block:timer",
-      "block:progress",
     ]);
   });
 });

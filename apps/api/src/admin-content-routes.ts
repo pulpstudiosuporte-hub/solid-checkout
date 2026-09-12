@@ -1,3 +1,4 @@
+import { hasPlatformPermission } from './platform-permissions.js';
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import type { AppEnvironment } from "@solid/config";
 import type { PrismaClient } from "@solid/database";
@@ -64,6 +65,34 @@ const categories = [
   "SECURITY",
 ] as const;
 const automaticReleases = [
+  {
+    publicId: "auto-20260912-marketing-site",
+    category: "NEWS" as const,
+    title: "Conheça o site da SOLID",
+    description: "Uma nova apresentação da SOLID, com demonstração interativa do checkout, recursos da plataforma, integrações e respostas às dúvidas mais comuns.",
+    publishedAt: new Date("2026-09-12T05:10:00.000Z"),
+  },
+  {
+    publicId: "auto-20260912-checkout-steps",
+    category: "IMPROVEMENT" as const,
+    title: "Etapas alinhadas ao formulário",
+    description: "Os indicadores de etapas agora ficam na coluna do formulário, com o resumo do pedido separado e alinhado mais acima. A prévia da personalização acompanha o novo layout no computador e no celular.",
+    publishedAt: new Date("2026-09-12T05:00:00.000Z"),
+  },
+  {
+    publicId: "auto-20260912-exit-offer",
+    category: "IMPROVEMENT" as const,
+    title: "Oferta de saída no checkout",
+    description: "Personalize um popup com cupom para recuperar compradores que demonstram intenção de sair. Ajuste textos, cores e exibição no celular, com prévia e contagem da validade real do desconto.",
+    publishedAt: new Date("2026-09-12T04:00:00.000Z"),
+  },
+  {
+    publicId: "auto-20260912-support-roles",
+    category: "SECURITY" as const,
+    title: "Suporte com acesso controlado",
+    description: "A equipe SOLID agora pode ajudar na dashboard por acessos temporários de consulta ou manutenção, com motivo e histórico das ações. Novos perfis definem as permissões da equipe técnica e de compliance.",
+    publishedAt: new Date("2026-09-12T03:00:00.000Z"),
+  },
   {
     publicId: "auto-20260912-globe-3d",
     category: "IMPROVEMENT" as const,
@@ -429,7 +458,7 @@ export function registerAdminContentRoutes(
     request: FastifyRequest,
   ): Promise<SessionUser | null> => {
     const current = await session(request);
-    return current?.user.platformAdmin ? current : null;
+    return current && !current.support && hasPlatformPermission(current.user, 'content.manage') ? current : null;
   };
   const mutationAllowed = (
     request: FastifyRequest,
@@ -475,7 +504,7 @@ export function registerAdminContentRoutes(
       return reply
         .code(401)
         .send(failure(request, "UNAUTHENTICATED", "Autenticação necessária."));
-    await ensureAutomaticReleases();
+    if (!request.supportSession) await ensureAutomaticReleases();
     const [releases, assets] = await Promise.all([
       db.productRelease.findMany({
         where: { published: true },

@@ -5,6 +5,7 @@ import type { AppEnvironment } from '@solid/config';
 import type { PrismaClient } from '@solid/database';
 import type { AuthRepository, LoginUser } from './auth-repository.js';
 import { hashPassword, verifyPassword } from './password.js';
+import { permissionsFor } from './platform-permissions.js';
 import { decryptSecret, encryptSecret } from './shopify-crypto.js';
 import { generateRecoveryCodes, generateTotpSecret, recoveryCodeHash, totpUri, verifyTotp } from './totp.js';
 
@@ -55,7 +56,7 @@ export function registerAuthRoutes(app: FastifyInstance, environment: AppEnviron
       expiresAt: new Date(now.getTime() + SESSION_SECONDS * 1000), absoluteExpiresAt: new Date(now.getTime() + ABSOLUTE_SESSION_SECONDS * 1000), ...(mfaVerifiedAt ? { mfaVerifiedAt } : {}) });
     return reply.clearCookie(authCsrfCookie, cookieBase).setCookie(sessionCookie, token, { ...cookieBase, httpOnly: true, maxAge: ABSOLUTE_SESSION_SECONDS })
       .setCookie(csrfCookie, csrfToken, { ...cookieBase, httpOnly: true, maxAge: SESSION_SECONDS })
-      .send({ user: { id: user.publicId, publicId: user.publicId, name: user.name, email: user.email, accountStatus: user.accountStatus ?? 'APPROVED', platformAdmin: user.platformAdmin ?? false, mfaEnabled: Boolean(user.mfaEnabledAt) }, csrfToken });
+      .send({ user: { id: user.publicId, publicId: user.publicId, name: user.name, email: user.email, accountStatus: user.accountStatus ?? 'APPROVED', platformAdmin: user.platformAdmin ?? false, platformRole: user.platformRole ?? null, platformPermissions: permissionsFor(user), mfaEnabled: Boolean(user.mfaEnabledAt) }, csrfToken });
   };
 
   app.get('/auth/csrf', async (_request, reply) => {
@@ -133,16 +134,19 @@ export function registerAuthRoutes(app: FastifyInstance, environment: AppEnviron
       if (recovery) await transaction.mfaRecoveryCode.update({ where: { id: recovery.id }, data: { usedAt: now } });
       await transaction.auditLog.create({ data: { actorType: 'USER', actorUserId: challenge.userId, action: recovery ? 'auth.mfa_recovery_used' : 'auth.mfa_verified', targetType: 'user', targetId: challenge.userId } });
     });
-    return issueSession(request, reply, challenge.user, now);
+    const verifiedUser = await repository.findUserByEmail(challenge.user.email);
+    if (!verifiedUser || verifiedUser.disabledAt || verifiedUser.accountStatus !== 'APPROVED') return reply.code(401).send(errorBody(request, 'INVALID_CREDENTIALS', 'Conta indisponível.'));
+    return issueSession(request, reply, verifiedUser, now);
   });
 
   app.get('/auth/session', async (request, reply) => {
     const token = request.cookies[sessionCookie]; if (!token) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     const now = new Date(); const session = await repository.findActiveSession(sha256(token), now);
+    if (!session && request.supportSession) return reply.code(409).send(errorBody(request, 'SUPPORT_SESSION_EXPIRED', 'O acesso de suporte foi encerrado.'));
     if (!session) return reply.clearCookie(sessionCookie, cookieBase).code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     const csrfToken = request.cookies[csrfCookie]; if (!csrfToken || !safeEqual(sha256(csrfToken), session.csrfTokenHash)) return reply.code(401).send(errorBody(request, 'UNAUTHENTICATED', 'Autenticação necessária.'));
     await repository.touchSession(session.sessionId, new Date(Math.min(now.getTime() + SESSION_SECONDS * 1000, session.absoluteExpiresAt.getTime())), now);
-    return reply.send({ user: session.user, csrfToken });
+    return reply.header('cache-control', 'private, no-store').send({ user: session.user, csrfToken, support: session.support ? { actorName: session.support.actorName, actorPublicId: session.support.actorPublicId, mode: session.support.mode, reason: session.support.reason, expiresAt: session.support.expiresAt } : null });
   });
 
   app.get('/auth/sessions', async (request, reply) => {

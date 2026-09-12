@@ -1,0 +1,91 @@
+/* Decorative light stays behind each section and never intercepts interaction. */
+.solid-site :is(.site-section, .final-section) {
+  position: relative;
+  isolation: isolate;
+  --light-x: 0%;
+  --light-y: 24%;
+  --light-secondary-x: 100%;
+  --light-secondary-y: 78%;
+}
+
+.solid-site :is(.site-section, .final-section)::before,
+.solid-site :is(.site-section, .final-section)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.solid-site :is(.site-section, .final-section)::before {
+  background:
+    radial-gradient(ellipse 7% 11% at var(--light-x) var(--light-y), #bf95ff45, transparent 100%),
+    radial-gradient(ellipse 42% 46% at var(--light-x) var(--light-y), #a558fb30, #7137d715 46%, transparent 100%),
+    radial-gradient(ellipse 6% 9% at var(--light-secondary-x) var(--light-secondary-y), #ac95ff38, transparent 100%),
+    radial-gradient(ellipse 37% 43% at var(--light-secondary-x) var(--light-secondary-y), #4922e532, transparent 100%);
+  mask-image: linear-gradient(transparent, #000 12%, #000 86%, transparent);
+}
+
+.solid-site :is(.site-section, .final-section).site-container::before {
+  left: calc((100% - 100vw) / 2);
+  right: calc((100% - 100vw) / 2);
+}
+
+.solid-site :is(.site-section, .final-section)::after {
+  background:
+    radial-gradient(circle at 5% 18%, #e1ccff 0 1px, #ad80f47a 2px, transparent 7px),
+    radial-gradient(circle at 94% 31%, #d3b1ff 0 1px, #a558fb65 2px, transparent 8px),
+    radial-gradient(circle at 8% 77%, #ba98ec 0 1px, #a558fb3d 2px, transparent 6px),
+    radial-gradient(circle at 97% 87%, #dec9ff 0 1px, #9873f759 2px, transparent 7px);
+  opacity: .6;
+  animation: section-light-breathe 12s ease-in-out infinite alternate;
+}
+
+.solid-site #recursos,
+.solid-site #integracoes {
+  --light-x: 100%;
+  --light-y: 22%;
+  --light-secondary-x: 0%;
+  --light-secondary-y: 82%;
+}
+
+.solid-site .foundation-section,
+.solid-site #duvidas {
+  --light-x: 4%;
+  --light-y: 45%;
+  --light-secondary-y: 67%;
+}
+
+.solid-site #como-funciona {
+  --light-x: 50%;
+  --light-y: 0%;
+  --light-secondary-y: 65%;
+}
+
+.solid-site .final-section {
+  --light-x: 0%;
+  --light-y: 50%;
+  --light-secondary-y: 55%;
+}
+
+.solid-site :is(#recursos, #integracoes, .final-section)::after {
+  animation-delay: -6s;
+}
+
+@keyframes section-light-breathe {
+  from { opacity: .35; }
+  to { opacity: .75; }
+}
+
+@media (max-width: 720px) {
+  .solid-site :is(.site-section, .final-section)::before { opacity: .75; }
+  .solid-site :is(.site-section, .final-section)::after { animation: none; opacity: .45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .solid-site :is(.site-section, .final-section)::after { animation: none; }
+}
+
+.motion-scene[data-motion=paused] .solid-site :is(.site-section, .final-section)::after {
+  animation: none;
+}

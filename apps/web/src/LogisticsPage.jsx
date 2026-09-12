@@ -1,3 +1,4 @@
+import { useSupportAccess } from './support-context';
 import { useEffect, useState } from "react";
 import {
   Clock3,
@@ -58,6 +59,7 @@ const shippingImage = (name) =>
   shippingPresets.find((item) => name.toLowerCase().includes(item.key))?.image;
 
 export default function LogisticsPage({ csrfToken, storeKey }) {
+  const support = useSupportAccess(); const readOnly = support?.mode === 'READ_ONLY';
   const [state, setState] = useState({ loading: true, items: [], error: "" });
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -170,7 +172,7 @@ export default function LogisticsPage({ csrfToken, storeKey }) {
             entrega.
           </p>
         </div>
-        <button className="primary" onClick={() => open()}>
+        <button className="primary" disabled={readOnly} onClick={() => open()}>
           <Plus size={17} /> Novo frete
         </button>
       </section>
@@ -184,7 +186,7 @@ export default function LogisticsPage({ csrfToken, storeKey }) {
           <button
             type="button"
             key={preset.key}
-            onClick={() => createPreset(preset)}
+            disabled={readOnly} onClick={() => createPreset(preset)}
           >
             <img src={preset.image} alt="" />
             <span>
@@ -216,7 +218,7 @@ export default function LogisticsPage({ csrfToken, storeKey }) {
             <p>
               Use uma modalidade pronta acima ou crie uma opção personalizada.
             </p>
-            <button className="primary" onClick={() => open()}>
+            <button className="primary" disabled={readOnly} onClick={() => open()}>
               <Plus size={16} /> Criar primeiro frete
             </button>
           </div>
@@ -253,14 +255,14 @@ export default function LogisticsPage({ csrfToken, storeKey }) {
                     type="checkbox"
                     checked={method.active}
                     onChange={() => toggle(method)}
-                    disabled={busy}
+                    disabled={readOnly || busy}
                   />
                   <span />
                   <em>{method.active ? "Ativo" : "Inativo"}</em>
                 </label>
                 <button
                   className="icon-btn"
-                  onClick={() => open(method)}
+                  disabled={readOnly} onClick={() => open(method)}
                   aria-label={`Editar ${method.name}`}
                 >
                   <Pencil size={16} />
@@ -269,7 +271,7 @@ export default function LogisticsPage({ csrfToken, storeKey }) {
                   className="icon-btn"
                   onClick={() => void remove(method)}
                   aria-label={`Excluir ${method.name}`}
-                  disabled={busy}
+                  disabled={readOnly || busy}
                 >
                   <Trash2 size={16} />
                 </button>
@@ -380,7 +382,7 @@ export default function LogisticsPage({ csrfToken, storeKey }) {
                 <button
                   type="button"
                   className="secondary"
-                  disabled={busy}
+                  disabled={readOnly || busy}
                   onClick={() => void remove(editing)}
                 >
                   Excluir
@@ -393,7 +395,7 @@ export default function LogisticsPage({ csrfToken, storeKey }) {
               >
                 Cancelar
               </button>
-              <button className="primary" disabled={busy}>
+              <button className="primary" disabled={readOnly || busy}>
                 {busy ? (
                   <LoaderCircle className="spin" size={17} />
                 ) : (

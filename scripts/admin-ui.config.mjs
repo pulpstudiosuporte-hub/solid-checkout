@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
   testDir: fileURLToPath(new URL('../apps/web/ui-tests', import.meta.url)),
-  testIgnore: ['pix.spec.mjs', 'areas.spec.mjs', 'google.spec.mjs', 'analytics.spec.mjs', 'roadmap.spec.mjs', 'geography.spec.mjs'],
+  testIgnore: ['pix.spec.mjs', 'areas.spec.mjs', 'google.spec.mjs', 'analytics.spec.mjs', 'roadmap.spec.mjs', 'geography.spec.mjs', 'support.spec.mjs', 'exit-offer.spec.mjs'],
   outputDir: fileURLToPath(new URL('../.visual-check/admin-test-results', import.meta.url)),
   workers: 1,
   expect: { timeout: 15000 },

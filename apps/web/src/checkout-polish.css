@@ -936,3 +936,24 @@
     max-width: 52px;
   }
 }
+
+/* Steps belong to the form column; the summary starts alongside them. */
+.session-checkout .customer-step > .checkout-progress {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 24px;
+  padding: 8px 0 22px;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+.editor-device .ep-form-progress > .ep-steps {
+  margin: 0 0 20px;
+  padding: 8px 0 22px;
+}
+@media (max-width: 700px) {
+  .session-checkout .customer-step > .checkout-progress {
+    margin-bottom: 18px;
+    padding: 4px 0 18px;
+  }
+}

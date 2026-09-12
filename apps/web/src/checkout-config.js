@@ -1,6 +1,8 @@
+import { exitOfferDefaults } from './exit-offer-config';
 import { defaultCheckoutFooterMethods } from "./CheckoutFooter";
 export const defaultBlockOrder = ["hero", "timer", "progress", "content"];
 export const defaultCheckoutConfig = {
+  ...exitOfferDefaults,
   template: "minimal",
   layout: "split",
   primary: "#7357e9",

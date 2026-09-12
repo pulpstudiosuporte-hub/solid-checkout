@@ -138,6 +138,8 @@ model User {
   disabledAt      DateTime?     @map("disabled_at") @db.Timestamptz(3)
   accountStatus   AccountStatus @default(PENDING) @map("account_status")
   platformAdmin   Boolean       @default(false) @map("platform_admin")
+  platformRoleId  String?       @map("platform_role_id") @db.Uuid
+  platformRole    PlatformRole? @relation(fields: [platformRoleId], references: [id], onDelete: SetNull)
   profile         Json?
   profileEncrypted String?      @map("profile_encrypted") @db.Text
   mfaSecretEncrypted String?    @map("mfa_secret_encrypted") @db.Text
@@ -160,6 +162,7 @@ model User {
   productFeedback ProductFeedback[]
   productFeedbackVotes ProductFeedbackVote[]
 
+  @@index([platformRoleId])
   @@index([accountStatus, createdAt(sort: Desc)])
   @@map("users")
 }
@@ -974,6 +977,11 @@ model Session {
   absoluteExpiresAt DateTime @map("absolute_expires_at") @db.Timestamptz(3)
   revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(3)
   mfaVerifiedAt   DateTime? @map("mfa_verified_at") @db.Timestamptz(3)
+  supportParentId String?  @map("support_parent_id") @db.Uuid
+  supportMode     String?  @map("support_mode") @db.VarChar(20)
+  supportReason   String?  @map("support_reason") @db.VarChar(240)
+  supportParent   Session? @relation("SupportSessions", fields: [supportParentId], references: [id], onDelete: Cascade)
+  supportChildren Session[] @relation("SupportSessions")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   activeMembership StoreMember? @relation(fields: [activeStoreId, userId], references: [storeId, userId], onDelete: Restrict)
@@ -981,7 +989,21 @@ model Session {
 
   @@index([userId, revokedAt])
   @@index([expiresAt])
+  @@index([supportParentId])
   @@map("sessions")
+}
+
+model PlatformRole {
+  id          String   @id @default(uuid()) @db.Uuid
+  publicId    String   @unique @default(cuid()) @map("public_id") @db.VarChar(32)
+  name        String   @unique @db.VarChar(80)
+  description String   @default("") @db.VarChar(240)
+  permissions String[] @default([])
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  users       User[]
+
+  @@map("platform_roles")
 }
 
 model MfaChallenge {

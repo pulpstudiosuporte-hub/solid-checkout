@@ -40,7 +40,9 @@ export function buildCheckoutLayoutEntries(config) {
     custom
       .filter((item) => topSlot(item, blocks.length) === slot)
       .forEach((item) => entries.push({ kind: "custom", id: item.id, item }));
-    if (slot < blocks.length) {
+    // Retain the legacy progress slot when reading saved custom elements.
+    // Steps now belong to the form column, not the full-width lane.
+    if (slot < blocks.length && blocks[slot] !== "progress") {
       entries.push({ kind: "block", id: blocks[slot] });
     }
   }
@@ -91,7 +93,7 @@ export function reorderCheckoutLayout(config, entryKey, direction) {
 
   return {
     ...config,
-    blockOrder: [...blockOrder, "content"],
+    blockOrder: [...blockOrder, "progress", "content"],
     customElements: [...untouchedElements, ...orderedTopElements],
   };
 }

@@ -1,6 +1,15 @@
 // @ts-check
 class RequestTimeoutError extends Error { code = 'REQUEST_TIMEOUT'; }
 const tabUserKey = 'solid-tab-user-context';
+const supportKey = 'solid-support-context';
+
+/** @param {string} token @param {string} userId */
+export function bindSupportSession(token, userId) {
+  sessionStorage.setItem(supportKey, token);
+  bindTabToUser(userId);
+}
+export function clearSupportSession() { sessionStorage.removeItem(supportKey); clearTabUser(); }
+export function hasSupportSession() { return Boolean(sessionStorage.getItem(supportKey)); }
 
 /** @param {string | undefined} userId */
 export function bindTabToUser(userId) {
@@ -17,6 +26,8 @@ export async function request(input, init = {}) {
   const expectedUser = sessionStorage.getItem(tabUserKey);
   const url = String(input);
   const establishesSession = /\/auth\/(csrf|login|register|verify-email|forgot-password|reset-password)$/.test(url);
+  const support = sessionStorage.getItem(supportKey);
+  if (init.credentials === 'include' && support) headers.set('x-solid-support-session', support);
   if (init.credentials === 'include' && expectedUser && !establishesSession) headers.set('x-solid-user-context', expectedUser);
   const timeout = AbortSignal.timeout(30_000);
   const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
@@ -35,6 +46,7 @@ export async function request(input, init = {}) {
     if (body?.error?.code === 'SESSION_CONTEXT_CHANGED') {
       window.dispatchEvent(new CustomEvent('solid:session-conflict'));
     }
+    if (body?.error?.code === 'SUPPORT_SESSION_EXPIRED') window.dispatchEvent(new CustomEvent('solid:support-expired'));
   }
   return response;
 }

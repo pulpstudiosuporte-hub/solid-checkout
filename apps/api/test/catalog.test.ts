@@ -138,6 +138,12 @@ describe('catálogo isolado por loja', () => {
     const response = await app.inject({ method: 'PATCH', url: '/checkouts/checkout-a/draft', headers: authenticatedHeaders, payload: { config: { ...config, seoTitle: 'Curso SOLID | Loja Teste', seoDescription: 'Finalize sua inscricao com seguranca.', faviconUrl: 'https://cdn.example.com/favicon.webp', customElements: [{ id: 'text-title-only', type: 'text', slot: 1, region: 'main', title: 'Uma oferta especial', text: '' }] } } });
     expect(response.statusCode).toBe(200); expect(catalog.checkouts[0]?.draftConfig).toMatchObject({ primary: '#7357e9', title: 'Finalize seu pedido', progressStyle: 'icons', footerPadding: 56, footerPaymentMethods: ['visa', 'mastercard', 'pix'], seoTitle: 'Curso SOLID | Loja Teste', faviconUrl: 'https://cdn.example.com/favicon.webp', customElements: [{ id: 'text-title-only', title: 'Uma oferta especial', text: '' }] });
     expect((await app.inject({ method: 'PATCH', url: '/checkouts/checkout-a/draft', headers: authenticatedHeaders, payload: { config: { ...config, primary: 'url(javascript:1)' } } })).statusCode).toBe(400);
+    const offer = { ...config, exitOfferEnabled: true, exitOfferCouponCode: 'fica10', exitOfferDelaySeconds: 8, exitOfferTitle: 'Espere!', exitOfferAccent: '#ab1234' };
+    expect((await app.inject({ method: 'PATCH', url: '/checkouts/checkout-a/draft', headers: authenticatedHeaders, payload: { config: offer } })).statusCode).toBe(200);
+    expect(catalog.checkouts[0]?.draftConfig).toMatchObject({ exitOfferEnabled: true, exitOfferCouponCode: 'FICA10', exitOfferDelaySeconds: 8, exitOfferTitle: 'Espere!', exitOfferAccent: '#ab1234' });
+    for (const invalid of [{ exitOfferCouponCode: '' }, { exitOfferDelaySeconds: 0 }, { exitOfferAccent: 'url(javascript:1)' }, { exitOfferMobile: 'yes' }]) {
+      expect((await app.inject({ method: 'PATCH', url: '/checkouts/checkout-a/draft', headers: authenticatedHeaders, payload: { config: { ...offer, ...invalid } } })).statusCode).toBe(400);
+    }
     await app.close();
   });
 

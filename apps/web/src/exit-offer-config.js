@@ -1,0 +1,1 @@
+export const exitOfferDefaults = { exitOfferEnabled: false, exitOfferCouponCode: '', exitOfferTitle: 'Não vá embora ainda!', exitOfferButtonText: 'Sim, quero aproveitar!', exitOfferDismissText: 'Não, obrigado', exitOfferAccent: '#f47e20', exitOfferBackground: '#ffffff', exitOfferTextColor: '#292938', exitOfferCountdown: true, exitOfferDelaySeconds: 10, exitOfferMobile: true };

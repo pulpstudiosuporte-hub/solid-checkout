@@ -1,3 +1,4 @@
+import ExitOfferSettings from './ExitOfferSettings';
 import React, { createContext, memo, useCallback, useContext, useDeferredValue, useEffect, useId, useMemo, useReducer, useRef, useState } from "react";
 import {
   ArrowDown,
@@ -149,6 +150,7 @@ const groups = [
   ["Efeitos dos botões", Save],
   ["Escassez", Clock3],
   ["Rastreamento de saída", Eye],
+  ["Oferta de saída", Eye],
   ["Campos personalizados", Type],
   ["Moeda e idioma", WalletCards],
   ["SEO", Monitor],
@@ -480,6 +482,7 @@ function Settings({ group, c, u, replaceConfig, scarcityView, setScarcityView, e
       "testimonials",
       testimonials.filter((item) => item.id !== id),
     );
+  if (group === "Oferta de saída") return <ExitOfferSettings config={c} update={u}/>;
   if (group === "Aparência")
     return (
       <>
@@ -898,8 +901,8 @@ function Settings({ group, c, u, replaceConfig, scarcityView, setScarcityView, e
         />
         <h3>Ordem da faixa superior</h3>
         <p className="panel-help">
-          Organize banner, cronômetro, etapas e complementos acima das duas
-          colunas. O formulário e o resumo permanecem logo abaixo.
+          Organize banner, cronômetro e complementos acima das duas colunas.
+          As etapas ficam acima do formulário, na coluna principal.
         </p>
         <div className="block-list layout-order-list">
           {checkoutLayoutEntries(c)
@@ -1579,6 +1582,24 @@ function Preview({
     device === "mobile" && c.heroMobileImageUrl
       ? c.heroMobileImageUrl
       : c.heroImageUrl;
+  const progress = c.showProgress && visibleOnDevice(c.progressDevice, device) ? (
+        <div className="ep-form-progress">
+          <div className={`ep-steps style-${c.progressStyle || "outline"}`}>
+            <span className="active">
+              <i>{c.progressStyle === "icons" ? <UserRound size={16} aria-hidden="true" /> : 1}</i>
+              {copy.identification}
+            </span>
+            <span>
+              <i>{c.progressStyle === "icons" ? <MapPin size={16} aria-hidden="true" /> : 2}</i>
+              {copy.delivery}
+            </span>
+            <span>
+              <i>{c.progressStyle === "icons" ? <CreditCard size={16} aria-hidden="true" /> : 3}</i>
+              {copy.payment}
+            </span>
+          </div>
+        </div>
+      ) : null;
   const blocks = {
     hero:
       c.heroEnabled && visibleOnDevice(c.heroDevice, device) ? (
@@ -1604,29 +1625,11 @@ function Preview({
           </div>
         </div>
       ) : null,
-    progress:
-      c.showProgress && visibleOnDevice(c.progressDevice, device) ? (
-        <div key="progress" className="ep-body ep-body-block">
-          <div className={`ep-steps style-${c.progressStyle || "outline"}`}>
-            <span className="active">
-              <i>{c.progressStyle === "icons" ? <UserRound size={16} aria-hidden="true" /> : 1}</i>
-              {copy.identification}
-            </span>
-            <span>
-              <i>{c.progressStyle === "icons" ? <MapPin size={16} aria-hidden="true" /> : 2}</i>
-              {copy.delivery}
-            </span>
-            <span>
-              <i>{c.progressStyle === "icons" ? <CreditCard size={16} aria-hidden="true" /> : 3}</i>
-              {copy.payment}
-            </span>
-          </div>
-        </div>
-      ) : null,
     content: (
       <div key="content" className="ep-body ep-body-block">
         <div className="ep-content">
           <div className="ep-main">
+            {progress}
             <div className="ep-card">
               <small className="ep-eyebrow">{c.eyebrow}</small>
               <h2>{c.title}</h2>
@@ -2003,13 +2006,14 @@ export default function CheckoutEditor({
   const leave = () => { if (!busy) dirty ? setConfirmExit(true) : onBack(); };
   const sections = [
     { name: "Identidade visual", items: ["Modelos", "Aparência", "Cores", "Cabeçalho"] },
-    { name: "Experiência de compra", items: ["Conteúdo das etapas", "Elementos", "Escassez", "Efeitos dos botões"] },
+    { name: "Experiência de compra", items: ["Conteúdo das etapas", "Elementos", "Escassez", "Oferta de saída", "Efeitos dos botões"] },
     { name: "Informações da loja", items: ["Rodapé", "Políticas", "Moeda e idioma", "SEO", "Rastreamento de saída"] },
   ];
   const descriptions = {
     Modelos: "Um ponto de partida para sua marca", Aparência: "Layout, fonte e arredondamento", Cores: "Paleta, fundos e botões", Cabeçalho: "Logo e banners da campanha",
     "Conteúdo das etapas": "Títulos, instruções e botão de compra", Elementos: "Blocos, ofertas e organização", Escassez: "Cronômetro e prova social", "Efeitos dos botões": "Movimento e resposta ao toque",
-    Rodapé: "Empresa e formas de pagamento", Políticas: "Privacidade e termos da loja", "Moeda e idioma": "Idioma e moeda de exibição", SEO: "Título, descrição e favicon", "Rastreamento de saída": "Destino após a compra aprovada",
+    Rodapé: "Empresa e formas de pagamento", Políticas: "Privacidade e termos da loja", "Moeda e idioma": "Idioma e moeda de exibição", SEO: "Título, descrição e favicon", "Oferta de saída": "Cupom para recuperar compradores antes de sair.",
+    "Rastreamento de saída": "Destino após a compra aprovada",
   };
   const normalize = value => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const matches = name => !query || normalize(`${name} ${descriptions[name]}`).includes(normalize(query));

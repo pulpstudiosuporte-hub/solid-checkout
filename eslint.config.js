@@ -15,7 +15,7 @@ export default tseslint.config(
   { ignores: ['**/dist/**', '**/node_modules/**', '.shopify/**', '.visual-check/**', 'apps/web/public/**', 'extensions/**/assets/**', 'scripts/*.mjs', 'eslint.config.js'] },
   { files: ['**/*.js', '**/*.jsx'], ...js.configs.recommended },
   {
-    files: ['apps/web/src/**/*.{js,jsx}', 'apps/web/test/**/*.{js,jsx}'],
+    files: ['apps/web/src/**/*.{js,jsx}', 'apps/web/test/**/*.{js,jsx}', 'solid-site/src/**/*.{js,jsx}'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -36,6 +36,7 @@ export default tseslint.config(
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
+  { files: ['solid-site/*.js'], languageOptions: { globals: globals.node } },
   ...typed,
   {
     files: ['**/*.ts', '**/*.tsx'],

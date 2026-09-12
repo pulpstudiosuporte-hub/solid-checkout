@@ -9,6 +9,7 @@ npm.cmd run visual:check -- /c/loja/checkout
 
 O comando compila o frontend, inicia um preview acessível apenas em `127.0.0.1`, captura desktop (1440×1000) e uma janela estreita (390×844), e encerra o preview. As imagens ficam em `.visual-check/desktop.png` e `.visual-check/mobile.png`. Abra as duas imagens para inspecioná-las; a execução bem-sucedida não aprova automaticamente o layout. Uma janela estreita não equivale à emulação completa de um celular.
 
+Para o site institucional, prefira `npm.cmd run test:site`: a nova suíte Playwright define a largura real da página, espera a interface carregar, testa cliques e gera capturas completas. O capturador nativo acima pode recortar a imagem em janelas menores que o mínimo aceito pelo Chrome; por isso não deve ser usado sozinho para aprovar o layout mobile. Consulte `docs/marketing-site.md`.
 
 O navegador usa um perfil novo em `.visual-check/run-*`, sem reutilizar o perfil pessoal ou sessões autenticadas. Essa pasta é ignorada pelo Git. As capturas podem conter dados da página escolhida. O processo não realiza login, envia formulários ou gera pagamentos. O endereço de API continua sendo o configurado no build; páginas com dados reais precisam da API disponível e da rota correta. Por padrão, a captura mostra o login.
 

@@ -12,3 +12,13 @@ coverage/
 desktop.ini
 Captura de tela*.png
 packages/database/generated/
+solid-site-dokploy.zip
+
+# Local diagnostics and generated working files
+/tmp/
+/.codex-*.json
+/.codex-*.txt
+/.codex-*.ps1
+/.codex_hits.txt
+/.deploy-log-summary.txt
+/.route-debug.txt

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { fileURLToPath } from 'node:url';
 
 const csp = [
   "default-src 'self'", "base-uri 'self'", "object-src 'none'", "frame-ancestors 'none'",
@@ -22,6 +23,10 @@ export default defineConfig({
     sourcemap: false,
     target: 'es2022',
     rollupOptions: {
+      input: {
+        app: fileURLToPath(new URL('./index.html', import.meta.url)),
+        site: fileURLToPath(new URL('./site.html', import.meta.url)),
+      },
       output: {
         manualChunks(id) {
           if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'vendor-react';

@@ -1,3 +1,4 @@
+import { hasPlatformPermission } from './platform-permissions.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import multipart from '@fastify/multipart';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
@@ -47,7 +48,7 @@ export function registerMediaRoutes(app: FastifyInstance, environment: AppEnviro
         const csrf = request.cookies[csrfCookie]; const header = request.headers['x-csrf-token'];
         if (!environment.CORS_ORIGINS.includes(request.headers.origin ?? '') || !csrf || typeof header !== 'string' || !same(csrf, header) || !same(sha256(header), session.csrfTokenHash)) return null;
       }
-      if (platform) return session.user.platformAdmin ? { storeId: null } : null;
+      if (platform) return !session.support && hasPlatformPermission(session.user, 'content.manage') ? { storeId: null } : null;
       const context = await catalog.resolveStoreContext(session.userId, session.sessionId);
       return context && ['OWNER', 'ADMIN'].includes(context.role) ? { storeId: context.storeId } : null;
     };
@@ -101,7 +102,7 @@ export function registerMediaRoutes(app: FastifyInstance, environment: AppEnviro
     const header = request.headers['x-csrf-token'];
     const originOk = typeof request.headers.origin === 'string' && environment.CORS_ORIGINS.includes(request.headers.origin);
     const session = token ? await auth.findActiveSession(sha256(token), new Date()) : null;
-    if (!session?.user.platformAdmin || !originOk || !csrf || typeof header !== 'string' || !same(csrf, header) || !same(sha256(header), session.csrfTokenHash)) return reply.code(403).send(error(request, 'FORBIDDEN', 'Acesso administrativo necessário.'));
+    if (!session || session.support || !hasPlatformPermission(session.user, 'content.manage') || !originOk || !csrf || typeof header !== 'string' || !same(csrf, header) || !same(sha256(header), session.csrfTokenHash)) return reply.code(403).send(error(request, 'FORBIDDEN', 'Acesso administrativo necessário.'));
 
     const image = await optimizedImage(request);
     if ('code' in image) return reply.code(400).send(error(request, image.code, image.message));

@@ -45,6 +45,8 @@ npm run dev:worker
 
 Para gerar capturas locais de desktop e celular, execute `npm run visual:check`. O procedimento, os requisitos e a alternativa ao navegador integrado estão em [docs/visual-review.md](docs/visual-review.md).
 
+O site institucional pode ser visualizado em `/site.html` e testado com `npm run test:site`, incluindo cliques e viewport mobile real. Veja [publicação em solidcheckout.xyz](docs/marketing-site.md).
+
 ## PostgreSQL local
 
 O Docker ainda precisa estar instalado na máquina. Depois disso:

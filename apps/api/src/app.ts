@@ -4,11 +4,14 @@ import rateLimit from '@fastify/rate-limit';
 import rawBody from 'fastify-raw-body';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { Redis } from 'ioredis';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { AppEnvironment } from '@solid/config';
 import type { ErrorResponse, HealthResponse } from '@solid/contracts';
 import type { AuthRepository } from './auth-repository.js';
 import { registerAuthRoutes } from './auth-routes.js';
+import { registerSupportSessionHook } from './support-session-hook.js';
+import { registerAdminSupportRoutes } from './admin-support-routes.js';
+import { registerPlatformRoleRoutes } from './platform-role-routes.js';
 import type { CatalogRepository } from './catalog-repository.js';
 import { registerCatalogRoutes } from './catalog-routes.js';
 import type { StoreRepository } from './store-repository.js';
@@ -46,7 +49,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
       level: environment.LOG_LEVEL,
       redact: {
         paths: [
-          'req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie',
+          'req.headers.x-solid-support-session', 'req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie',
           'req.body.password', 'req.body.currentPassword', 'req.body.newPassword',
           'req.body.token', 'req.body.code', 'req.body.accessToken', 'req.body.apiKey',
           'req.body.publicKey', 'req.body.secretKey', 'req.body.cpf',
@@ -86,28 +89,17 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
       checkoutOriginCache.set(hostname, { allowed, expiresAt: Date.now() + 60_000 });
       callback(null, allowed);
     }).catch(() => callback(null, false));
-  }, credentials: true, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], allowedHeaders: ['authorization', 'content-type', 'x-csrf-token', 'x-request-id', 'x-solid-user-context'], maxAge: 600 });
+  }, credentials: true, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], allowedHeaders: ['authorization', 'content-type', 'x-csrf-token', 'x-request-id', 'x-solid-user-context', 'x-solid-support-session'], maxAge: 600 });
   void app.register(rateLimit, { max: 100, timeWindow: '1 minute', ban: 3, ...(rateLimitRedis ? { redis: rateLimitRedis } : {}), errorResponseBuilder: (_request, context) => ({ error: { code: 'RATE_LIMITED', message: `Muitas requisições. Tente novamente em ${context.after}.`, requestId: _request.id } }) });
-  if (dependencies.authRepository) {
-    const repository = dependencies.authRepository;
-    const sessionCookie = environment.NODE_ENV === 'production' ? '__Host-solid_session' : 'solid_session';
-    app.addHook('onRequest', async (request, reply) => {
-      const expectedUser = request.headers['x-solid-user-context'];
-      if (typeof expectedUser !== 'string') return;
-      const rawCookie = request.headers.cookie || '';
-      const encodedToken = rawCookie.split(';').map(part => part.trim()).find(part => part.startsWith(`${sessionCookie}=`))?.slice(sessionCookie.length + 1);
-      if (!encodedToken) return reply.code(409).send({ error: { code: 'SESSION_CONTEXT_CHANGED', message: 'A conta desta aba foi alterada em outra aba.', requestId: request.id } });
-      const tokenHash = createHash('sha256').update(decodeURIComponent(encodedToken)).digest('hex');
-      const session = await repository.findActiveSession(tokenHash, new Date());
-      if (!session || session.user.publicId !== expectedUser) {
-        return reply.code(409).send({ error: { code: 'SESSION_CONTEXT_CHANGED', message: 'A conta desta aba foi alterada em outra aba.', requestId: request.id } });
-      }
-    });
-  }
+  if (dependencies.authRepository) registerSupportSessionHook(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.authRepository) registerAuthRoutes(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.database) registerRegistrationRoutes(app, environment, dependencies.database);
   if (dependencies.authRepository && dependencies.database) registerDashboardRoutes(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.database) registerAdminUserRoutes(app, environment, dependencies.authRepository, dependencies.database);
+  if (dependencies.authRepository && dependencies.database) {
+    registerAdminSupportRoutes(app, environment, dependencies.authRepository, dependencies.database);
+    registerPlatformRoleRoutes(app, environment, dependencies.authRepository, dependencies.database);
+  }
   if (dependencies.authRepository && dependencies.database) registerAdminOperationRoutes(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.database) registerNotificationRoutes(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.database) {

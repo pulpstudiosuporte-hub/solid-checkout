@@ -64,6 +64,8 @@ jobs:
       - run: npx playwright test --config scripts/analytics-ui.config.mjs
       - run: npx playwright test --config scripts/roadmap-ui.config.mjs
       - run: npx playwright test --config scripts/geography-ui.config.mjs
+      - run: npx playwright test --config scripts/support-ui.config.mjs
+      - run: npx playwright test --config scripts/exit-offer-ui.config.mjs
   static-security:
     runs-on: ubuntu-latest
     timeout-minutes: 15
