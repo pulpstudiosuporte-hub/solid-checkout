@@ -74,6 +74,10 @@ Em produção/staging use somente `npm run db:deploy`; nunca use `migrate dev`.
 
 Configure o serviço web para construir com o arquivo `Dockerfile.web`. Ele gera o bundle Vite e publica pelo Nginx com fallback de SPA, cache correto dos assets e headers de segurança. O serviço deve expor a porta `80` e receber `VITE_API_URL` e `VITE_TURNSTILE_SITE_KEY` como argumentos de build.
 
+No serviço **solid-checkout-web**, selecione **Build Type: Dockerfile**, **Dockerfile Path: Dockerfile.web**, **Docker Context Path: .** e deixe **Docker Build Stage** vazio. Mantenha o caminho do repositório na raiz (`/`) e configure a porta do domínio como `80`. Salve antes de iniciar o deploy. Os comandos de instalação, build e inicialização são definidos pelo Dockerfile; não use os comandos do Nixpacks nesse serviço. Veja os [campos de build do Dokploy](https://docs.dokploy.com/docs/core/applications/build-type).
+
+Se o log mostrar `npm error code ECONNRESET` durante `npm ci`, a conexão de download das dependências foi interrompida antes da compilação. O `.npmrc` limita conexões simultâneas a cinco e configura cinco novas tentativas para leituras com falha transitória, mantendo a verificação TLS e o lockfile. Isso ajuda com instabilidades, mas não corrige indisponibilidade persistente de rede, DNS ou proxy no servidor. Nesse caso, verifique a conectividade de saída do host antes de tentar novamente. Referência: [configuração de rede do npm](https://docs.npmjs.com/cli/v10/using-npm/config/#fetch-retries).
+
 O serviço da API continua usando seu fluxo próprio e deve executar `prisma migrate deploy` antes de iniciar. Nunca compartilhe o mesmo health check ou Dockerfile entre web e API.
 
 ## Desconto Pix
