@@ -1,7 +1,7 @@
 import { readdirSync, statSync } from 'node:fs';
 const directory = new URL('../apps/web/dist/assets/', import.meta.url);
 const files = readdirSync(directory);
-for (const [pattern, limit] of [[/^AdminApp-.*\.css$/, 300_000], [/^AdminApp-.*\.js$/, 150_000], [/^WorldMap-.*\.js$/, 5_000], [/^PublicApp-.*\.js$/, 80_000]]) {
+for (const [pattern, limit] of [[/^AdminApp-.*\.css$/, 300_000], [/^AdminApp-.*\.js$/, 150_000], [/^WorldMap-.*\.js$/, 5_000], [/^FlatWorldMap-.*\.js$/, 5_000], [/^3d-globe-.*\.js$/, 1_000_000], [/^vendor-react-.*\.js$/, 210_000], [/^PublicApp-.*\.js$/, 80_000]]) {
   const matched = files.filter(file => pattern.test(file));
   if (matched.length !== 1) throw new Error(`Expected one bundle matching ${pattern}`);
   const size = statSync(new URL(matched[0], directory)).size;

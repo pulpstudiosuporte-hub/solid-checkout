@@ -11,8 +11,11 @@ const locations = [
   { country: 'US', region: 'NY', city: null, latitude: 40.7128, longitude: -74.006, visitors: 1 },
   { country: 'BR', region: 'SP', city: 'Sem coordenadas', latitude: null, longitude: null, visitors: 1 },
 ];
+const empty = new URLSearchParams(window.location.search).has('empty');
+const originalFetch = window.fetch.bind(window);
 window.fetch = async input => {
   const path = new URL(String(input), location.origin).pathname;
-  return new Response(JSON.stringify(path === '/platform-content' ? { releases: [] } : { userName: 'Revisão local', revenueCents: 0, paidOrders: 0, pendingPix: 0, conversionRate: 0, activeVisitors: 0, series: [], analytics: { sessions: 17, geography: { locations, cities: 5, countries: 3, regions: 6, visitors: 17 } }, checklist: {} }), { headers: { 'Content-Type': 'application/json' } });
+  if (path !== '/platform-content' && !path.includes('dashboard')) return originalFetch(input);
+  return new Response(JSON.stringify(path === '/platform-content' ? { releases: [] } : { userName: 'Revisão local', revenueCents: 0, paidOrders: 0, pendingPix: 0, conversionRate: 0, activeVisitors: 0, series: [], analytics: { generatedRevenueCents: 0, sessions: empty ? 0 : 17, geography: { locations: empty ? [] : locations, cities: empty ? 0 : 5, countries: empty ? 0 : 3, regions: empty ? 0 : 6, visitors: empty ? 0 : 17 } }, checklist: {} }), { headers: { 'Content-Type': 'application/json' } });
 };
 createRoot(document.getElementById('root')).render(<div className="app solid-admin"><div style={{ width: '100%' }}><DashboardPage storeKey="test-store" setPage={() => {}}/></div></div>);

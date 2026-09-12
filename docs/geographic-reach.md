@@ -2,6 +2,8 @@
 
 ## Correções
 
+O Início e Análises agora usam um globo 3D como visualização principal. Consulte [Globo 3D](globe-3d.md) para implementação, dependências, estilos e validação. As regras de projeção e recorte abaixo continuam aplicáveis à alternativa **Mapa plano**; o globo usa a esfera completa com textura equiretangular.
+
 O fundo estático foi gerado com dotted-map 3.1.0, projeção Mercator elipsoidal WGS84 e recorte de latitude -56 a 71 e longitude -168 a 168. Os marcadores usavam anteriormente uma projeção linear de latitude/longitude e limites mundiais diferentes. O módulo `world-map-projection.js` usa os limites e a projeção do fundo. Ambos agora estão no mesmo SVG, evitando divergências de escala no celular. A projeção foi confrontada com pontos de terra do próprio SVG para São Paulo, Manaus, Brasília, Nova York, Londres e Tóquio.
 
 Coordenadas nulas, vazias, inválidas, o par 0/0 e pontos fora do recorte não viram marcadores. Regiões sem cidade não são descartadas quando têm coordenadas válidas. O alcance mostra a lista de cidades/regiões e informa quando uma localização não tem ponto disponível.

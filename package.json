@@ -49,6 +49,7 @@
     "vitest": "4.1.10"
   },
   "overrides": {
+    "@types/three": "0.180.0",
     "esbuild": "0.28.1",
     "fast-uri@^3": "3.1.7",
     "fast-uri@^4": "4.1.4"

@@ -1,53 +1,60 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Globe2, Map } from 'lucide-react';
+import { coordinate } from './world-map-projection';
 import './world-map.css';
-import { projectPoint } from './world-map-projection';
 
-const curvedPath = (start, end) => {
-  const middleX = (start.x + end.x) / 2;
-  const middleY = Math.min(start.y, end.y) - Math.min(65, Math.abs(end.x - start.x) * 0.16 + 24);
-  return `M ${start.x} ${start.y} Q ${middleX} ${middleY} ${end.x} ${end.y}`;
-};
+const Globe3D = lazy(() => import('./3d-globe'));
+const FlatWorldMap = lazy(() => import('./FlatWorldMap').then(module => ({ default: module.FlatWorldMap })));
+
+class GlobeBoundary extends Component {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch() { this.props.onError(); }
+  render() { return this.state.failed ? null : this.props.children; }
+}
 
 export function WorldMap({ locations = [], lineColor = '#7657ed' }) {
-  const gradientId = useId().replace(/:/g, '');
   const container = useRef(null);
   const [visible, setVisible] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [pageVisible, setPageVisible] = useState(!document.hidden);
+  const [flat, setFlat] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
+  const [ready, setReady] = useState(false);
+  const fail = useCallback(() => setUnavailable(true), []);
+  const markReady = useCallback(() => setReady(true), []);
   useEffect(() => {
-    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting));
+    if (!window.IntersectionObserver) { setVisible(true); setLoaded(true); return; }
+    const observer = new IntersectionObserver(([entry]) => { setVisible(entry.isIntersecting); if (entry.isIntersecting) setLoaded(true); });
     observer.observe(container.current);
     return () => observer.disconnect();
   }, []);
-  const mapSource = '/illustrations/world-map.svg';
-  const points = locations.map(location => ({ ...location, point: projectPoint(location.latitude, location.longitude) })).filter(location => location.point);
-  const origin = points[0];
-
-  return <div ref={container} data-paused={!visible} className="world-map-visual">
-    <svg viewBox="0 0 800 400" preserveAspectRatio="none" role="img" aria-label={points.length ? `Mapa com ${points.length} localizações aproximadas por IP` : 'Mapa sem coordenadas disponíveis'}>
-      <image className="world-map-base" href={mapSource} x="0" y="0" width="800" height="400" preserveAspectRatio="none"/>
-      <defs>
-        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor={lineColor} stopOpacity="0"/>
-          <stop offset="8%" stopColor={lineColor} stopOpacity=".75"/>
-          <stop offset="92%" stopColor={lineColor} stopOpacity=".75"/>
-          <stop offset="100%" stopColor={lineColor} stopOpacity="0"/>
-        </linearGradient>
-      </defs>
-      {origin && points.slice(1).map((location, index) => <path
-        key={`route-${location.country}-${location.region}-${location.city}-${index}`}
-        className="world-map-route"
-        d={curvedPath(origin.point, location.point)}
-        fill="none"
-        stroke={`url(#${gradientId})`}
-        strokeWidth="1.4"
-        pathLength="1"
-        style={{ animationDelay: `${index * .12}s` }}
-      />)}
-      {points.map((location, index) => <g key={`point-${location.country}-${location.region}-${location.city}-${index}`}>
-        <title>{[location.city, location.region, location.country].filter(Boolean).join(' · ')}: {location.visitors} visitantes · Aproximado por IP</title>
-        <circle cx={location.point.x} cy={location.point.y} r="4" fill={lineColor} stroke="#fff" strokeWidth="2"/>
-        <circle className="world-map-pulse" cx={location.point.x} cy={location.point.y} r="4" fill="none" stroke={lineColor} strokeWidth="1.5" style={{ animationDelay: `${index * .15}s` }}/>
-      </g>)}
-    </svg>
-    {locations.length > points.length && <span className="world-map-missing">{locations.length - points.length} {locations.length - points.length === 1 ? 'localização sem ponto disponível' : 'localizações sem ponto disponível'}</span>}
+  useEffect(() => {
+    const change = () => setPageVisible(!document.hidden);
+    document.addEventListener('visibilitychange', change);
+    return () => document.removeEventListener('visibilitychange', change);
+  }, []);
+  useEffect(() => {
+    if (!loaded || ready || flat || unavailable) return;
+    const timer = setTimeout(fail, 25000);
+    return () => clearTimeout(timer);
+  }, [loaded, ready, flat, unavailable, fail]);
+  const markers = useMemo(() => locations.flatMap(location => {
+    const lat = coordinate(location.latitude, 90), lng = coordinate(location.longitude, 180);
+    if (lat === null || lng === null || (lat === 0 && lng === 0)) return [];
+    return [{ lat, lng, label: `${[location.city, location.region, location.country].filter(Boolean).join(' · ')} · ${location.visitors} ${Number(location.visitors) === 1 ? 'visitante' : 'visitantes'}` }];
+  }), [locations]);
+  const missing = locations.length - markers.length;
+  const isFlat = flat || unavailable;
+  return <div ref={container} className={`world-map-panel ${isFlat ? 'is-flat' : ''}`}>
+    <div className="world-map-caption"><span>{isFlat ? 'ALCANCE GEOGRÁFICO' : 'VISITAS PELO MUNDO'}</span><strong>{markers.length} {markers.length === 1 ? 'localização' : 'localizações'}</strong></div>
+    {!unavailable && <button type="button" className="map-mode" onClick={() => { setFlat(value => !value); setReady(false); }} aria-label={flat ? 'Ver globo 3D' : 'Ver mapa plano'}>{flat ? <Globe2 size={14}/> : <Map size={14}/>}<span>{flat ? 'Globo 3D' : 'Mapa plano'}</span></button>}
+    <Suspense fallback={<p className="world-map-wait" role="status">Carregando mapa...</p>}>
+      {isFlat ? <FlatWorldMap locations={locations} lineColor={lineColor}/> : loaded && <GlobeBoundary onError={fail}>
+        <Globe3D markers={markers} active={visible && pageVisible} onUnavailable={fail} onReady={markReady}/>
+      </GlobeBoundary>}
+    </Suspense>
+    {!isFlat && missing > 0 && <span className="globe-missing">{missing} {missing === 1 ? 'localização sem ponto disponível' : 'localizações sem ponto disponível'}</span>}
+    {unavailable && <span className="world-map-fallback" role="status">3D indisponível. Exibindo o mapa plano.</span>}
   </div>;
 }

@@ -65,6 +65,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: "auto-20260912-globe-3d",
+    category: "IMPROVEMENT" as const,
+    title: "Seu alcance em um globo 3D",
+    description: "Explore as localizações das visitas em um globo interativo no Início e em Análises. Selecione uma cidade ou região, pause a rotação e volte ao Brasil com um toque. O mapa plano continua disponível, e a localização permanece aproximada por IP.",
+    publishedAt: new Date("2026-09-12T01:00:00.000Z"),
+  },
+  {
     publicId: "auto-20260911-geography",
     category: "FIX" as const,
     title: "Pontos do mapa geográfico corrigidos",
