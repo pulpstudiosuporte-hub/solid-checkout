@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: "auto-20260912-exit-offer-back-approach",
+    category: "IMPROVEMENT" as const,
+    title: "Oferta antecipada ao aproximar do Voltar",
+    description: "O popup de desconto agora detecta a aproximação do mouse ao canto superior esquerdo do checkout, em direção ao botão Voltar. O disparo acontece antes de sair da página e mantém o prazo configurado e o limite de uma oferta por sessão.",
+    publishedAt: new Date("2026-09-12T17:00:00.000Z"),
+  },
+  {
     publicId: "auto-20260912-support-entry-validation",
     category: "FIX" as const,
     title: "Orientações no acesso de suporte",

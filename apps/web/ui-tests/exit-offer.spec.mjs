@@ -84,6 +84,27 @@ test('timer can be disabled and approaching the top works without a click', asyn
   await expect(page.getByRole('dialog')).toBeVisible();
 });
 
+test('approaching Back opens inside the page after the minimum delay, once per session', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-09-12T12:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-09-12T12:00:01Z'));
+  await page.goto(`${path}?buyer`);
+  await expect(page.getByRole('textbox', { name: 'Nome completo' })).toBeVisible();
+  await page.mouse.move(350, 250);
+  await page.mouse.move(140, 70);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.mouse.move(350, 250);
+  await page.clock.fastForward(6000);
+  // Moving around the rest of the header does not count as approaching Back.
+  await page.mouse.move(800, 70);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.mouse.move(140, 70);
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByRole('button', { name: 'Fechar oferta' }).click();
+  await page.mouse.move(350, 250);
+  await page.mouse.move(140, 70);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
 test('timer waits for another dialog to close', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-09-12T12:00:00Z') }); await page.clock.pauseAt(new Date('2026-09-12T12:00:01Z')); await page.goto(`${path}?buyer&timed`);
   await expect(page.getByRole('textbox', { name: 'Nome completo' })).toBeVisible();

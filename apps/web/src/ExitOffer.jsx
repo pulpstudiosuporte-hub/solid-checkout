@@ -47,7 +47,7 @@ export default function ExitOffer({ config, sessionId, token, enabled, onApply }
     const controller = new AbortController();
     if (!startedAt.current.has(key)) startedAt.current.set(key, Date.now());
     const started = startedAt.current.get(key);
-    let attempted = false, peak = window.scrollY, previousY = null;
+    let attempted = false, peak = window.scrollY, previousPointer = null;
     const available = () => !controller.signal.aborted && enabledRef.current && document.visibilityState === 'visible' && !document.querySelector('dialog[open]');
     const show = async (delaySeconds) => {
       if (attempted || shown.current.has(key) || Date.now() - started < delaySeconds * 1000 || !available()) return;
@@ -64,9 +64,17 @@ export default function ExitOffer({ config, sessionId, token, enabled, onApply }
     };
     const showOnExit = () => void show(config.exitOfferDelaySeconds ?? 10);
     const leave = event => { if (event.clientY <= 8 && window.matchMedia('(pointer: fine)').matches) showOnExit(); };
+    // Anticipate the browser's Back control while the pointer is still in the page.
+    const nearBack = point => point.x <= Math.min(200, window.innerWidth * 0.35) && point.y <= 100;
     const move = event => {
-      if (window.matchMedia('(pointer: fine)').matches && previousY !== null && previousY > 24 && event.clientY <= 24) showOnExit();
-      previousY = event.clientY;
+      const point = { x: event.clientX, y: event.clientY };
+      if (window.matchMedia('(pointer: fine)').matches && previousPointer) {
+        const approachingBack = nearBack(point) && !nearBack(previousPointer)
+          && (point.y < previousPointer.y || point.x < previousPointer.x);
+        const approachingTop = previousPointer.y > 24 && point.y <= 24;
+        if (approachingBack || approachingTop) showOnExit();
+      }
+      previousPointer = point;
     };
     const scroll = () => { peak = Math.max(peak, window.scrollY); if (config.exitOfferMobile !== false && window.matchMedia('(pointer: coarse)').matches && peak > 250 && window.scrollY < 80) showOnExit(); };
     // Keep checking so a deadline reached during another dialog or operation is not lost.
