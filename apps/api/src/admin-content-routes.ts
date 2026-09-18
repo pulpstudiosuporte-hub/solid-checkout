@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260918-public-documentation',
+    category: 'NEWS' as const,
+    title: 'Seu manual de bordo agora é público',
+    description: 'A documentação da Pirat reúne guias de checkout, criação com IA, integrações, pagamentos e entrega, com busca por assunto, passos de configuração e soluções para dúvidas comuns. Acesse Documentação no menu do painel e compartilhe os guias sem exigir login.',
+    publishedAt: new Date('2026-09-18T23:20:00.000Z'),
+  },
+  {
     publicId: 'auto-20260918-checkout-ai-studio-entry',
     category: 'IMPROVEMENT' as const,
     title: 'Um novo destaque para criar com IA',

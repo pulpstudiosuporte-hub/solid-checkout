@@ -118,6 +118,7 @@ function Sidebar({ open, collapsed, onClose, onToggleCollapsed, page, setPage, u
       </nav>
       <div className="side-bottom">
         <small className="nav-title">Conta</small>
+        <a className="nav-item" href="https://docs.apirat.io/" target="_blank" rel="noreferrer" title="Documentação (abre em nova aba)" style={{ textDecoration: 'none' }}><Globe2 size={18} aria-hidden="true"/><span>Documentação</span></a>
         {(!support || support.mode === 'FULL_ACCESS') && <button title={collapsed ? 'Meu plano' : undefined} className={page === 'Meu plano' ? 'nav-item active' : 'nav-item'} onClick={() => navigate('Meu plano')}><CreditCard size={18}/><span>Meu plano</span></button>}
         <button title={collapsed ? 'Configurações' : undefined} className={page === 'Configurações' ? 'nav-item active' : 'nav-item'} onClick={() => navigate('Configurações')}><Settings size={18}/><span>Configurações</span></button>
         <div className="profile"><div className="avatar">{user?.name?.split(' ').slice(0,2).map(part=>part[0]).join('').toUpperCase() || 'AD'}</div><span><b>{user?.name || 'Usuário'}</b><small>{roleLabels[activeRole] || 'Membro'}</small></span><button className="icon-btn" onClick={onLogout} aria-label="Sair do painel" title="Sair"><LogOut size={17}/></button></div>
