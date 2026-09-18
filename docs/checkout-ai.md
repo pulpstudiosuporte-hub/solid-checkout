@@ -4,7 +4,13 @@ Em Checkouts → Criar com IA, escolha loja Shopify ou produto de link direto,
 descreva o visual e gere uma prévia. Novas instruções ajustam a configuração
 anterior. Salvar rascunho e abrir editor usa o fluxo existente; não publica.
 
-O fluxo guiado pergunta marca, estrutura, logo, banners e recursos em três etapas.
+O papagaio conduz uma conversa guiada, com uma pergunta por vez sobre marca,
+ideia, cores, tipo, estrutura, imagens e recursos. As perguntas iniciais são
+determinísticas: o Gemini recebe as escolhas somente ao gerar ou ajustar a prévia.
+As respostas ficam em um histórico editável e em um resumo; revisar uma delas
+preserva as demais. Produto e organização aparecem conforme o tipo e modelo.
+Enter envia a ideia ou o ajuste; Shift+Enter insere uma linha. Perguntas opcionais
+aceitam continuar sem imagem, depoimentos ou cores definidas.
 Varejo (três colunas) e Marketplace (cartões) também estão no editor manual.
 A prévia alterna computador/celular e pode ser ampliada. Alterar as escolhas
 exige regenerar antes de salvar, para o rascunho corresponder à prévia.
@@ -38,7 +44,7 @@ usam as variáveis da API já configuradas para o papagaio.
 
 A saída passa por uma lista explícita de campos visuais. URLs, scripts, preços,
 descontos e depoimentos gerados não são aceitos. Uma falha mantém os dados do
-formulário. Saídas e referências não são registradas nos logs da rota.
+conversa. Saídas e referências não são registradas nos logs da rota.
 
 ## Verificação
 

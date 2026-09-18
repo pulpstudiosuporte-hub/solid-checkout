@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260918-checkout-ai-conversation',
+    category: 'IMPROVEMENT' as const,
+    title: 'Crie seu checkout numa conversa com o papagaio',
+    description: 'O Criar com IA agora conduz uma conversa, uma pergunta por vez, sobre marca, cores, imagens e recursos. Revise respostas anteriores, confira a prévia e peça ajustes antes de salvar o rascunho no editor.',
+    publishedAt: new Date('2026-09-18T23:30:00.000Z'),
+  },
+  {
     publicId: 'auto-20260918-public-documentation',
     category: 'NEWS' as const,
     title: 'Seu manual de bordo agora é público',

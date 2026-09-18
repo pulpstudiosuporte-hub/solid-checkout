@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, ImagePlus, LoaderCircle, Monitor, Smartphone, Maximize2, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, Pencil, ImagePlus, LoaderCircle, Monitor, Smartphone, Maximize2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { generateCheckoutPreview, uploadProductImage, resolveMediaUrl } from './api';
 import { defaultCheckoutConfig } from './checkout-config';
 import './checkout-ai.css';
@@ -9,7 +9,26 @@ const Preview = lazy(() => import('./CheckoutEditor').then(module => ({ default:
 const examples = ['Uma marca de café, com tons quentes e visual acolhedor.', 'Um curso online com visual limpo, azul escuro e foco no formulário.', 'Uma loja de acessórios com fundo claro e detalhes em vermelho.'];
 const slug = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 65);
 const initialBrief = { template: 'auto', brand: '', logoUrl: '', heroImageUrl: '', heroMobileImageUrl: '', summaryBannerUrl: '', fidelity: 'close', layout: 'auto', progressStyle: 'auto', showProgress: true, showCoupon: true, showSummary: true, socialProofEnabled: false };
-const steps = ['Sua marca', 'Logo e banners', 'Recursos e geração'];
+const questionOrder = ['brand', 'idea', 'colors', 'mode', 'product', 'template', 'reference', 'logo', 'banner', 'summaryImage', 'layout', 'progress', 'coupon', 'summary', 'socialProof', 'reviews', 'name'];
+const questionText = {
+  brand: 'Fala, marujo! Vamos dar cara ao seu checkout. Qual é o nome da sua marca?',
+  idea: 'Boa! O que sua loja vende e que estilo você imagina para ela?',
+  colors: 'E as cores da sua marca? Pode me contar os nomes ou os códigos.',
+  mode: 'Esse checkout vai receber o carrinho da Shopify ou vender um produto específico?',
+  product: 'Qual produto vamos colocar nesse checkout?',
+  template: 'Como você quer organizar o checkout? Posso escolher ou seguir um destes modelos.',
+  reference: 'Tem algum visual que você curte? Me mande uma referência, se quiser.',
+  logo: 'Sua marca tem logo? Manda aqui ou eu uso o nome dela no cabeçalho.',
+  banner: 'Quer um banner para receber o comprador ou prefere um topo mais limpo?',
+  summaryImage: 'Quer colocar uma imagem junto ao resumo da compra?',
+  layout: 'No computador, você prefere tudo centralizado ou o resumo ao lado?',
+  progress: 'Como vamos mostrar o caminho até o pagamento?',
+  coupon: 'Vamos deixar um espaço para o comprador inserir cupom?',
+  summary: 'Quer mostrar o resumo com os produtos e valores da compra?',
+  socialProof: 'E aqueles avisos de compras recentes? Quer ativar?',
+  reviews: 'Tem depoimentos reais para incluir? Pode mandar os nomes e as avaliações.',
+  name: 'Último detalhe, capitão: como vamos chamar esse checkout no seu painel?',
+};
 
 function DesignPreview({ config, product, device }) {
   const container = useRef(null);
@@ -36,10 +55,17 @@ export default function CheckoutAiBuilder({ products, csrfToken, onBack, onCreat
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [step, setStep] = useState(0);
+  const [question, setQuestion] = useState('brand');
+  const [answered, setAnswered] = useState([]);
+  const [colors, setColors] = useState('');
+  const [adjustment, setAdjustment] = useState('');
+  const [messages, setMessages] = useState([]);
+  const activeQuestion = useRef(null);
+  const conversation = useRef(null);
   const [brief, setBrief] = useState(initialBrief);
   const [assetChoices, setAssetChoices] = useState({ logo: 'text', banner: 'none', summary: 'none' });
   const [uploading, setUploading] = useState(false);
+  const [reading, setReading] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [device, setDevice] = useState(() => window.innerWidth < 700 ? 'mobile' : 'desktop');
   const [expanded, setExpanded] = useState(false);
@@ -49,7 +75,7 @@ export default function CheckoutAiBuilder({ products, csrfToken, onBack, onCreat
   const fileReader = useRef(null);
   const heading = useRef(null);
   useEffect(() => { heading.current?.focus(); return () => { request.current?.abort(); fileReader.current?.abort(); }; }, []);
-  function clearReference() { fileReader.current?.abort(); fileReader.current = null; setReference(null); if (fileInput.current) fileInput.current.value = ''; }
+  function clearReference() { setReading(false); fileReader.current?.abort(); fileReader.current = null; setReference(null); if (fileInput.current) fileInput.current.value = ''; }
   function leave() { request.current?.abort(); clearReference(); onBack(); }
   async function uploadAsset(key, file) {
     if (!file || uploading) return;
@@ -62,34 +88,75 @@ export default function CheckoutAiBuilder({ products, csrfToken, onBack, onCreat
   function assetField(key, label) {
     return <div className="checkout-ai-asset"><label>{label}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={event => { void uploadAsset(key, event.target.files?.[0]); event.target.value = ''; }}/></label>{brief[key] && <div className="checkout-ai-reference"><img src={resolveMediaUrl(brief[key])} alt={label}/><span>Imagem pronta para o checkout</span><button type="button" className="secondary" aria-label={`Remover ${label.toLowerCase()}`} onClick={() => changeBrief(key, '')}><Trash2 size={16}/></button></div>}</div>;
   }
-  function validateStage(stage) {
-    if (stage === 0 && (!brief.brand.trim() || !prompt.trim() || !name.trim() || mode === 'DIRECT_LINK' && !productId)) { setError('Informe a marca, a ideia e o nome do checkout. Para link direto, escolha um produto.'); setStep(0); return false; }
-    if (stage === 1 && (assetChoices.logo === 'image' && !brief.logoUrl || assetChoices.banner === 'image' && !brief.heroImageUrl || assetChoices.summary === 'image' && !brief.summaryBannerUrl)) { setError('Envie as imagens escolhidas ou selecione a opção sem imagem para continuar.'); setStep(1); return false; }
-    return true;
+  const visibleQuestions = questionOrder.filter(id => (id !== 'product' || mode === 'DIRECT_LINK') && (id !== 'layout' || !structuralCheckoutTemplates[brief.template]));
+  const locked = busy || saving || uploading || reading;
+  useEffect(() => {
+    activeQuestion.current?.focus({ preventScroll: true });
+    if (conversation.current) conversation.current.scrollTop = conversation.current.scrollHeight;
+  }, [question, messages.length]);
+  function questionError(id) {
+    if (id === 'brand' && !brief.brand.trim()) return 'Me diga o nome da marca para começarmos.';
+    if (id === 'idea' && !prompt.trim()) return 'Conte um pouco sobre a loja e o estilo que você quer.';
+    if (id === 'product' && !products.some(product => product.publicId === productId)) return 'Escolha um produto cadastrado para continuar.';
+    if (id === 'name' && (!name.trim() || !slug(name))) return 'Dê um nome ao checkout usando letras ou números.';
+    const assets = { logo: ['logo', 'logoUrl'], banner: ['banner', 'heroImageUrl'], summaryImage: ['summary', 'summaryBannerUrl'] };
+    if (assets[id] && assetChoices[assets[id][0]] === 'image' && !brief[assets[id][1]]) return 'Envie a imagem ou escolha continuar sem ela.';
+    if (id === 'reviews' && reviews.some(item => !item.name.trim() || !item.text.trim())) return 'Preencha o nome e a avaliação real, ou remova o depoimento incompleto.';
+    return '';
   }
-  function nextStage() { if (validateStage(step)) { setError(''); setStep(current => Math.min(2, current + 1)); } }
+  function answer(event) {
+    event.preventDefault();
+    if (locked) return;
+    if (question === 'ready') { void generate(); return; }
+    const problem = questionError(question);
+    if (problem) { setError(problem); return; }
+    const completed = [...new Set([...answered, question])];
+    setAnswered(completed); setError('');
+    setQuestion(visibleQuestions.find(id => !completed.includes(id)) || 'ready');
+  }
+  function editAnswer(id) { setQuestion(id); setError(''); }
+  function answerSummary(id) {
+    const yesNo = value => value ? 'Sim' : 'Não';
+    return ({
+      brand: brief.brand, idea: prompt, colors: colors.trim() || 'Pode escolher as cores para mim',
+      mode: mode === 'SHOPIFY_CART' ? 'Carrinho da Shopify' : 'Produto específico',
+      product: products.find(item => item.publicId === productId)?.checkoutTitle || 'Produto não selecionado',
+      template: structuralCheckoutTemplates[brief.template]?.name || ({ auto: 'Pode escolher o modelo', minimal: 'Clássico · duas colunas', compact: 'Compacto · centralizado' })[brief.template],
+      reference: reference ? `${reference.name} · ${brief.fidelity === 'close' ? 'Seguir de perto' : 'Usar como inspiração'}` : 'Sem referência visual',
+      logo: assetChoices.logo === 'image' ? 'Usar minha logo' : 'Usar o nome da marca',
+      banner: assetChoices.banner === 'image' ? `Com banner${brief.heroMobileImageUrl ? ' e versão para celular' : ''}` : 'Sem banner',
+      summaryImage: assetChoices.summary === 'image' ? 'Com imagem no resumo' : 'Sem imagem no resumo',
+      layout: ({ auto: 'Pode escolher a organização', split: 'Resumo ao lado', centered: 'Tudo centralizado' })[brief.layout],
+      progress: brief.showProgress ? ({ auto: 'Pode escolher as etapas', icons: 'Etapas com ícones', outline: 'Círculos com contorno', solid: 'Círculos preenchidos', chevrons: 'Faixas com setas' })[brief.progressStyle] : 'Sem indicador de etapas',
+      coupon: `${yesNo(brief.showCoupon)}, ${brief.showCoupon ? 'permitir' : 'ocultar'} cupom`,
+      summary: `${yesNo(brief.showSummary)}, ${brief.showSummary ? 'mostrar' : 'ocultar'} resumo`,
+      socialProof: brief.socialProofEnabled ? 'Ativar avisos de compras reais' : 'Sem avisos de compras',
+      reviews: reviews.length ? `${reviews.length} depoimento(s) fornecido(s)` : 'Sem depoimentos por enquanto',
+      name,
+    })[id];
+  }
   function readFile(file) {
     clearReference(); setError(''); setDirty(true);
     if (!file) return;
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) { setError('Escolha uma imagem PNG, JPEG ou WebP de até 2 MB.'); return; }
-    const reader = new FileReader(); fileReader.current = reader;
-    reader.onload = () => { if (fileReader.current === reader) setReference({ name: file.name, data: reader.result }); };
-    reader.onerror = () => setError('Não consegui abrir a imagem. Tente outro arquivo.');
+    setReading(true); const reader = new FileReader(); fileReader.current = reader;
+    reader.onload = () => { if (fileReader.current === reader) { setReference({ name: file.name, data: reader.result }); setReading(false); } };
+    reader.onerror = () => { setReading(false); setError('Não consegui abrir a imagem. Tente outro arquivo.'); };
     reader.readAsDataURL(file);
   }
-  async function generate(event) {
-    event.preventDefault();
-    if (request.current || saving || uploading) return;
-    if (step < 2) { nextStage(); return; }
-    if (!validateStage(0) || !validateStage(1)) return;
-    if (!prompt.trim() || mode === 'DIRECT_LINK' && !productId) { setError('Descreva sua ideia e selecione o produto para o link direto.'); return; }
-    const testimonials = reviews.filter(item => item.name.trim() || item.text.trim());
-    if (testimonials.some(item => !item.name.trim() || !item.text.trim())) { setError('Preencha o nome e a avaliação real, ou remova o depoimento incompleto.'); return; }
+  async function generate() {
+    if (request.current || locked || config && !dirty) return;
+    const invalid = visibleQuestions.find(id => questionError(id));
+    if (invalid) { setQuestion(invalid); setError(questionError(invalid)); return; }
+    const missing = visibleQuestions.find(id => !answered.includes(id));
+    if (missing) { setQuestion(missing); return; }
+    const testimonials = reviews.filter(item => item.name.trim() && item.text.trim());
+    const sentAdjustment = adjustment.trim();
     const controller = new AbortController(); request.current = controller; setBusy(true); setError('');
     try {
       const selectedBrief = { ...brief, brand: brief.brand.trim(), logoUrl: assetChoices.logo === 'image' ? brief.logoUrl : '', heroImageUrl: assetChoices.banner === 'image' ? brief.heroImageUrl : '', heroMobileImageUrl: assetChoices.banner === 'image' ? brief.heroMobileImageUrl : '', summaryBannerUrl: assetChoices.summary === 'image' && brief.showSummary ? brief.summaryBannerUrl : '' };
-      const result = await generateCheckoutPreview({ prompt: prompt.trim(), brief: selectedBrief, ...(mode === 'DIRECT_LINK' ? { productId } : {}), ...(reference ? { reference: reference.data } : {}), ...(config ? { current: config } : {}), testimonials }, csrfToken, controller.signal);
-      if (!controller.signal.aborted) { setConfig({ ...defaultCheckoutConfig, ...result.config }); setDirty(false); }
+      const result = await generateCheckoutPreview({ prompt: [prompt.trim(), colors.trim() ? `Cores da marca: ${colors.trim()}` : '', sentAdjustment ? `Ajuste solicitado: ${sentAdjustment}` : ''].filter(Boolean).join('\n'), brief: selectedBrief, ...(mode === 'DIRECT_LINK' ? { productId } : {}), ...(reference ? { reference: reference.data } : {}), ...(config ? { current: config } : {}), testimonials }, csrfToken, controller.signal);
+      if (!controller.signal.aborted) { setConfig({ ...defaultCheckoutConfig, ...result.config }); setDirty(false); setAdjustment(''); setMessages(items => [...items, ...(sentAdjustment ? [{ role: 'user', text: sentAdjustment }] : []), { role: 'assistant', text: config ? 'Ajuste pronto, capitão. Confira a nova prévia e me diga se quer mudar mais alguma coisa.' : 'Pronto, seu checkout tomou forma! Confira a prévia. Quer mudar algo? Me conta aqui.' }]); }
     } catch (cause) { if (!controller.signal.aborted) setError(cause.status === 429 ? 'Você chegou ao limite de 10 criações por hora. Tente mais tarde.' : cause.message); }
     finally { if (request.current === controller) { request.current = null; setBusy(false); } }
   }
@@ -104,58 +171,59 @@ export default function CheckoutAiBuilder({ products, csrfToken, onBack, onCreat
   }
   const updateReview = (index, key, value) => { setReviews(items => items.map((item, position) => position === index ? { ...item, [key]: value } : item)); setDirty(true); };
   const previewProduct = mode === 'DIRECT_LINK' ? products.find(product => product.publicId === productId) : null;
+  function options(label, value, items, onChange) {
+    return <div className="checkout-ai-choices" role="group" aria-label={label}>{items.map(([id, title, help]) => <button type="button" key={String(id)} aria-pressed={value === id} onClick={() => onChange(id)}><span>{title}</span>{help && <small>{help}</small>}{value === id && <Check size={16} aria-hidden="true"/>}</button>)}</div>;
+  }
+  const inputKeyDown = event => {
+    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
+  };
+  function questionControl() {
+    switch (question) {
+      case 'brand': return <label>Nome da marca<input value={brief.brand} onChange={event => { changeBrief('brand', event.target.value); if (!answered.includes('name')) setName(`Checkout ${event.target.value}`); }} maxLength={24} placeholder="Ex.: Aurora" autoComplete="organization"/></label>;
+      case 'idea': return <><label>Sua ideia<textarea value={prompt} onChange={event => { setPrompt(event.target.value); setDirty(true); }} onKeyDown={inputKeyDown} maxLength={1200} rows={3} placeholder="Uma loja de tênis com um visual minimalista…"/></label><div className="checkout-ai-examples">{examples.map(example => <button type="button" key={example} onClick={() => { setPrompt(example); setDirty(true); }}>{example}</button>)}</div></>;
+      case 'colors': return <><label>Cores da marca<input value={colors} onChange={event => { setColors(event.target.value); setDirty(true); }} maxLength={160} placeholder="Ex.: preto e branco, detalhes em vermelho"/></label><small>Se ainda não definiu, deixe em branco e eu escolho com base na sua ideia.</small></>;
+      case 'mode': return options('Tipo de checkout', mode, [['SHOPIFY_CART', 'Carrinho da Shopify', 'Recebe os produtos da sua loja.'], ['DIRECT_LINK', 'Produto específico', 'Um link para um produto cadastrado.']], value => { setMode(value); setConfig(null); setDirty(true); });
+      case 'product': return <><label>Produto<select value={productId} onChange={event => { setProductId(event.target.value); setConfig(null); setDirty(true); }}><option value="">Selecione um produto</option>{products.map(product => <option key={product.publicId} value={product.publicId}>{product.checkoutTitle}</option>)}</select></label>{!products.length && <p>Você precisa cadastrar um produto primeiro. Pode voltar e escolher o carrinho da Shopify ou sair para cadastrar.</p>}</>;
+      case 'template': return options('Estrutura do checkout', brief.template, [['auto', 'Escolha para mim'], ...Object.entries(structuralCheckoutTemplates).map(([id, item]) => [id, item.name, item.description]), ['minimal', 'Clássico · duas colunas'], ['compact', 'Compacto · centralizado']], value => changeBrief('template', value));
+      case 'reference': return <><label className="checkout-ai-upload"><ImagePlus size={19}/> Referência visual opcional<input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" onChange={event => readFile(event.target.files?.[0])}/></label>{reference && <><div className="checkout-ai-reference"><img src={reference.data} alt="Referência temporária do visual"/><span>{reference.name}</span><button type="button" className="secondary" onClick={() => { clearReference(); setDirty(true); }} aria-label="Remover referência"><Trash2 size={16}/></button></div>{options('Uso da referência', brief.fidelity, [['close', 'Seguir de perto'], ['inspired', 'Só inspiração']], value => changeBrief('fidelity', value))}</>}<small>A referência é temporária: sai ao fechar ou salvar. Ela não vira logo nem banner.</small></>;
+      case 'logo': return <>{options('Logo da marca', assetChoices.logo, [['text', 'Usar o nome da marca'], ['image', 'Enviar minha logo']], value => { setAssetChoices(current => ({ ...current, logo: value })); setDirty(true); })}{assetChoices.logo === 'image' && assetField('logoUrl', 'Logo da marca')}</>;
+      case 'banner': return <>{options('Banner no topo', assetChoices.banner, [['none', 'Prefiro sem banner'], ['image', 'Quero enviar um banner']], value => { setAssetChoices(current => ({ ...current, banner: value })); setDirty(true); })}{assetChoices.banner === 'image' && <>{assetField('heroImageUrl', 'Banner principal')}{assetField('heroMobileImageUrl', 'Banner para celular (opcional)')}</>}</>;
+      case 'summaryImage': return <>{options('Imagem do resumo', assetChoices.summary, [['none', 'Sem imagem adicional'], ['image', 'Enviar imagem do resumo']], value => { setAssetChoices(current => ({ ...current, summary: value })); setDirty(true); })}{assetChoices.summary === 'image' && assetField('summaryBannerUrl', 'Imagem do resumo')}</>;
+      case 'layout': return options('Organização no computador', brief.layout, [['auto', 'Escolha para mim'], ['split', 'Resumo ao lado'], ['centered', 'Tudo centralizado']], value => changeBrief('layout', value));
+      case 'progress': return options('Indicador de etapas', brief.showProgress ? brief.progressStyle : 'hidden', [['auto', 'Escolha para mim'], ['chevrons', 'Faixas com setas'], ['icons', 'Ícones'], ['outline', 'Círculos com contorno'], ['solid', 'Círculos preenchidos'], ['hidden', 'Não mostrar etapas']], value => { changeBrief('showProgress', value !== 'hidden'); if (value !== 'hidden') changeBrief('progressStyle', value); });
+      case 'coupon': return <>{options('Cupom', brief.showCoupon, [[true, 'Sim, permitir cupom'], [false, 'Não preciso de cupom']], value => changeBrief('showCoupon', value))}<small>Usa os cupons que você cadastrar na loja.</small></>;
+      case 'summary': return <>{options('Resumo da compra', brief.showSummary, [[true, 'Sim, mostrar resumo'], [false, 'Ocultar resumo']], value => changeBrief('showSummary', value))}{!brief.showSummary && assetChoices.summary === 'image' && <small>A imagem do resumo também ficará oculta.</small>}</>;
+      case 'socialProof': return <>{options('Avisos de compras recentes', brief.socialProofEnabled, [[true, 'Sim, ativar avisos'], [false, 'Sem avisos de compras']], value => changeBrief('socialProofEnabled', value))}<small>Só aparecem compras reais elegíveis da loja. Sem vendas inventadas, marujo.</small></>;
+      case 'reviews': return <><p>Sem avaliações agora? Pode seguir e adicionar depois no editor.</p>{reviews.map((review, index) => <div className="checkout-ai-review" key={index}><label>Nome do cliente {index + 1}<input value={review.name} maxLength={80} onChange={event => updateReview(index, 'name', event.target.value)}/></label><label>Avaliação real {index + 1}<textarea value={review.text} maxLength={240} rows={2} onChange={event => updateReview(index, 'text', event.target.value)}/></label><label>Nota {index + 1}<select value={review.rating} onChange={event => updateReview(index, 'rating', Number(event.target.value))}>{[5, 4, 3, 2, 1].map(rating => <option key={rating} value={rating}>{rating} de 5</option>)}</select></label><button type="button" className="secondary" onClick={() => { setReviews(items => items.filter((_, i) => i !== index)); setDirty(true); }}><Trash2 size={15}/> Remover depoimento {index + 1}</button></div>)}<button type="button" className="secondary" disabled={reviews.length >= 6} onClick={() => { setReviews(items => [...items, { name: '', text: '', rating: 5 }]); setDirty(true); }}><Plus size={17}/> Adicionar depoimento</button></>;
+      case 'name': return <label>Nome do checkout<input value={name} onChange={event => setName(event.target.value)} maxLength={120}/></label>;
+      default: return config ? <label>O que quer ajustar?<textarea value={adjustment} disabled={busy || saving} onChange={event => { setAdjustment(event.target.value); setDirty(true); }} onKeyDown={inputKeyDown} maxLength={500} rows={3} placeholder="Ex.: deixa os botões mais arredondados…"/></label> : <p>As respostas estão na conversa. Pode alterar qualquer uma antes de gerar.</p>;
+    }
+  }
+  const completedQuestions = visibleQuestions.filter(id => answered.includes(id));
   return <main className={`page checkout-ai ${expanded ? "is-expanded" : ""}`}>
-    <header className="page-title"><div><p className="eyebrow">ESTÚDIO PIRAT · CRIAR COM IA</p><h1 ref={heading} tabIndex={-1}>Dê a ideia. Eu monto o mapa.</h1><p>Descreva seu checkout, confira a prévia e deixe do seu jeito no editor.</p></div><button type="button" className="secondary" onClick={leave} disabled={saving || uploading}><ArrowLeft size={17}/> Voltar aos checkouts</button></header>
-    <div className="checkout-ai-grid"><form className="card checkout-ai-form" onSubmit={generate}>
-      <nav className="checkout-ai-stages" aria-label="Etapas da criação">{steps.map((label, index) => <button key={label} type="button" aria-current={step === index ? 'step' : undefined} disabled={busy || saving || uploading || index > step} onClick={() => { setStep(index); setError(''); }}><b>{index + 1}</b><span>{label}</span></button>)}</nav>
-      <fieldset hidden={step !== 0} disabled={busy || saving || uploading}><legend>1. Vamos conhecer sua marca</legend><p>O que a referência tem de bom? Conte o que você quer manter e o que prefere mudar.</p>
-        <label>Qual é o nome da marca?<input value={brief.brand} onChange={event => changeBrief('brand', event.target.value)} maxLength={24} placeholder="Nome que aparece para o comprador"/></label>
-        <label>Nome do checkout<input value={name} onChange={event => setName(event.target.value)} maxLength={120}/></label>
-        <label>Tipo de checkout<select value={mode} onChange={event => { setMode(event.target.value); setConfig(null); }}><option value="SHOPIFY_CART">Loja Shopify · carrinho automático</option><option value="DIRECT_LINK">Link direto · produto específico</option></select></label>
-        {mode === 'DIRECT_LINK' && <label>Produto<select value={productId} onChange={event => { setProductId(event.target.value); setConfig(null); }}><option value="">Selecione um produto</option>{products.map(product => <option key={product.publicId} value={product.publicId}>{product.checkoutTitle}</option>)}</select></label>}
-        <label htmlFor="checkout-ai-idea">Como você imagina o checkout?</label><textarea id="checkout-ai-idea" value={prompt} onChange={event => { setPrompt(event.target.value); setDirty(true); }} maxLength={2000} rows={4} placeholder="Conte a marca, as cores e o estilo que você quer…"/>
-        {!config && <div className="checkout-ai-examples">{examples.map(example => <button type="button" key={example} onClick={() => setPrompt(example)}>{example}</button>)}</div>}
-        <label>Qual estrutura quer usar?<select value={brief.template} onChange={event => changeBrief('template', event.target.value)}><option value="auto">IA escolhe pela referência</option>{Object.entries(structuralCheckoutTemplates).map(([id, item]) => <option key={id} value={id}>{item.name}</option>)}<option value="minimal">Clássico · duas colunas</option><option value="compact">Compacto · centralizado</option></select></label>
-        {structuralCheckoutTemplates[brief.template] && <p className="checkout-ai-model-help">{structuralCheckoutTemplates[brief.template].description}</p>}
-        <label>Como usar a referência?<select value={brief.fidelity} onChange={event => changeBrief('fidelity', event.target.value)}><option value="close">Aproximar cores, proporções e estilo</option><option value="inspired">Usar como inspiração e explorar</option></select></label>
-        <label className="checkout-ai-upload"><ImagePlus size={19}/> Referência visual opcional<input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" onChange={event => readFile(event.target.files?.[0])}/></label>
-        {reference && <div className="checkout-ai-reference"><img src={reference.data} alt="Referência temporária do visual"/><span>{reference.name}</span><button type="button" className="secondary" onClick={() => { clearReference(); setDirty(true); }} aria-label="Remover referência"><Trash2 size={16}/></button></div>}
-        <small>A referência inspira cores e organização. Não vira banner nem entra na biblioteca; é descartada ao sair ou salvar o rascunho.</small>
-      </fieldset>
-      <fieldset hidden={step !== 1} disabled={busy || saving || uploading}><legend>2. Sua logo e suas imagens</legend><p>A referência mostra o estilo. Aqui entram as imagens que vão aparecer de verdade no checkout.</p>
-        <label>Você tem uma logo?<select value={assetChoices.logo} onChange={event => { setAssetChoices(value => ({ ...value, logo: event.target.value })); setDirty(true); }}><option value="text">Usar o nome da marca</option><option value="image">Sim, vou enviar minha logo</option></select></label>
-        {assetChoices.logo === 'image' && assetField('logoUrl', 'Logo da marca')}
-        <label>Quer um banner no topo?<select value={assetChoices.banner} onChange={event => { setAssetChoices(value => ({ ...value, banner: event.target.value })); setDirty(true); }}><option value="none">Sem banner, visual mais limpo</option><option value="image">Sim, vou enviar um banner</option></select></label>
-        {assetChoices.banner === 'image' && <>{assetField('heroImageUrl', 'Banner principal')}{assetField('heroMobileImageUrl', 'Banner para celular (opcional)')}</>}
-        <label>Quer uma imagem junto ao resumo?<select value={assetChoices.summary} onChange={event => { setAssetChoices(value => ({ ...value, summary: event.target.value })); setDirty(true); }}><option value="none">Sem imagem adicional</option><option value="image">Sim, adicionar imagem ao resumo</option></select></label>
-        {assetChoices.summary === 'image' && assetField('summaryBannerUrl', 'Imagem do resumo')}
-        {uploading && <p role="status">Enviando imagem para a biblioteca…</p>}
-        <small>Logos e banners enviados ficam na biblioteca da loja para continuar aparecendo. A imagem de referência permanece temporária. Você pode remover imagens não utilizadas pela biblioteca.</small>
-      </fieldset>
-      <fieldset hidden={step !== 2} disabled={busy || saving || uploading}><legend>3. O que seu checkout precisa ter?</legend>
-        <label>Como organizar o checkout no computador?<select disabled={Boolean(structuralCheckoutTemplates[brief.template])} value={structuralCheckoutTemplates[brief.template] ? "split" : brief.layout} onChange={event => changeBrief('layout', event.target.value)}><option value="auto">IA escolhe pela referência</option><option value="split">Formulário e resumo lado a lado</option><option value="centered">Conteúdo centralizado</option></select></label>
-        <label>Qual estilo de etapas você prefere?<select value={brief.progressStyle} onChange={event => changeBrief('progressStyle', event.target.value)}><option value="auto">IA escolhe pela referência</option><option value="chevrons">Faixas com setas</option><option value="icons">Ícones</option><option value="outline">Círculos com contorno</option><option value="solid">Círculos preenchidos</option></select></label>
-        <div className="checkout-ai-options">{[['showProgress', 'Mostrar as etapas do checkout', 'Identificação, entrega quando necessária e pagamento.'], ['showSummary', 'Mostrar o resumo da compra', 'Produtos e valores vêm do carrinho real.'], ['showCoupon', 'Permitir inserir cupom', 'Usa os cupons cadastrados na loja.'], ['socialProofEnabled', 'Ativar avisos de compras recentes', 'Os pop-ups aparecem quando houver vendas reais elegíveis na loja. Não inventamos compradores.']].map(([key, label, help]) => <label className="checkout-ai-option" key={key}><input type="checkbox" checked={brief[key]} onChange={event => changeBrief(key, event.target.checked)}/><span><b>{label}</b><small>{help}</small></span></label>)}</div>
-        <h3>E os depoimentos?</h3><p>Deixo os cartões prontos com as avaliações que você fornecer. Sem avaliações, a seção fica desativada no rascunho.</p>
-        {reviews.map((review, index) => <div className="checkout-ai-review" key={index}><label>Nome do cliente {index + 1}<input value={review.name} maxLength={80} onChange={event => updateReview(index, 'name', event.target.value)}/></label><label>Avaliação real<textarea value={review.text} maxLength={240} rows={2} onChange={event => updateReview(index, 'text', event.target.value)}/></label><label>Nota<select value={review.rating} onChange={event => updateReview(index, 'rating', Number(event.target.value))}>{[5, 4, 3, 2, 1].map(rating => <option key={rating} value={rating}>{rating} de 5</option>)}</select></label><button type="button" className="secondary" onClick={() => { setReviews(items => items.filter((_, i) => i !== index)); setDirty(true); }}><Trash2 size={15}/> Remover depoimento {index + 1}</button></div>)}
-        <button type="button" className="secondary" disabled={reviews.length >= 6} onClick={() => { setReviews(items => [...items, { name: '', text: '', rating: 5 }]); setDirty(true); }}><Plus size={17}/> Adicionar depoimento</button>
-      </fieldset>
-      <p className="checkout-ai-privacy" hidden={step !== 2}>Enviamos sua ideia e a referência ao Gemini. Evite dados pessoais nas imagens. As avaliações são inseridas sem alteração pela Pirat e não são enviadas à IA. O processamento no Google segue os termos do serviço.</p>
-      {error && <p role="alert" className="public-error">{error}</p>}
-      <div className="checkout-ai-actions">
-        {step > 0 && <button type="button" className="secondary" disabled={busy || saving || uploading} onClick={() => { setStep(value => value - 1); setError(''); }}><ArrowLeft size={17}/> Anterior</button>}
-        {step < 2 ? <button type="submit" className="primary" disabled={busy || saving || uploading}>Continuar <ArrowRight size={17}/></button> : <button type="submit" className="primary" disabled={busy || saving || uploading || !prompt.trim()}>{busy ? <LoaderCircle className="spin" size={18}/> : <Sparkles size={18}/>} {busy ? 'Montando sua prévia…' : config ? 'Ajustar com IA' : 'Gerar prévia'}</button>}
-        {busy && <button type="button" className="secondary" onClick={() => { request.current?.abort(); request.current = null; setBusy(false); }}>Cancelar geração</button>}
+    <header className="page-title"><div><p className="eyebrow">ESTÚDIO PIRAT · CRIAR COM IA</p><h1 ref={heading} tabIndex={-1}>Seu checkout começa numa conversa.</h1><p>Um papo com o papagaio. Uma ideia de cada vez. Tudo com a sua cara.</p></div><button type="button" className="secondary" onClick={leave} disabled={saving || uploading}><ArrowLeft size={17}/> Voltar aos checkouts</button></header>
+    <div className="checkout-ai-grid"><form className="card checkout-ai-form checkout-ai-chat" onSubmit={answer}>
+      <div className="checkout-ai-chat-head"><img src={busy ? "/brand/assistant/thinking.webp" : config ? "/brand/assistant/happy.webp" : "/brand/assistant/greeting.webp"} alt="" width="56" height="56"/><div><b>Papagaio da Pirat</b><span>Seu parceiro de criação</span></div><span className="checkout-ai-chat-count">{completedQuestions.length}/{visibleQuestions.length}</span></div>
+      <div className="checkout-ai-chat-progress" role="progressbar" aria-label="Respostas da criação" aria-valuemin={0} aria-valuemax={visibleQuestions.length} aria-valuenow={completedQuestions.length}><span style={{ width: `${completedQuestions.length / visibleQuestions.length * 100}%` }}/></div>
+      <div className="checkout-ai-conversation" ref={conversation} role="region" aria-label="Conversa de criação" tabIndex={0}>
+        {completedQuestions.length > 0 && <ol className="checkout-ai-messages" aria-label="Respostas anteriores">{completedQuestions.map(id => <li key={id}><p className="checkout-ai-bubble from-parrot">{questionText[id]}</p><div className="checkout-ai-bubble from-merchant"><span>{answerSummary(id)}</span><button type="button" disabled={locked} onClick={() => editAnswer(id)} aria-label={`Alterar resposta: ${id === 'idea' ? 'ideia' : answerSummary(id)}`}><Pencil size={15}/></button></div></li>)}</ol>}
+        {messages.map((message, index) => <p key={index} className={`checkout-ai-bubble ${message.role === 'user' ? 'from-merchant' : 'from-parrot'}`}>{message.text}</p>)}
+        <div className="checkout-ai-current"><span className="eyebrow">PAPAGAIO DA PIRAT</span><h2 ref={activeQuestion} tabIndex={-1}>{question === 'ready' ? config ? 'O que mais vamos deixar do seu jeito?' : `Fechou, ${brief.brand}! Vamos montar sua prévia?` : questionText[question]}</h2></div>
       </div>
-      {step === 2 && config && <div className="checkout-ai-refine"><label htmlFor="checkout-ai-adjust">O que quer ajustar?</label><textarea id="checkout-ai-adjust" disabled={busy || saving} value={prompt} onChange={event => { setPrompt(event.target.value); setDirty(true); }} rows={3} maxLength={2000}/><small>Para mudar marca, imagens ou recursos, volte às etapas anteriores. Depois clique em Ajustar com IA.</small></div>}
-    </form><section className="card checkout-ai-result" aria-label="Prévia do checkout"><div className="checkout-ai-result-head"><span className="eyebrow">SEU CHECKOUT, DO SEU JEITO</span><h2>{config ? 'Seu checkout tomou forma.' : 'Um bom checkout começa aqui.'}</h2><p>{config ? 'Prévia ilustrativa. Os produtos e preços publicados vêm da sua loja. Amplie para conferir os detalhes.' : 'Primeiro a marca. Depois as imagens e os recursos. A IA combina suas escolhas com a referência.'}</p></div>
+      <fieldset className="checkout-ai-composer" disabled={locked}><legend className="sr-only">Sua resposta</legend>{questionControl()}</fieldset>
+      {['logo', 'banner', 'summaryImage'].includes(question) && <small className="checkout-ai-asset-note">Logo e banners ficam na biblioteca para aparecer no checkout. A referência visual é temporária.</small>}
+      {uploading && <p role="status">Enviando imagem para a biblioteca…</p>}{reading && <p role="status">Preparando a referência…</p>}
+      {question === 'ready' && <p className="checkout-ai-privacy">Sua ideia e referência são enviadas ao Gemini. Evite dados pessoais nas imagens. Os depoimentos são aplicados pela Pirat sem alteração e não são enviados à IA.</p>}
+      {error && <p role="alert" className="public-error">{error}</p>}
+      <div className="checkout-ai-actions">{question !== 'ready' && completedQuestions.length > 0 && <button type="button" className="secondary" disabled={locked} onClick={() => editAnswer(visibleQuestions[Math.max(0, visibleQuestions.indexOf(question) - 1)])}><ArrowLeft size={17}/> Voltar</button>}<button type="submit" className="primary" disabled={locked || question === 'ready' && Boolean(config) && !dirty}>{busy ? <LoaderCircle className="spin" size={18}/> : question === 'ready' ? <Sparkles size={18}/> : <ArrowUp size={18}/>} {busy ? 'Montando sua prévia…' : question === 'ready' ? config ? 'Enviar ajuste' : 'Gerar prévia' : 'Enviar resposta'}</button>{busy && <button type="button" className="secondary" onClick={() => { request.current?.abort(); request.current = null; setBusy(false); }}>Cancelar geração</button>}</div>
+    </form><section className="card checkout-ai-result" aria-label="Prévia do checkout"><div className="checkout-ai-result-head"><span className="eyebrow">SEU CHECKOUT, DO SEU JEITO</span><h2>{config ? 'Seu checkout tomou forma.' : 'Um bom checkout começa aqui.'}</h2><p>{config ? 'Prévia ilustrativa. Os produtos e preços publicados vêm da sua loja. Amplie para conferir os detalhes.' : 'Enquanto a gente conversa, suas escolhas ficam guardadas aqui. A prévia aparece quando você pedir para gerar.'}</p></div>
       {config ? <>
         <div className="checkout-ai-toolbar" role="group" aria-label="Dispositivo da prévia"><button type="button" className="secondary" aria-pressed={device === 'desktop'} onClick={() => setDevice('desktop')}><Monitor size={17}/> Computador</button><button type="button" className="secondary" aria-pressed={device === 'mobile'} onClick={() => setDevice('mobile')}><Smartphone size={17}/> Celular</button><button type="button" className="secondary" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}><Maximize2 size={17}/> {expanded ? 'Voltar à criação' : 'Ampliar prévia'}</button></div>
         <DesignPreview config={config} product={previewProduct ? { ...previewProduct, title: previewProduct.checkoutTitle } : undefined} device={device}/>
         <div className="checkout-ai-design-summary"><b>{config.logoText}</b><span>{config.layout === 'split' ? 'Formulário e resumo lado a lado' : 'Composição centralizada'} · {config.font}</span><span>{config.heroEnabled ? 'Com banner' : 'Sem banner'} · {config.socialProofEnabled ? 'Avisos de vendas reais ativados' : 'Sem avisos de compras'}</span></div>
         {config.socialProofEnabled && <p className="checkout-ai-proof-note">As notificações aparecem no checkout publicado quando há compras reais disponíveis. Esta prévia não simula clientes.</p>}
         <div className="checkout-ai-result-foot">{dirty && <p role="status">Suas escolhas mudaram. Gere uma nova prévia antes de salvar.</p>}<button type="button" className="primary" onClick={save} disabled={saving || busy || dirty || uploading}>{saving ? <LoaderCircle className="spin" size={18}/> : <Sparkles size={18}/>} Salvar rascunho e abrir editor</button><small>Tudo continua editável. Confira os textos e publique pelo editor quando estiver pronto.</small></div>
-      </> : <div className="checkout-ai-empty"><img src="/brand/assistant/thinking.webp" alt="Papagaio da Pirat pensando no próximo checkout" width="180" height="180"/><h3>Vamos dar cara à sua loja.</h3><p>A referência guia a composição, as cores e as etapas. Sua logo, seus banners e seus depoimentos completam o visual.</p><div className="checkout-ai-review-placeholder"><b>Você escolhe. A IA organiza.</b><small>Marca · Imagens · Etapas · Resumo · Compras recentes</small></div></div>}
+      </> : <div className="checkout-ai-empty"><img src="/brand/assistant/thinking.webp" alt="Papagaio da Pirat pensando no próximo checkout" width="180" height="180"/><h3>{brief.brand ? `A próxima parada é ${brief.brand}.` : 'Puxa uma cadeira, marujo.'}</h3><p>Me conte sua ideia. Eu pergunto o que falta e monto o checkout com você.</p>{completedQuestions.length > 0 && <dl className="checkout-ai-brief-summary">{completedQuestions.map(id => <div key={id}><dt>{({brand:'Marca',idea:'Ideia',colors:'Cores',mode:'Tipo',product:'Produto',template:'Modelo',reference:'Referência',logo:'Logo',banner:'Banner',summaryImage:'Imagem',layout:'Organização',progress:'Etapas',coupon:'Cupom',summary:'Resumo',socialProof:'Compras recentes',reviews:'Depoimentos',name:'Nome'})[id]}</dt><dd>{answerSummary(id)}</dd></div>)}</dl>}</div>}
     </section></div>
   </main>;
 }
