@@ -20,8 +20,8 @@ export function clearTabUser() {
   sessionStorage.removeItem(tabUserKey);
 }
 
-/** @param {RequestInfo | URL} input @param {RequestInit} init */
-export async function request(input, init = {}) {
+/** @param {RequestInfo | URL} input @param {RequestInit} init @param {number} timeoutMs */
+export async function request(input, init = {}, timeoutMs = 30_000) {
   const headers = new Headers(init.headers || {});
   const expectedUser = sessionStorage.getItem(tabUserKey);
   const url = String(input);
@@ -29,7 +29,7 @@ export async function request(input, init = {}) {
   const support = sessionStorage.getItem(supportKey);
   if (init.credentials === 'include' && support) headers.set('x-solid-support-session', support);
   if (init.credentials === 'include' && expectedUser && !establishesSession) headers.set('x-solid-user-context', expectedUser);
-  const timeout = AbortSignal.timeout(30_000);
+  const timeout = AbortSignal.timeout(timeoutMs);
   const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
   let response;
   try { response = await globalThis.fetch(input, { ...init, headers, signal }); }

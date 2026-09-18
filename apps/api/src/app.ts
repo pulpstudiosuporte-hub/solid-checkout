@@ -42,6 +42,7 @@ import { registerAdminContentRoutes } from './admin-content-routes.js';
 import { registerChromaSenseRoutes } from './chromasense-routes.js';
 import { registerSettingsRoutes } from './settings-routes.js';
 import { registerAssistantRoutes } from './assistant-routes.js';
+import { registerCheckoutAiRoutes } from './checkout-ai-routes.js';
 
 export function buildApp(environment: AppEnvironment, dependencies: { authRepository?: AuthRepository; catalogRepository?: CatalogRepository; storeRepository?: StoreRepository; shopifyRepository?: ShopifyRepository; gatewayRepository?: PrismaGatewayRepository; orderRepository?: OrderRepository; dokployClient?: DokployDomainClient; database?: PrismaClient } = {}): FastifyInstance {
   const checkoutOriginCache = new Map<string, { allowed: boolean; expiresAt: number }>();
@@ -97,7 +98,11 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
   if (dependencies.authRepository) {
     const authRepository = dependencies.authRepository;
     // Register after the rate-limit plugin has installed its onRoute hook.
-    void app.register((assistantApp, _options, done) => { registerAssistantRoutes(assistantApp, environment, authRepository); done(); });
+    void app.register((assistantApp, _options, done) => {
+      registerAssistantRoutes(assistantApp, environment, authRepository);
+      if (dependencies.catalogRepository) registerCheckoutAiRoutes(assistantApp, environment, authRepository, dependencies.catalogRepository);
+      done();
+    });
   }
   if (dependencies.database) registerRegistrationRoutes(app, environment, dependencies.database);
   if (dependencies.authRepository && dependencies.database) registerDashboardRoutes(app, environment, dependencies.authRepository, dependencies.database);

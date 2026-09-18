@@ -1,0 +1,43 @@
+# Criar checkout com IA
+
+Em Checkouts → Criar com IA, escolha loja Shopify ou produto de link direto,
+descreva o visual e gere uma prévia. Novas instruções ajustam a configuração
+anterior. Salvar rascunho e abrir editor usa o fluxo existente; não publica.
+
+Esta primeira versão gera modelos, layout, cores, fonte, cantos e textos.
+Logos, banners, ofertas e blocos adicionais são ajustados no editor. Preços e
+produtos continuam vindo do catálogo/carrinho, nunca do modelo. Depoimentos
+fornecidos pelo lojista são preservados, sem envio ao Gemini. Sem depoimentos,
+a seção permanece desativada. A prévia é ilustrativa e não cria pagamentos.
+
+## Referência temporária
+
+PNG, JPEG ou WebP até 2 MB e 16 megapixels. A API valida, remove metadados e
+reduz a imagem para até 1280 pixels em memória antes de enviar como inlineData.
+Não usa disco, biblioteca de mídia, banco nem a Files API. Ao sair da criação
+ou salvar, a referência é removida do estado do navegador. Cancelar uma geração
+interrompe a requisição, preservando a ideia e a referência para outra tentativa.
+Fechar a aba descarta o estado. Não há promessa de remoção imediata nos sistemas
+do Google; o processamento segue os termos do provedor.
+
+## Limites e acesso
+
+`POST /checkouts/ai/preview` exige sessão, CSRF/origem válidos e papel OWNER ou
+ADMIN na loja ativa. Sessões de suporte não geram checkouts. O produto é buscado
+no contexto da loja; somente o título é enviado ao modelo. Limite de 10 pedidos
+por conta/hora, corpo de 3 MB e geração de até 45 segundos. A chave e o modelo
+usam as variáveis da API já configuradas para o papagaio.
+
+A saída passa por uma lista explícita de campos visuais. URLs, scripts, preços,
+descontos e depoimentos gerados não são aceitos. Uma falha mantém os dados do
+formulário. Saídas e referências não são registradas nos logs da rota.
+
+## Verificação
+
+- API: autenticação, loja, imagem, limite, cancelamento, saída inválida e campos permitidos.
+- Interface: prévia, ajustes, rascunho, referência temporária, cancelamento e falha;
+  temas claro/escuro, celular e auditoria automática de acessibilidade.
+- Os testes de interface usam respostas simuladas. A geração real depende do
+  Gemini configurado e deve ser conferida separadamente após publicação.
+
+Contrato oficial: [imagens no Gemini](https://ai.google.dev/gemini-api/docs/image-understanding).

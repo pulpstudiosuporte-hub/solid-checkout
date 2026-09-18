@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260918-checkout-ai-builder',
+    category: 'NEWS' as const,
+    title: 'Crie seu checkout com IA',
+    description: 'Descreva sua ideia e gere uma prévia com cores, fontes e textos. Você pode enviar uma referência visual temporária, incluir depoimentos reais e pedir ajustes. Salve como rascunho para finalizar no editor; a publicação continua sob seu controle.',
+    publishedAt: new Date('2026-09-18T22:00:00.000Z'),
+  },
+  {
     publicId: 'auto-20260918-pirat-assistant-permissions',
     category: 'SECURITY' as const,
     title: 'Ajuda do papagaio conforme seu acesso',
