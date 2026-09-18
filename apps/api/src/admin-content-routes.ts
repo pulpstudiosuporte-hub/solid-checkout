@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260918-pirat-tablet-layout',
+    category: 'FIX' as const,
+    title: 'Painel mais confortável no celular e tablet',
+    description: 'O painel aproveita toda a largura em tablets, sem faixa vazia na lateral. No celular, a busca ganhou uma barra maior e resultados em tela cheia, com mais espaço para ler e tocar.',
+    publishedAt: new Date('2026-09-18T17:30:00.000Z'),
+  },
+  {
     publicId: 'auto-20260918-pirat-dark-mode',
     category: 'IMPROVEMENT' as const,
     title: 'Seu painel, claro ou escuro',

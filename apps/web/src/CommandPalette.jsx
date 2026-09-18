@@ -76,7 +76,7 @@ export default function CommandPalette({ open, onClose, onNavigate, platformAdmi
       <h2 id="command-title" className="sr-only">Busca avançada do painel</h2>
       <div className="command-input">
         <Search size={20} aria-hidden="true"/>
-        <input aria-label="Buscar páginas, recursos ou ações" ref={inputRef} value={query} onChange={event => { setQuery(event.target.value); setActive(0); }} placeholder="Buscar páginas, recursos ou ações..." role="combobox" aria-expanded="true" aria-controls="command-results" aria-activedescendant={results[active] ? `command-option-${active}` : undefined}/>
+        <input aria-label="Buscar páginas, recursos ou ações" ref={inputRef} value={query} onChange={event => { setQuery(event.target.value); setActive(0); }} placeholder="Buscar no painel..." role="combobox" aria-expanded="true" aria-controls="command-results" aria-activedescendant={results[active] ? `command-option-${active}` : undefined}/>
         <button type="button" onClick={() => { if (query) { setQuery(''); inputRef.current?.focus(); } else onClose(); }} aria-label={query ? 'Limpar busca' : 'Fechar busca'}><X size={17}/></button>
         <kbd>Esc</kbd>
       </div>

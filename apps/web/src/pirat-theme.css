@@ -142,7 +142,7 @@
 .session-loading .loading-symbol { width: 80px; height: 80px; object-fit: contain; }
 .session-loading > svg { color: var(--p-red,#c91d16); }
 
-@media (max-width: 900px) {
+@media (max-width: 1050px) {
   .app.solid-admin.sidebar-collapsed .side-head { padding: 12px 20px; }
   .solid-auth .login-brand-panel { padding-inline: 28px; }
 }
