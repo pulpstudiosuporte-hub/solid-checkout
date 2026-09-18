@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260918-pirat-assistant-permissions',
+    category: 'SECURITY' as const,
+    title: 'Ajuda do papagaio conforme seu acesso',
+    description: 'Sugestões e orientações administrativas agora respeitam as permissões da conta. O assistente bloqueia pedidos identificados de informações internas e traz instruções revisadas para ativar o checkout na Shopify.',
+    publishedAt: new Date('2026-09-18T21:00:00.000Z'),
+  },
+  {
     publicId: 'auto-20260918-pirat-assistant-recovery',
     category: 'FIX' as const,
     title: 'Mais estabilidade nas respostas do papagaio',

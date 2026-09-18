@@ -3,7 +3,7 @@ import { ArrowUp, MessageCircle, RotateCcw, X } from 'lucide-react';
 import { askPirat, getAssistantStatus } from './api';
 import './pirat-assistant.css';
 
-const suggestions = ['Como publico meu checkout?', 'Como configuro o Pixel?', 'O que são falhas em Operações?'];
+const defaultSuggestions = ['Como publico meu checkout?', 'Como configuro o Pixel?', 'Como configuro a oferta de saída?'];
 const moods = new Set(['replying', 'happy', 'angry', 'sad']);
 const captions = { greeting: 'Pode chegar, marujo.', idle: 'Manda a dúvida.', thinking: 'Consultando o mapa…', replying: 'Olha o mapa aí!', happy: 'Aí sim, marujo!', angry: 'Vamos desembolar essa bagunça.', sad: 'Calma, vamos por partes.' };
 
@@ -16,6 +16,7 @@ export function helpHistory(messages, question) {
 export default function PiratAssistant({ csrfToken }) {
   const [open, setOpen] = useState(false);
   const [availability, setAvailability] = useState('loading');
+  const [suggestions, setSuggestions] = useState(defaultSuggestions);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState('');
@@ -35,7 +36,11 @@ export default function PiratAssistant({ csrfToken }) {
     title.current?.focus();
     const controller = new AbortController();
     setAvailability('loading');
-    getAssistantStatus(controller.signal).then(result => setAvailability(result.available ? 'ready' : 'unconfigured')).catch(() => { if (!controller.signal.aborted) setAvailability('error'); });
+    getAssistantStatus(controller.signal).then(result => {
+      if (controller.signal.aborted) return;
+      setAvailability(result.available ? 'ready' : 'unconfigured');
+      setSuggestions(Array.isArray(result.suggestions) ? result.suggestions.slice(0, 3).filter(item => typeof item === 'string' && item.length <= 100) : defaultSuggestions);
+    }).catch(() => { if (!controller.signal.aborted) setAvailability('error'); });
     return () => controller.abort();
   }, [open]);
   useEffect(() => { if (transcript.current) transcript.current.scrollTop = transcript.current.scrollHeight; }, [messages, pending, error]);

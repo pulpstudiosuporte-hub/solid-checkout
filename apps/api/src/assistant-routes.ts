@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppEnvironment } from '@solid/config';
-import type { AuthRepository } from './auth-repository.js';
+import type { AuthRepository, SessionUser } from './auth-repository.js';
+import { helpSuggestions } from './assistant-access.js';
 import { hashToken, sessionCookieName, validAdminMutation } from './admin-access.js';
 import { AssistantUnavailable, generateHelp, type HelpMessage } from './pirat-assistant.js';
 
@@ -31,20 +32,21 @@ export function registerAssistantRoutes(app: FastifyInstance, environment: AppEn
     return session && !session.support && !request.headers['x-solid-support-session'] ? session : null;
   };
   app.get('/assistant/status', async (request, reply) => {
-    if (!await sessionFor(request)) return reply.code(401).send({ error: { code: 'UNAUTHENTICATED', message: 'Entre na sua conta para conversar.' } });
-    return reply.header('cache-control', 'private, no-store').send({ available: Boolean(environment.GEMINI_API_KEY) });
+    const session = await sessionFor(request);
+    if (!session) return reply.code(401).send({ error: { code: 'UNAUTHENTICATED', message: 'Entre na sua conta para conversar.' } });
+    return reply.header('cache-control', 'private, no-store').send({ available: Boolean(environment.GEMINI_API_KEY), suggestions: helpSuggestions(session.user) });
   });
   // Authenticate before the limiter so its key follows the account, not an IP or a new session.
-  const actors = new WeakMap<FastifyRequest, string>();
+  const actors = new WeakMap<FastifyRequest, SessionUser>();
   app.post('/assistant/messages', {
     bodyLimit: 64000,
     preValidation: async (request, reply) => {
       const session = await sessionFor(request);
       if (!session) return reply.code(401).send({ error: { code: 'UNAUTHENTICATED', message: 'Entre na sua conta para conversar.' } });
       if (!validAdminMutation(request, session, environment)) return reply.code(403).send({ error: { code: 'CSRF_INVALID', message: 'Recarregue o painel e tente novamente.' } });
-      actors.set(request, session.userId);
+      actors.set(request, session);
     },
-    config: { rateLimit: { hook: 'preHandler', max: 20, ban: -1, timeWindow: '1 hour', keyGenerator: (request: FastifyRequest) => `pirat-help:${actors.get(request) || request.ip}`, errorResponseBuilder: () => ({ statusCode: 429, message: 'Assistant rate limit reached' }) } },
+    config: { rateLimit: { hook: 'preHandler', max: 20, ban: -1, timeWindow: '1 hour', keyGenerator: (request: FastifyRequest) => `pirat-help:${actors.get(request)?.userId || request.ip}`, errorResponseBuilder: () => ({ statusCode: 429, message: 'Assistant rate limit reached' }) } },
   }, async (request, reply) => {
     reply.header('cache-control', 'private, no-store');
     const messages = parseHelpMessages(request.body);
@@ -53,7 +55,7 @@ export function registerAssistantRoutes(app: FastifyInstance, environment: AppEn
     const controller = new AbortController();
     const disconnect = () => { if (!reply.raw.writableEnded) controller.abort(); };
     reply.raw.once('close', disconnect);
-    try { return reply.send(await generateHelp(environment, messages, controller.signal)); }
+    try { return reply.send(await generateHelp(environment, messages, controller.signal, actors.get(request)?.user)); }
     catch (cause) {
       const quota = cause instanceof AssistantUnavailable && cause.reason === 'quota';
       const timeout = cause instanceof AssistantUnavailable && cause.reason === 'timeout';

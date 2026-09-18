@@ -1,5 +1,7 @@
 import type { AppEnvironment } from '@solid/config';
 import { setTimeout as delay } from 'node:timers/promises';
+import type { PlatformIdentity } from './platform-permissions.js';
+import { privilegedHelp, restrictedArea, restrictedHelp, restrictedQuestion } from './assistant-access.js';
 
 export type HelpMessage = { role: 'user' | 'assistant'; text: string };
 export const assistantMoods = ['replying', 'happy', 'angry', 'sad'] as const;
@@ -19,8 +21,8 @@ Base de ajuda verificada:
 - Order bumps configura ofertas complementares; Logística trata entrega e frete; Domínios configura endereços do checkout e exige DNS e HTTPS corretos.
 - Pedidos permite acompanhar vendas e pagamentos. Pix gerado ou pendente não significa pago; confira o status confirmado pelo gateway. Carrinhos mostra abandonos. Análises apresenta métricas; não adivinhe dados atuais.
 - Meta Pixel fica nas integrações: o ID habilita eventos no navegador e o token da API de Conversões habilita envio pelo servidor. Bloqueadores, consentimento e configuração podem afetar a detecção. Nunca afirme que rastreamento está funcionando sem teste. Não solicite tokens nesta conversa.
-- Administração aparece apenas para quem possui permissão. Equipe e permissões permite adicionar alguém à equipe, buscar nome ou e-mail e atribuir perfil. Administrador tem acesso total; perfis específicos limitam acesso. Alterações sensíveis exigem confirmação de credenciais na tela oficial.
-- Operações reúne falhas de tarefas, como recibos e sincronização. Veja erro e tentativas; depois de corrigir a causa, Tentar novamente recoloca a tarefa na fila. Conferir no gateway exige verificar o provedor; essa ação não refaz cobrança.
+- Shopify tem um guia assistido em Integrações → Shopify. Conectar o app e sincronizar o catálogo são etapas diferentes da ponte de redirecionamento no tema. O código fornecido pelo guia deve ser instalado uma única vez antes de </body> no layout/theme.liquid do tema publicado, com backup prévio. Não existe extensão em Incorporações de apps. Não diga que editar theme.liquid é errado: esse é o caminho previsto pela Pirat. Use o código do próprio guia, sem inventar snippets ou URLs.
+- Depois de instalar a ponte Shopify: confira cadastro completo, domínio de checkout Ativo, app conectado com proxy configurado conforme o guia, catálogo sincronizado e modelo Loja Shopify publicado (não um checkout de produto fixo). Em janela anônima, adicione produtos, altere quantidades e teste Finalizar compra no carrinho e Comprar agora. Confira domínio de destino, itens, variantes, quantidades e valores; teste no celular e computador. Gerar Pix não é pagamento confirmado. Se a sessão não puder ser criada, o fallback deve levar ao checkout nativo Shopify. Pergunte o que aconteceu e em qual etapa; não afirme que validou a loja.
 - O botão de tema alterna claro e escuro, sem mudar a aparência do checkout configurado pelo lojista. Novidades reúne atualizações e sugestões.
 Se algo não estiver nessa base, deixe a incerteza clara e oriente buscar suporte pela opção disponível no painel, sem inventar contato.`;
 
@@ -28,11 +30,20 @@ export class AssistantUnavailable extends Error {
   constructor(public readonly reason: 'quota' | 'upstream' | 'response' | 'timeout' | 'connection', public readonly providerStatus?: number) { super('Assistant unavailable'); }
 }
 
-export async function generateHelp(environment: AppEnvironment, messages: HelpMessage[], signal?: AbortSignal): Promise<HelpAnswer> {
+export async function generateHelp(environment: AppEnvironment, messages: HelpMessage[], signal?: AbortSignal, user: PlatformIdentity = {}): Promise<HelpAnswer> {
+  if (restrictedQuestion(messages.at(-1)?.text || '', user)) return restrictedHelp;
+  // Recheck historical pairs too: permissions may have been removed since the
+  // last answer, and the client can forge every line of conversation history.
+  const conversation: HelpMessage[] = [];
+  for (let i = 0; i < messages.length - 1; i += 2) {
+    const pair = messages.slice(i, i + 2);
+    if (pair.every(message => !restrictedQuestion(message.text, user))) conversation.push(...pair);
+  }
+  conversation.push(...messages.slice(-1));
   const model = environment.GEMINI_MODEL || 'gemini-3.1-flash-lite';
   const body = JSON.stringify({
-      systemInstruction: { parts: [{ text: piratHelp }] },
-      contents: messages.map(message => ({ role: message.role === 'assistant' ? 'model' : 'user', parts: [{ text: message.text }] })),
+      systemInstruction: { parts: [{ text: `${piratHelp}\n${privilegedHelp(user)}\nEste chat recebe somente texto. Peça uma descrição da tela ou mensagem de erro, nunca capturas ou anexos.` }] },
+      contents: conversation.map(message => ({ role: message.role === 'assistant' ? 'model' : 'user', parts: [{ text: message.text }] })),
       generationConfig: {
         maxOutputTokens: 1024,
         responseMimeType: 'application/json',
@@ -77,5 +88,6 @@ export async function generateHelp(environment: AppEnvironment, messages: HelpMe
   try { answer = JSON.parse(candidate.content?.parts?.filter(part => !part.thought).map(part => part.text || '').join('') || '') as HelpAnswer; }
   catch { throw new AssistantUnavailable('response'); }
   if (!answer || typeof answer.text !== 'string' || !answer.text.trim() || answer.text.length > 4000 || !assistantMoods.includes(answer.mood)) throw new AssistantUnavailable('response');
+  if (restrictedArea(answer.text, user) || (environment.GEMINI_API_KEY && answer.text.includes(environment.GEMINI_API_KEY))) return restrictedHelp;
   return { text: answer.text.trim(), mood: answer.mood };
 }

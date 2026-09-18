@@ -6,9 +6,9 @@ import { mockAdmin } from './fixtures.mjs';
 const launcher = page => page.getByRole('button', { name: 'Conversar com o papagaio da Pirat' });
 const question = page => page.getByRole('textbox', { name: 'Sua pergunta' });
 const output = name => fileURLToPath(new URL(`../../../.visual-check/assistant-${name}.png`, import.meta.url));
-async function setup(page, { available = true, anonymous = false } = {}) {
+async function setup(page, { available = true, anonymous = false, suggestions } = {}) {
   await mockAdmin(page, { anonymous });
-  await page.route('**/assistant/status', route => route.fulfill({ json: { available } }));
+  await page.route('**/assistant/status', route => route.fulfill({ json: { available, suggestions } }));
   await page.goto('/');
 }
 for (const theme of ['light', 'dark']) {
@@ -56,6 +56,21 @@ for (const theme of ['light', 'dark']) {
     await expect(page.getByRole('log')).toBeEmpty();
   });
 }
+test('sugestões seguem permissões do servidor e usam temas de lojista por padrão', async ({ page }) => {
+  await setup(page);
+  await launcher(page).click();
+  await expect(page.getByRole('button', { name: 'Como configuro a oferta de saída?' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'O que são falhas em Operações?' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Fechar conversa' }).click();
+  await page.route('**/assistant/status', route => route.fulfill({ json: { available: true, suggestions: ['O que são falhas em Operações?'] } }));
+  await launcher(page).click();
+  await expect(page.getByRole('button', { name: 'O que são falhas em Operações?' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Fechar conversa' }).click();
+  await page.route('**/assistant/status', route => route.fulfill({ json: { available: true, suggestions: ['Como configuro a oferta de saída?'] } }));
+  await launcher(page).click();
+  await expect(page.getByRole('button', { name: 'Como configuro a oferta de saída?' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'O que são falhas em Operações?' })).toHaveCount(0);
+});
 test('falha preserva pergunta para repetir e fechamento cancela a resposta', async ({ page }) => {
   await setup(page);
   await page.route('**/assistant/messages', route => route.fulfill({ status: 503, json: { error: { code: 'ASSISTANT_UNAVAILABLE' } } }));
