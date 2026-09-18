@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260918-checkout-ai-studio-entry',
+    category: 'IMPROVEMENT' as const,
+    title: 'Um novo destaque para criar com IA',
+    description: 'O estúdio de IA ganhou um painel com a identidade da Pirat e acesso destacado na página de checkouts, adaptado ao computador e ao celular. A prévia também passa a ocultar a etapa de entrega para produtos digitais identificados.',
+    publishedAt: new Date('2026-09-18T23:10:00.000Z'),
+  },
+  {
     publicId: 'auto-20260918-checkout-models-guided',
     category: 'IMPROVEMENT' as const,
     title: 'Mais estruturas para personalizar seu checkout',

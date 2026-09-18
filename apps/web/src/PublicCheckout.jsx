@@ -1,6 +1,7 @@
 import { loadMetaPixel, trackMeta } from './meta-pixel';
 import './checkout-progress.css';
 import './checkout-templates.css';
+import CheckoutProgress from './CheckoutProgress';
 import ExitOffer from './ExitOffer';
 import { mergePaymentUpdate, pollPaymentStatus } from './payment-polling';
 import { Component, useCallback, useEffect, useRef, useState } from "react";
@@ -14,12 +15,10 @@ import {
   CreditCard,
   ChevronDown,
   LoaderCircle,
-  MapPin,
   QrCode,
   ShieldCheck,
   ShoppingBag,
   Truck,
-  UserRound,
 } from "lucide-react";
 import {
   createPublicCheckoutSession,
@@ -853,22 +852,7 @@ function SessionContent({ session: initialSession, token }) {
   };
   const googleTracking = <><ExitOffer config={config} sessionId={session.publicId} token={token} enabled={!busy && !payment && session.status === 'OPEN' && expiry.remaining > 0 && !session.couponCode} onApply={acceptExitOffer}/>
       <GoogleCheckoutTracking sessionId={session.publicId} token={token} paymentStatus={paymentStatus} shippingSelected={Boolean(selectedShipping)} paymentCreated={Boolean(payment?.publicId)} checkoutRevision={`${session.totalCents}:${session.discountCents}:${selectedShipping?.shippingPriceCents ?? session.shippingPriceCents}`}/></>;
-  const checkoutProgress = (config.showProgress && <nav className={`checkout-progress style-${config.progressStyle || 'outline'} checkout-device-${config.progressDevice || 'all'}`} aria-label="Etapas do checkout">
-        <span className="active">
-          <i>{config.progressStyle === 'icons' ? <UserRound size={16} aria-hidden="true" /> : 1}</i>
-          {copy.identification}
-        </span>
-        <b />
-        {requiresShipping && <><span className={step >= 2 ? "active" : ""}>
-          <i>{config.progressStyle === 'icons' ? <MapPin size={16} aria-hidden="true" /> : 2}</i>
-          {copy.shipping}
-        </span>
-        <b /></>}
-          <span className={step >= 4 ? "active" : ""}>
-            <i>{config.progressStyle === 'icons' ? <CreditCard size={16} aria-hidden="true" /> : (requiresShipping ? 3 : 2)}</i>
-          {copy.payment}
-        </span>
-      </nav>);
+  const checkoutProgress = config.showProgress && <CheckoutProgress config={config} labels={{ identification: copy.identification, delivery: copy.shipping, payment: copy.payment }} requiresShipping={requiresShipping} step={step}/>;
   const orderItemsView = (<div className="session-items">
               {items.map((item) => (
                 <article

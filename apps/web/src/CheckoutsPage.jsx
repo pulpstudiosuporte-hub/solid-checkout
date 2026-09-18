@@ -1,11 +1,12 @@
 import { useSupportAccess } from './support-context';
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { CheckCircle2, Clipboard, ExternalLink, Link2, LoaderCircle, Palette, Plus, Rocket, ShoppingBag, Trash2, X } from 'lucide-react';
+import { ArrowUpRight, CheckCircle2, Clipboard, ExternalLink, Link2, LoaderCircle, Palette, Plus, Rocket, ShoppingBag, Sparkles, Trash2, X } from 'lucide-react';
 import { listMediaImages, deleteMediaImage, createCheckout, createProduct, deleteCheckout, getCheckouts, getProducts, getStoreDomain, getStores, publishCheckout, updateCheckoutDraft, uploadProductImage } from './api';
 const CheckoutEditor = lazy(() => import('./CheckoutEditor'));
 const CheckoutAiBuilder = lazy(() => import('./CheckoutAiBuilder'));
 import './checkouts-page.css';
 import './checkout-actions.css';
+import './checkout-ai-entry.css';
 
 const toSlug = value => value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
 
@@ -38,7 +39,22 @@ export default function CheckoutsPage({ csrfToken, storeSlug }) {
   return <main className="page checkouts-page">
     <section className="page-title"><div><p className="eyebrow">CHECKOUT</p><h1>Checkouts</h1><p>Personalize um modelo automático para a Shopify ou crie links exclusivos para infoprodutos.</p></div><button className="primary" disabled={readOnly} onClick={startCheckout}><Plus size={17}/> Criar checkout</button></section>
     {data.error && <p className="public-error" role="alert">{data.error}</p>}
-    <div className="checkout-ai-entry"><button type="button" className="secondary" disabled={Boolean(support)} onClick={() => setAiCreating(true)}><Palette size={17}/> Criar com IA</button></div>
+    <section className="checkout-ai-entry" aria-labelledby="checkout-ai-entry-title">
+      <div className="checkout-ai-entry-copy">
+        <p className="checkout-ai-entry-label"><Sparkles size={15} aria-hidden="true"/> ESTÚDIO CRIATIVO PIRAT</p>
+        <h2 id="checkout-ai-entry-title">Sua ideia.<br/><span>Seu checkout.</span></h2>
+        <p className="checkout-ai-entry-description">Manda a visão, marujo. O papagaio monta.<br/>Sua marca, suas imagens e um checkout com a sua cara.</p>
+        <button type="button" className="checkout-ai-entry-action" disabled={Boolean(support)} onClick={() => setAiCreating(true)}><Sparkles size={19} aria-hidden="true"/> Criar com IA <ArrowUpRight size={21} aria-hidden="true"/></button>
+        {support && <small>Disponível na sessão do próprio lojista.</small>}
+      </div>
+      <div className="checkout-ai-entry-art" aria-hidden="true">
+        <span className="checkout-ai-entry-orbit"/>
+        <span className="checkout-ai-entry-signature">solta a ideia.</span>
+        <img src="/brand/assistant/greeting.webp" alt="" width="256" height="256"/>
+        <span className="checkout-ai-entry-stamp"><Sparkles size={14}/> FEITO DO SEU JEITO</span>
+      </div>
+      <div className="checkout-ai-entry-foot"><span>Referência visual</span><i aria-hidden="true"/><span>Logo e banners</span><i aria-hidden="true"/><span>Prévia editável</span></div>
+    </section>
     {data.checkouts.length === 0 ? <section className="card checkout-empty"><Rocket size={30}/><h2>Escolha seu primeiro modelo</h2><p>Use o carrinho real da Shopify ou publique um link direto para um infoproduto.</p><button className="primary" disabled={readOnly} onClick={() => setCreating(true)}><Plus size={17}/> Criar checkout</button></section> : <section className="checkout-grid">{data.checkouts.map(checkout => { const shopify = checkout.mode === 'SHOPIFY_CART'; return <article className="card checkout-card" key={checkout.publicId}><header><div className="checkout-card-badges"><span className={checkout.status === 'PUBLISHED' ? 'published' : 'draft'}>{checkout.status === 'PUBLISHED' ? <CheckCircle2 size={15}/> : <Rocket size={15}/>}{checkout.status === 'PUBLISHED' ? 'Publicado' : 'Rascunho'}</span><span className="checkout-type">{shopify ? <ShoppingBag size={14}/> : <Link2 size={14}/>} {shopify ? 'Shopify' : 'Link direto'}</span></div><button className="icon-btn checkout-delete" type="button" onClick={() => void remove(checkout)} disabled={readOnly || busy} title="Excluir checkout" aria-label={`Excluir ${checkout.name}`}><Trash2 size={16}/></button></header><div><h2>{checkout.name}</h2><p>{shopify ? 'Carrinho real · produtos e quantidades escolhidos na Shopify' : checkout.product?.checkoutTitle || 'Produto indisponível'}</p></div>{shopify ? <div className="checkout-shopify-status"><ShoppingBag size={18}/><div><b>{checkout.isDefault ? 'Modelo automático ativo' : 'Publique para ativar na loja'}</b><small>O mesmo visual será usado para qualquer carrinho da Shopify.</small></div></div> : <><div className="checkout-link"><code>{checkoutUrl(checkout)}</code><button className="icon-btn" type="button" onClick={() => void copy(checkout)} title="Copiar link" aria-label="Copiar link do checkout"><Clipboard size={16}/></button></div>{copied === checkout.publicId && <small className="checkout-copied">Link copiado.</small>}</>}<footer><button className="secondary" type="button" onClick={() => setEditing(checkout)} disabled={readOnly || busy}><Palette size={16}/> Personalizar</button>{checkout.status !== 'PUBLISHED' ? <button className="primary" type="button" onClick={() => void publish(checkout)} disabled={readOnly || busy}>{busy ? <LoaderCircle className="spin" size={16}/> : <Rocket size={16}/>} Publicar</button> : shopify ? <button className="secondary" type="button" disabled={Boolean(support)} onClick={() => window.dispatchEvent(new CustomEvent('solid:navigate', { detail: 'Integrações' }))}><ShoppingBag size={16}/> Tutorial</button> : <a className="secondary" href={checkoutUrl(checkout)} target="_blank" rel="noreferrer"><ExternalLink size={16}/> Abrir</a>}</footer></article>; })}</section>}
     {creating && <CreateCheckoutDialog products={data.products} busy={busy} onClose={() => setCreating(false)} onCreate={create}/>}</main>;
 }

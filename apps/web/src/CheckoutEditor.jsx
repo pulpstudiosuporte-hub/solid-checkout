@@ -1,5 +1,6 @@
 import ThemeToggle from './ThemeToggle';
 import './checkout-progress.css';
+import CheckoutProgress from './CheckoutProgress';
 import { structuralCheckoutTemplates } from './checkout-template-catalog';
 import './checkout-templates.css';
 import ExitOfferSettings from './ExitOfferSettings';
@@ -17,7 +18,6 @@ import {
   Laptop,
   LayoutTemplate,
   LoaderCircle,
-  MapPin,
   Monitor,
   Palette,
   Plus,
@@ -1591,20 +1591,7 @@ function Preview({
       : c.heroImageUrl;
   const progress = c.showProgress && visibleOnDevice(c.progressDevice, device) ? (
         <div className="ep-form-progress">
-          <div className={`ep-steps style-${c.progressStyle || "outline"}`}>
-            <span className="active">
-              <i>{c.progressStyle === "icons" ? <UserRound size={16} aria-hidden="true" /> : 1}</i>
-              {copy.identification}
-            </span>
-            <span>
-              <i>{c.progressStyle === "icons" ? <MapPin size={16} aria-hidden="true" /> : 2}</i>
-              {copy.delivery}
-            </span>
-            <span>
-              <i>{c.progressStyle === "icons" ? <CreditCard size={16} aria-hidden="true" /> : 3}</i>
-              {copy.payment}
-            </span>
-          </div>
+          <CheckoutProgress config={c} labels={copy} requiresShipping={product?.fulfillmentType !== 'DIGITAL'} preview/>
         </div>
       ) : null;
   const blocks = {

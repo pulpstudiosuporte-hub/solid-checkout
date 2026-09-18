@@ -5,6 +5,26 @@ import { mockAdmin } from './fixtures.mjs';
 
 const design = { primary: '#b51b22', pageBg: '#fffaf1', cardBg: '#ffffff', headerBg: '#ffffff', textColor: '#241416', pageTextColor: '#241416', headerTextColor: '#241416', buttonTextColor: '#ffffff', borderColor: '#ddd4ce', inputBg: '#ffffff', logoText: 'Aurora', title: 'Finalize seu pedido', subtitle: 'Confira seus dados para continuar.', buttonText: 'Gerar Pix', eyebrow: 'SEU PEDIDO', summaryTitle: 'Resumo', template: 'minimal', layout: 'split', font: 'Inter', radius: 12, progressActiveColor: '#b51b22', progressActiveTextColor: '#ffffff', progressActiveLabelColor: '#241416', showBump: false, showTrust: false, testimonials: [], timer: false, socialProofEnabled: false, customElements: [] };
 const image = { name: 'reference.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aJ1cAAAAASUVORK5CYII=', 'base64') };
+for (const theme of ['light', 'dark']) {
+  test(`entrada do estúdio permanece acessível em três larguras no tema ${theme}`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await mockAdmin(page); await page.goto('/');
+    await page.getByRole('button', { name: 'Abrir busca avançada' }).click();
+    await page.getByRole('combobox', { name: 'Buscar páginas, recursos ou ações' }).fill('Checkouts');
+    await page.getByRole('option').filter({ has: page.locator('b', { hasText: /^Checkouts$/ }) }).click();
+    const entry = page.locator('.checkout-ai-entry');
+    for (const width of [1440, 820, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await expect(entry).toBeVisible();
+      expect(await page.locator('body').evaluate(el => el.scrollWidth <= window.innerWidth)).toBe(true);
+      await page.screenshot({ path: fileURLToPath(new URL(`../../../.visual-check/ai-entry-${theme}-${width}.png`, import.meta.url)), fullPage: true });
+    }
+    const scan = await new AxeBuilder({ page }).include('.checkout-ai-entry').withTags(['wcag2a', 'wcag2aa']).analyze();
+    expect(scan.violations.map(item => item.id)).toEqual([]);
+    await page.getByRole('button', { name: 'Criar com IA', exact: true }).click();
+    await expect(page.getByLabel('Qual é o nome da marca?')).toBeVisible();
+  });
+}
 async function open(page) {
   await mockAdmin(page); await page.goto('/');
   await page.getByRole('button', { name: 'Abrir busca avançada' }).click();
