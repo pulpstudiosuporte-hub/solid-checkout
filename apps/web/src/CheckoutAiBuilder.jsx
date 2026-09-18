@@ -54,6 +54,12 @@ export default function CheckoutAiBuilder({ products, csrfToken, onBack, onCreat
   const [config, setConfig] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [slowGeneration, setSlowGeneration] = useState(false);
+  useEffect(() => {
+    if (!busy) return;
+    const timer = setTimeout(() => setSlowGeneration(true), 15_000);
+    return () => clearTimeout(timer);
+  }, [busy]);
   const [saving, setSaving] = useState(false);
   const [question, setQuestion] = useState('brand');
   const [answered, setAnswered] = useState([]);
@@ -154,7 +160,7 @@ export default function CheckoutAiBuilder({ products, csrfToken, onBack, onCreat
     if (missing) { setQuestion(missing); return; }
     const testimonials = reviews.filter(item => item.name.trim() && item.text.trim());
     const sentAdjustment = adjustment.trim();
-    const controller = new AbortController(); request.current = controller; setBusy(true); setError('');
+    const controller = new AbortController(); request.current = controller; setSlowGeneration(false); setBusy(true); setError('');
     try {
       const selectedBrief = { ...brief, brand: brief.brand.trim(), logoUrl: assetChoices.logo === 'image' ? brief.logoUrl : '', heroImageUrl: assetChoices.banner === 'image' ? brief.heroImageUrl : '', heroMobileImageUrl: assetChoices.banner === 'image' ? brief.heroMobileImageUrl : '', summaryBannerUrl: assetChoices.summary === 'image' && brief.showSummary ? brief.summaryBannerUrl : '' };
       const result = await generateCheckoutPreview({ prompt: [prompt.trim(), colors.trim() ? `Cores da marca: ${colors.trim()}` : '', sentAdjustment ? `Ajuste solicitado: ${sentAdjustment}` : ''].filter(Boolean).join('\n'), brief: selectedBrief, ...(mode === 'DIRECT_LINK' ? { productId } : {}), ...(reference ? { reference: reference.data } : {}), ...(config ? { current: config } : {}), testimonials }, csrfToken, controller.signal);
@@ -202,7 +208,7 @@ export default function CheckoutAiBuilder({ products, csrfToken, onBack, onCreat
     }
   }
   const completedQuestions = visibleQuestions.filter(id => answered.includes(id));
-  const speech = busy ? 'Segura aí, capitão. Estou dando forma à sua ideia…' : saving ? 'Guardando seu rascunho…' : question === 'ready' ? config ? 'Pronto, capitão! Olha a prévia. O que vamos ajustar?' : `Fechou, ${brief.brand}! Vamos montar sua prévia?` : questionText[question];
+  const speech = busy ? slowGeneration ? 'Ainda estou montando sua prévia, capitão. Pode aguardar sem enviar de novo.' : 'Segura aí, capitão. Estou dando forma à sua ideia…' : saving ? 'Guardando seu rascunho…' : question === 'ready' ? config ? 'Pronto, capitão! Olha a prévia. O que vamos ajustar?' : `Fechou, ${brief.brand}! Vamos montar sua prévia?` : questionText[question];
   const pose = busy || saving ? 'thinking' : error ? 'sad' : config && question === 'ready' ? 'happy' : question === 'brand' ? 'greeting' : 'replying';
   return <main className={`page checkout-ai ai-stage-page ${config ? "has-preview" : ""} ${motionPaused ? "motion-paused" : ""} ${expanded ? "is-expanded" : ""}`}>
     <header className="page-title"><div><p className="eyebrow">ESTÚDIO PIRAT · CRIAR COM IA</p><h1 ref={heading} tabIndex={-1}>Seu checkout começa numa conversa.</h1><p>Um papo com o papagaio. Uma ideia de cada vez. Tudo com a sua cara.</p></div><button type="button" className="secondary" onClick={leave} disabled={saving || uploading}><ArrowLeft size={17}/> Voltar aos checkouts</button></header>

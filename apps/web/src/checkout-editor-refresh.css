@@ -257,3 +257,9 @@
   .solid-editor .editor-exit-dialog h2 { margin-top: 0; }
 }
 @media(prefers-reduced-motion:reduce) { .solid-editor *, .solid-editor *:before,.solid-editor *:after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+.solid-editor .testimonial-elements .testimonial-editor-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:12px 0; }
+.solid-editor .testimonial-elements .testimonial-editor-heading button { min-height:40px; padding:8px; border:1px solid var(--bd); border-radius:8px; color:var(--p-fg); background:var(--p-alt); font:inherit; }
+.solid-editor .testimonial-elements .element-catalog-row.active { border-left-color:var(--p-red,#c91d16); }
+.solid-editor .testimonial-elements .element-row-copy { min-height:44px; overflow-wrap:anywhere; }
+.solid-editor .testimonial-elements .element-edit { min-height:44px; min-width:32px; }

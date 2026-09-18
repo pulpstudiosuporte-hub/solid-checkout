@@ -74,11 +74,11 @@ for (const theme of ['light', 'dark']) {
   test(`cria prévia, ajusta e salva somente rascunho no tema ${theme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' }); await open(page);
     const requests = [];
-    await page.route('**/checkouts/ai/preview', route => { requests.push(route.request().postDataJSON()); return route.fulfill({ json: { config: { ...design, testimonials: requests.at(-1).testimonials.map((item, index) => ({ ...item, id: `real-${index}`, imageUrl: '' })), showTrust: requests.at(-1).testimonials.length > 0 } } }); });
+    await page.route('**/checkouts/ai/preview', route => { requests.push(route.request().postDataJSON()); return route.fulfill({ json: { config: { ...design, testimonials: [], customElements: requests.at(-1).testimonials.map((item, index) => ({ id: `real-${index}`, type: 'testimonial', title: item.name, text: item.text, rating: item.rating, enabled: true, slot: 0, region: 'main' })), showTrust: requests.at(-1).testimonials.length > 0 } } }); });
     await brief(page, { reference: true, direct: true, review: true });
     await page.getByRole('button', { name: 'Gerar prévia', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Seu checkout tomou forma.' })).toBeVisible();
-    await expect(page.locator('.checkout-ai-preview .checkout-testimonials')).toContainText('Avaliação fictícia usada somente no teste.');
+    await expect(page.locator('.checkout-ai-preview .type-testimonial')).toContainText('Avaliação fictícia usada somente no teste.');
     expect(requests[0].reference).toContain('data:image/png'); expect(requests[0].productId).toBe('qa-product-1');
     expect(requests[0].brief.brand).toBe('Aurora'); expect(requests[0].brief.socialProofEnabled).toBe(true); expect(requests[0].prompt).toContain('Vermelho e marfim');
     await page.getByLabel('O que quer ajustar?').fill('Deixe o título mais direto.');
@@ -168,13 +168,35 @@ test('checkout público mostra depoimentos cadastrados e omite lista vazia', asy
     return route.fulfill({ json: { items: [], payment: null, pixelId: null } });
   });
   await page.goto('/#/session/qa-testimonials?token=local-fixture');
-  const region = page.getByRole('region', { name: 'Depoimentos de clientes' });
-  await expect(region).toContainText(reviews[0].text); await expect(region).toContainText(reviews[1].text);
-  await expect(region.getByLabel('4 de 5 estrelas')).toBeVisible();
+  const region = page.locator('.public-custom-element.type-testimonial');
+  await expect(region).toHaveText([new RegExp(reviews[0].text), new RegExp(reviews[1].text)]);
+  await expect(region.first().locator('.public-custom-stars')).toHaveText('★★★★');
   await page.setViewportSize({ width: 390, height: 844 });
-  await region.scrollIntoViewIfNeeded();
+  await region.first().scrollIntoViewIfNeeded();
   await page.screenshot({ path: fileURLToPath(new URL('../../../.visual-check/testimonials-public-mobile.png', import.meta.url)) });
   expect(await page.locator('body').evaluate(el => el.scrollWidth <= window.innerWidth)).toBe(true);
   items = []; await page.reload(); await expect(page.getByRole('textbox', { name: 'Nome completo', exact: true })).toBeVisible();
   await expect(region).toHaveCount(0);
+});
+
+
+test('geração lenta informa a espera sem duplicar a solicitação', async ({ page }) => {
+  await open(page); await brief(page);
+  await page.clock.install();
+  let release;
+  let calls = 0;
+  await page.route('**/checkouts/ai/preview', async route => {
+    calls++;
+    await new Promise(resolve => { release = resolve; });
+    await route.fulfill({ json: { config: design } });
+  });
+  await page.getByRole('button', { name: 'Gerar prévia', exact: true }).click();
+  await expect.poll(() => Boolean(release)).toBe(true);
+  await page.clock.fastForward(16_000);
+  await expect(page.getByRole('heading', { name: /Pode aguardar sem enviar de novo/ })).toBeVisible();
+  expect(calls).toBe(1);
+  await expect(page.getByRole('button', { name: 'Cancelar geração' })).toBeEnabled();
+  release();
+  await expect(page.getByRole('button', { name: 'Salvar rascunho e abrir editor' })).toBeEnabled();
+  await expect(page.getByRole('heading', { name: /Pode aguardar sem enviar de novo/ })).toHaveCount(0);
 });

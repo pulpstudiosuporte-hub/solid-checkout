@@ -1,4 +1,4 @@
-import CheckoutTestimonials from './CheckoutTestimonials';
+import { normalizeCheckoutTestimonials } from './checkout-testimonials';
 import { loadMetaPixel, trackMeta } from './meta-pixel';
 import './checkout-progress.css';
 import './checkout-templates.css';
@@ -683,7 +683,7 @@ function SessionContent({ session: initialSession, token }) {
     void start();
     return () => { controller.abort(); clearTimeout(retry); };
   }, [session.publicId, token]); // eslint-disable-line react-hooks/exhaustive-deps
-  const config = publicConfig(session.checkout?.publishedConfig);
+  const config = normalizeCheckoutTestimonials(publicConfig(session.checkout?.publishedConfig));
   const availableOrderBumps = config.showBump
     ? (session.orderBumps || (session.orderBump ? [session.orderBump] : []))
     : [];
@@ -1035,7 +1035,6 @@ function SessionContent({ session: initialSession, token }) {
               {config.showTrust && <section className={`public-trust checkout-device-${config.trustDevice || 'all'}`} aria-label="Confiança da loja">
                 <div className="public-trust-benefits"><span><i><ShieldCheck size={17}/></i><b>{config.trustBenefit1}</b></span><span><i><Check size={17}/></i><b>{config.trustBenefit2}</b></span><span><i><CreditCard size={17}/></i><b>{config.trustBenefit3}</b></span></div>
               </section>}
-              <CheckoutTestimonials items={config.testimonials}/>
             </form>
           ) : step === 2 ? (
             <form className="delivery-step-form" onSubmit={saveShipping} noValidate>

@@ -241,3 +241,40 @@ test('editor: touch controls, tablet split layout and mobile fixed actions', asy
   await page.getByRole('button', { name: 'Continuar editando' }).click();
   await page.screenshot({ path: output('responsive-editor-landscape.png'), fullPage: true, animations: 'disabled' });
 });
+
+
+test('depoimentos antigos podem ser editados, movidos, ocultados e excluídos sem voltar após salvar', async ({ page }) => {
+  await mockAdmin(page);
+  let draft = { testimonials: [
+    { id: 'real-1', name: 'Pedro', text: 'Relato de teste do Pedro.', rating: 4, imageUrl: '' },
+    { id: 'real-2', name: 'Ana', text: 'Relato de teste da Ana.', rating: 5, imageUrl: '' },
+  ], customElements: [] };
+  await page.route('**/checkouts', route => route.fulfill({ json: { items: [{ publicId: 'qa-checkout', name: 'Checkout principal', slug: 'principal', mode: 'SHOPIFY_CART', status: 'DRAFT', draftConfig: draft }] } }));
+  await page.route('**/checkouts/qa-checkout/draft', route => {
+    draft = route.request().postDataJSON().config;
+    return route.fulfill({ json: { checkout: { publicId: 'qa-checkout', name: 'Checkout principal', draftConfig: draft, status: 'DRAFT' } } });
+  });
+  await openEditor(page); await section(page, 'Elementos');
+  await expect(page.locator('.ep-custom-element.type-testimonial')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Editar depoimento de Pedro' }).click();
+  await page.getByRole('textbox', { name: 'Mensagem', exact: true }).fill('Relato atualizado.');
+  await page.getByLabel('Posição no checkout').selectOption('sidebar');
+  await page.getByRole('button', { name: 'Aplicar ao rascunho' }).click();
+  await expect(page.locator('.ep-custom-element.type-testimonial').filter({ hasText: 'Pedro' })).toContainText('Relato atualizado.');
+  await page.getByRole('button', { name: 'Desativar depoimento de Ana' }).click();
+  await expect(page.locator('.ep-custom-element.type-testimonial')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Salvar rascunho', exact: true }).click();
+  await expect.poll(() => draft.testimonials.length).toBe(0);
+  expect(draft.customElements.find(item => item.title === 'Pedro')).toMatchObject({ text: 'Relato atualizado.', region: 'sidebar' });
+  expect(draft.customElements.find(item => item.title === 'Ana').enabled).toBe(false);
+  await page.screenshot({ path: output('testimonials-elements-desktop.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: output('testimonials-elements-mobile.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Excluir depoimento de Pedro' }).click();
+  await page.getByRole('button', { name: 'Excluir depoimento de Ana' }).click();
+  await page.getByRole('button', { name: 'Salvar rascunho', exact: true }).click();
+  await expect.poll(() => draft.customElements.length).toBe(0);
+  await page.setViewportSize({ width: 1440, height: 1050 });
+  await openEditor(page);
+  await expect(page.locator('.ep-custom-element.type-testimonial')).toHaveCount(0);
+});

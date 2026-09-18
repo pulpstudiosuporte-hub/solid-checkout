@@ -1,3 +1,4 @@
+import { normalizeCheckoutTestimonials } from '../src/checkout-testimonials.js';
 import { describe, expect, it } from "vitest";
 import {
   checkoutLayoutEntries,
@@ -263,5 +264,26 @@ describe("ordenação dos elementos do checkout", () => {
       "custom:top",
       "block:timer",
     ]);
+  });
+});
+
+
+describe('depoimentos antigos usam elementos editáveis', () => {
+  it('preserva avaliações, fotos e elementos existentes, sem duplicar nem ressuscitar exclusões', () => {
+    const original = { textColor: '#111111', cardBg: '#ffffff', customElements: [{ id: 'review_1', type: 'testimonial', title: 'Manual', enabled: false }], testimonials: [{ id: 'old', name: 'Ana', text: 'Relato real', rating: 4, imageUrl: 'https://example.com/avatar.webp' }] };
+    const converted = normalizeCheckoutTestimonials(original);
+    expect(converted.testimonials).toEqual([]);
+    expect(converted.customElements).toHaveLength(2);
+    expect(converted.customElements[0]).toEqual(original.customElements[0]);
+    expect(converted.customElements[1]).toMatchObject({ id: 'review_1_', type: 'testimonial', title: 'Ana', text: 'Relato real', rating: 4, imageUrl: 'https://example.com/avatar.webp', region: 'main' });
+    expect(normalizeCheckoutTestimonials(converted)).toEqual(converted);
+    expect(normalizeCheckoutTestimonials({ ...converted, customElements: [] }).customElements).toEqual([]);
+    expect(original.testimonials).toHaveLength(1);
+  });
+  it('não cria avaliações padrão e preserva todas as 50 avaliações antigas', () => {
+    expect(normalizeCheckoutTestimonials({})).toEqual({});
+    const result = normalizeCheckoutTestimonials({ testimonials: Array.from({ length: 50 }, (_, i) => ({ name: `Cliente ${i}`, text: 'Relato', rating: 5 })), customElements: [] });
+    expect(result.customElements).toHaveLength(50);
+    expect(new Set(result.customElements.map(item => item.id)).size).toBe(50);
   });
 });

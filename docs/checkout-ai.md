@@ -60,3 +60,11 @@ conversa. Saídas e referências não são registradas nos logs da rota.
   Gemini configurado e deve ser conferida separadamente após publicação.
 
 Contrato oficial: [imagens no Gemini](https://ai.google.dev/gemini-api/docs/image-understanding).
+
+## Depoimentos no personalizador
+
+A IA aplica as avaliações fornecidas como elementos `testimonial` em `customElements`, sem inventar relatos. Cada avaliação fica disponível em Elementos → Depoimentos para editar texto, nome, nota, foto, estilo, posição e visibilidade, ou excluir. A prévia e o checkout público usam o mesmo tipo de bloco.
+
+Ao abrir configurações antigas, a lista `testimonials` é convertida em elementos preservando nome, texto, foto e nota. A lista antiga é esvaziada ao salvar o rascunho, evitando que avaliações excluídas reapareçam. A publicação continua sendo uma ação separada.
+
+A geração usa um prazo total de 65 segundos no servidor, compartilhado com uma eventual repetição por falha transitória. Uma resposta ainda em andamento não é reiniciada aos 20 segundos. O cliente espera até 90 segundos para receber também o erro do servidor e mostra um aviso após 15 segundos, mantendo o cancelamento disponível.

@@ -66,6 +66,20 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260919-checkout-ai-wait',
+    category: 'IMPROVEMENT' as const,
+    title: 'Mais continuidade na geração com IA',
+    description: 'A criação dá mais tempo para a IA concluir sem reiniciar uma resposta em andamento. O papagaio avisa quando a espera demora e permite cancelar preservando suas respostas.',
+    publishedAt: new Date('2026-09-19T01:05:00.000Z'),
+  },
+  {
+    publicId: 'auto-20260919-checkout-testimonials-elements',
+    category: 'IMPROVEMENT' as const,
+    title: 'Depoimentos da IA no editor de elementos',
+    description: 'Os depoimentos criados com IA agora usam o mesmo elemento do personalizador. Edite conteúdo e aparência, mova, oculte ou exclua cada avaliação. Os depoimentos de rascunhos anteriores também podem ser gerenciados em Elementos.',
+    publishedAt: new Date('2026-09-19T01:00:00.000Z'),
+  },
+  {
     publicId: 'auto-20260918-checkout-ai-animated-parrot',
     category: 'IMPROVEMENT' as const,
     title: 'O papagaio ganhou o centro da conversa',

@@ -123,7 +123,7 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   if (!Array.isArray(blockOrder) || blockOrder.length !== allowedBlocks.length || new Set(blockOrder).size !== allowedBlocks.length || blockOrder.some(value => typeof value !== 'string' || !allowedBlocks.includes(value))) return null;
   result.blockOrder = blockOrder;
   const customElements = input.customElements ?? [];
-  if (!Array.isArray(customElements) || customElements.length > 20) return null;
+  if (!Array.isArray(customElements) || customElements.length > 70) return null;
   const customIds = new Set<string>();
   const sanitizedElements: Array<Record<string, unknown>> = [];
   for (const value of customElements) {
@@ -139,6 +139,7 @@ const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
     if (!id || customIds.has(id) || !/^[A-Za-z0-9_-]+$/.test(id) || typeof element.type !== 'string' || !allowedTypes.includes(element.type) || title === null || body === null || !hasValidContent || slot === null || rating === null || typeof enabled !== 'boolean' || typeof display !== 'string' || !['fixed', 'carousel'].includes(display) || typeof device !== 'string' || !['all', 'desktop', 'mobile'].includes(device) || typeof align !== 'string' || !['left', 'center', 'right'].includes(align) || typeof region !== 'string' || !['top', 'main', 'sidebar'].includes(region) || fontSize === null || radius === null || paddingY === null || paddingX === null || durationMinutes === null || progress === null || imageHeight === null || widthPercent === null || ![25, 33, 50, 66, 75, 100].includes(widthPercent) || typeof horizontalAlign !== 'string' || !['left', 'center', 'right'].includes(horizontalAlign) || typeof imageFit !== 'string' || !['cover', 'contain'].includes(imageFit) || imageAlt === null || textColor === null || backgroundColor === null || iconColor === null || iconBackgroundColor === null || titleColor === null || bodyColor === null || titleFontSize === null || bodyFontSize === null || titleWeight === null || ![400, 500, 600, 700, 800, 900].includes(titleWeight) || lineHeight === null || [imageUrl, mediaUrl, linkUrl].some(url => typeof url !== 'string' || url.length > 2048 || url && !url.startsWith('https://'))) return null;
     customIds.add(id); sanitizedElements.push({ id, type: element.type, slot, region, title: title ?? '', text: body ?? '', rating, enabled, display, device, align, widthPercent, horizontalAlign, fontSize, radius, paddingY, paddingX, durationMinutes, progress, imageHeight, imageFit, imageAlt: imageAlt ?? '', textColor, backgroundColor, iconColor, iconBackgroundColor, titleColor, bodyColor, titleFontSize, bodyFontSize, titleWeight, lineHeight, imageUrl, mediaUrl, linkUrl });
   }
+  if (sanitizedElements.filter(item => item.type !== 'testimonial').length > 20) return null;
   result.customElements = sanitizedElements;
   const elementEditMode = input.elementEditMode ?? 'guided'; if (typeof elementEditMode !== 'string' || !['guided', 'free'].includes(elementEditMode)) return null; result.elementEditMode = elementEditMode;
   const globalStyle = input.elementGlobalStyle ?? { radius: 12, spacing: 12, fontScale: 100 };

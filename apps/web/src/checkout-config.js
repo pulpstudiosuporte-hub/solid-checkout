@@ -75,15 +75,7 @@ export const defaultCheckoutConfig = {
   trustBenefit3: "Seus dados estão seguros",
   testimonialName: "Cliente verificado",
   testimonialText: "Compra simples, rápida e segura.",
-  testimonials: [
-    {
-      id: "default",
-      name: "Cliente verificado",
-      text: "Compra simples, rápida e segura.",
-      imageUrl: "",
-      rating: 5,
-    },
-  ],
+  testimonials: [],
   customElements: [],
   footerEnabled: true,
   footerBackgroundColor: "#000000",

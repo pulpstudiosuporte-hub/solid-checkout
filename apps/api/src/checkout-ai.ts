@@ -80,13 +80,17 @@ export async function referenceImage(data: string): Promise<string> {
 
 type DesignResponse = { candidates?: { finishReason?: string; content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
 async function requestDesign(environment: AppEnvironment, body: string, signal: AbortSignal): Promise<DesignResponse> {
+  // A single deadline lets an in-flight generation finish instead of restarting
+  // it at 20 seconds. Transport/server failures may retry within this budget.
+  const timeout = AbortSignal.timeout(65_000);
+  const requestSignal = AbortSignal.any([signal, timeout]);
   for (let attempt = 0; attempt < 2; attempt++) {
     signal.throwIfAborted();
-    const timeout = AbortSignal.timeout(20_000);
+    if (timeout.aborted) throw new AssistantUnavailable('timeout');
     try {
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(environment.GEMINI_MODEL || 'gemini-3.1-flash-lite')}:generateContent`, {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': environment.GEMINI_API_KEY! },
-        signal: AbortSignal.any([signal, timeout]), body,
+        signal: requestSignal, body,
       });
       if (response.ok) return await response.json() as DesignResponse;
       await response.body?.cancel();
@@ -94,12 +98,18 @@ async function requestDesign(environment: AppEnvironment, body: string, signal: 
       if (!transient || attempt === 1) throw new AssistantUnavailable(response.status === 429 ? 'quota' : 'upstream', response.status);
     } catch (cause) {
       signal.throwIfAborted();
+      if (timeout.aborted) throw new AssistantUnavailable('timeout');
       if (cause instanceof AssistantUnavailable) throw cause;
       if (cause instanceof SyntaxError) throw new AssistantUnavailable('response');
-      if (attempt === 1) throw new AssistantUnavailable(timeout.aborted ? 'timeout' : 'connection');
-      if (!(cause instanceof TypeError) && !timeout.aborted) throw cause;
+      if (attempt === 1) throw new AssistantUnavailable('connection');
+      if (!(cause instanceof TypeError)) throw cause;
     }
-    await delay(500, undefined, { signal });
+    try { await delay(500, undefined, { signal: requestSignal }); }
+    catch (cause) {
+      signal.throwIfAborted();
+      if (timeout.aborted) throw new AssistantUnavailable('timeout');
+      throw cause;
+    }
   }
   throw new AssistantUnavailable('connection');
 }
@@ -128,5 +138,5 @@ export async function generateCheckoutDesign(environment: AppEnvironment, idea: 
   try { patch = designPatch(JSON.parse(candidate.content?.parts?.filter(part => !part.thought).map(part => part.text || '').join('') || '')); } catch { throw new AssistantUnavailable('response'); }
   if (!patch) throw new AssistantUnavailable('response');
   const selected: Record<string, unknown> = brief ? { ...(brief.template && brief.template !== 'auto' ? { template: brief.template } : {}), logoText: brief.brand, logoUrl: brief.logoUrl, heroImageUrl: brief.heroImageUrl, heroMobileImageUrl: brief.heroMobileImageUrl, summaryBannerUrl: brief.summaryBannerUrl, heroEnabled: Boolean(brief.heroImageUrl), showProgress: brief.showProgress, showCoupon: brief.showCoupon, showSummary: brief.showSummary, socialProofEnabled: brief.socialProofEnabled, ...(brief.layout !== 'auto' ? { layout: brief.layout } : {}), ...(brief.progressStyle !== 'auto' ? { progressStyle: brief.progressStyle } : {}) } : {};
-  return { ...patch, buttonBgColor: patch.primary, inputBorderColor: patch.borderColor, inputRadius: Math.min(Number(patch.radius), 14), progressActiveColor: patch.primary, progressActiveTextColor: (brief?.progressStyle === 'auto' || !brief ? patch.progressStyle : brief.progressStyle) === 'solid' ? patch.buttonTextColor : patch.primary, progressActiveLabelColor: patch.textColor, progressLabelColor: patch.textColor, progressInactiveTextColor: patch.textColor, progressInactiveColor: patch.inputBg, footerBackgroundColor: patch.headerBg, footerTextColor: patch.headerTextColor, timer: false, showBump: false, socialProofEnabled: false, socialProofPreviewMessages: '', exitOfferEnabled: false, heroEnabled: false, showTrust: idea.testimonials.length > 0, testimonials: idea.testimonials.map((item, index) => ({ ...item, id: `real-${index + 1}`, imageUrl: '' })), testimonialName: 'Avaliação da loja', testimonialText: 'Adicione uma avaliação real no editor.', footerText: 'Confira os dados do pedido antes de continuar.', footerPaymentMethods: ['pix'], customElements: [], summaryDevice: 'all', heroDevice: 'all', progressDevice: 'all', socialProofBackgroundColor: patch.cardBg, socialProofTextColor: patch.textColor, socialProofSecondaryColor: patch.textColor, socialProofBorderColor: patch.borderColor, socialProofIconBackgroundColor: patch.primary, socialProofIconColor: patch.buttonTextColor, ...selected, footerCompanyName: brief?.brand || patch.logoText, ...(['retail', 'marketplace'].includes(String(selected.template || patch.template)) ? { layout: 'split' } : {}) };
+  return { ...patch, buttonBgColor: patch.primary, inputBorderColor: patch.borderColor, inputRadius: Math.min(Number(patch.radius), 14), progressActiveColor: patch.primary, progressActiveTextColor: (brief?.progressStyle === 'auto' || !brief ? patch.progressStyle : brief.progressStyle) === 'solid' ? patch.buttonTextColor : patch.primary, progressActiveLabelColor: patch.textColor, progressLabelColor: patch.textColor, progressInactiveTextColor: patch.textColor, progressInactiveColor: patch.inputBg, footerBackgroundColor: patch.headerBg, footerTextColor: patch.headerTextColor, timer: false, showBump: false, socialProofEnabled: false, socialProofPreviewMessages: '', exitOfferEnabled: false, heroEnabled: false, showTrust: idea.testimonials.length > 0, testimonials: [], testimonialName: 'Avaliação da loja', testimonialText: 'Adicione uma avaliação real no editor.', footerText: 'Confira os dados do pedido antes de continuar.', footerPaymentMethods: ['pix'], customElements: idea.testimonials.map((item, index) => ({ id: `real-${index + 1}`, type: 'testimonial', title: item.name, text: item.text, rating: item.rating, imageUrl: '', enabled: true, region: 'main', slot: 0, device: 'all', textColor: patch.textColor, backgroundColor: patch.cardBg, iconColor: patch.primary, iconBackgroundColor: patch.inputBg, radius: patch.radius })), summaryDevice: 'all', heroDevice: 'all', progressDevice: 'all', socialProofBackgroundColor: patch.cardBg, socialProofTextColor: patch.textColor, socialProofSecondaryColor: patch.textColor, socialProofBorderColor: patch.borderColor, socialProofIconBackgroundColor: patch.primary, socialProofIconColor: patch.buttonTextColor, ...selected, footerCompanyName: brief?.brand || patch.logoText, ...(['retail', 'marketplace'].includes(String(selected.template || patch.template)) ? { layout: 'split' } : {}) };
 }

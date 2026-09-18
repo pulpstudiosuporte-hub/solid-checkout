@@ -1,4 +1,4 @@
-import CheckoutTestimonials from './CheckoutTestimonials';
+import { normalizeCheckoutTestimonials } from './checkout-testimonials';
 import ThemeToggle from './ThemeToggle';
 import './checkout-progress.css';
 import CheckoutProgress from './CheckoutProgress';
@@ -462,32 +462,6 @@ function Settings({ group, c, u, replaceConfig, scarcityView, setScarcityView, e
       </select>
     </Field>
   );
-  const testimonials = Array.isArray(c.testimonials) ? c.testimonials : [];
-  const addTestimonial = () => {
-    if (testimonials.length >= 50) return;
-    u("testimonials", [
-      ...testimonials,
-      {
-        id: `t_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
-        name: "Novo cliente",
-        text: "Conte como foi a experiência de compra.",
-        imageUrl: "",
-        rating: 5,
-      },
-    ]);
-  };
-  const updateTestimonial = (id, key, value) =>
-    u(
-      "testimonials",
-      testimonials.map((item) =>
-        item.id === id ? { ...item, [key]: value } : item,
-      ),
-    );
-  const removeTestimonial = (id) =>
-    u(
-      "testimonials",
-      testimonials.filter((item) => item.id !== id),
-    );
   if (group === "Oferta de saída") return <ExitOfferSettings config={c} update={u}/>;
   if (group === "Aparência")
     return (
@@ -803,96 +777,6 @@ function Settings({ group, c, u, replaceConfig, scarcityView, setScarcityView, e
             />
           </Field>
         )}
-      </>
-    );
-  if (group === "Depoimentos")
-    return (
-      <>
-        <div className="testimonial-editor-heading">
-          <div>
-            <h3>Depoimentos</h3>
-            <small>{testimonials.length} de 50 adicionados</small>
-          </div>
-          <button
-            type="button"
-            onClick={addTestimonial}
-            disabled={testimonials.length >= 50}
-          >
-            <Plus size={15} /> Adicionar
-          </button>
-        </div>
-        <p className="panel-help">
-          Adicione fotos, avaliações e relatos reais dos seus clientes.
-        </p>
-        {!testimonials.length && (
-          <div className="testimonial-empty">
-            Adicione o primeiro depoimento do checkout.
-          </div>
-        )}
-        {testimonials.map((item, index) => (
-          <section className="testimonial-editor-card" key={item.id}>
-            <header>
-              <b>Depoimento {index + 1}</b>
-              <button
-                type="button"
-                onClick={() => removeTestimonial(item.id)}
-                aria-label={`Excluir depoimento ${index + 1}`}
-              >
-                <Trash2 size={15} />
-              </button>
-            </header>
-            <Field label="Foto do cliente">
-              <ImageDropzone
-                id={`testimonial-${item.id}`}
-                value={item.imageUrl}
-                onChange={(value) =>
-                  updateTestimonial(item.id, "imageUrl", value)
-                }
-                label="Envie a foto do cliente"
-                alt={`Foto de ${item.name}`}
-              />
-            </Field>
-            <Field label="Nome do cliente">
-              <input
-                value={item.name}
-                maxLength="80"
-                onChange={(e) =>
-                  updateTestimonial(item.id, "name", e.target.value)
-                }
-              />
-            </Field>
-            <Field label="Depoimento">
-              <textarea
-                rows="3"
-                value={item.text}
-                maxLength="240"
-                onChange={(e) =>
-                  updateTestimonial(item.id, "text", e.target.value)
-                }
-              />
-            </Field>
-            <div className="testimonial-rating">
-              <span>Nota</span>
-              <div>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    className={star <= item.rating ? "active" : ""}
-                    onClick={() => updateTestimonial(item.id, "rating", star)}
-                    aria-label={`${star} estrela${star > 1 ? "s" : ""}`}
-                  >
-                    <Star
-                      size={18}
-                      fill={star <= item.rating ? "currentColor" : "none"}
-                    />
-                  </button>
-                ))}
-              </div>
-              <b>{item.rating}/5</b>
-            </div>
-          </section>
-        ))}
       </>
     );
   if (group === "Elementos")
@@ -1535,6 +1419,7 @@ function Preview({
   readOnly = false,
   product,
 }) {
+  c = normalizeCheckoutTestimonials(c);
   const copy = editorLocale[c.language] || editorLocale["pt-BR"];
   const previewMoney = new Intl.NumberFormat(c.language || "pt-BR", {
     style: "currency",
@@ -1701,7 +1586,6 @@ function Preview({
 
               </div>
             )}
-            <CheckoutTestimonials items={c.testimonials}/>
             <EditorRegionElements
               config={c}
               region="main"
@@ -1885,24 +1769,10 @@ export default function CheckoutEditor({
   products = [],
 }) {
   const load = () => {
-    const draft = checkout?.draftConfig || {};
-    const testimonials = Array.isArray(draft.testimonials)
-      ? draft.testimonials
-      : [
-          {
-            id: "legacy",
-            name:
-              draft.testimonialName || defaultCheckoutConfig.testimonialName,
-            text:
-              draft.testimonialText || defaultCheckoutConfig.testimonialText,
-            imageUrl: "",
-            rating: 5,
-          },
-        ];
+    const draft = normalizeCheckoutTestimonials(checkout?.draftConfig || {});
     return {
       ...defaultCheckoutConfig,
       ...draft,
-      testimonials,
       customElements: Array.isArray(draft.customElements)
         ? draft.customElements.map((item) => {
             const region = customElementRegion(item);
@@ -1957,7 +1827,8 @@ export default function CheckoutEditor({
     const region = customElementRegion(placement);
     const element = { ...newElementDefaults(type, slot, region), ...placement, region };
     replaceConfig(old => {
-      if ((old.customElements || []).length >= 20) return old;
+      const existing = old.customElements || [];
+      if (existing.length >= 70 || existing.filter(item => item.type === type).length >= (type === "testimonial" ? 50 : 20) || (type !== "testimonial" && existing.filter(item => item.type !== "testimonial").length >= 20)) return old;
       const free = old.elementEditMode === "free" && placement.horizontalAlign && placement.horizontalAlign !== "center";
       return { ...old, customElements: placeCustomElement(old.customElements || [], free ? { ...element, widthPercent: 50 } : element, slot, index) };
     });

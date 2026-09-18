@@ -101,10 +101,3 @@
 .editor-device.template-marketplace .ep-button { border-radius:6px; }
 .editor-device.template-marketplace:not(.mobile) .ep-content { grid-template-columns:minmax(0,2.2fr) minmax(240px,1fr); }
 .editor-device.template-marketplace .ep-content.without-summary { grid-template-columns:minmax(0,1fr); }
-
-.checkout-testimonials { display:grid; gap:12px; margin-top:20px; }
-.checkout-testimonials blockquote { display:flex; align-items:flex-start; gap:12px; margin:0; padding:16px; border:1px solid currentColor; border-radius:12px; overflow-wrap:anywhere; }
-.checkout-testimonials blockquote img { flex:none; border-radius:50%; object-fit:cover; }
-.checkout-testimonials blockquote div { min-width:0; }
-.checkout-testimonials blockquote p { margin:8px 0; font-size:14px; line-height:1.6; }
-.checkout-testimonials blockquote b { display:block; font-size:13px; }

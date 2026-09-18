@@ -3,7 +3,7 @@ import { resolveApiOrigin } from './api-origin';
 export const apiBaseUrl = resolveApiOrigin(globalThis.location?.hostname, import.meta.env.VITE_API_URL);
 
 import { request as fetch } from './api-request';
-export async function generateCheckoutPreview(input, csrfToken, signal) { return readJson(await fetch(`${apiBaseUrl}/checkouts/ai/preview`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(input), signal }, 60_000)); }
+export async function generateCheckoutPreview(input, csrfToken, signal) { return readJson(await fetch(`${apiBaseUrl}/checkouts/ai/preview`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify(input), signal }, 90_000)); }
 export { bindTabToUser, clearTabUser } from './api-request';
 
 // Imagens enviadas pelo painel são armazenadas e servidas pela API.  Mantemos

@@ -290,7 +290,7 @@ export default function CheckoutElementsPanel({
   };
   const openEditor = (type, item) => {
     setOriginal(item ? { ...item } : null);
-    setEditing(type);
+    setEditing(item?.id || type);
   };
   const activate = (type, on) => {
     const current = byType.get(type);
@@ -300,7 +300,7 @@ export default function CheckoutElementsPanel({
       setTimeout(() => setEditing(type), 0);
     } else if (current) updateElement(current.id, { enabled: on });
   };
-  const current = editing ? byType.get(editing) : null;
+  const current = editing ? elements.find(item => item.id === editing) || byType.get(editing) : null;
   const closeEditor = () => {
     setEditing(null);
     setOriginal(null);
@@ -774,6 +774,27 @@ export default function CheckoutElementsPanel({
             .map(([type, item]) => {
               const Icon = item.icon;
               const active = byType.get(type);
+              if (type === 'testimonial' && active) {
+                const reviews = elements.filter(element => element.type === type);
+                return <section className="testimonial-elements" key={type} aria-label="Depoimentos adicionados">
+                  <div className="testimonial-editor-heading">
+                    <b>Depoimentos ({reviews.length})</b>
+                    <button type="button" disabled={reviews.length >= 50 || elements.length >= 70} onClick={() => {
+                      addElement(type, 0, Number.POSITIVE_INFINITY, { region: 'main' });
+                      setOriginal(null);
+                      setEditing(type);
+                    }}>Adicionar depoimento</button>
+                  </div>
+                  {reviews.map(review => <div className={`element-catalog-row ${review.enabled !== false ? "active" : ""}`} key={review.id}>
+                    <span><Star size={18} aria-hidden="true" /></span>
+                    <button type="button" className="element-row-copy" aria-label={`Editar depoimento de ${review.title}`} onClick={() => openEditor(type, review)}>
+                      <b>{review.title}</b><small>Editar conteúdo e estilo</small>
+                    </button>
+                    <Toggle on={review.enabled !== false} change={enabled => updateElement(review.id, { enabled })} label={`depoimento de ${review.title}`} />
+                    <button type="button" className="element-edit" onClick={() => removeElement(review.id)} aria-label={`Excluir depoimento de ${review.title}`}><Trash2 size={15}/></button>
+                  </div>)}
+                </section>;
+              }
               return (
                 <div
                   className={`element-catalog-row ${active?.enabled !== false && active ? "active" : ""}`}

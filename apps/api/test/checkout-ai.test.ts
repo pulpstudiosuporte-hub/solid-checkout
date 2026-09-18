@@ -63,7 +63,8 @@ describe('checkout AI drafts', () => {
     const response = await app.inject({ method: 'POST', url: '/checkouts/ai/preview', headers, payload: { prompt: 'Visual para café', productId: 'mine', testimonials: [review] } });
     expect(response.statusCode).toBe(200);
     const config = response.json<{ config: Record<string, unknown> }>().config;
-    expect(config.testimonials).toEqual([{ ...review, id: 'real-1', imageUrl: '' }]);
+    expect(config.testimonials).toEqual([]);
+    expect(config.customElements).toEqual([expect.objectContaining({ id: 'real-1', type: 'testimonial', title: review.name, text: review.text, rating: 4, enabled: true, region: 'main' })]);
     expect(config.priceCents).toBeUndefined(); expect(config.logoUrl).toBeUndefined(); expect(config.exitOfferEnabled).toBe(false);
     const call = fetch.mock.calls[0] as [string, RequestInit];
     expect(call[1].body).toContain('Café da loja');
@@ -109,12 +110,13 @@ describe('checkout AI drafts', () => {
     await expect(generateCheckoutDesign(environment, { prompt: 'test', testimonials: [] }, undefined, undefined, signal)).rejects.toMatchObject({ reason: 'quota' });
     expect(fetch).toHaveBeenCalledTimes(1);
   });
-  it('reports repeated timeout distinctly and cancels during retry backoff', async () => {
+  it('reports the shared deadline without restarting and cancels during retry backoff', async () => {
     vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => AbortSignal.abort(new DOMException('Slow provider', 'TimeoutError')));
     const fetch = vi.fn().mockRejectedValue(new DOMException('Slow provider', 'TimeoutError'));
     vi.stubGlobal('fetch', fetch);
     await expect(generateCheckoutDesign(environment, { prompt: 'test', testimonials: [] }, undefined, undefined, new AbortController().signal)).rejects.toMatchObject({ reason: 'timeout' });
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
     const controller = new AbortController();
     fetch.mockReset().mockRejectedValue(new TypeError('Connection lost'));
     const pending = generateCheckoutDesign(environment, { prompt: 'test', testimonials: [] }, undefined, undefined, controller.signal);
@@ -122,6 +124,26 @@ describe('checkout AI drafts', () => {
     await new Promise(resolve => setTimeout(resolve, 10));
     controller.abort(); await rejected;
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it('accepts a generation slower than 20 seconds without starting it again', async () => {
+    vi.useFakeTimers();
+    const timeoutController = new AbortController();
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+      setTimeout(() => timeoutController.abort(), ms);
+      return timeoutController.signal;
+    });
+    const fetch = vi.fn((_url: string, init: RequestInit) => new Promise<Response>((resolve, reject) => {
+      setTimeout(() => resolve(provider()), 30_000);
+      init.signal!.addEventListener('abort', () => reject(new DOMException('Timeout', 'AbortError')), { once: true });
+    }));
+    vi.stubGlobal('fetch', fetch);
+    try {
+      const pending = generateCheckoutDesign(environment, { prompt: 'test', testimonials: [] }, undefined, undefined, new AbortController().signal);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect((await pending).logoText).toBe('Minha loja');
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(timeout).toHaveBeenCalledOnce();
+    } finally { vi.useRealTimers(); }
   });
   it('passes cancellation to the provider', async () => {
     const fetch = vi.fn((_url: string, init: RequestInit) => new Promise((_resolve, reject) => {
