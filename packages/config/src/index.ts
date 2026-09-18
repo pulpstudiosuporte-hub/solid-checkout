@@ -32,6 +32,8 @@ const environmentSchema = z.object({
   BILLING_ROAS_PUBLIC_KEY: z.string().min(8).optional(),
   BILLING_ROAS_SECRET_KEY: z.string().min(8).optional(),
   TURNSTILE_SECRET_KEY: z.string().min(10).optional(),
+  GEMINI_API_KEY: z.string().trim().min(1).optional(),
+  GEMINI_MODEL: z.string().regex(/^[a-zA-Z0-9._-]{1,100}$/).optional(),
   APP_ENCRYPTION_KEY: z.string().optional().refine(value => !value || Buffer.from(value, 'base64').length === 32, 'deve conter exatamente 32 bytes em base64')
 }).strict();
 
@@ -51,7 +53,8 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): AppEnvironment {
     STRIPE_SECRET_KEY: input.STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET: input.STRIPE_WEBHOOK_SECRET,
     STRIPE_PRICE_START: input.STRIPE_PRICE_START, STRIPE_PRICE_PRIME: input.STRIPE_PRICE_PRIME, STRIPE_PRICE_ELITE: input.STRIPE_PRICE_ELITE,
     BILLING_ROAS_PUBLIC_KEY: input.BILLING_ROAS_PUBLIC_KEY, BILLING_ROAS_SECRET_KEY: input.BILLING_ROAS_SECRET_KEY,
-    TURNSTILE_SECRET_KEY: input.TURNSTILE_SECRET_KEY
+    TURNSTILE_SECRET_KEY: input.TURNSTILE_SECRET_KEY,
+    GEMINI_API_KEY: input.GEMINI_API_KEY, GEMINI_MODEL: input.GEMINI_MODEL
   };
   const result = environmentSchema.safeParse(known);
   if (!result.success) {

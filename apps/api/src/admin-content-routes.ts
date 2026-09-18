@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260918-pirat-assistant',
+    category: 'NEWS' as const,
+    title: 'Um papagaio para tirar suas dúvidas',
+    description: 'Converse por texto com o assistente da Pirat sobre os recursos do painel. O papagaio acompanha a conversa com novas expressões, nos temas claro e escuro. As respostas usam IA e não alteram configurações nem pedidos da sua loja.',
+    publishedAt: new Date('2026-09-18T20:00:00.000Z'),
+  },
+  {
     publicId: 'auto-20260918-pirat-panel-domain',
     category: 'IMPROVEMENT' as const,
     title: 'Novo endereço do painel Pirat',

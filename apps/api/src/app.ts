@@ -41,6 +41,7 @@ import { registerProductFeedbackRoutes } from './product-feedback-routes.js';
 import { registerAdminContentRoutes } from './admin-content-routes.js';
 import { registerChromaSenseRoutes } from './chromasense-routes.js';
 import { registerSettingsRoutes } from './settings-routes.js';
+import { registerAssistantRoutes } from './assistant-routes.js';
 
 export function buildApp(environment: AppEnvironment, dependencies: { authRepository?: AuthRepository; catalogRepository?: CatalogRepository; storeRepository?: StoreRepository; shopifyRepository?: ShopifyRepository; gatewayRepository?: PrismaGatewayRepository; orderRepository?: OrderRepository; dokployClient?: DokployDomainClient; database?: PrismaClient } = {}): FastifyInstance {
   const checkoutOriginCache = new Map<string, { allowed: boolean; expiresAt: number }>();
@@ -51,7 +52,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
         paths: [
           'req.headers.x-solid-support-session', 'req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie',
           'req.body.password', 'req.body.currentPassword', 'req.body.newPassword',
-          'req.body.token', 'req.body.code', 'req.body.accessToken', 'req.body.apiKey',
+          'req.body.token', 'req.body.code', 'req.body.accessToken', 'req.body.apiKey', 'req.body.messages',
           'req.body.publicKey', 'req.body.secretKey', 'req.body.cpf',
           'req.body.values.document', 'req.body.values.legalName',
           'req.body.values.birthDate', 'req.body.values.zipCode',
@@ -93,6 +94,11 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
   void app.register(rateLimit, { max: 100, timeWindow: '1 minute', ban: 3, ...(rateLimitRedis ? { redis: rateLimitRedis } : {}), errorResponseBuilder: (_request, context) => ({ error: { code: 'RATE_LIMITED', message: `Muitas requisições. Tente novamente em ${context.after}.`, requestId: _request.id } }) });
   if (dependencies.authRepository) registerSupportSessionHook(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.authRepository) registerAuthRoutes(app, environment, dependencies.authRepository, dependencies.database);
+  if (dependencies.authRepository) {
+    const authRepository = dependencies.authRepository;
+    // Register after the rate-limit plugin has installed its onRoute hook.
+    void app.register((assistantApp, _options, done) => { registerAssistantRoutes(assistantApp, environment, authRepository); done(); });
+  }
   if (dependencies.database) registerRegistrationRoutes(app, environment, dependencies.database);
   if (dependencies.authRepository && dependencies.database) registerDashboardRoutes(app, environment, dependencies.authRepository, dependencies.database);
   if (dependencies.authRepository && dependencies.database) registerAdminUserRoutes(app, environment, dependencies.authRepository, dependencies.database);

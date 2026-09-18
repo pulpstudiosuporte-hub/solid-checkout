@@ -58,6 +58,13 @@ async function readJson(response) {
   return body;
 }
 
+export async function getAssistantStatus(signal) {
+  return readJson(await fetch(`${apiBaseUrl}/assistant/status`, { credentials: 'include', signal }));
+}
+export async function askPirat(messages, csrfToken, signal) {
+  return readJson(await fetch(`${apiBaseUrl}/assistant/messages`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken }, body: JSON.stringify({ messages }), signal }));
+}
+
 export async function getSession() {
   const response = await fetch(`${apiBaseUrl}/auth/session`, { credentials: 'include', headers: { Accept: 'application/json' } });
   return readJson(response);

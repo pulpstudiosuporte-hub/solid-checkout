@@ -1,0 +1,49 @@
+.pirat-help { color: var(--text); font-family: 'Pirat Inter', sans-serif; }
+.pirat-help-launch { position: fixed; z-index: 35; right: 24px; bottom: 24px; display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 4px 16px 4px 4px; background: var(--sf, #fff); color: var(--text); border: 1px solid var(--border); border-radius: 40px; box-shadow: 0 5px 24px #2b020022; cursor: pointer; font-weight: 700; }
+.pirat-help-launch img { object-fit: contain; }
+.pirat-help-launch:hover { border-color: var(--primary); }
+.pirat-help-dialog { position: fixed; inset: auto 24px 24px auto; margin: 0; padding: 0; width: 420px; max-width: calc(100vw - 32px); height: 690px; max-height: calc(100dvh - 48px); border: 1px solid var(--border); border-radius: 22px; color: var(--text); background: var(--sf, #fff); box-shadow: 0 24px 80px #15020055; overflow: hidden; }
+.pirat-help-dialog[open] { display: flex; flex-direction: column; }
+.pirat-help-dialog::backdrop { background: #10070355; }
+.pirat-help-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 20px 0; gap: 12px; }
+.pirat-help-header small { color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .12em; }
+.pirat-help-header h2 { font: 700 22px/1.3 'Bricolage Grotesque', sans-serif; margin: 4px 0; }
+.pirat-help-header button { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 50%; cursor: pointer; }
+.pirat-help-character { display: flex; align-items: center; flex-shrink: 0; gap: 12px; margin: 8px 20px 0; border-bottom: 1px solid var(--border); }
+.pirat-help-character img { width: 104px; height: 104px; object-fit: contain; }
+.pirat-help-badge { font-size: 9px; letter-spacing: .1em; color: var(--muted); font-weight: 700; }
+.pirat-help-character p { font-size: 14px; font-weight: 600; margin: 6px 0 10px; }
+.pirat-help-transcript { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; scrollbar-width: thin; }
+.pirat-help-welcome h3 { margin: 0 0 8px; font: 700 21px/1.25 'Bricolage Grotesque', sans-serif; }
+.pirat-help-welcome > p { margin: 0 0 16px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.pirat-help-suggestions { display: grid; gap: 8px; }
+.pirat-help-suggestions button { display: flex; justify-content: space-between; align-items: center; text-align: left; gap: 8px; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; min-height: 44px; color: var(--text); background: var(--bg, #f7f5f2); font-size: 12px; cursor: pointer; }
+.pirat-help-suggestions svg { flex-shrink: 0; transform: rotate(45deg); }
+.pirat-help-message { max-width: 94%; margin: 0 0 16px; padding: 12px 14px; border-radius: 14px 14px 14px 2px; background: var(--bg, #f7f5f2); border: 1px solid var(--border); overflow-wrap: anywhere; }
+.pirat-help-message.user { margin-left: auto; background: var(--p-alt, #fff0ed); border-radius: 14px 14px 2px 14px; }
+.pirat-help-message small { font-size: 10px; font-weight: 700; color: var(--muted); }
+.pirat-help-message p { white-space: pre-wrap; font-size: 13px; line-height: 1.65; margin: 5px 0 0; }
+.pirat-help-wait, .pirat-help-notice { font-size: 12px; line-height: 1.6; color: var(--muted); }
+.pirat-help-notice { border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+.pirat-help-footer { padding: 12px 20px 16px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.pirat-help-footer label { display: block; font-size: 11px; font-weight: 600; margin-bottom: 7px; }
+.pirat-help-composer { display: flex; align-items: flex-end; gap: 8px; padding: 6px; background: var(--bg, #f7f5f2); border: 1px solid var(--border); border-radius: 14px; }
+.pirat-help-composer textarea { flex: 1; width: 100%; min-width: 0; resize: none; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 14px; line-height: 1.5; padding: 8px; min-height: 58px; max-height: 130px; }
+.pirat-help-composer textarea::placeholder { color: var(--muted); }
+.pirat-help-composer button { border: 0; display: grid; place-items: center; border-radius: 10px; background: #c91d16; color: #fff; min-width: 44px; height: 44px; cursor: pointer; }
+.pirat-help-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pirat-help-tools button { display: flex; align-items: center; gap: 5px; background: transparent; border: 0; color: var(--muted); font-size: 11px; min-height: 36px; padding: 4px 0; cursor: pointer; }
+.pirat-help-tools small { font-size: 10px; color: var(--muted); }
+.pirat-help-footer > p { font-size: 10px; line-height: 1.5; color: var(--muted); margin: 0; }
+.pirat-help button:disabled { opacity: .5; cursor: not-allowed; }
+.pirat-help :is(button, textarea):focus-visible { outline: 2px solid var(--p-red, #c91d16); outline-offset: 3px; }
+@media (max-width: 600px) {
+  .pirat-help-launch { right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); padding-right: 14px; }
+  .pirat-help-launch span { display: none; }
+  .pirat-help-dialog { inset: 0; width: 100%; max-width: 100%; height: 100dvh; max-height: 100dvh; border: 0; border-radius: 0; }
+  .pirat-help-header { padding-top: max(16px, env(safe-area-inset-top)); }
+  .pirat-help-footer { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .pirat-help-composer textarea { font-size: 16px; }
+}
+@media (max-height: 520px) { .pirat-help-character { display: none; } .pirat-help-header { padding-top: 8px; } .pirat-help-footer > p { font-size: 9px; } }
+@media (prefers-reduced-motion: reduce) { .pirat-help *, .pirat-help *::before, .pirat-help *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
