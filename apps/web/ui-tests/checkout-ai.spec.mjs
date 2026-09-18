@@ -12,6 +12,12 @@ async function open(page) {
   await page.getByRole('option').filter({ has: page.locator('b', { hasText: /^Checkouts$/ }) }).click();
   await page.getByRole('button', { name: 'Criar com IA', exact: true }).click();
 }
+async function choices(page) {
+  await page.getByLabel('Qual é o nome da marca?').fill('Aurora');
+  await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+  await expect(page.getByLabel('Você tem uma logo?')).toBeVisible();
+  await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+}
 for (const theme of ['light', 'dark']) {
   test(`cria prévia, ajusta e salva somente rascunho no tema ${theme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
@@ -23,6 +29,8 @@ for (const theme of ['light', 'dark']) {
     await page.getByLabel('Como você imagina o checkout?').fill('Uma loja de acessórios clara, com detalhes vermelhos.');
     await page.getByLabel('Referência visual opcional').setInputFiles(image);
     await expect(page.getByAltText('Referência temporária do visual')).toBeVisible();
+    await choices(page);
+    await page.getByLabel('Ativar avisos de compras recentes').check();
     await page.getByRole('button', { name: 'Adicionar depoimento' }).click();
     await page.getByLabel('Nome do cliente 1').fill('Cliente de teste');
     await page.getByLabel('Avaliação real').fill('Avaliação fictícia usada somente no teste.');
@@ -30,6 +38,8 @@ for (const theme of ['light', 'dark']) {
     await expect(page.getByRole('heading', { name: 'Seu checkout tomou forma.' })).toBeVisible();
     expect(requests[0].reference).toContain('data:image/png');
     expect(requests[0].productId).toBe('qa-product-1');
+    expect(requests[0].brief.brand).toBe('Aurora');
+    expect(requests[0].brief.socialProofEnabled).toBe(true);
     await page.getByLabel('O que quer ajustar?').fill('Deixe o título mais direto.');
     await page.getByRole('button', { name: 'Ajustar com IA' }).click();
     await expect.poll(() => requests.length).toBe(2);
@@ -56,9 +66,11 @@ test('erro preserva ideia e referência; sair descarta a imagem; cancelar não a
   await open(page);
   await page.getByLabel('Como você imagina o checkout?').fill('Minha ideia de checkout');
   await page.getByLabel('Referência visual opcional').setInputFiles(image);
+  await choices(page);
   await page.route('**/checkouts/ai/preview', route => route.fulfill({ status: 503, json: { error: { message: 'IA temporariamente indisponível' } } }));
   await page.getByRole('button', { name: 'Gerar prévia', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('indisponível');
+  await page.getByRole('button', { name: '1 Sua marca' }).click();
   await expect(page.getByLabel('Como você imagina o checkout?')).toHaveValue('Minha ideia de checkout');
   await expect(page.getByAltText('Referência temporária do visual')).toBeVisible();
   await page.getByRole('button', { name: 'Voltar aos checkouts' }).click();
@@ -68,6 +80,7 @@ test('erro preserva ideia e referência; sair descarta a imagem; cancelar não a
   let release;
   await page.route('**/checkouts/ai/preview', async route => { await new Promise(resolve => { release = resolve; }); await route.fulfill({ json: { config: design } }).catch(() => {}); });
   await page.getByLabel('Como você imagina o checkout?').fill('Novo teste');
+  await choices(page);
   await page.getByRole('button', { name: 'Gerar prévia', exact: true }).click();
   await expect.poll(() => Boolean(release)).toBe(true);
   await page.getByRole('button', { name: 'Cancelar geração' }).click(); release();

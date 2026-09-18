@@ -1,4 +1,6 @@
 import { loadMetaPixel, trackMeta } from './meta-pixel';
+import './checkout-progress.css';
+import './checkout-templates.css';
 import ExitOffer from './ExitOffer';
 import { mergePaymentUpdate, pollPaymentStatus } from './payment-polling';
 import { Component, useCallback, useEffect, useRef, useState } from "react";
@@ -851,6 +853,47 @@ function SessionContent({ session: initialSession, token }) {
   };
   const googleTracking = <><ExitOffer config={config} sessionId={session.publicId} token={token} enabled={!busy && !payment && session.status === 'OPEN' && expiry.remaining > 0 && !session.couponCode} onApply={acceptExitOffer}/>
       <GoogleCheckoutTracking sessionId={session.publicId} token={token} paymentStatus={paymentStatus} shippingSelected={Boolean(selectedShipping)} paymentCreated={Boolean(payment?.publicId)} checkoutRevision={`${session.totalCents}:${session.discountCents}:${selectedShipping?.shippingPriceCents ?? session.shippingPriceCents}`}/></>;
+  const checkoutProgress = (config.showProgress && <nav className={`checkout-progress style-${config.progressStyle || 'outline'} checkout-device-${config.progressDevice || 'all'}`} aria-label="Etapas do checkout">
+        <span className="active">
+          <i>{config.progressStyle === 'icons' ? <UserRound size={16} aria-hidden="true" /> : 1}</i>
+          {copy.identification}
+        </span>
+        <b />
+        {requiresShipping && <><span className={step >= 2 ? "active" : ""}>
+          <i>{config.progressStyle === 'icons' ? <MapPin size={16} aria-hidden="true" /> : 2}</i>
+          {copy.shipping}
+        </span>
+        <b /></>}
+          <span className={step >= 4 ? "active" : ""}>
+            <i>{config.progressStyle === 'icons' ? <CreditCard size={16} aria-hidden="true" /> : (requiresShipping ? 3 : 2)}</i>
+          {copy.payment}
+        </span>
+      </nav>);
+  const orderItemsView = (<div className="session-items">
+              {items.map((item) => (
+                <article
+                  className="public-line-item"
+                  key={`${item.titleSnapshot}-${item.variantSnapshot || "default"}`}
+                >
+                  <ProductImage
+                    src={item.imageUrlSnapshot}
+                    title={item.titleSnapshot}
+                  />
+                  <div className="line-item-copy">
+                    <b>{item.titleSnapshot}</b>
+                    {item.variantSnapshot &&
+                      item.variantSnapshot !== "Default Title" && (
+                        <span>{item.variantSnapshot}</span>
+                      )}
+                    {!item.isOrderBump && session.source === 'DIRECT' ? <div className="public-quantity" aria-label={copy.quantity}><button type="button" onClick={()=>changeQuantity(item.quantity-1)} disabled={busy||Boolean(payment)||item.quantity<=1} aria-label="−">−</button><b>{item.quantity}</b><button type="button" onClick={()=>changeQuantity(item.quantity+1)} disabled={busy||Boolean(payment)||item.quantity>=(checkoutProduct?.maxPerOrder||1000)} aria-label="+">+</button></div> : <small>{copy.quantity}: {item.quantity}</small>}
+                    <small>
+                      {money.format(item.unitPriceCents / 100)} {copy.perUnit}
+                    </small>
+                  </div>
+                  <strong>{money.format(item.totalCents / 100)}</strong>
+                </article>
+              ))}
+            </div>);
   if (String(payment?.status).toUpperCase() === "PAID") {
     return <><ThankYouPage session={session} items={items} itemCount={itemCount} selectedShipping={selectedShipping} payment={payment} config={config} delivery={delivery} />{googleTracking}</>;
   }
@@ -898,23 +941,10 @@ function SessionContent({ session: initialSession, token }) {
         className={`public-checkout-grid summary-device-${config.summaryDevice || 'all'} ${config.showSummary ? "" : "without-summary"} ${payment ? "pix-generated-grid" : ""}`}
         style={{order:layoutOrder('block','content')}}
       >
+        {config.template === 'retail' && checkoutProgress}
+        {config.template === 'retail' && config.showSummary && <aside className="retail-products-column" aria-label="Produtos do pedido"><h2>Produtos</h2>{orderItemsView}</aside>}
         <section className="customer-step">
-      {config.showProgress && <nav className={`checkout-progress style-${config.progressStyle || 'outline'} checkout-device-${config.progressDevice || 'all'}`} aria-label="Etapas do checkout">
-        <span className="active">
-          <i>{config.progressStyle === 'icons' ? <UserRound size={16} aria-hidden="true" /> : 1}</i>
-          {copy.identification}
-        </span>
-        <b />
-        {requiresShipping && <><span className={step >= 2 ? "active" : ""}>
-          <i>{config.progressStyle === 'icons' ? <MapPin size={16} aria-hidden="true" /> : 2}</i>
-          {copy.shipping}
-        </span>
-        <b /></>}
-          <span className={step >= 4 ? "active" : ""}>
-            <i>{config.progressStyle === 'icons' ? <CreditCard size={16} aria-hidden="true" /> : (requiresShipping ? 3 : 2)}</i>
-          {copy.payment}
-        </span>
-      </nav>}
+      {config.template !== 'retail' && checkoutProgress}
           {step === 1 ? (
             <form onSubmit={advance} noValidate>
               <div className="checkout-primary-card">
@@ -1293,31 +1323,7 @@ function SessionContent({ session: initialSession, token }) {
                 {itemCount} {itemCount === 1 ? copy.item : copy.items}
               </small>
             </div>
-            <div className="session-items">
-              {items.map((item) => (
-                <article
-                  className="public-line-item"
-                  key={`${item.titleSnapshot}-${item.variantSnapshot || "default"}`}
-                >
-                  <ProductImage
-                    src={item.imageUrlSnapshot}
-                    title={item.titleSnapshot}
-                  />
-                  <div className="line-item-copy">
-                    <b>{item.titleSnapshot}</b>
-                    {item.variantSnapshot &&
-                      item.variantSnapshot !== "Default Title" && (
-                        <span>{item.variantSnapshot}</span>
-                      )}
-                    {!item.isOrderBump && session.source === 'DIRECT' ? <div className="public-quantity" aria-label={copy.quantity}><button type="button" onClick={()=>changeQuantity(item.quantity-1)} disabled={busy||Boolean(payment)||item.quantity<=1} aria-label="−">−</button><b>{item.quantity}</b><button type="button" onClick={()=>changeQuantity(item.quantity+1)} disabled={busy||Boolean(payment)||item.quantity>=(checkoutProduct?.maxPerOrder||1000)} aria-label="+">+</button></div> : <small>{copy.quantity}: {item.quantity}</small>}
-                    <small>
-                      {money.format(item.unitPriceCents / 100)} {copy.perUnit}
-                    </small>
-                  </div>
-                  <strong>{money.format(item.totalCents / 100)}</strong>
-                </article>
-              ))}
-            </div>
+            {orderItemsView}
             {config.showCoupon && (
               <form className="session-summary-coupon" onSubmit={applyCoupon}>
                 <input
@@ -1353,6 +1359,7 @@ function SessionContent({ session: initialSession, token }) {
                 <strong>{money.format((selectedShipping?.grandTotalCents ?? (session.totalCents - (session.discountCents || 0) + (session.shippingPriceCents || 0))) / 100)}</strong>
               </div>
             </div>
+            {config.template === 'marketplace' && step === 4 && !payment && <button type="button" className={`customer-continue marketplace-summary-pay effect-${config.buttonEffect}`} onClick={generatePix} disabled={busy || !validCpf(form.document)}>{busy ? <LoaderCircle className="spin" size={18}/> : 'Gerar Pix'}</button>}
             <p className="session-security">
               <ShieldCheck size={16} /> Preços e estoque protegidos contra
               alterações no navegador.

@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260918-checkout-models-guided',
+    category: 'IMPROVEMENT' as const,
+    title: 'Mais estruturas para personalizar seu checkout',
+    description: 'Escolha os modelos Varejo ou Marketplace no editor e na criação com IA. Defina sua marca, envie logo e banners, escolha o formato das etapas e ative avisos de compras reais. Confira a prévia no computador e no celular antes de salvar o rascunho.',
+    publishedAt: new Date('2026-09-18T23:00:00.000Z'),
+  },
+  {
     publicId: 'auto-20260918-checkout-ai-recovery',
     category: 'FIX' as const,
     title: 'Recuperação automática na criação com IA',

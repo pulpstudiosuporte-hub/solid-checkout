@@ -22,6 +22,24 @@ function setup(role = 'OWNER') {
 afterEach(async () => { vi.restoreAllMocks(); vi.unstubAllGlobals(); await Promise.all(apps.splice(0).map(app => app.close())); });
 
 describe('checkout AI drafts', () => {
+  const brief = { template: 'retail', brand: 'Aurora', logoUrl: 'https://cdn.example.com/logo.webp', heroImageUrl: 'https://cdn.example.com/banner.webp', heroMobileImageUrl: '', summaryBannerUrl: '', fidelity: 'close', layout: 'auto', progressStyle: 'chevrons', showProgress: true, showCoupon: false, showSummary: true, socialProofEnabled: true };
+  it('honors explicit brand, structure, assets and features instead of model guesses', async () => {
+    const fetch = vi.fn().mockResolvedValue(provider()); vi.stubGlobal('fetch', fetch);
+    const idea = parseCheckoutIdea({ prompt: 'Minha loja', brief });
+    expect(idea).not.toBeNull();
+    const config = await generateCheckoutDesign(environment, idea!, undefined, undefined, new AbortController().signal);
+    expect(config).toMatchObject({ template: 'retail', layout: 'split', logoText: 'Aurora', logoUrl: brief.logoUrl, heroEnabled: true, heroImageUrl: brief.heroImageUrl, progressStyle: 'chevrons', showCoupon: false, socialProofEnabled: true, socialProofPreviewMessages: '', testimonials: [] });
+    const body = (fetch.mock.calls[0] as [string, RequestInit])[1].body;
+    expect(body).toContain('Aurora'); expect(body).not.toContain(brief.logoUrl); expect(body).not.toContain(brief.heroImageUrl);
+  });
+  it('validates guided options and preserves compatibility with earlier requests', () => {
+    for (const patch of [{ logoUrl: 'javascript:alert(1)' }, { logoUrl: 'https://user:password@example.com/image' }, { socialProofEnabled: 'true' }, { template: 'unknown' }, { progressStyle: 'unknown' }, { heroImageUrl: '', heroMobileImageUrl: brief.heroImageUrl }, { customScript: 'bad' }, { brand: '' }]) {
+      expect(parseCheckoutIdea({ prompt: 'Loja', brief: { ...brief, ...patch } })).toBeNull();
+    }
+    expect(parseCheckoutIdea({ prompt: 'Loja' })).not.toBeNull();
+    for (const template of ['retail', 'marketplace']) expect(designPatch({ ...design, template, progressStyle: 'chevrons' })).toMatchObject({ template });
+    expect(designPatch({ ...design, contentWidth: 5000 })).toBeNull();
+  });
   it('requires auth, CSRF and store write access before generation', async () => {
     const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
     const { app } = setup();

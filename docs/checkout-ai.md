@@ -4,8 +4,13 @@ Em Checkouts → Criar com IA, escolha loja Shopify ou produto de link direto,
 descreva o visual e gere uma prévia. Novas instruções ajustam a configuração
 anterior. Salvar rascunho e abrir editor usa o fluxo existente; não publica.
 
-Esta primeira versão gera modelos, layout, cores, fonte, cantos e textos.
-Logos, banners, ofertas e blocos adicionais são ajustados no editor. Preços e
+O fluxo guiado pergunta marca, estrutura, logo, banners e recursos em três etapas.
+Varejo (três colunas) e Marketplace (cartões) também estão no editor manual.
+A prévia alterna computador/celular e pode ser ampliada. Alterar as escolhas
+exige regenerar antes de salvar, para o rascunho corresponder à prévia.
+Logos e banners reais são enviados à biblioteca e mantidos para publicação;
+seus endereços não vão ao Gemini. Ofertas e outros blocos continuam no editor.
+Avisos de compras usam apenas as vendas reais disponíveis. Preços e
 produtos continuam vindo do catálogo/carrinho, nunca do modelo. Depoimentos
 fornecidos pelo lojista são preservados, sem envio ao Gemini. Sem depoimentos,
 a seção permanece desativada. A prévia é ilustrativa e não cria pagamentos.

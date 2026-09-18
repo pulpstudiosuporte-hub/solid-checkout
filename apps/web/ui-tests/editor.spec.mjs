@@ -36,6 +36,20 @@ async function mockWrites(page, { saveStatus = 200, publishStatus = 200, delay =
   });
   return calls;
 }
+
+test('modelos estruturais também podem ser escolhidos e salvos sem IA', async ({ page }) => {
+  await mockAdmin(page); await openEditor(page);
+  const calls = await mockWrites(page);
+  for (const [template, label] of [['retail', 'Varejo · três colunas'], ['marketplace', 'Marketplace · cartões']]) {
+    await section(page, 'Modelos');
+    await page.getByRole('button', { name: new RegExp(label) }).click();
+    await expect(page.locator(`.editor-device.template-${template}`)).toBeVisible();
+    await page.screenshot({ path: output(`editor-template-${template}.png`), fullPage: true, animations: 'disabled' });
+    await page.getByRole('button', { name: 'Salvar rascunho', exact: true }).click();
+    await expect.poll(() => calls.at(-1)?.config.template).toBe(template);
+    expect(calls.at(-1).config.logoText).toBeTruthy();
+  }
+});
 test('editor: revisão de desktop e celular', async ({ page }) => {
   await mockAdmin(page);
   await openEditor(page);

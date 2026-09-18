@@ -1,4 +1,7 @@
 import ThemeToggle from './ThemeToggle';
+import './checkout-progress.css';
+import { structuralCheckoutTemplates } from './checkout-template-catalog';
+import './checkout-templates.css';
 import ExitOfferSettings from './ExitOfferSettings';
 import React, { createContext, memo, useCallback, useContext, useDeferredValue, useEffect, useId, useMemo, useReducer, useRef, useState } from "react";
 import {
@@ -65,6 +68,7 @@ export { reorderCheckoutLayout } from "./checkout-layout";
 import { defaultCheckoutConfig, defaultBlockOrder } from "./checkout-config";
 export { defaultCheckoutConfig } from "./checkout-config";
 const templatePresets = {
+  ...Object.fromEntries(Object.entries(structuralCheckoutTemplates).map(([id, item]) => [id, item.preset])),
   minimal: {
     template: "minimal",
     layout: "split",
@@ -416,8 +420,8 @@ function Settings({ group, c, u, replaceConfig, scarcityView, setScarcityView, e
     const preset = templatePresets[id] || {};
     replaceConfig(old => ({ ...old, ...preset,
       ...(preset.primary ? { buttonBgColor: preset.primary, progressActiveColor: preset.primary } : {}),
-      ...(preset.borderColor ? { inputBorderColor: preset.borderColor } : {}),
-      ...(Number.isInteger(preset.radius) ? { inputRadius: Math.min(preset.radius, 14) } : {}),
+      ...(preset.borderColor ? { inputBorderColor: preset.inputBorderColor || preset.borderColor } : {}),
+      ...(Number.isInteger(preset.radius) ? { inputRadius: preset.inputRadius ?? Math.min(preset.radius, 14) } : {}),
     }));
   };
   const moveLayoutEntry = (entryKey, direction) => {
@@ -631,6 +635,7 @@ function Settings({ group, c, u, replaceConfig, scarcityView, setScarcityView, e
           >
             <option value="outline">Somente contorno</option>
             <option value="solid">Cor sólida</option>
+            <option value="chevrons">Faixas com setas</option>
             <option value="icons">Ícones com contorno</option>
           </select>
         </Field>
@@ -711,6 +716,7 @@ function Settings({ group, c, u, replaceConfig, scarcityView, setScarcityView, e
             ["conversion", "Conversão"],
             ["showcase", "Vitrine"],
             ["compact", "Compacto"],
+            ...Object.entries(structuralCheckoutTemplates).map(([id, item]) => [id, item.name]),
           ].map(([id, n]) => (
             <button
               key={id}
@@ -722,7 +728,7 @@ function Settings({ group, c, u, replaceConfig, scarcityView, setScarcityView, e
                 <i />
                 <i />
               </span>
-              <b>{n}</b>
+              <b>{n}</b>{structuralCheckoutTemplates[id] && <small>{structuralCheckoutTemplates[id].description}</small>}
               {c.template === id && <Check size={14} />}
             </button>
           ))}
@@ -1628,9 +1634,11 @@ function Preview({
       ) : null,
     content: (
       <div key="content" className="ep-body ep-body-block">
-        <div className="ep-content">
+        {c.template === 'retail' && progress}
+        <div className={`ep-content ${c.showSummary ? '' : 'without-summary'}`}>
+          {c.template === 'retail' && c.showSummary && <aside className="ep-retail-products"><h2>Produtos</h2><article>{product?.imageUrl ? <img src={product.imageUrl} alt=""/> : <span className="retail-product-placeholder"/>}<div><b>{productTitle}</b><small>{copy.quantity}</small><strong>{previewMoney}</strong></div></article></aside>}
           <div className="ep-main">
-            {progress}
+            {c.template !== 'retail' && progress}
             <div className="ep-card">
               <small className="ep-eyebrow">{c.eyebrow}</small>
               <h2>{c.title}</h2>
@@ -1862,13 +1870,13 @@ export function CheckoutDesignPreview({ config, onClose }) {
   );
 }
 
-export function CheckoutAnalyticsPreview({ config, product }) {
+export function CheckoutAnalyticsPreview({ config, product, device = "mobile" }) {
   const noop = () => {};
   return (
     <div className="checkout-analytics-render" aria-hidden="true" inert>
       <Preview
         c={{ ...defaultCheckoutConfig, ...config }}
-        device="mobile"
+        device={device}
         onAddElement={noop}
         onMoveElement={noop}
         onRemoveElement={noop}

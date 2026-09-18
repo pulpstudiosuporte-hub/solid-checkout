@@ -1,0 +1,19 @@
+/* The editor and public checkout share the same chevron composition. */
+.ep-steps.style-chevrons { --step-bg:var(--eprogress-inactive,#d5d5d5); --step-fg:var(--etext); --step-accent:var(--eprogress-active); --step-on:var(--ebutton-text); }
+.checkout-progress.style-chevrons { --step-bg:var(--public-progress-inactive,#d5d5d5); --step-fg:var(--public-text); --step-accent:var(--public-progress-active); --step-on:var(--public-button-text); }
+.editor-device .ep-steps.style-chevrons, .public-checkout .checkout-progress.style-chevrons {
+  display:flex; width:100%; gap:0; padding:0; margin:0 0 24px; border:0;
+}
+.editor-device .ep-steps.style-chevrons > span, .public-checkout .checkout-progress.style-chevrons > span {
+  flex:1; width:auto; min-width:0; min-height:54px; padding:10px 16px; box-sizing:border-box;
+  flex-direction:row; justify-content:center; gap:7px; font-size:11px;
+  background:var(--step-bg,#f2f2f2); color:var(--step-fg,#171717)!important;
+  clip-path:polygon(0 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,0 100%,12px 50%);
+}
+.editor-device .ep-steps.style-chevrons > span:first-child, .public-checkout .checkout-progress.style-chevrons > span:first-child { clip-path:polygon(0 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,0 100%); }
+.editor-device .ep-steps.style-chevrons > span.active, .public-checkout .checkout-progress.style-chevrons > span.active { background:color-mix(in srgb,var(--step-accent) 10%,var(--step-bg,#fff)); font-weight:750; }
+.editor-device .ep-steps.style-chevrons i, .public-checkout .checkout-progress.style-chevrons i { width:22px; height:22px; flex:none; border:0; box-shadow:none; font-size:11px; background:transparent; color:var(--step-fg,#171717)!important; }
+.editor-device .ep-steps.style-chevrons .active i, .public-checkout .checkout-progress.style-chevrons .active i { background:var(--step-accent); color:var(--step-on,#fff)!important; }
+.checkout-progress.style-chevrons > b { display:none; }
+.editor-device.mobile .ep-steps.style-chevrons > span { flex-direction:column; padding:9px 12px; font-size:9px; }
+@media(max-width:600px) { .public-checkout .checkout-progress.style-chevrons > span { flex-direction:column; padding:9px 12px; font-size:10px; } }
