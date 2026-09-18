@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowUp, Check, Pencil, ImagePlus, LoaderCircle, Monitor, Smartphone, Maximize2, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, Pencil, ImagePlus, LoaderCircle, Monitor, Smartphone, Maximize2, Plus, Sparkles, Trash2, Pause, Play } from 'lucide-react';
 import { generateCheckoutPreview, uploadProductImage, resolveMediaUrl } from './api';
 import { defaultCheckoutConfig } from './checkout-config';
 import './checkout-ai.css';
@@ -60,6 +60,8 @@ export default function CheckoutAiBuilder({ products, csrfToken, onBack, onCreat
   const [colors, setColors] = useState('');
   const [adjustment, setAdjustment] = useState('');
   const [messages, setMessages] = useState([]);
+  const [motionPaused, setMotionPaused] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const activeQuestion = useRef(null);
   const conversation = useRef(null);
   const [brief, setBrief] = useState(initialBrief);
@@ -112,9 +114,9 @@ export default function CheckoutAiBuilder({ products, csrfToken, onBack, onCreat
     if (problem) { setError(problem); return; }
     const completed = [...new Set([...answered, question])];
     setAnswered(completed); setError('');
-    setQuestion(visibleQuestions.find(id => !completed.includes(id)) || 'ready');
+    setQuestion(visibleQuestions.find(id => !completed.includes(id)) || 'ready'); setHistoryOpen(false);
   }
-  function editAnswer(id) { setQuestion(id); setError(''); }
+  function editAnswer(id) { setQuestion(id); setError(''); setHistoryOpen(false); }
   function answerSummary(id) {
     const yesNo = value => value ? 'Sim' : 'Não';
     return ({
@@ -200,30 +202,36 @@ export default function CheckoutAiBuilder({ products, csrfToken, onBack, onCreat
     }
   }
   const completedQuestions = visibleQuestions.filter(id => answered.includes(id));
-  return <main className={`page checkout-ai ${expanded ? "is-expanded" : ""}`}>
+  const speech = busy ? 'Segura aí, capitão. Estou dando forma à sua ideia…' : saving ? 'Guardando seu rascunho…' : question === 'ready' ? config ? 'Pronto, capitão! Olha a prévia. O que vamos ajustar?' : `Fechou, ${brief.brand}! Vamos montar sua prévia?` : questionText[question];
+  const pose = busy || saving ? 'thinking' : error ? 'sad' : config && question === 'ready' ? 'happy' : question === 'brand' ? 'greeting' : 'replying';
+  return <main className={`page checkout-ai ai-stage-page ${config ? "has-preview" : ""} ${motionPaused ? "motion-paused" : ""} ${expanded ? "is-expanded" : ""}`}>
     <header className="page-title"><div><p className="eyebrow">ESTÚDIO PIRAT · CRIAR COM IA</p><h1 ref={heading} tabIndex={-1}>Seu checkout começa numa conversa.</h1><p>Um papo com o papagaio. Uma ideia de cada vez. Tudo com a sua cara.</p></div><button type="button" className="secondary" onClick={leave} disabled={saving || uploading}><ArrowLeft size={17}/> Voltar aos checkouts</button></header>
-    <div className="checkout-ai-grid"><form className="card checkout-ai-form checkout-ai-chat" onSubmit={answer}>
-      <div className="checkout-ai-chat-head"><img src={busy ? "/brand/assistant/thinking.webp" : config ? "/brand/assistant/happy.webp" : "/brand/assistant/greeting.webp"} alt="" width="56" height="56"/><div><b>Papagaio da Pirat</b><span>Seu parceiro de criação</span></div><span className="checkout-ai-chat-count">{completedQuestions.length}/{visibleQuestions.length}</span></div>
+    <div className="checkout-ai-grid"><form className="checkout-ai-form checkout-ai-chat" onSubmit={answer}>
+      <div className="checkout-ai-chat-head"><div><b>Papagaio da Pirat</b><span>{busy ? 'Criando sua prévia' : 'Vamos criar juntos'}</span></div><span className="checkout-ai-chat-count">{completedQuestions.length}/{visibleQuestions.length}</span><button type="button" className="secondary" aria-label={motionPaused ? 'Ativar animações' : 'Pausar animações'} aria-pressed={motionPaused} onClick={() => setMotionPaused(value => !value)}>{motionPaused ? <Play size={16}/> : <Pause size={16}/>}</button></div>
       <div className="checkout-ai-chat-progress" role="progressbar" aria-label="Respostas da criação" aria-valuemin={0} aria-valuemax={visibleQuestions.length} aria-valuenow={completedQuestions.length}><span style={{ width: `${completedQuestions.length / visibleQuestions.length * 100}%` }}/></div>
+      <div className={`checkout-ai-stage pose-${pose}`}>
+        <div className="checkout-ai-speech" key={`${question}-${busy}-${saving}-${messages.length}`}><h2 ref={activeQuestion} tabIndex={-1}>{speech}</h2></div>
+        <div className="checkout-ai-perch" aria-hidden="true"><div className="checkout-ai-orbit"/><img key={pose} src={`/brand/assistant/${pose}.webp`} alt="" width="180" height="180"/><span className="checkout-ai-presence">{busy ? 'Pensando na sua ideia' : saving ? 'Salvando' : error ? 'Vamos resolver isso' : 'Pode mandar, estou por aqui'}</span></div>
+      </div>
+      <details className="checkout-ai-history" open={historyOpen} onToggle={event => setHistoryOpen(event.currentTarget.open)}><summary>Nossa conversa · {completedQuestions.length} respostas</summary>
       <div className="checkout-ai-conversation" ref={conversation} role="region" aria-label="Conversa de criação" tabIndex={0}>
         {completedQuestions.length > 0 && <ol className="checkout-ai-messages" aria-label="Respostas anteriores">{completedQuestions.map(id => <li key={id}><p className="checkout-ai-bubble from-parrot">{questionText[id]}</p><div className="checkout-ai-bubble from-merchant"><span>{answerSummary(id)}</span><button type="button" disabled={locked} onClick={() => editAnswer(id)} aria-label={`Alterar resposta: ${id === 'idea' ? 'ideia' : answerSummary(id)}`}><Pencil size={15}/></button></div></li>)}</ol>}
         {messages.map((message, index) => <p key={index} className={`checkout-ai-bubble ${message.role === 'user' ? 'from-merchant' : 'from-parrot'}`}>{message.text}</p>)}
-        <div className="checkout-ai-current"><span className="eyebrow">PAPAGAIO DA PIRAT</span><h2 ref={activeQuestion} tabIndex={-1}>{question === 'ready' ? config ? 'O que mais vamos deixar do seu jeito?' : `Fechou, ${brief.brand}! Vamos montar sua prévia?` : questionText[question]}</h2></div>
-      </div>
+      </div></details>
       <fieldset className="checkout-ai-composer" disabled={locked}><legend className="sr-only">Sua resposta</legend>{questionControl()}</fieldset>
       {['logo', 'banner', 'summaryImage'].includes(question) && <small className="checkout-ai-asset-note">Logo e banners ficam na biblioteca para aparecer no checkout. A referência visual é temporária.</small>}
       {uploading && <p role="status">Enviando imagem para a biblioteca…</p>}{reading && <p role="status">Preparando a referência…</p>}
       {question === 'ready' && <p className="checkout-ai-privacy">Sua ideia e referência são enviadas ao Gemini. Evite dados pessoais nas imagens. Os depoimentos são aplicados pela Pirat sem alteração e não são enviados à IA.</p>}
       {error && <p role="alert" className="public-error">{error}</p>}
       <div className="checkout-ai-actions">{question !== 'ready' && completedQuestions.length > 0 && <button type="button" className="secondary" disabled={locked} onClick={() => editAnswer(visibleQuestions[Math.max(0, visibleQuestions.indexOf(question) - 1)])}><ArrowLeft size={17}/> Voltar</button>}<button type="submit" className="primary" disabled={locked || question === 'ready' && Boolean(config) && !dirty}>{busy ? <LoaderCircle className="spin" size={18}/> : question === 'ready' ? <Sparkles size={18}/> : <ArrowUp size={18}/>} {busy ? 'Montando sua prévia…' : question === 'ready' ? config ? 'Enviar ajuste' : 'Gerar prévia' : 'Enviar resposta'}</button>{busy && <button type="button" className="secondary" onClick={() => { request.current?.abort(); request.current = null; setBusy(false); }}>Cancelar geração</button>}</div>
-    </form><section className="card checkout-ai-result" aria-label="Prévia do checkout"><div className="checkout-ai-result-head"><span className="eyebrow">SEU CHECKOUT, DO SEU JEITO</span><h2>{config ? 'Seu checkout tomou forma.' : 'Um bom checkout começa aqui.'}</h2><p>{config ? 'Prévia ilustrativa. Os produtos e preços publicados vêm da sua loja. Amplie para conferir os detalhes.' : 'Enquanto a gente conversa, suas escolhas ficam guardadas aqui. A prévia aparece quando você pedir para gerar.'}</p></div>
+    </form><section hidden={!config} className="card checkout-ai-result" aria-label="Prévia do checkout"><div className="checkout-ai-result-head"><span className="eyebrow">SEU CHECKOUT, DO SEU JEITO</span><h2>{config ? 'Seu checkout tomou forma.' : 'Um bom checkout começa aqui.'}</h2><p>{config ? 'Prévia ilustrativa. Os produtos e preços publicados vêm da sua loja. Amplie para conferir os detalhes.' : 'Enquanto a gente conversa, suas escolhas ficam guardadas aqui. A prévia aparece quando você pedir para gerar.'}</p></div>
       {config ? <>
         <div className="checkout-ai-toolbar" role="group" aria-label="Dispositivo da prévia"><button type="button" className="secondary" aria-pressed={device === 'desktop'} onClick={() => setDevice('desktop')}><Monitor size={17}/> Computador</button><button type="button" className="secondary" aria-pressed={device === 'mobile'} onClick={() => setDevice('mobile')}><Smartphone size={17}/> Celular</button><button type="button" className="secondary" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}><Maximize2 size={17}/> {expanded ? 'Voltar à criação' : 'Ampliar prévia'}</button></div>
         <DesignPreview config={config} product={previewProduct ? { ...previewProduct, title: previewProduct.checkoutTitle } : undefined} device={device}/>
         <div className="checkout-ai-design-summary"><b>{config.logoText}</b><span>{config.layout === 'split' ? 'Formulário e resumo lado a lado' : 'Composição centralizada'} · {config.font}</span><span>{config.heroEnabled ? 'Com banner' : 'Sem banner'} · {config.socialProofEnabled ? 'Avisos de vendas reais ativados' : 'Sem avisos de compras'}</span></div>
         {config.socialProofEnabled && <p className="checkout-ai-proof-note">As notificações aparecem no checkout publicado quando há compras reais disponíveis. Esta prévia não simula clientes.</p>}
-        <div className="checkout-ai-result-foot">{dirty && <p role="status">Suas escolhas mudaram. Gere uma nova prévia antes de salvar.</p>}<button type="button" className="primary" onClick={save} disabled={saving || busy || dirty || uploading}>{saving ? <LoaderCircle className="spin" size={18}/> : <Sparkles size={18}/>} Salvar rascunho e abrir editor</button><small>Tudo continua editável. Confira os textos e publique pelo editor quando estiver pronto.</small></div>
-      </> : <div className="checkout-ai-empty"><img src="/brand/assistant/thinking.webp" alt="Papagaio da Pirat pensando no próximo checkout" width="180" height="180"/><h3>{brief.brand ? `A próxima parada é ${brief.brand}.` : 'Puxa uma cadeira, marujo.'}</h3><p>Me conte sua ideia. Eu pergunto o que falta e monto o checkout com você.</p>{completedQuestions.length > 0 && <dl className="checkout-ai-brief-summary">{completedQuestions.map(id => <div key={id}><dt>{({brand:'Marca',idea:'Ideia',colors:'Cores',mode:'Tipo',product:'Produto',template:'Modelo',reference:'Referência',logo:'Logo',banner:'Banner',summaryImage:'Imagem',layout:'Organização',progress:'Etapas',coupon:'Cupom',summary:'Resumo',socialProof:'Compras recentes',reviews:'Depoimentos',name:'Nome'})[id]}</dt><dd>{answerSummary(id)}</dd></div>)}</dl>}</div>}
+        <div className="checkout-ai-result-foot"><button type="button" className="secondary" disabled={locked} onClick={() => editAnswer('reviews')}>Adicionar ou editar depoimentos</button>{dirty && <p role="status">Suas escolhas mudaram. Gere uma nova prévia antes de salvar.</p>}<button type="button" className="primary" onClick={save} disabled={saving || busy || dirty || uploading}>{saving ? <LoaderCircle className="spin" size={18}/> : <Sparkles size={18}/>} Salvar rascunho e abrir editor</button><small>Tudo continua editável. Confira os textos e publique pelo editor quando estiver pronto.</small></div>
+      </> : null}
     </section></div>
   </main>;
 }

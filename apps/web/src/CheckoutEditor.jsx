@@ -1,3 +1,4 @@
+import CheckoutTestimonials from './CheckoutTestimonials';
 import ThemeToggle from './ThemeToggle';
 import './checkout-progress.css';
 import CheckoutProgress from './CheckoutProgress';
@@ -1697,11 +1698,10 @@ function Preview({
                     <b>{c.trustBenefit3}</b>
                   </span>
                 </div>
-                <blockquote>
-                  “{c.testimonialText}”<b>{c.testimonialName}</b>
-                </blockquote>
+
               </div>
             )}
+            <CheckoutTestimonials items={c.testimonials}/>
             <EditorRegionElements
               config={c}
               region="main"

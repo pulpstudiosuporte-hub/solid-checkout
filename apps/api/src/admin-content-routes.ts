@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260918-checkout-ai-animated-parrot',
+    category: 'IMPROVEMENT' as const,
+    title: 'O papagaio ganhou o centro da conversa',
+    description: 'Crie com IA em uma conversa central, com o papagaio animado, falas em destaque e escolhas rápidas. Pause os movimentos quando quiser. Os depoimentos cadastrados agora aparecem corretamente na prévia e no checkout.',
+    publishedAt: new Date('2026-09-19T00:00:00.000Z'),
+  },
+  {
     publicId: 'auto-20260918-checkout-ai-conversation',
     category: 'IMPROVEMENT' as const,
     title: 'Crie seu checkout numa conversa com o papagaio',

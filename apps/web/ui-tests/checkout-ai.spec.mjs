@@ -63,10 +63,12 @@ for (const theme of ['light', 'dark']) {
     await expect(page.getByRole('textbox', { name: 'Sua ideia', exact: true })).toBeVisible();
     await page.getByRole('textbox', { name: 'Sua ideia', exact: true }).fill('Loja minimalista'); await page.getByRole('textbox', { name: 'Sua ideia', exact: true }).press('Enter');
     await expect(page.getByRole('textbox', { name: 'Cores da marca', exact: true })).toBeVisible();
+    if (await page.locator('.checkout-ai-history').getAttribute('open') === null) await page.locator('.checkout-ai-history > summary').click();
     await page.getByRole('button', { name: 'Alterar resposta: Aurora', exact: true }).click();
     await expect(page.getByRole('textbox', { name: 'Nome da marca', exact: true })).toHaveValue('Aurora');
     await page.getByRole('textbox', { name: 'Nome da marca', exact: true }).fill('Aurora Nova'); await send(page);
     await expect(page.getByRole('textbox', { name: 'Cores da marca', exact: true })).toBeVisible();
+    await page.locator('.checkout-ai-history > summary').click();
     await expect(page.getByRole('region', { name: 'Conversa de criação' })).toContainText('Loja minimalista');
   });
   test(`cria prévia, ajusta e salva somente rascunho no tema ${theme}`, async ({ page }) => {
@@ -76,6 +78,7 @@ for (const theme of ['light', 'dark']) {
     await brief(page, { reference: true, direct: true, review: true });
     await page.getByRole('button', { name: 'Gerar prévia', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Seu checkout tomou forma.' })).toBeVisible();
+    await expect(page.locator('.checkout-ai-preview .checkout-testimonials')).toContainText('Avaliação fictícia usada somente no teste.');
     expect(requests[0].reference).toContain('data:image/png'); expect(requests[0].productId).toBe('qa-product-1');
     expect(requests[0].brief.brand).toBe('Aurora'); expect(requests[0].brief.socialProofEnabled).toBe(true); expect(requests[0].prompt).toContain('Vermelho e marfim');
     await page.getByLabel('O que quer ajustar?').fill('Deixe o título mais direto.');
@@ -83,7 +86,9 @@ for (const theme of ['light', 'dark']) {
     await page.getByRole('button', { name: 'Enviar ajuste' }).click();
     await expect.poll(() => requests.length).toBe(2); expect(requests[1].current.logoText).toBe('Aurora'); expect(requests[1].prompt).toContain('Deixe o título mais direto.');
     await expect(page.getByRole('button', { name: 'Salvar rascunho e abrir editor' })).toBeEnabled();
+    await page.locator('.checkout-ai-history > summary').click();
     await expect(page.getByRole('region', { name: 'Conversa de criação' })).toContainText('Deixe o título mais direto.');
+    if (await page.locator('.checkout-ai-history').getAttribute('open') === null) await page.locator('.checkout-ai-history > summary').click();
     await page.getByRole('button', { name: 'Alterar resposta: Aurora', exact: true }).click();
     await page.getByRole('textbox', { name: 'Nome da marca', exact: true }).fill('Aurora Nova'); await send(page);
     await expect(page.getByRole('button', { name: 'Salvar rascunho e abrir editor' })).toBeDisabled();
@@ -107,6 +112,7 @@ test('erro preserva conversa e referência; sair descarta imagem; cancelar ignor
   await open(page); await brief(page, { reference: true });
   await page.route('**/checkouts/ai/preview', route => route.fulfill({ status: 503, json: { error: { message: 'IA temporariamente indisponível' } } }));
   await page.getByRole('button', { name: 'Gerar prévia', exact: true }).click(); await expect(page.getByRole('alert')).toContainText('indisponível');
+  await page.locator('.checkout-ai-history > summary').click();
   await page.getByRole('button', { name: /Alterar resposta: reference.png/ }).click();
   await expect(page.getByAltText('Referência temporária do visual')).toBeVisible(); await send(page);
   await page.getByRole('button', { name: 'Voltar aos checkouts' }).click(); await page.getByRole('button', { name: 'Criar com IA', exact: true }).click();
@@ -115,7 +121,7 @@ test('erro preserva conversa e referência; sair descarta imagem; cancelar ignor
   await page.route('**/checkouts/ai/preview', async route => { await new Promise(resolve => { release = resolve; }); await route.fulfill({ json: { config: design } }).catch(() => {}); });
   await brief(page); await page.getByRole('button', { name: 'Gerar prévia', exact: true }).click(); await expect.poll(() => Boolean(release)).toBe(true);
   await page.getByRole('button', { name: 'Cancelar geração' }).click(); release();
-  await expect(page.getByRole('heading', { name: 'Um bom checkout começa aqui.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Vamos montar sua prévia/ })).toBeVisible();
 });
 test('preserva uploads permanentes, modelo estrutural e perguntas condicionais', async ({ page }) => {
   await open(page);
@@ -125,6 +131,7 @@ test('preserva uploads permanentes, modelo estrutural e perguntas condicionais',
   await brief(page, { assets: true, retail: true });
   await page.getByRole('button', { name: 'Gerar prévia', exact: true }).click(); await expect.poll(() => Boolean(request)).toBe(true);
   expect(request.brief.logoUrl).toBe('/brand/assistant/idle.webp'); expect(request.brief.heroImageUrl).toBe('/brand/assistant/idle.webp'); expect(request.brief.template).toBe('retail'); expect(request).not.toHaveProperty('productId');
+  await page.locator('.checkout-ai-history > summary').click();
   await page.getByRole('button', { name: 'Alterar resposta: Carrinho da Shopify', exact: true }).click();
   await page.getByRole('button', { name: /Produto específico Um link/ }).click(); await send(page);
   await expect(page.getByRole('combobox', { name: 'Produto', exact: true })).toBeVisible();
@@ -132,4 +139,42 @@ test('preserva uploads permanentes, modelo estrutural e perguntas condicionais',
   await expect(page.getByRole('button', { name: 'Gerar prévia', exact: true })).toBeVisible();
   request = null; await page.getByRole('button', { name: 'Gerar prévia', exact: true }).click(); await expect.poll(() => Boolean(request)).toBe(true);
   expect(request.productId).toBe('qa-product-2'); expect(request.brief.logoUrl).toBe('/brand/assistant/idle.webp');
+});
+
+test('animações podem ser pausadas e respeitam movimento reduzido', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' }); await open(page);
+  const mascot = page.locator('.checkout-ai-perch img');
+  await expect(mascot).toBeVisible();
+  expect(await mascot.evaluate(el => getComputedStyle(el).animationName)).toContain('ai-parrot');
+  await page.getByRole('button', { name: 'Pausar animações' }).click();
+  expect(await mascot.evaluate(el => getComputedStyle(el).animationName)).toBe('none');
+  await page.getByRole('button', { name: 'Ativar animações' }).click();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  expect(await mascot.evaluate(el => getComputedStyle(el).animationName)).toBe('none');
+  await page.getByLabel('Nome da marca', { exact: true }).fill('Aurora'); await send(page);
+  await expect(page.getByRole('heading', { name: /O que sua loja vende/ })).toBeVisible();
+});
+
+test('checkout público mostra depoimentos cadastrados e omite lista vazia', async ({ page }) => {
+  page.on('pageerror', error => console.log('Public test error:', error.message));
+  const reviews = [{ id: 'qa-review-1', name: 'Pessoa de teste', text: 'Avaliação de teste fornecida pela loja.', rating: 4, imageUrl: '' }, { id: 'qa-review-2', name: 'Outra pessoa de teste', text: 'Segunda avaliação cadastrada.', rating: 5, imageUrl: '' }];
+  let items = reviews;
+  await page.route('**/*', route => {
+    if (new URL(route.request().url()).hostname === 'fonts.googleapis.com') return route.fulfill({ contentType: 'text/css', body: '' });
+    if (!['xhr', 'fetch'].includes(route.request().resourceType())) return route.continue();
+    const path = new URL(route.request().url()).pathname;
+    if (path.startsWith('/assets/') || path.startsWith('/brand/')) return route.continue();
+    if (path === '/public/checkout-sessions/qa-testimonials') return route.fulfill({ json: { session: { publicId: 'qa-testimonials', status: 'OPEN', source: 'DIRECT', expiresAt: new Date(Date.now() + 300000).toISOString(), customerCaptured: false, quantity: 1, unitPriceCents: 10000, totalCents: 10000, discountCents: 0, shippingPriceCents: 0, checkout: { name: 'Loja de teste', product: { publicId: 'qa-product', checkoutTitle: 'Produto de teste', priceCents: 10000, fulfillmentType: 'DIGITAL' }, publishedConfig: { ...design, testimonials: items, showTrust: false } } } } });
+    return route.fulfill({ json: { items: [], payment: null, pixelId: null } });
+  });
+  await page.goto('/#/session/qa-testimonials?token=local-fixture');
+  const region = page.getByRole('region', { name: 'Depoimentos de clientes' });
+  await expect(region).toContainText(reviews[0].text); await expect(region).toContainText(reviews[1].text);
+  await expect(region.getByLabel('4 de 5 estrelas')).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await region.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: fileURLToPath(new URL('../../../.visual-check/testimonials-public-mobile.png', import.meta.url)) });
+  expect(await page.locator('body').evaluate(el => el.scrollWidth <= window.innerWidth)).toBe(true);
+  items = []; await page.reload(); await expect(page.getByRole('textbox', { name: 'Nome completo', exact: true })).toBeVisible();
+  await expect(region).toHaveCount(0);
 });

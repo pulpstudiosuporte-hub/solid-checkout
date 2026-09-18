@@ -1,3 +1,4 @@
+import CheckoutTestimonials from './CheckoutTestimonials';
 import { loadMetaPixel, trackMeta } from './meta-pixel';
 import './checkout-progress.css';
 import './checkout-templates.css';
@@ -1034,6 +1035,7 @@ function SessionContent({ session: initialSession, token }) {
               {config.showTrust && <section className={`public-trust checkout-device-${config.trustDevice || 'all'}`} aria-label="Confiança da loja">
                 <div className="public-trust-benefits"><span><i><ShieldCheck size={17}/></i><b>{config.trustBenefit1}</b></span><span><i><Check size={17}/></i><b>{config.trustBenefit2}</b></span><span><i><CreditCard size={17}/></i><b>{config.trustBenefit3}</b></span></div>
               </section>}
+              <CheckoutTestimonials items={config.testimonials}/>
             </form>
           ) : step === 2 ? (
             <form className="delivery-step-form" onSubmit={saveShipping} noValidate>

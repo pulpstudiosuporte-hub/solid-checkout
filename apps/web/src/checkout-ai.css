@@ -20,9 +20,6 @@
 .checkout-ai-result { position:sticky; top:100px; }
 .checkout-ai-result-head h2 { margin:10px 0; font-size:24px; }
 .checkout-ai-result-head p { font-size:13px; }
-.checkout-ai-empty { text-align:center; padding:36px 12px; }
-.checkout-ai-empty img { display:block; margin:0 auto 24px; }
-.checkout-ai-review-placeholder { padding:24px; border:1px dashed var(--border); border-radius:14px; margin-top:28px; }
 .checkout-ai-preview { max-height:650px; overflow:auto; border:1px solid var(--border); border-radius:16px; margin:20px 0; }
 .checkout-ai-preview .checkout-analytics-render { width:100%; max-width:100%; }
 .checkout-ai-preview .editor-device.mobile { width:100%; border:0; border-radius:0; box-shadow:none; }
@@ -31,16 +28,7 @@
 .checkout-ai-preview .ep-two { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .checkout-ai-result-foot { display:grid; gap:12px; }
 .checkout-ai-form [hidden] { display:none; }
-.checkout-ai-stages { display:flex; gap:8px; margin-bottom:28px; }
-.checkout-ai-stages button { flex:1; min-width:0; padding:10px 6px; display:flex; flex-direction:column; align-items:center; gap:7px; border:1px solid var(--border); border-radius:12px; background:var(--bg); color:var(--text); font:inherit; font-size:11px; }
-.checkout-ai-stages button b { display:grid; place-items:center; width:24px; height:24px; border-radius:50%; border:1px solid var(--border); }
-.checkout-ai-stages [aria-current=step] { border-color:var(--primary); box-shadow:inset 0 -3px var(--primary); font-weight:750; }
-.checkout-ai-stages button:disabled { opacity:.65; }
-.checkout-ai-form label.checkout-ai-option { display:flex; flex-direction:row; align-items:flex-start; gap:12px; border:1px solid var(--border); padding:14px; border-radius:12px; cursor:pointer; }
-.checkout-ai-form .checkout-ai-option input { width:20px; min-height:20px; height:20px; flex:none; margin:2px 0; accent-color:var(--primary); }
-.checkout-ai-option small { margin-top:4px; font-weight:400; }
 .checkout-ai-asset { padding:14px; margin-bottom:20px; border:1px dashed var(--border); border-radius:12px; }
-.checkout-ai-refine { margin-top:24px; padding-top:20px; border-top:1px solid var(--border); }
 .checkout-ai-toolbar { display:flex; flex-wrap:wrap; gap:8px; margin-top:20px; }
 .checkout-ai-toolbar button { padding:8px 10px; font-size:12px; }
 .checkout-ai-toolbar [aria-pressed=true] { border-color:var(--primary); box-shadow:inset 0 -2px var(--primary); }
@@ -59,7 +47,6 @@
 /* Guided conversation: one question, with the answered brief kept in view. */
 .checkout-ai-chat { padding:0; overflow:hidden; }
 .checkout-ai-chat-head { display:flex; align-items:center; gap:12px; padding:20px 24px; background:var(--bg); border-bottom:1px solid var(--border); }
-.checkout-ai-chat-head img { object-fit:contain; flex:none; }
 .checkout-ai-chat-head > div { display:grid; gap:4px; flex:1; min-width:0; }
 .checkout-ai-chat-head b { font-size:16px; }
 .checkout-ai-chat-head span { font-size:12px; }
@@ -76,8 +63,6 @@
 .checkout-ai-bubble.from-merchant span { flex:1; min-width:0; }
 .checkout-ai-bubble button { min-width:44px; flex:none; display:grid; place-items:center; border:0; border-radius:10px; color:var(--text); background:transparent; cursor:pointer; }
 .checkout-ai-bubble button:hover { background:var(--border); }
-.checkout-ai-current h2 { font-size:22px; line-height:1.4; margin:10px 0 0; font-weight:700; text-wrap:balance; }
-.checkout-ai-current h2:focus { outline:none; }
 .checkout-ai-form fieldset.checkout-ai-composer { margin:0; padding:0 24px; }
 .checkout-ai-composer > label { margin-bottom:12px; }
 .checkout-ai-composer > p { font-size:14px; }
@@ -90,11 +75,41 @@
 .checkout-ai-choices button svg { position:absolute; right:10px; top:16px; }
 .checkout-ai-choices button[aria-pressed=true] { border-color:var(--primary); box-shadow:inset 0 0 0 1px var(--primary); background:color-mix(in srgb,var(--primary) 6%,var(--bg)); }
 .checkout-ai-choices button:disabled { cursor:default; opacity:.65; }
-.checkout-ai-brief-summary { text-align:left; border:1px solid var(--border); border-radius:16px; padding:8px 16px; margin-top:28px; max-height:340px; overflow:auto; }
-.checkout-ai-brief-summary > div { display:grid; grid-template-columns:95px minmax(0,1fr); gap:12px; padding:12px 0; border-bottom:1px solid var(--border); font-size:13px; }
-.checkout-ai-brief-summary > div:last-child { border:0; }
-.checkout-ai-brief-summary dt { font-weight:650; }
-.checkout-ai-brief-summary dd { margin:0; overflow-wrap:anywhere; }
 @media(max-width:1000px) { .checkout-ai-conversation { max-height:320px; } .checkout-ai-empty { padding:20px 8px; } .checkout-ai-empty img { width:100px; height:100px; } }
 @media(max-width:480px) { .checkout-ai-chat { padding:0; } .checkout-ai-chat-head, .checkout-ai-conversation { padding:16px; } .checkout-ai-current h2 { font-size:20px; } .checkout-ai-form fieldset.checkout-ai-composer { padding:0 16px; } .checkout-ai-choices { grid-template-columns:1fr; } .checkout-ai-chat .checkout-ai-actions { padding:16px; } .checkout-ai-bubble.from-merchant { margin-left:16px; } .checkout-ai-chat > :is(.checkout-ai-privacy,.checkout-ai-asset-note,.public-error,[role=status]) { margin:12px 16px; } }
 @media(prefers-reduced-motion:reduce) { .checkout-ai-chat-progress > span { transition:none; } }
+
+/* The parrot leads a central conversation; the canvas joins after generation. */
+.ai-stage-page:not(.has-preview) .checkout-ai-grid { display:block; max-width:760px; margin:0 auto; }
+.ai-stage-page .checkout-ai-chat { background:none; border:0; box-shadow:none; border-radius:0; }
+.ai-stage-page .checkout-ai-chat-head { padding:12px 0; background:none; border:0; }
+.ai-stage-page .checkout-ai-chat-head button { min-width:44px; display:grid; place-items:center; }
+.ai-stage-page .checkout-ai-chat-progress { border-radius:8px; overflow:hidden; }
+.checkout-ai-stage { text-align:center; padding:28px 12px 0; }
+.checkout-ai-speech { position:relative; max-width:660px; margin:0 auto; padding:22px; border:1px solid var(--border); border-radius:24px; background:var(--surface,var(--bg)); animation:ai-speech-in .35s ease-out; }
+.checkout-ai-speech:after { content:""; position:absolute; width:16px; height:16px; bottom:-9px; left:calc(50% - 8px); background:inherit; border-right:1px solid var(--border); border-bottom:1px solid var(--border); transform:rotate(45deg); }
+.checkout-ai-speech h2 { margin:0; font-size:clamp(21px,2.2vw,28px); line-height:1.4; text-wrap:balance; }
+.ai-stage-page .checkout-ai-speech h2:focus { outline:none!important; }
+.checkout-ai-perch { position:relative; display:grid; justify-items:center; padding:14px 0; }
+.checkout-ai-perch img { position:relative; width:180px; height:180px; object-fit:contain; transform-origin:50% 85%; animation:ai-parrot-talk .6s ease-in-out 4,ai-parrot-breathe 4s ease-in-out 2.4s infinite; }
+.pose-thinking .checkout-ai-perch img { animation:ai-parrot-think 2.8s ease-in-out infinite; }
+.pose-happy .checkout-ai-perch img { animation:ai-parrot-celebrate .65s ease-in-out 2,ai-parrot-breathe 4s ease-in-out 1.3s infinite; }
+.checkout-ai-orbit { position:absolute; width:230px; height:170px; top:25px; border-radius:50%; background:radial-gradient(ellipse,color-mix(in srgb,var(--primary) 16%,transparent),transparent 70%); }
+.checkout-ai-presence { color:var(--text-secondary,var(--text)); font-size:12px; margin-top:8px; }
+.checkout-ai-history { margin:4px 24px 20px; border-bottom:1px solid var(--border); }
+.checkout-ai-history summary { cursor:pointer; padding:12px 0; font-size:13px; min-height:44px; box-sizing:border-box; }
+.checkout-ai-history summary:focus-visible { outline:2px solid var(--primary); outline-offset:3px; }
+.ai-stage-page .checkout-ai-chat .checkout-ai-actions { border:0; margin-top:0; }
+.ai-stage-page .checkout-ai-composer input,.ai-stage-page .checkout-ai-composer textarea { border-radius:18px; padding:16px; }
+.ai-stage-page .checkout-ai-choices button { transition:transform .18s ease,background .18s ease; }
+.ai-stage-page .checkout-ai-choices button:active { transform:scale(.98); }
+@keyframes ai-speech-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+@keyframes ai-parrot-talk { 0%,100% { transform:rotate(-2deg); } 50% { transform:translateY(-7px) rotate(3deg); } }
+@keyframes ai-parrot-breathe { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-5px) rotate(1deg); } }
+@keyframes ai-parrot-think { 0%,100% { transform:rotate(-4deg); } 50% { transform:translateY(-6px) rotate(4deg); } }
+@keyframes ai-parrot-celebrate { 0%,100% { transform:none; } 50% { transform:translateY(-12px) rotate(-4deg); } }
+.ai-stage-page.motion-paused * { animation:none!important; transition:none!important; }
+@media(max-width:480px) { .checkout-ai-stage { padding:20px 0 0; } .checkout-ai-speech { padding:18px; } .checkout-ai-perch img { width:140px; height:140px; } .checkout-ai-orbit { height:130px; } .checkout-ai-history { margin:0 16px 16px; } }
+@media(prefers-reduced-motion:reduce) { .ai-stage-page * { animation:none!important; transition:none!important; } }
+
+.solid-admin:has(.ai-stage-page) .pirat-help-launch { display:none; }

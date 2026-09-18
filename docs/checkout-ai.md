@@ -7,8 +7,11 @@ anterior. Salvar rascunho e abrir editor usa o fluxo existente; não publica.
 O papagaio conduz uma conversa guiada, com uma pergunta por vez sobre marca,
 ideia, cores, tipo, estrutura, imagens e recursos. As perguntas iniciais são
 determinísticas: o Gemini recebe as escolhas somente ao gerar ou ajustar a prévia.
-As respostas ficam em um histórico editável e em um resumo; revisar uma delas
-preserva as demais. Produto e organização aparecem conforme o tipo e modelo.
+A conversa fica centralizada, com o mascote e sua fala acima da resposta. O papagaio
+muda de pose ao perguntar, gerar, concluir ou encontrar um erro. Os movimentos
+podem ser pausados e respeitam a preferência de movimento reduzido do dispositivo.
+As respostas ficam em Nossa conversa, um histórico recolhível e editável; revisar
+uma delas preserva as demais. Produto e organização aparecem conforme o tipo e modelo.
 Enter envia a ideia ou o ajuste; Shift+Enter insere uma linha. Perguntas opcionais
 aceitam continuar sem imagem, depoimentos ou cores definidas.
 Varejo (três colunas) e Marketplace (cartões) também estão no editor manual.
@@ -19,7 +22,9 @@ seus endereços não vão ao Gemini. Ofertas e outros blocos continuam no editor
 Avisos de compras usam apenas as vendas reais disponíveis. Preços e
 produtos continuam vindo do catálogo/carrinho, nunca do modelo. Depoimentos
 fornecidos pelo lojista são preservados, sem envio ao Gemini. Sem depoimentos,
-a seção permanece desativada. A prévia é ilustrativa e não cria pagamentos.
+a seção permanece desativada. O botão Adicionar ou editar depoimentos permite
+voltar à etapa pela prévia. A lista cadastrada é renderizada tanto no editor
+quanto no checkout público, independentemente dos selos de confiança. A prévia é ilustrativa e não cria pagamentos.
 
 ## Referência temporária
 
