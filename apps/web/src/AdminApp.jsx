@@ -3,6 +3,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { ArrowRight, BarChart3, Box, Check, CheckCircle2, Clock3, Copy, CreditCard, Eye, Globe2, Home, LayoutTemplate, Menu, Package, PanelLeftClose, PanelLeftOpen, Plug, Plus, Search, Settings, ShieldCheck, ShoppingBag, ShoppingCart, Sparkles, Store, Tag, TrendingUp, Truck, Users, X, Zap, LogOut, ServerCog, Webhook, Megaphone, ScanSearch } from 'lucide-react';
 import './admin-styles.css';
 import './admin-refresh.css';
+import './pirat-theme.css';
 import { defaultCheckoutConfig } from './checkout-config';
 const CheckoutEditor = lazy(() => import('./CheckoutEditor'));
 import { archiveStore, bindTabToUser, clearTabUser, completeMfaLogin, createStore, forgotPassword, getApiHealth, getSession, getSettings, getStores, login, logout, registerAccount, resetPassword, selectStore, verifyAccount } from './api';
@@ -59,7 +60,7 @@ const navGroups = [
 ];
 
 function Logo({ compact = false }) {
-  return <div className={`brand ${compact ? 'compact' : ''}`}><img className="brand-symbol" src="/brand/solid-symbol-96.png" alt=""/>{!compact && <img className="brand-wordmark" src="/brand/solid-wordmark-light.png" alt="SOLID"/>}</div>;
+  return <div className={`brand ${compact ? 'compact' : ''}`}><img className="brand-symbol" src="/brand/pirat-mascot.png" alt=""/>{!compact && <img className="brand-wordmark" src="/brand/pirat-logo-on-light.png" alt="Pirat"/>}</div>;
 }
 
 function Badge({ children, tone = 'neutral' }) { return <span className={`badge ${tone}`}>{children}</span>; }
@@ -146,7 +147,7 @@ function FirstStoreSetup({ onCreate, busy }) {
       <div className="first-store-icon"><Store size={27}/></div>
       <p className="eyebrow">PRIMEIROS PASSOS</p>
       <h1 id="first-store-title">Crie sua primeira loja</h1>
-      <p className="first-store-lead">Sua conta está pronta. Agora escolha o nome da operação que você quer administrar na SOLID.</p>
+      <p className="first-store-lead">Sua conta está pronta. Agora escolha o nome da operação que você quer administrar na Pirat.</p>
       <form onSubmit={submit}>
         <label htmlFor="first-store-name">Nome da loja</label>
         <div className="first-store-input"><Store size={18}/><input id="first-store-name" value={name} onChange={event => setName(event.target.value)} placeholder="Ex.: Loja Pedro" minLength={3} maxLength={120} autoFocus disabled={busy}/></div>
@@ -195,7 +196,7 @@ function Checkout({ onBack, customConfig }) {
       {step===1 ? <form onSubmit={advance}><p className="checkout-kicker">FINALIZE SEU PEDIDO</p><h1>Você está a um passo.</h1><p className="lead">Preencha seus dados para gerar o Pix. Leva menos de um minuto.</p><div className="form-card"><div className="section-title"><span><Users size={18}/></span><div><h2>Seus dados</h2><p>Usaremos apenas para processar o pedido.</p></div></div><label>Nome completo<input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="Como aparece no documento" required/></label><div className="field-grid"><label>E-mail<input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="voce@email.com" required/></label><label>Celular / WhatsApp<input value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} placeholder="(11) 99999-9999" required/></label></div><label>CPF ou CNPJ<input value={form.cpf} onChange={e=>setForm({...form,cpf:e.target.value})} placeholder="000.000.000-00" required/></label></div><label className={`bump ${bump?'selected':''}`}><input type="checkbox" checked={bump} onChange={e=>setBump(e.target.checked)}/><span className="check-box">{bump&&<Check size={14}/>}</span><div className="bump-icon"><Zap size={21}/></div><div><Badge tone="purple">OFERTA ESPECIAL</Badge><h3>Adicione o Guia de Resultados</h3><p>Estratégias práticas para aproveitar ainda mais seu produto.</p></div><strong>+ {money.format(29.9)}</strong></label><button className="checkout-cta" type="submit" disabled={!valid}>Gerar Pix agora <ArrowRight size={19}/></button><p className="privacy"><ShieldCheck size={14}/> Seus dados estão protegidos e não serão compartilhados.</p></form> : <div className="pix-card"><div className="success-icon"><CheckCircle2 size={30}/></div><p className="checkout-kicker">PEDIDO CRIADO</p><h1>Escaneie e pague com Pix</h1><p className="lead">Abra o app do seu banco e escaneie o QR Code.</p><div className="qr"><div className="fake-qr">{Array.from({length:121}).map((_,i)=><i key={i} className={(i*7+i%3)%5<2?'dark':''}/>)}</div></div><strong className="pix-value">{money.format(total)}</strong><p className="expire"><Clock3 size={16}/> Expira em <b>14:59</b></p><button className="copy-btn" onClick={copy}>{copied?<Check size={18}/>:<Copy size={18}/>} {copied?'Código copiado!':'Copiar código Pix'}</button><button className="ghost wide" onClick={()=>setStep(1)}>Voltar e editar dados</button></div>}
     </section>
     <aside className="order-summary"><div className="product"><div className="product-image"><Box size={38}/></div><div><Badge tone="purple">MAIS VENDIDO</Badge><h2>Kit Performance</h2><p>O pacote completo para acelerar seus resultados.</p></div></div><div className="summary-row"><span>Kit Performance <small>Quantidade: 1</small></span><b>{money.format(148)}</b></div>{bump&&<div className="summary-row bump-row"><span>Guia de Resultados</span><b>{money.format(29.9)}</b></div>}<div className="divider"/><div className="summary-row total"><span>Total</span><strong>{money.format(total)}</strong></div><div className="pix-only"><div className="pix-logo">pix</div><div><b>Pagamento via Pix</b><small>Aprovação em poucos segundos</small></div></div><div className="guarantees"><span><ShieldCheck size={17}/> Compra 100% segura</span><span><Zap size={17}/> Liberação imediata</span><span><CreditCard size={17}/> Sem taxas adicionais</span></div></aside>
-  </div><footer className="checkout-footer"><Logo/><span>© 2026 Solid Commerce. Todos os direitos reservados.</span><div><a href="#">Privacidade</a><a href="#">Termos</a></div></footer></div>;
+  </div><footer className="checkout-footer"><Logo/><span>© 2026 Pirat Checkout. Todos os direitos reservados.</span><div><a href="#">Privacidade</a><a href="#">Termos</a></div></footer></div>;
 }
 
 

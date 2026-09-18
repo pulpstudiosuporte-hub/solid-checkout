@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260918-pirat-app-identity',
+    category: 'IMPROVEMENT' as const,
+    title: 'Uma nova identidade: Pirat Checkout',
+    description: 'Login e painel ganham a marca Pirat, com o papagaio, novas cores e tipografia. A navegação e as configurações das suas lojas continuam no mesmo lugar.',
+    publishedAt: new Date('2026-09-18T12:00:00.000Z'),
+  },
+  {
     publicId: 'auto-20260912-meta-browser-pixel',
     category: 'FIX' as const,
     title: 'Pixel da Meta com configuração simplificada',

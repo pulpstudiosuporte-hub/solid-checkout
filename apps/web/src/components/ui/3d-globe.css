@@ -1,12 +1,12 @@
-.globe-3d{position:relative;width:100%;height:100%;min-height:340px;background:radial-gradient(ellipse at 48% 48%,#30234d 0%,#151322 52%,#0d101a 100%);color:#f5f1ff;isolation:isolate}
+.globe-3d{position:relative;width:100%;height:100%;min-height:340px;background:radial-gradient(ellipse at 48% 48%,#352821 0%,#141414 52%,#141414 100%);color:#fffcf8;isolation:isolate}
 .globe-canvas{position:absolute;inset:36px 0 66px}
-.globe-loading{position:absolute;inset:45% 16px auto;text-align:center;font-size:12px;color:#d4c9ed;pointer-events:none}
-.globe-hint{position:absolute;bottom:56px;left:16px;right:16px;margin:0;text-align:center;font-size:11px;line-height:1.5;color:#c6badc;pointer-events:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.globe-loading{position:absolute;inset:45% 16px auto;text-align:center;font-size:12px;color:#ddd0c3;pointer-events:none}
+.globe-hint{position:absolute;bottom:56px;left:16px;right:16px;margin:0;text-align:center;font-size:11px;line-height:1.5;color:#ddd0c3;pointer-events:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .globe-controls{position:absolute;bottom:12px;left:12px;display:flex;gap:6px}
-.globe-3d .globe-controls button,.world-map-panel .map-mode{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:8px 10px;border:1px solid #ffffff26;border-radius:9px;background:#222033;color:#eee7ff;font:inherit;font-size:11px;cursor:pointer;box-shadow:none}
-.globe-3d .globe-controls button:hover,.world-map-panel .map-mode:hover{background:#38304b}
-.globe-3d button:focus-visible,.globe-locations:focus-visible,.world-map-panel .map-mode:focus-visible{outline:2px solid #d7baff;outline-offset:3px}
-.globe-3d .globe-locations{position:absolute;bottom:12px;right:12px;width:min(230px,44%);min-height:36px;padding:8px;border:1px solid #ffffff26;border-radius:9px;background:#222033;color:#eee7ff;font:inherit;font-size:11px;text-overflow:ellipsis}
-.globe-photo-marker{width:26px;height:26px;padding:0;border:2px solid white;border-radius:50%;overflow:hidden;background:#201c30;cursor:pointer}
+.globe-3d .globe-controls button,.world-map-panel .map-mode{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:8px 10px;border:1px solid #ffffff26;border-radius:9px;background:#282421;color:#fffcf8;font:inherit;font-size:11px;cursor:pointer;box-shadow:none}
+.globe-3d .globe-controls button:hover,.world-map-panel .map-mode:hover{background:#493a30}
+.globe-3d button:focus-visible,.globe-locations:focus-visible,.world-map-panel .map-mode:focus-visible{outline:2px solid #ffbc21;outline-offset:3px}
+.globe-3d .globe-locations{position:absolute;bottom:12px;right:12px;width:min(230px,44%);min-height:36px;padding:8px;border:1px solid #ffffff26;border-radius:9px;background:#282421;color:#fffcf8;font:inherit;font-size:11px;text-overflow:ellipsis}
+.globe-photo-marker{width:26px;height:26px;padding:0;border:2px solid white;border-radius:50%;overflow:hidden;background:#282421;cursor:pointer}
 .globe-photo-marker img{width:100%;height:100%;object-fit:cover}
 @media(max-width:520px){.globe-3d{min-height:370px}.globe-canvas{inset:44px 0 108px}.globe-hint{bottom:96px}.globe-3d .globe-locations{bottom:53px;width:calc(100% - 24px);min-height:36px}.globe-controls{left:50%;transform:translateX(-50%)}.globe-3d .globe-controls button{min-height:36px}}

@@ -1,5 +1,5 @@
-const CACHE = 'solid-shell-v5';
-const STATIC_ASSETS = ['/', '/manifest.webmanifest', '/brand/solid-symbol-48.png'];
+const CACHE = 'solid-shell-v6';
+const STATIC_ASSETS = ['/', '/manifest.webmanifest', '/brand/pirat-mascot.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -62,15 +62,15 @@ self.addEventListener('push', event => {
     payload = event.data?.json() || {};
   } catch {
     payload = {
-      title: 'Novo alerta SOLID',
+      title: 'Novo alerta Pirat',
       message: event.data?.text() || 'Abra o aplicativo para conferir.',
     };
   }
 
-  event.waitUntil(self.registration.showNotification(payload.title || 'Novo alerta SOLID', {
+  event.waitUntil(self.registration.showNotification(payload.title || 'Novo alerta Pirat', {
     body: payload.message || 'Abra o aplicativo para conferir.',
-    icon: '/brand/solid-symbol-48.png',
-    badge: '/brand/solid-symbol-48.png',
+    icon: '/brand/pirat-mascot.png',
+    badge: '/brand/pirat-mascot.png',
     tag: payload.tag || 'solid-alert',
     renotify: true,
     data: {

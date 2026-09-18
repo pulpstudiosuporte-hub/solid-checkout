@@ -1,23 +1,17 @@
 {
-  "name": "SOLID Checkout",
-  "short_name": "SOLID",
-  "description": "Acompanhe pedidos, pagamentos e sua operação SOLID.",
+  "name": "Pirat Checkout",
+  "short_name": "Pirat",
+  "description": "Acompanhe pedidos, pagamentos e sua operação Pirat.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f6f7fb",
-  "theme_color": "#6849dc",
+  "background_color": "#fffcf8",
+  "theme_color": "#c91d16",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/brand/solid-symbol-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/brand/solid-symbol-512.png",
-      "sizes": "512x512",
+      "src": "/brand/pirat-mascot.png",
+      "sizes": "1200x1200",
       "type": "image/png",
       "purpose": "any"
     }

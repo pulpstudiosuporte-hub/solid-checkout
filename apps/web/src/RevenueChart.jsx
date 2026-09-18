@@ -48,7 +48,7 @@ export default function RevenueChart({ series }) {
     <div className="dashboard-y-axis"><span>{compactMoney.format(max / 100)}</span><span>{compactMoney.format(max / 200)}</span><span>R$ 0</span></div>
     <div className="chart dashboard-chart" onPointerMove={selectNearest} onPointerLeave={() => setActiveIndex(null)}>
       <svg viewBox={`0 0 ${width} 230`} preserveAspectRatio="none" role="img" aria-label="Evolução da receita confirmada no período">
-        <defs><linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#7357e9" stopOpacity=".28"/><stop offset="1" stopColor="#7357e9" stopOpacity="0"/></linearGradient></defs>
+        <defs><linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="var(--primary, #c91d16)" stopOpacity=".28"/><stop offset="1" stopColor="var(--primary, #c91d16)" stopOpacity="0"/></linearGradient></defs>
         <g className="gridlines dashboard-gridlines">{ticks.map(item => <line key={item.date} x1={item.x} y1={top} x2={item.x} y2={bottom}/>)}</g>
         {area && <path d={area} fill={`url(#${gradientId})`}/>}<path className="line dashboard-smooth-line" d={smoothPath} fill="none"/>
         {active && <g className="chart-active-marker"><line x1={active.x} y1={top} x2={active.x} y2={bottom}/><circle cx={active.x} cy={active.y} r="6"/></g>}

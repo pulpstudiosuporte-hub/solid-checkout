@@ -20,12 +20,12 @@ function buildThemeSnippet(checkoutHost) {
 function buildGuide(checkoutHost) {
   return [
     {
-      key: 'prerequisites', title: 'Conclua os pré-requisitos da SOLID', icon: UserCheck, description: 'Ative o cadastro e o domínio antes de publicar.', path: 'SOLID → Configurações e Domínios', action: 'prerequisites', actionLabel: 'Revisar pré-requisitos', automatic: true,
+      key: 'prerequisites', title: 'Conclua os pré-requisitos da Pirat', icon: UserCheck, description: 'Ative o cadastro e o domínio antes de publicar.', path: 'Pirat → Configurações e Domínios', action: 'prerequisites', actionLabel: 'Revisar pré-requisitos', automatic: true,
       instructions: ['Conclua os dados obrigatórios da loja e do responsável.', 'Adicione um domínio de checkout e aguarde o status Ativo.', 'O modelo pode ser editado antes disso, mas a publicação e o redirecionamento dependem desses dois itens.'],
     },
     {
       key: 'create', title: 'Crie seu app no Dev Dashboard', icon: ShoppingBag, description: 'O app deve pertencer à mesma organização da loja.', path: 'Dev Dashboard → Apps → Criar app', action: 'dashboard', actionLabel: 'Abrir Dev Dashboard', manual: true,
-      instructions: ['Entre no Dev Dashboard com a conta proprietária da mesma organização Shopify da loja.', 'Clique em Apps, Criar app e Começar a partir do Dev Dashboard.', 'Use um nome reconhecível, como “SOLID Checkout — Minha Loja”.', 'Não compartilhe o Client secret: esse app e as credenciais pertencem à sua operação.'],
+      instructions: ['Entre no Dev Dashboard com a conta proprietária da mesma organização Shopify da loja.', 'Clique em Apps, Criar app e Começar a partir do Dev Dashboard.', 'Use um nome reconhecível, como “Pirat Checkout — Minha Loja”.', 'Não compartilhe o Client secret: esse app e as credenciais pertencem à sua operação.'],
     },
     {
       key: 'permissions', title: 'Crie e lance uma versão', icon: Settings2, description: 'Configure URLs, escopos e App Proxy na mesma versão.', path: 'Seu app → Versões → Criar uma versão', action: 'dashboard', actionLabel: 'Abrir Dev Dashboard', manual: true,
@@ -36,15 +36,15 @@ function buildGuide(checkoutHost) {
       instructions: ['Clique em Instalar app e selecione a loja correta.', 'Revise produtos, pedidos e proxy e confirme a instalação.', 'Confirme em Shopify Admin → Configurações → Apps e canais de vendas.', 'Se a instalação continuar em zero, aguarde a versão propagar, atualize a página e tente novamente.'],
     },
     {
-      key: 'credentials', title: 'Conecte as credenciais na SOLID', icon: KeyRound, description: 'A API valida loja, instalação e todos os escopos.', path: 'Seu app → Configurações → Credenciais; depois SOLID → Integrações → Shopify', action: 'credentials', actionLabel: 'Preencher credenciais',
+      key: 'credentials', title: 'Conecte as credenciais na Pirat', icon: KeyRound, description: 'A API valida loja, instalação e todos os escopos.', path: 'Seu app → Configurações → Credenciais; depois Pirat → Integrações → Shopify', action: 'credentials', actionLabel: 'Preencher credenciais',
       instructions: ['Abra Configurações no menu do app e copie o ID do cliente e a Chave secreta na seção Credenciais.', 'Informe também o domínio original nomedaloja.myshopify.com.', 'Clique em Conectar app próprio.', 'Se faltar uma permissão, volte à versão do app, corrija os escopos, lance novamente e aprove a alteração.', 'Nunca envie a chave secreta por mensagem ou captura de tela.'],
     },
     {
-      key: 'sync', title: 'Sincronize e confira o catálogo', icon: RefreshCw, description: 'Valide produtos, variantes, imagens e coleções.', path: 'SOLID → Integrações → Shopify', action: 'sync', actionLabel: 'Ir para sincronização',
-      instructions: ['Clique em Sincronizar catálogo.', 'Confira se os totais importados correspondem à loja.', 'A SOLID renova automaticamente os tokens temporários.', 'Sincronize novamente quando precisar refletir uma alteração imediatamente.'],
+      key: 'sync', title: 'Sincronize e confira o catálogo', icon: RefreshCw, description: 'Valide produtos, variantes, imagens e coleções.', path: 'Pirat → Integrações → Shopify', action: 'sync', actionLabel: 'Ir para sincronização',
+      instructions: ['Clique em Sincronizar catálogo.', 'Confira se os totais importados correspondem à loja.', 'A Pirat renova automaticamente os tokens temporários.', 'Sincronize novamente quando precisar refletir uma alteração imediatamente.'],
     },
     {
-      key: 'checkout', title: 'Crie e publique o modelo Shopify', icon: Palette, description: 'Um modelo automático atende qualquer carrinho da loja.', path: 'SOLID → Checkouts → Criar checkout → Loja Shopify', action: 'checkout', actionLabel: 'Abrir Checkouts', manual: true,
+      key: 'checkout', title: 'Crie e publique o modelo Shopify', icon: Palette, description: 'Um modelo automático atende qualquer carrinho da loja.', path: 'Pirat → Checkouts → Criar checkout → Loja Shopify', action: 'checkout', actionLabel: 'Abrir Checkouts', manual: true,
       instructions: ['Escolha Loja Shopify; não selecione um produto fixo.', 'Personalize o visual e publique o modelo.', 'O modelo Shopify publicado recebe os produtos, variantes, quantidades e preços do carrinho real.', 'Para infoprodutos, crie separadamente um Link para infoproduto com produto fixo.'],
     },
     {
@@ -53,7 +53,7 @@ function buildGuide(checkoutHost) {
     },
     {
       key: 'test', title: 'Faça o teste final de ponta a ponta', icon: TestTube2, description: 'Confirme redirecionamento, carrinho e fallback.', path: 'Loja publicada → janela anônima → produto → carrinho → Finalizar compra', manual: true,
-      instructions: ['Teste em janela anônima no celular e no desktop.', 'Adicione dois produtos, altere quantidades e finalize pelo carrinho e pelo botão Comprar agora.', 'Confirme se a URL abre no seu domínio ativo e se itens, variantes, quantidades e valores estão corretos.', 'Gere o Pix e confira o pedido na SOLID; não faça um pagamento real se estiver apenas validando.', 'Se a SOLID não puder criar a sessão, o fallback deve levar ao checkout nativo da Shopify.'],
+      instructions: ['Teste em janela anônima no celular e no desktop.', 'Adicione dois produtos, altere quantidades e finalize pelo carrinho e pelo botão Comprar agora.', 'Confirme se a URL abre no seu domínio ativo e se itens, variantes, quantidades e valores estão corretos.', 'Gere o Pix e confira o pedido na Pirat; não faça um pagamento real se estiver apenas validando.', 'Se a Pirat não puder criar a sessão, o fallback deve levar ao checkout nativo da Shopify.'],
     },
   ];
 }
@@ -84,13 +84,13 @@ export default function ShopifyOnboarding({ connected, synced, enteredShop, stor
   const copyCode = () => navigator.clipboard.writeText(activeStep.code).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1600); });
 
   return <section className="card shopify-onboarding">
-    <button className="onboarding-summary" type="button" onClick={() => setOpen(value => !value)} aria-expanded={open}><span className="onboarding-help"><HelpCircle size={21}/></span><div><span>GUIA ASSISTIDO · SHOPIFY</span><h2>Configure sua loja para vender com a SOLID</h2><p>{total} de {guide.length} etapas concluídas</p></div><div className="onboarding-progress" aria-label={`${total} de ${guide.length} etapas concluídas`}><i style={{ '--progress': progress }}/><strong>{progress}</strong></div><ChevronDown className={open ? 'rotated' : ''} size={20}/></button>
+    <button className="onboarding-summary" type="button" onClick={() => setOpen(value => !value)} aria-expanded={open}><span className="onboarding-help"><HelpCircle size={21}/></span><div><span>GUIA ASSISTIDO · SHOPIFY</span><h2>Configure sua loja para vender com a Pirat</h2><p>{total} de {guide.length} etapas concluídas</p></div><div className="onboarding-progress" aria-label={`${total} de ${guide.length} etapas concluídas`}><i style={{ '--progress': progress }}/><strong>{progress}</strong></div><ChevronDown className={open ? 'rotated' : ''} size={20}/></button>
     {open && <div className="onboarding-body">
       <div className="onboarding-intro" role="note"><strong>Jornada para app próprio da sua organização Shopify.</strong><span>A instalação por Client ID e Client secret funciona quando o app e a loja pertencem à mesma organização. Você pode ocultar o tutorial e continuar depois.</span></div>
       {!checkoutHost && <div className="onboarding-theme-warning" role="alert"><div><strong>O domínio do checkout ainda não está ativo.</strong><span>Configure o domínio antes de publicar o modelo ou copiar o código do tema.</span></div><button type="button" onClick={() => onAction?.('domains')}>Configurar domínio</button></div>}
       {checkoutHost && !manual.theme && <div className="onboarding-theme-warning" role="alert"><div><strong>Falta ativar a ponte no tema.</strong><span>O código já usa o domínio ativo <code>{checkoutHost}</code>.</span></div><button type="button" onClick={() => selectStep(themeIndex)}>Ver ativação no tema</button></div>}
       <div className="onboarding-workspace">
-        <nav className="onboarding-step-list" aria-label="Etapas do tutorial">{guide.map((step, index) => { const Icon = step.icon; const done = completed[step.key]; const blocked = Boolean(step.requiresDomain && !checkoutHost); return <button type="button" key={step.key} className={`${expanded === index ? 'active ' : ''}${done ? 'done ' : ''}${blocked ? 'blocked' : ''}`} aria-current={expanded === index ? 'step' : undefined} onClick={() => selectStep(index)}><span className="guide-status">{done ? <Check size={15}/> : <b>{index + 1}</b>}</span><span className="guide-icon"><Icon size={17}/></span><span className="guide-step-copy"><small>{step.automatic ? 'VERIFICAÇÃO AUTOMÁTICA' : step.manual ? 'CONFIRMAÇÃO MANUAL' : 'AÇÃO NA SOLID'}</small><strong>{step.title}</strong></span><ChevronDown size={16} aria-hidden="true"/></button>; })}</nav>
+        <nav className="onboarding-step-list" aria-label="Etapas do tutorial">{guide.map((step, index) => { const Icon = step.icon; const done = completed[step.key]; const blocked = Boolean(step.requiresDomain && !checkoutHost); return <button type="button" key={step.key} className={`${expanded === index ? 'active ' : ''}${done ? 'done ' : ''}${blocked ? 'blocked' : ''}`} aria-current={expanded === index ? 'step' : undefined} onClick={() => selectStep(index)}><span className="guide-status">{done ? <Check size={15}/> : <b>{index + 1}</b>}</span><span className="guide-icon"><Icon size={17}/></span><span className="guide-step-copy"><small>{step.automatic ? 'VERIFICAÇÃO AUTOMÁTICA' : step.manual ? 'CONFIRMAÇÃO MANUAL' : 'AÇÃO NA Pirat'}</small><strong>{step.title}</strong></span><ChevronDown size={16} aria-hidden="true"/></button>; })}</nav>
         <article className={`guide-panel ${activeDone ? 'done ' : ''}${activeBlocked ? 'blocked' : ''}`} aria-labelledby={`guide-title-${activeStep.key}`}>
           <header><span className="guide-panel-icon"><ActiveIcon size={20}/></span><div><small>{expanded + 1} DE {guide.length}</small><h3 id={`guide-title-${activeStep.key}`}>{activeStep.title}</h3><p>{activeStep.description}</p></div>{activeDone && <span className="guide-complete"><Check size={14}/> Concluída</span>}</header>
           {activeBlocked && <p className="guide-blocked-message" role="status">Ative o domínio para liberar esta etapa.</p>}

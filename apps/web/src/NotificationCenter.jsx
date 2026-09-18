@@ -148,7 +148,7 @@ export default function NotificationCenter({ csrfToken, storeKey, onNavigate }) 
       try { await syncWebPush(); } catch (error) { setState(current => ({ ...current, error: error.message })); }
     }
     await playSaleSound();
-    if (permission === 'granted') await showDeviceNotification({ id: 'test', title: 'Teste de venda SOLID', message: '', destination: 'orders' }, true);
+    if (permission === 'granted') await showDeviceNotification({ id: 'test', title: 'Teste de venda Pirat', message: '', destination: 'orders' }, true);
   };
   const navigate = item => { setOpen(false); onNavigate(item.destination); };
 

@@ -45,7 +45,7 @@ test('editor: revisão de desktop e celular', async ({ page }) => {
   await page.getByRole('button', { name: 'Prévia', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Prévia', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: 'Personalizar', exact: true })).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByRole('button', { name: 'Prévia', exact: true })).toHaveCSS('background-color', 'rgb(242, 234, 250)');
+  await expect(page.getByRole('button', { name: 'Prévia', exact: true })).toHaveCSS('background-color', 'rgb(255, 227, 223)');
   await expect(page.getByRole('main', { name: 'Prévia do checkout' })).toBeVisible();
   await page.screenshot({ path: output('editor-mobile-preview.png'), fullPage: true, animations: 'disabled' });
   for (const width of [320, 768, 1024, 1440]) {
@@ -213,7 +213,7 @@ test('editor: touch controls, tablet split layout and mobile fixed actions', asy
   await expect(page.locator('.editor-panel')).toBeHidden();
   await expect(page.getByRole('button', { name: 'Voltar para checkouts' })).toBeInViewport();
   expect((await page.locator('.editor-top').boundingBox()).y).toBeGreaterThanOrEqual(0);
-  await expect(page.getByRole('button', { name: 'Prévia', exact: true })).toHaveCSS('background-color', 'rgb(242, 234, 250)');
+  await expect(page.getByRole('button', { name: 'Prévia', exact: true })).toHaveCSS('background-color', 'rgb(255, 227, 223)');
   await page.screenshot({ path: output('responsive-editor-preview-mobile.png'), fullPage: true, animations: 'disabled' });
   await page.getByRole('button', { name: 'Salvar rascunho' }).click();
   await expect(page.locator('.editor-toast')).toContainText('Rascunho salvo');

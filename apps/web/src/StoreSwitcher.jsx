@@ -22,7 +22,7 @@ export default function StoreSwitcher({ stores, onSelect, onCreate, onArchive, b
   return <div className={`store-switcher ${hasStores ? '' : 'is-empty'}`}>
     <button ref={triggerRef} className="store-switch" disabled={support && !hasStores} onClick={() => hasStores ? setOpen(value => !value) : setCreating(true)} aria-expanded={hasStores ? open : creating} aria-haspopup={hasStores ? 'listbox' : 'dialog'}>
       <span className="store-avatar">{hasStores ? initials(activeStore?.name) : <Store size={18}/>}</span>
-      <span><b>{activeStore?.name || (support ? 'Sem loja' : 'Crie sua primeira loja')}</b><small>{activeStore?.slug || 'Comece sua operação na SOLID'}</small></span>
+      <span><b>{activeStore?.name || (support ? 'Sem loja' : 'Crie sua primeira loja')}</b><small>{activeStore?.slug || 'Comece sua operação na Pirat'}</small></span>
       {hasStores ? <ChevronDown size={16}/> : <Plus size={17}/>}
     </button>
     {open && <><button className="store-menu-backdrop" onClick={() => setOpen(false)} aria-label="Fechar seletor de lojas"/><div className="store-menu" role="listbox" aria-label="Selecionar loja">

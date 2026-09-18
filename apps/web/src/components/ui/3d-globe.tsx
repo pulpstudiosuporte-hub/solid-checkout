@@ -55,11 +55,11 @@ const defaults: Required<Globe3DConfig> = {
   radius: 2, globeColor: '#ffffff',
   textureUrl: '/illustrations/globe/earth.jpg',
   bumpMapUrl: '/illustrations/globe/elevation.png',
-  showAtmosphere: true, atmosphereColor: '#9474ff', atmosphereIntensity: 0.22,
+  showAtmosphere: true, atmosphereColor: '#ffdf99', atmosphereIntensity: 0.22,
   atmosphereBlur: 3, bumpScale: 1, autoRotateSpeed: 0.3,
   enableZoom: false, enablePan: false, minDistance: 5, maxDistance: 15,
   initialRotation: { x: 0, y: 0 }, markerSize: 0.045,
-  showWireframe: false, wireframeColor: '#a798e8',
+  showWireframe: false, wireframeColor: '#c9bdb3',
   ambientIntensity: 1.8, pointLightIntensity: 2, backgroundColor: null,
 };
 
@@ -79,18 +79,18 @@ function Marker({ marker, radius, size, selected, onClick, onHover }: {
   return <group position={position} quaternion={rotation}>
     <mesh position={[0, radius * 0.035, 0]}>
       <cylinderGeometry args={[0.006, 0.006, radius * 0.07, 6]}/>
-      <meshBasicMaterial color="#d5c5ff"/>
+      <meshBasicMaterial color="#ffdf99"/>
     </mesh>
     <mesh position={[0, radius * 0.075, 0]}
       onClick={event => { event.stopPropagation(); onClick(); }}
       onPointerOver={event => { event.stopPropagation(); setHovered(true); onHover(marker); }}
       onPointerOut={() => { setHovered(false); onHover(null); }}>
       <sphereGeometry args={[markerSize * (hovered || selected ? 1.5 : 1), 12, 8]}/>
-      <meshBasicMaterial color={hovered || selected ? '#ffffff' : '#c9a6ff'}/>
+      <meshBasicMaterial color={hovered || selected ? '#ffffff' : '#ffbc21'}/>
     </mesh>
     <mesh position={[0, 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
       <ringGeometry args={[markerSize * 1.1, markerSize * 1.6, 16]}/>
-      <meshBasicMaterial color="#d2b7ff" side={THREE.DoubleSide}/>
+      <meshBasicMaterial color="#ffbc21" side={THREE.DoubleSide}/>
     </mesh>
     {marker.src && <Html position={[0, radius * 0.15, 0]} center sprite occlude>
       <button type="button" className="globe-photo-marker" onClick={onClick} aria-label={marker.label || 'Ver localização'}>
@@ -211,7 +211,7 @@ export function Globe3D({ markers = [], config = {}, className = '', active = tr
         <CameraPosition config={merged} focus={selected} reset={reset}/>
         <ambientLight intensity={merged.ambientIntensity}/>
         <directionalLight position={[5, 3, 5]} intensity={merged.pointLightIntensity}/>
-        <directionalLight position={[-3, 1, -2]} intensity={merged.pointLightIntensity * 0.3} color="#b6a4ff"/>
+        <directionalLight position={[-3, 1, -2]} intensity={merged.pointLightIntensity * 0.3} color="#fff3de"/>
         <Suspense fallback={null}>
           <Earth config={merged} markers={validMarkers} selected={selected} onSelect={select} onHover={hover}
             onReady={() => { setReady(true); onReady?.(); }}/>

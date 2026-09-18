@@ -22,7 +22,7 @@
     transform 0.16s;
 }
 .shipping-presets button:hover {
-  border-color: #b9aae9;
+  border-color: #ffada7;
   box-shadow: 0 8px 24px rgba(67, 46, 119, 0.08);
   transform: translateY(-1px);
 }

@@ -8,7 +8,7 @@ const curvedPath = (start, end) => {
   return `M ${start.x} ${start.y} Q ${middleX} ${middleY} ${end.x} ${end.y}`;
 };
 
-export function FlatWorldMap({ locations = [], lineColor = '#7657ed' }) {
+export function FlatWorldMap({ locations = [], lineColor = '#c91d16' }) {
   const gradientId = useId().replace(/:/g, '');
   const container = useRef(null);
   const [visible, setVisible] = useState(false);

@@ -37,16 +37,16 @@ export async function showDeviceNotification(item, test = false) {
   if (deviceNotificationPermission() !== 'granted') return false;
   const options = {
     body: test ? 'Os alertas deste aparelho est\u00e3o funcionando.' : item.message,
-    icon: '/brand/solid-symbol.png',
-    badge: '/brand/solid-symbol.png',
+    icon: '/brand/pirat-mascot.png',
+    badge: '/brand/pirat-mascot.png',
     tag: test ? 'solid-notification-test' : `solid-${item.id}`,
     data: { destination: item.destination || 'orders' },
   };
   if ('serviceWorker' in navigator) {
     const registration = await navigator.serviceWorker.ready;
-    await registration.showNotification(test ? 'Teste de notifica\u00e7\u00e3o SOLID' : item.title, options);
+    await registration.showNotification(test ? 'Teste de notifica\u00e7\u00e3o Pirat' : item.title, options);
     return true;
   }
-  new window.Notification(test ? 'Teste de notifica\u00e7\u00e3o SOLID' : item.title, options);
+  new window.Notification(test ? 'Teste de notifica\u00e7\u00e3o Pirat' : item.title, options);
   return true;
 }

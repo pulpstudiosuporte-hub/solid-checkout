@@ -29,7 +29,7 @@
 .admin-assets-list small { font-size: 11px; }
 .admin-assets-group-title {
   margin: 12px 0 2px;
-  color: #817a87;
+  color: #625b56;
   font-size: 11px;
   letter-spacing: .06em;
   text-transform: uppercase;
@@ -54,11 +54,11 @@
   border: 1px solid var(--solid-line);
   border-radius: 12px;
   background: #fff;
-  color: #746d79;
+  color: #625b56;
   text-align: center;
 }
 .release-state svg { color: var(--solid-purple-strong); }
-.release-state b { color: #25202a; font-size: 16px; }
+.release-state b { color: #2d2926; font-size: 16px; }
 .release-state span { max-width: 440px; font-size: 13px; line-height: 1.5; }
 .release-state.error svg { color: #c6531d; }
 .release-state button { min-height: 44px; margin-top: 6px; }
@@ -70,7 +70,7 @@
   gap: 9px;
   padding: 0 8px;
   border-bottom: 1px solid var(--solid-line);
-  color: #746d79;
+  color: #625b56;
   font-size: 12px;
 }
 .home-news-state svg { color: var(--solid-purple-strong); }

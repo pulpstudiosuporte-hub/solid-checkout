@@ -42,13 +42,13 @@ export default function Login({ onSubmit, onMfaSubmit, onRegister, onVerify, onF
 
   const changeMode = next => { setMode(next); setError(''); setNotice(''); setMfaChallenge(null); setMfaCode(''); setEmailCode(''); setPassword(''); setConfirmPassword(''); if (next === 'register') { setTurnstileToken(''); setTurnstileReset(value => value + 1); } window.history.replaceState({}, '', next === 'register' ? '/#/cadastro' : next === 'forgot' ? '/#/esqueci-senha' : '/#/login'); };
   return <main className="login-page solid-auth">
-    <section className="login-brand-panel" aria-label="SOLID Checkout">
-      <div className="login-brand"><img src="/brand/solid-wordmark-light.png" alt="SOLID"/></div>
+    <section className="login-brand-panel" aria-label="Pirat Checkout">
+      <div className="login-brand"><img src="/brand/pirat-logo-on-dark.png" alt="Pirat"/></div>
       <div className="login-message"><span className="login-kicker"><ShieldCheck size={16}/> Operação protegida</span><h1>Seu checkout.<br/>Sua operação.<br/><em>Sob controle.</em></h1><p>Acompanhe pedidos, personalize sua experiência e gerencie suas vendas em um só lugar.</p></div>
       <div className="login-brand-features"><span><CheckCircle2 size={16}/> Pedidos organizados</span><span><CheckCircle2 size={16}/> Checkout com sua marca</span><span><CheckCircle2 size={16}/> Controle da operação</span></div><div className="login-security"><LockKeyhole size={18}/><span><strong>Acesso seguro</strong><small>Sessão criptografada e protegida</small></span></div>
     </section>
     <section className="login-form-panel"><form className="login-card" onSubmit={submit} noValidate>
-      <div className="login-mobile-brand"><img src="/brand/solid-wordmark-dark.png" alt="SOLID"/></div>
+      <div className="login-mobile-brand"><img src="/brand/pirat-logo-on-light.png" alt="Pirat"/></div>
       <p className="eyebrow">{mode === 'register' ? 'COMECE AGORA' : mode === 'verify' ? 'VALIDAÇÃO SEGURA' : mode === 'mfa' ? 'SEGUNDO FATOR' : mode === 'forgot' || mode === 'reset' ? 'RECUPERAÇÃO SEGURA' : 'PAINEL ADMINISTRATIVO'}</p>
       <h2>{mode === 'register' ? 'Crie sua conta' : mode === 'verify' ? 'Confirme seu e-mail' : mode === 'mfa' ? 'Confirme que é você' : mode === 'forgot' ? 'Recupere seu acesso' : mode === 'reset' ? 'Crie uma nova senha' : 'Bem-vindo de volta'}</h2>
       <p className="login-subtitle">{mode === 'forgot' ? 'Informe seu e-mail. A resposta não revela se ele está cadastrado.' : mode === 'reset' ? 'O link só pode ser usado uma vez e expira em 20 minutos.' : mode === 'register' ? 'Confirme seu e-mail e entre imediatamente, sem aprovação manual.' : mode === 'verify' ? 'Digite o código de 6 dígitos enviado ao seu e-mail.' : mode === 'mfa' ? 'Digite o código do aplicativo autenticador ou um código de recuperação.' : 'Entre com os dados cadastrados para acessar sua loja.'}</p>
@@ -72,4 +72,4 @@ export default function Login({ onSubmit, onMfaSubmit, onRegister, onVerify, onF
   </main>;
 }
 
-export function SessionLoading() { return <main className="session-loading" role="status"><img className="loading-symbol" src="/brand/solid-symbol-96.png" alt=""/><LoaderCircle className="spin" size={24}/><span>Validando acesso seguro...</span></main>; }
+export function SessionLoading() { return <main className="session-loading" role="status"><img className="loading-symbol" src="/brand/pirat-mascot.png" alt=""/><LoaderCircle className="spin" size={24}/><span>Validando acesso seguro...</span></main>; }

@@ -100,10 +100,10 @@ export default function DomainsPage({ csrfToken }) {
           <button className="icon-btn danger-icon" type="button" aria-label="Remover domínio" title="Remover domínio" onClick={() => void remove()} disabled={busy}><Trash2 size={17}/></button>
         </div>}
       </section>
-      <aside className="card domain-security"><span><ShieldCheck size={23}/></span><h2>Conexão segura</h2><p>O endereço só é aceito depois que apontar para a infraestrutura da SOLID.</p><ul><li>Salvar aqui não altera o DNS no provedor do domínio</li><li>SSL é emitido automaticamente após a validação</li><li>O checkout continua com preço validado pela API</li></ul></aside>
+      <aside className="card domain-security"><span><ShieldCheck size={23}/></span><h2>Conexão segura</h2><p>O endereço só é aceito depois que apontar para a infraestrutura da Pirat.</p><ul><li>Salvar aqui não altera o DNS no provedor do domínio</li><li>SSL é emitido automaticamente após a validação</li><li>O checkout continua com preço validado pela API</li></ul></aside>
     </div>
     {state.domain && <section className="card dns-instructions">
-      <div><p className="eyebrow">AÇÃO NECESSÁRIA</p><h2>Crie este CNAME no provedor do domínio</h2><p>A SOLID verificará automaticamente a cada 15 segundos. Não use registro A e remova qualquer registro A/AAAA existente com o mesmo nome.</p></div>
+      <div><p className="eyebrow">AÇÃO NECESSÁRIA</p><h2>Crie este CNAME no provedor do domínio</h2><p>A Pirat verificará automaticamente a cada 15 segundos. Não use registro A e remova qualquer registro A/AAAA existente com o mesmo nome.</p></div>
       <div className="dns-record"><span>CNAME</span><code>{recordName}</code><code>{state.cnameTarget}</code><button className="icon-btn" type="button" onClick={() => void copy(state.cnameTarget)} aria-label="Copiar destino"><Copy size={16}/></button></div>
       <div className="domain-actions">
         <button className="secondary" type="button" onClick={() => void verify()} disabled={busy}>{busy ? <LoaderCircle className="spin" size={17}/> : <RefreshCw size={17}/>} Verificar agora</button>
@@ -111,6 +111,6 @@ export default function DomainsPage({ csrfToken }) {
         {active && <div className="domain-ready"><CheckCircle2 size={17}/><span><b>Checkout ativo</b><small>O endereço foi conectado e o certificado SSL está sendo emitido automaticamente.</small></span><a href={`https://${state.domain.hostname}`} target="_blank" rel="noreferrer"><ExternalLink size={15}/> Abrir checkout</a></div>}
       </div>
     </section>}
-    <section className="domain-help"><h2>Como funciona?</h2><ol><li>Escolha um endereço como <b>checkout.sualoja.com</b>.</li><li>No provedor do domínio, crie o CNAME apontando para <b>pay.solidcheckout.xyz</b>.</li><li>A SOLID detecta o registro, conecta o domínio à aplicação e solicita o SSL automaticamente.</li></ol></section>
+    <section className="domain-help"><h2>Como funciona?</h2><ol><li>Escolha um endereço como <b>checkout.sualoja.com</b>.</li><li>No provedor do domínio, crie o CNAME apontando para <b>pay.solidcheckout.xyz</b>.</li><li>A Pirat detecta o registro, conecta o domínio à aplicação e solicita o SSL automaticamente.</li></ol></section>
   </main>;
 }

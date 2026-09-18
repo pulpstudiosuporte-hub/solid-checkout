@@ -13,7 +13,7 @@ class GlobeBoundary extends Component {
   render() { return this.state.failed ? null : this.props.children; }
 }
 
-export function WorldMap({ locations = [], lineColor = '#7657ed' }) {
+export function WorldMap({ locations = [], lineColor = '#c91d16' }) {
   const container = useRef(null);
   const [visible, setVisible] = useState(false);
   const [loaded, setLoaded] = useState(false);

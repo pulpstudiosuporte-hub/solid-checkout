@@ -64,8 +64,8 @@
 }
 .order-customer > span {
   border-radius: 50%;
-  background: #eeeafd;
-  color: #6348cb;
+  background: #ffe3df;
+  color: #c91d16;
   font-size: 9px;
   font-weight: 800;
 }
@@ -227,7 +227,7 @@
   border-radius: 7px;
 }
 .order-open:hover {
-  background: #f0edfe;
+  background: #ffe3df;
 }
 .sr-only {
   position: absolute;
@@ -353,7 +353,7 @@
   display: grid;
   place-items: center;
   border-radius: 12px;
-  background: #eeeafd;
+  background: #ffe3df;
   color: var(--primary-dark);
   margin-bottom: 15px;
 }
@@ -418,9 +418,9 @@
 }
 .copy-payment-code {
   min-height: 40px;
-  border: 1px solid #d9d1ff;
+  border: 1px solid #ffe3df;
   border-radius: 10px;
-  background: #f4f1ff;
+  background: #fffcf8;
   color: var(--primary-dark);
   display: inline-flex;
   align-items: center;
@@ -432,7 +432,7 @@
   cursor: pointer;
 }
 .copy-payment-code:hover {
-  background: #ebe5ff;
+  background: #ffe3df;
 }
 .copy-payment-code:focus-visible {
   outline: 2px solid var(--primary);
@@ -443,9 +443,9 @@
   color: #128154;
 }
 .orders-columns.active {
-  border-color: #8e73ea;
-  background: #f4f1ff;
-  color: #6542d7;
+  border-color: #ffada7;
+  background: #fffcf8;
+  color: #c91d16;
 }
 .orders-management {
   max-width: 1400px;
@@ -476,8 +476,8 @@
   color: #858591;
 }
 .orders-search:focus-within {
-  border-color: #8e73ea;
-  box-shadow: 0 0 0 3px #eee9ff;
+  border-color: #ffada7;
+  box-shadow: 0 0 0 3px #ffe3df;
 }
 .orders-search input {
   width: 100%;
@@ -711,7 +711,7 @@
   width: min(100%, 1480px);
   margin-inline: auto;
   min-width: 0;
-  color: #17131d;
+  color: #2d2926;
   font-size: 14px;
   line-height: 1.5;
 }
@@ -746,7 +746,7 @@
 }
 .ow-header p {
   margin: 8px 0 0;
-  color: #74717f;
+  color: #625b56;
   font-size: 14px;
   line-height: 1.5;
 }
@@ -784,9 +784,9 @@
   min-height: 40px;
   flex: 0 0 auto;
   padding: 0 12px;
-  border: 1px solid #e5e2eb;
+  border: 1px solid #f4efea;
   border-radius: 9px;
-  color: #706b7d;
+  color: #625b56;
   background: #fff;
   font-weight: 700;
   white-space: nowrap;
@@ -807,8 +807,8 @@
   font-size: 12px;
   font-weight: 750;
   line-height: 1;
-  background: #f0edf5;
-  color: #575162;
+  background: #f4efea;
+  color: #625b56;
 }
 .ow-pill.paid,
 .ow-pill.delivered,
@@ -833,7 +833,7 @@
   align-items: flex-end;
   gap: 6px;
   margin-bottom: 22px;
-  border-bottom: 1px solid #e5e2e8;
+  border-bottom: 1px solid #e5ddd5;
   overflow-x: auto;
   scrollbar-width: thin;
 }
@@ -844,17 +844,17 @@
   border: 0;
   border-bottom: 2px solid transparent;
   border-radius: 10px 10px 0 0;
-  color: #625d6c;
+  color: #625b56;
   background: transparent;
   font-weight: 700;
 }
 .ow-tabs button:hover {
-  background: #faf9fc;
-  color: #241f2c;
+  background: #fffcf8;
+  color: #2d2926;
 }
 .ow-tabs button.active {
-  color: #6842ed;
-  border-bottom-color: #7651f5;
+  color: #c91d16;
+  border-bottom-color: #c91d16;
   background: #fff;
 }
 .ow-notice {
@@ -895,7 +895,7 @@
   gap: 16px;
   min-height: 76px;
   padding: 18px 22px;
-  border-bottom: 1px solid #ebe8ef;
+  border-bottom: 1px solid #f4efea;
 }
 .ow-card-section > header h2 {
   margin: 0 0 5px;
@@ -904,7 +904,7 @@
 }
 .ow-card-section > header span,
 .ow-muted {
-  color: #777180;
+  color: #625b56;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -920,7 +920,7 @@
   min-width: 0;
   min-height: 190px;
   padding: 24px;
-  border-right: 1px solid #ebe8ef;
+  border-right: 1px solid #f4efea;
 }
 .ow-summary-grid > article:last-child {
   border-right: 0;
@@ -931,7 +931,7 @@
 .ow-section-label {
   display: block;
   margin: 0 0 8px;
-  color: #7f7789;
+  color: #625b56;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.09em;
@@ -945,7 +945,7 @@
 }
 .ow-summary-grid p {
   margin: 5px 0;
-  color: #554f5d;
+  color: #2d2926;
   font-size: 13px;
   line-height: 1.55;
 }
@@ -954,7 +954,7 @@
   display: block;
   max-width: 100%;
   margin: 0;
-  color: #554f5d;
+  color: #2d2926;
   font-size: 13px;
   font-style: normal;
   line-height: 1.55;
@@ -975,7 +975,7 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  color: #66606f;
+  color: #625b56;
   font-size: 12px;
 }
 .ow-total dt,
@@ -986,7 +986,7 @@
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   padding: 28px 24px;
-  border-bottom: 1px solid #ebe8ef;
+  border-bottom: 1px solid #f4efea;
 }
 .ow-fulfillment > div {
   position: relative;
@@ -995,7 +995,7 @@
   gap: 9px;
   min-width: 0;
   text-align: center;
-  color: #7a7382;
+  color: #625b56;
   font-size: 11px;
 }
 .ow-fulfillment > div::before {
@@ -1005,7 +1005,7 @@
   right: 50%;
   width: 100%;
   height: 1px;
-  background: #ded9e5;
+  background: #e5ddd5;
   z-index: 0;
 }
 .ow-fulfillment > div:first-child::before {
@@ -1017,19 +1017,19 @@
   width: 28px;
   height: 28px;
   padding: 6px;
-  border: 1px solid #dcd6e3;
+  border: 1px solid #e5ddd5;
   border-radius: 50%;
-  color: #8b8395;
+  color: #625b56;
   background: #fff;
 }
 .ow-fulfillment > div.done {
-  color: #4d2ed0;
+  color: #c91d16;
   font-weight: 750;
 }
 .ow-fulfillment > div.done svg {
-  border-color: #7651f5;
+  border-color: #c91d16;
   color: #fff;
-  background: #7651f5;
+  background: #c91d16;
 }
 .ow-products {
   display: grid;
@@ -1040,7 +1040,7 @@
   align-items: center;
   gap: 15px;
   padding: 16px 22px;
-  border-bottom: 1px solid #efedf2;
+  border-bottom: 1px solid #f4efea;
 }
 .ow-products article:last-child {
   border-bottom: 0;
@@ -1051,10 +1051,10 @@
   width: 52px;
   height: 52px;
   overflow: hidden;
-  border: 1px solid #e8e4eb;
+  border: 1px solid #f4efea;
   border-radius: 11px;
-  color: #8b8492;
-  background: #f8f7fa;
+  color: #625b56;
+  background: #fffcf8;
 }
 .ow-product-image img {
   width: 100%;
@@ -1067,7 +1067,7 @@
   min-width: 0;
 }
 .ow-products small {
-  color: #7a7481;
+  color: #625b56;
 }
 .ow-two-columns {
   display: grid;
@@ -1088,7 +1088,7 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  color: #6d49ee;
+  color: #c91d16;
 }
 .ow-payment-heading svg {
   width: 22px;
@@ -1096,7 +1096,7 @@
   flex: 0 0 auto;
 }
 .ow-payment-heading span {
-  color: #777180;
+  color: #625b56;
   font-size: 13px;
   font-weight: 700;
 }
@@ -1141,13 +1141,13 @@
 .ow-table-wrap th,
 .ow-table-wrap td {
   padding: 14px 18px;
-  border-bottom: 1px solid #efedf2;
+  border-bottom: 1px solid #f4efea;
   text-align: left;
   white-space: nowrap;
 }
 .ow-table-wrap th {
-  color: #777180;
-  background: #fbfafc;
+  color: #625b56;
+  background: #fffcf8;
   font-size: 11px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -1156,7 +1156,7 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1px;
-  background: #ebe8ef;
+  background: #f4efea;
 }
 .ow-facts-transaction {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1170,7 +1170,7 @@
   background: #fff;
 }
 .ow-facts span {
-  color: #7c7584;
+  color: #625b56;
   font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.05em;
@@ -1193,7 +1193,7 @@
 .ow-form label {
   display: grid;
   gap: 7px;
-  color: #413b49;
+  color: #2d2926;
   font-size: 13px;
   font-weight: 700;
 }
@@ -1209,9 +1209,9 @@
 .ow-inline-form textarea {
   width: 100%;
   min-height: 44px;
-  border: 1px solid #ddd8e4;
+  border: 1px solid #e5ddd5;
   border-radius: 10px;
-  color: #29232f;
+  color: #2d2926;
   background: #fff;
 }
 .ow-inline-form {
@@ -1220,7 +1220,7 @@
   gap: 12px;
   align-items: end;
   padding: 20px 22px;
-  border-bottom: 1px solid #efedf2;
+  border-bottom: 1px solid #f4efea;
 }
 .ow-inline-form label {
   display: grid;
@@ -1235,7 +1235,7 @@
   justify-content: space-between;
   gap: 18px;
   padding: 18px 22px;
-  border-top: 1px solid #efedf2;
+  border-top: 1px solid #f4efea;
 }
 .ow-address-row > div {
   display: grid;
@@ -1243,7 +1243,7 @@
 }
 .ow-address-row span,
 .ow-danger-row span {
-  color: #716a79;
+  color: #625b56;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -1268,8 +1268,8 @@
   height: 48px;
   flex: 0 0 auto;
   border-radius: 50%;
-  color: #5b36db;
-  background: #efeaff;
+  color: #c91d16;
+  background: #ffe3df;
   font-weight: 800;
 }
 .ow-customer > div {
@@ -1279,7 +1279,7 @@
 }
 .ow-customer a,
 .ow-customer span:not(.ow-avatar) {
-  color: #6f6877;
+  color: #625b56;
   font-size: 13px;
   line-height: 1.45;
   text-decoration: none;
@@ -1296,14 +1296,14 @@
   align-items: center;
   gap: 15px;
   padding: 14px 22px;
-  border-top: 1px solid #efedf2;
+  border-top: 1px solid #f4efea;
 }
 .ow-history-list article > div {
   display: grid;
   gap: 4px;
 }
 .ow-history-list small {
-  color: #7a7381;
+  color: #625b56;
 }
 .ow-utm-list article {
   display: grid;
@@ -1311,10 +1311,10 @@
   align-items: center;
   gap: 14px;
   padding: 16px 22px;
-  border-bottom: 1px solid #efedf2;
+  border-bottom: 1px solid #f4efea;
 }
 .ow-utm-list article > span {
-  color: #777180;
+  color: #625b56;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.05em;
@@ -1326,7 +1326,7 @@
 }
 .ow-jobs article {
   min-width: 0;
-  border-bottom: 1px solid #ebe8ef;
+  border-bottom: 1px solid #f4efea;
 }
 .ow-jobs article > header {
   display: flex;
@@ -1335,7 +1335,7 @@
   flex-wrap: wrap;
   gap: 12px;
   padding: 16px 22px;
-  background: #fbfafc;
+  background: #fffcf8;
 }
 .ow-jobs article > header > div {
   display: flex;
@@ -1348,7 +1348,7 @@
 }
 .ow-jobs p {
   margin: 7px 0 0;
-  color: #5f5867;
+  color: #625b56;
   font-size: 13px;
   line-height: 1.55;
 }
@@ -1370,13 +1370,13 @@
   min-height: 220px;
   padding: 32px;
   text-align: center;
-  color: #787180;
+  color: #625b56;
 }
 .ow-empty svg {
-  color: #7651f5;
+  color: #c91d16;
 }
 .ow-empty strong {
-  color: #29232f;
+  color: #2d2926;
 }
 .ow-mono {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
@@ -1403,7 +1403,7 @@
     border-right: 0;
   }
   .ow-summary-grid > article:nth-child(-n + 2) {
-    border-bottom: 1px solid #ebe8ef;
+    border-bottom: 1px solid #f4efea;
   }
   .ow-two-columns {
     grid-template-columns: 1fr;
@@ -1464,7 +1464,7 @@
   .ow-summary-grid > article {
     min-height: auto;
     border-right: 0;
-    border-bottom: 1px solid #ebe8ef;
+    border-bottom: 1px solid #f4efea;
     padding: 20px;
   }
   .ow-summary-grid > article:last-child {

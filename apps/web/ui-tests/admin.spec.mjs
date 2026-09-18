@@ -36,10 +36,12 @@ test('visão geral mostra dados de teste da API e gráfico explorável', async (
   await page.getByLabel('Período da receita').selectOption('month');
   await expect(page.locator('.admin-revenue-card')).toHaveAttribute('aria-busy', 'false');
   await page.mouse.move(0, 0);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: output('admin-dashboard-desktop.png'), fullPage: true, animations: 'disabled' });
   await fits(page); expect(errors).toEqual([]); expect(mock.unexpected).toEqual([]); expect(mock.mutations).toEqual([]);
   await page.setViewportSize({ width: 390, height: 844 });
   await fits(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: output('admin-dashboard-mobile.png'), fullPage: true, animations: 'disabled' });
 });
 
