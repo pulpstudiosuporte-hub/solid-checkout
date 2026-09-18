@@ -41,8 +41,8 @@ test('abas, perguntas e navegação funcionam com teclado', async ({ page }) => 
   await expect(page.locator('#feature-detail')).toContainText('Menos abas');
   await page.getByText('Preciso usar Shopify?', { exact: true }).click();
   await expect(page.locator('details').filter({ hasText: 'Preciso usar Shopify?' })).toHaveAttribute('open', '');
-  await expect(page.getByRole('link', { name: 'Criar minha conta' })).toHaveAttribute('href', 'https://app.solidcheckout.xyz/#/cadastro');
-  await expect(page.getByRole('link', { name: 'Entrar', exact: true }).first()).toHaveAttribute('href', 'https://app.solidcheckout.xyz/#/login');
+  await expect(page.getByRole('link', { name: 'Criar minha conta' })).toHaveAttribute('href', 'https://app.apirat.io/#/cadastro');
+  await expect(page.getByRole('link', { name: 'Entrar', exact: true }).first()).toHaveAttribute('href', 'https://app.apirat.io/#/login');
 });
 
 test('pedido calcula quantidade, cupom, frete e preserva escolhas ao voltar', async ({ page }) => {
@@ -138,7 +138,7 @@ test('guia mantém checklist entre etapas, conclui e reinicia', async ({ page })
     if (step < 3) await guide.getByRole('button', { name: 'Próxima etapa' }).click();
   }
   await expect(guide.getByRole('status')).toContainText('12 de 12');
-  await expect(guide.getByRole('link', { name: 'Ir para o cadastro' })).toHaveAttribute('href', 'https://app.solidcheckout.xyz/#/cadastro');
+  await expect(guide.getByRole('link', { name: 'Ir para o cadastro' })).toHaveAttribute('href', 'https://app.apirat.io/#/cadastro');
   await guide.getByRole('button', { name: /Prepare sua loja/ }).click();
   await expect(guide.getByRole('checkbox').first()).toBeChecked();
   await guide.getByRole('button', { name: 'Limpar lista' }).click();

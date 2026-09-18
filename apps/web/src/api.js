@@ -1,6 +1,6 @@
-const fallbackApiUrl = 'http://127.0.0.1:3333';
+import { resolveApiOrigin } from './api-origin';
 
-export const apiBaseUrl = (import.meta.env.VITE_API_URL || fallbackApiUrl).replace(/\/$/, '');
+export const apiBaseUrl = resolveApiOrigin(globalThis.location?.hostname, import.meta.env.VITE_API_URL);
 
 import { request as fetch } from './api-request';
 export { bindTabToUser, clearTabUser } from './api-request';

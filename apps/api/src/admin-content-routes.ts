@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260918-pirat-panel-domain',
+    category: 'IMPROVEMENT' as const,
+    title: 'Novo endereço do painel Pirat',
+    description: 'Acesse seu painel em app.apirat.io, com conexão segura e os mesmos dados da sua loja. O endereço anterior continua disponível durante a transição.',
+    publishedAt: new Date('2026-09-18T18:15:00.000Z'),
+  },
+  {
     publicId: 'auto-20260918-pirat-tablet-layout',
     category: 'FIX' as const,
     title: 'Painel mais confortável no celular e tablet',
