@@ -3,13 +3,13 @@ import { MiniMovingChart, SuccessBurst } from './SiteMotion';
 import { ArrowRight, Check, CheckCheck, Copy, LockKeyhole, Minus, Plus, QrCode, RotateCcw, ShieldCheck, ShoppingBag, SlidersHorizontal } from 'lucide-react';
 
 const money = value => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const colors = [['violet', 'Violeta'], ['blue', 'Azul'], ['green', 'Verde']];
+const colors = [['red', 'Vermelho'], ['blue', 'Azul'], ['green', 'Verde']];
 const deliveryOptions = [{ id: 'standard', name: 'Entrega padrão', time: '5 a 8 dias úteis', price: 0 }, { id: 'express', name: 'Entrega expressa', time: '2 a 3 dias úteis', price: 19.9 }];
 
 export function CheckoutDemo() {
   const id = useId();
   const heading = useRef(null);
-  const [color, setColor] = useState('violet');
+  const [color, setColor] = useState('red');
   const [bump, setBump] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [step, setStep] = useState(0);
@@ -43,7 +43,7 @@ export function CheckoutDemo() {
   };
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText('SOLID-DEMONSTRACAO-SEM-VALOR-DE-PAGAMENTO');
+      await navigator.clipboard.writeText('PIRAT-DEMONSTRACAO-SEM-VALOR-DE-PAGAMENTO');
       setCopyMessage('Texto de exemplo copiado. Ele não funciona em aplicativos bancários.');
     } catch {
       setCopyMessage('Não foi possível copiar. Selecione e copie o texto de exemplo abaixo.');
@@ -79,7 +79,7 @@ export function CheckoutDemo() {
         {step === 1 ? <button key="submit-customer" className="demo-pay" type="submit" form={`${id}-customer`}>Continuar para entrega <ArrowRight size={15}/></button> : <button key="next-step" type="button" className="demo-pay" onClick={() => go(step + 1)}>{['Continuar com este pedido', '', 'Revisar pedido', 'Experimentar pagamento'][step]} <ArrowRight size={15}/></button>}
         {step > 0 && <button className="demo-link" onClick={() => go(step - 1)}>Voltar uma etapa</button>}
       </>}
-      {step === 4 && <div className="demo-pix"><span className="demo-qr-placeholder"><QrCode size={64}/></span><b>{money(total)}</b><p className="demo-help">Este símbolo representa o QR Code. Não é um código de pagamento. Em uma compra real, o cliente paga no banco e aguarda a confirmação.</p><button className="demo-secondary" onClick={copy}><Copy size={15}/> Copiar texto de exemplo</button><code>SOLID-DEMONSTRACAO-SEM-VALOR-DE-PAGAMENTO</code><p className="demo-help" role="status">{copyMessage || 'Aguardando sua ação para continuar a demonstração.'}</p><button className="demo-pay" onClick={() => go(5)}>Simular pagamento aprovado <Check size={16}/></button><button className="demo-link" onClick={() => go(3)}>Cancelar simulação e revisar</button></div>}
+      {step === 4 && <div className="demo-pix"><span className="demo-qr-placeholder"><QrCode size={64}/></span><b>{money(total)}</b><p className="demo-help">Este símbolo representa o QR Code. Não é um código de pagamento. Em uma compra real, o cliente paga no banco e aguarda a confirmação.</p><button className="demo-secondary" onClick={copy}><Copy size={15}/> Copiar texto de exemplo</button><code>PIRAT-DEMONSTRACAO-SEM-VALOR-DE-PAGAMENTO</code><p className="demo-help" role="status">{copyMessage || 'Aguardando sua ação para continuar a demonstração.'}</p><button className="demo-pay" onClick={() => go(5)}>Simular pagamento aprovado <Check size={16}/></button><button className="demo-link" onClick={() => go(3)}>Cancelar simulação e revisar</button></div>}
       {step === 5 && <div className="demo-success" role="status"><SuccessBurst/><span className="demo-success-icon"><CheckCheck size={31}/></span><p>Experiência concluída.</p><span>Pedido de {money(total)} confirmado na demonstração. Nenhuma cobrança ou e-mail foi enviado.</span><button onClick={() => go(0)}><RotateCcw size={13}/> Experimentar de novo</button><button onClick={reset}>Limpar escolhas e recomeçar</button></div>}
       <div className="demo-caption"><ShieldCheck size={12}/> Demonstração interativa. Nenhuma cobrança real.</div>
     </div>
@@ -89,7 +89,7 @@ export function CheckoutDemo() {
 
 export function FeatureVisual({ active }) {
   const [brand, setBrand] = useState('Sua marca');
-  const [color, setColor] = useState('violet');
+  const [color, setColor] = useState('red');
   const [offer, setOffer] = useState(true);
   const [period, setPeriod] = useState('7');
   const [flow, setFlow] = useState(0);
@@ -103,7 +103,7 @@ export function FeatureVisual({ active }) {
 }
 
 const guideSteps = [
-  { title: 'Prepare sua loja', subtitle: 'Conta e catálogo', text: 'Comece pela base da operação. Você pode cadastrar produtos na SOLID ou conectar um catálogo Shopify.', checks: ['Criar a conta e confirmar o e-mail', 'Preencher os dados da loja', 'Cadastrar os produtos ou conectar a Shopify'] },
+  { title: 'Prepare sua loja', subtitle: 'Conta e catálogo', text: 'Comece pela base da operação. Você pode cadastrar produtos na Pirat ou conectar um catálogo Shopify.', checks: ['Criar a conta e confirmar o e-mail', 'Preencher os dados da loja', 'Cadastrar os produtos ou conectar a Shopify'] },
   { title: 'Faça ser sua', subtitle: 'Marca e ofertas', text: 'Monte a experiência que o cliente vai encontrar. Confira textos, imagens e o resumo do pedido no celular.', checks: ['Personalizar a aparência do checkout', 'Definir ofertas e regras dos cupons', 'Configurar e verificar o domínio, se usar um próprio'] },
   { title: 'Conecte o pagamento', subtitle: 'Gateway Pix', text: 'Escolha um gateway disponível no painel. Consulte suas condições e conclua a configuração da conta de recebimento.', checks: ['Escolher e configurar o gateway', 'Conferir as condições e tarifas', 'Validar a criação do Pix e o retorno do status'] },
   { title: 'Publique e acompanhe', subtitle: 'Revisão e lançamento', text: 'Antes de divulgar, percorra uma compra no seu checkout real. A demonstração deste site não substitui essa validação.', checks: ['Revisar dados, entrega e total em desktop e celular', 'Validar o fluxo de pagamento no ambiente adequado', 'Compartilhar o link e acompanhar os pedidos'] },
@@ -117,9 +117,9 @@ export function SetupGuide({ signup }) {
 }
 
 export const integrations = [
-  { name: 'Shopify', detail: 'Catálogo e pedidos', description: 'Conecte sua loja Shopify para integrar o catálogo e a sincronização dos pedidos.', steps: ['Tenha acesso à administração da loja Shopify.', 'Inicie a conexão da loja no painel SOLID.', 'Confira os produtos importados e valide a sincronização dos pedidos.'] },
+  { name: 'Shopify', detail: 'Catálogo e pedidos', description: 'Conecte sua loja Shopify para integrar o catálogo e a sincronização dos pedidos.', steps: ['Tenha acesso à administração da loja Shopify.', 'Inicie a conexão da loja no painel Pirat.', 'Confira os produtos importados e valide a sincronização dos pedidos.'] },
   { name: 'UTMify', detail: 'Acompanhamento', description: 'Relacione os pedidos ao acompanhamento de campanhas da sua operação.', steps: ['Tenha uma conta e os dados de integração da UTMify.', 'Configure a integração no painel da sua loja.', 'Valide o recebimento de um evento e os dados da campanha.'] },
-  { name: 'Meta', detail: 'Eventos de conversão', description: 'Configure o acompanhamento de eventos para entender a jornada das suas campanhas.', steps: ['Separe os dados de configuração da sua conta Meta.', 'Preencha as opções disponíveis no painel SOLID.', 'Confira os eventos na ferramenta de diagnóstico da Meta.'] },
+  { name: 'Meta', detail: 'Eventos de conversão', description: 'Configure o acompanhamento de eventos para entender a jornada das suas campanhas.', steps: ['Separe os dados de configuração da sua conta Meta.', 'Preencha as opções disponíveis no painel Pirat.', 'Confira os eventos na ferramenta de diagnóstico da Meta.'] },
   { name: 'Roas · WestPay', detail: 'Pagamentos Pix', description: 'Escolha um gateway disponível para gerar o Pix e acompanhar o retorno do pagamento.', steps: ['Tenha uma conta aprovada no gateway escolhido.', 'Consulte tarifas e configure a conexão no painel.', 'Valide a geração do Pix e a atualização do pedido.'] },
   { name: 'Webhooks', detail: 'Sua operação', description: 'Envie os eventos disponíveis para um sistema da sua operação por meio de um endereço de recebimento.', steps: ['Prepare o endereço de recebimento no seu sistema.', 'Configure os eventos e a autenticação disponíveis no painel.', 'Teste o recebimento e o tratamento de eventos repetidos.'] },
 ];

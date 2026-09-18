@@ -1,3 +1,4 @@
+import { getAppTheme } from './app-theme';
 import { Component, lazy, Suspense, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { resolvePublicRoute } from './public-route';
@@ -24,7 +25,7 @@ function Root() {
     window.addEventListener('popstate', navigate);
     return () => { window.removeEventListener('hashchange', navigate); window.removeEventListener('popstate', navigate); };
   }, []);
-  return <AppLoadBoundary><Suspense fallback={<div role="status" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', fontFamily: 'system-ui', ...(marketing ? { background: '#0b0a10', color: '#f6f4ff' } : {}) }}>Carregando...</div>}>
+  return <AppLoadBoundary><Suspense fallback={<div role="status" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', fontFamily: 'system-ui', ...(marketing ? { background: '#0b0a10', color: '#f6f4ff' } : !route && getAppTheme() === 'dark' ? { background: '#171210', color: '#fffcf8' } : {}) }}>Carregando...</div>}>
     {route ? <PublicApp route={route} /> : marketing ? <LandingPage /> : <AdminApp />}
   </Suspense></AppLoadBoundary>;
 }

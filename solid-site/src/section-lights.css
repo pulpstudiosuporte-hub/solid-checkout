@@ -19,10 +19,10 @@
 
 .solid-site :is(.site-section, .final-section)::before {
   background:
-    radial-gradient(ellipse 7% 11% at var(--light-x) var(--light-y), #bf95ff45, transparent 100%),
-    radial-gradient(ellipse 42% 46% at var(--light-x) var(--light-y), #a558fb30, #7137d715 46%, transparent 100%),
-    radial-gradient(ellipse 6% 9% at var(--light-secondary-x) var(--light-secondary-y), #ac95ff38, transparent 100%),
-    radial-gradient(ellipse 37% 43% at var(--light-secondary-x) var(--light-secondary-y), #4922e532, transparent 100%);
+    radial-gradient(ellipse 7% 11% at var(--light-x) var(--light-y), #ff9c9545, transparent 100%),
+    radial-gradient(ellipse 42% 46% at var(--light-x) var(--light-y), #fb635830, #d7423715 46%, transparent 100%),
+    radial-gradient(ellipse 6% 9% at var(--light-secondary-x) var(--light-secondary-y), #ff9c9538, transparent 100%),
+    radial-gradient(ellipse 37% 43% at var(--light-secondary-x) var(--light-secondary-y), #e52f2232, transparent 100%);
   mask-image: linear-gradient(transparent, #000 12%, #000 86%, transparent);
 }
 
@@ -33,10 +33,10 @@
 
 .solid-site :is(.site-section, .final-section)::after {
   background:
-    radial-gradient(circle at 5% 18%, #e1ccff 0 1px, #ad80f47a 2px, transparent 7px),
-    radial-gradient(circle at 94% 31%, #d3b1ff 0 1px, #a558fb65 2px, transparent 8px),
-    radial-gradient(circle at 8% 77%, #ba98ec 0 1px, #a558fb3d 2px, transparent 6px),
-    radial-gradient(circle at 97% 87%, #dec9ff 0 1px, #9873f759 2px, transparent 7px);
+    radial-gradient(circle at 5% 18%, #ffcfcc 0 1px, #f488807a 2px, transparent 7px),
+    radial-gradient(circle at 94% 31%, #ffb6b1 0 1px, #fb635865 2px, transparent 8px),
+    radial-gradient(circle at 8% 77%, #ec9e98 0 1px, #fb63583d 2px, transparent 6px),
+    radial-gradient(circle at 97% 87%, #ffcdc9 0 1px, #f77c7359 2px, transparent 7px);
   opacity: .6;
   animation: section-light-breathe 12s ease-in-out infinite alternate;
 }

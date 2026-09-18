@@ -8,7 +8,7 @@
   min-height: 92px;
   border: 1px solid var(--border);
   border-radius: 13px;
-  background: #fff;
+  background: var(--sf,#fff);
   padding: 14px;
   display: grid;
   grid-template-columns: 54px 1fr 20px;
@@ -22,7 +22,7 @@
     transform 0.16s;
 }
 .shipping-presets button:hover {
-  border-color: #ffada7;
+  border-color: var(--bd,#ffada7);
   box-shadow: 0 8px 24px rgba(67, 46, 119, 0.08);
   transform: translateY(-1px);
 }
@@ -31,7 +31,7 @@
   height: 42px;
   object-fit: contain;
   border-radius: 8px;
-  background: #fafafa;
+  background: var(--sf,#fafafa);
 }
 .shipping-presets span {
   display: grid;
@@ -46,7 +46,7 @@
   line-height: 1.4;
 }
 .shipping-presets svg {
-  color: var(--primary);
+  color: var(--p-red,var(--primary));
 }
 .logistics-card {
   overflow: hidden;
@@ -69,9 +69,9 @@
 }
 .logistics-head > span {
   border-radius: 999px;
-  background: #e8f7ef;
+  background: var(--p-alt,#e8f7ef);
   padding: 6px 10px;
-  color: #14784d;
+  color: var(--p-green,#14784d);
   font-size: 10px;
   font-weight: 700;
 }
@@ -97,9 +97,9 @@
   place-items: center;
   border: 1px solid var(--border);
   border-radius: 10px;
-  color: var(--primary);
+  color: var(--p-red,var(--primary));
   overflow: hidden;
-  background: #fff;
+  background: var(--sf,#fff);
 }
 .shipping-icon img {
   width: 36px;
@@ -135,7 +135,7 @@
   width: 38px;
   height: 22px;
   border-radius: 999px;
-  background: #c9c9d0;
+  background: var(--p-alt,#c9c9d0);
   padding: 3px;
   transition: 0.2s;
 }
@@ -145,7 +145,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: white;
+  background: var(--sf,white);
   transition: 0.2s;
 }
 .shipping-toggle input:checked + span {
@@ -189,7 +189,7 @@
 .shipping-modal {
   width: min(560px, 100%);
   border-radius: 16px;
-  background: white;
+  background: var(--sf,white);
   padding: 24px;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.2);
 }

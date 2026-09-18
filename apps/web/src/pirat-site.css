@@ -1,0 +1,82 @@
+@font-face {
+  font-family: 'Pirat Site Display';
+  src: url('/brand/fonts/bricolage-grotesque-latin.woff2') format('woff2');
+  font-weight: 500 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Pirat Site Text';
+  src: url('/brand/fonts/inter-latin.woff2') format('woff2');
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+/* Shared Pirat identity for the integrated and standalone marketing entries. */
+body.solid-marketing-body { background: #2b0200; }
+.solid-site {
+  --site-bg: #2b0200;
+  --site-surface: #37100c;
+  --site-text: #fffcf8;
+  --site-muted: #d3bab0;
+  --site-accent: #ffbc21;
+  --site-line: #fffcf821;
+  font-family: 'Pirat Site Text', system-ui, sans-serif;
+}
+.solid-site :is(h1,h2,h3,h4) {
+  font-family: 'Pirat Site Display', system-ui, sans-serif;
+  font-weight: 700;
+  text-wrap: balance;
+}
+.solid-site ::selection { background: #ffbc21; color: #2b0200; }
+.solid-site :focus-visible { outline-color: #ffbc21; }
+.solid-site .site-header { background: #2b0200ed; border-bottom-color: var(--site-line); }
+.solid-site .header-inner { min-height: 100px; }
+.solid-site .solid-site-brand { gap: 8px; }
+.solid-site .solid-site-brand img { width: 88px; height: 80px; object-fit: contain; }
+.solid-site .solid-site-brand > span { color: #fffcf8; font-size: 13px; }
+.solid-site .hero-copy h1 > span,
+.solid-site .section-heading h2 > span,
+.solid-site .integrations-layout h2 > span,
+.solid-site .faq-section h2 > span {
+  background: none;
+  color: #ffbc21;
+  -webkit-text-fill-color: currentColor;
+}
+.solid-site .site-eyebrow { color: #ffbc21; }
+.solid-site .site-eyebrow > i { background: #ffbc21; box-shadow: 0 0 14px #ffbc2155; }
+.solid-site .site-button { background: #c91d16; color: #fff; border-color: #f52218; box-shadow: 0 5px 22px #f522181c; }
+.solid-site .site-button:hover { background: #a8100a; }
+.solid-site .site-button.light { background: #ffbc21; color: #2b0200; border-color: #ffbc21; }
+.solid-site .site-button.light:hover { background: #ffcf62; }
+.solid-site .site-text-link.lavender { color: #ffcf62; }
+.solid-site .hero-copy > p,
+.solid-site .section-heading > p,
+.solid-site .feature-copy > p,
+.solid-site .foundation-card p,
+.solid-site .steps-grid p,
+.solid-site .integrations-layout p,
+.solid-site .faq-section > div > p,
+.solid-site .faq-list details > p,
+.solid-site .footer-top p,
+.solid-site .footer-links a,
+.solid-site .footer-bottom { color: var(--site-muted); }
+.solid-site .site-demo { --demo-accent: #c91d16; --demo-soft: #fff0ed; }
+.solid-site .site-demo.blue { --demo-accent: #2563eb; --demo-soft: #edf4ff; }
+.solid-site .site-demo.green { --demo-accent: #177b63; --demo-soft: #e8f5ef; }
+.solid-site .color-swatch.red { background: #c91d16; }
+.solid-site .network-center { background: #fffcf8; border-color: #ffbc2166; }
+.solid-site .network-center img { object-fit: contain; }
+.solid-site .final-cta { background: radial-gradient(ellipse at 15% 0, #f5221830, transparent 60%), #37100c; border-color: #ffbc2155; }
+.solid-site .final-cta .site-eyebrow { color: #ffbc21; }
+.solid-site .pirat-cta-mascot { display: block; object-fit: contain; margin: 0 auto 24px; }
+.solid-site .final-cta p,
+.solid-site .final-note { color: #e6d2c6; }
+.solid-site .footer-brand img { width: 110px; height: 100px; }
+@media (max-width: 720px) {
+  .solid-site .header-inner { height: 88px; min-height: 88px; }
+  .solid-site .solid-site-brand img { width: 72px; height: 66px; }
+  .solid-site .site-nav { top: 88px; background: #2b0200; }
+  .solid-site .site-button.small { min-height: 44px; }
+  .solid-site .site-menu-toggle { min-width: 44px; min-height: 44px; }
+  .solid-site .footer-brand img { width: 90px; height: 82px; }
+}

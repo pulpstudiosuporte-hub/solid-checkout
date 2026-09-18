@@ -1,9 +1,12 @@
+import { useAppTheme } from './app-theme';
+import ThemeToggle from './ThemeToggle';
 import { SupportContext } from './support-context';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, BarChart3, Box, Check, CheckCircle2, Clock3, Copy, CreditCard, Eye, Globe2, Home, LayoutTemplate, Menu, Package, PanelLeftClose, PanelLeftOpen, Plug, Plus, Search, Settings, ShieldCheck, ShoppingBag, ShoppingCart, Sparkles, Store, Tag, TrendingUp, Truck, Users, X, Zap, LogOut, ServerCog, Webhook, Megaphone, ScanSearch } from 'lucide-react';
 import './admin-styles.css';
 import './admin-refresh.css';
 import './pirat-theme.css';
+import './app-dark-theme.css';
 import { defaultCheckoutConfig } from './checkout-config';
 const CheckoutEditor = lazy(() => import('./CheckoutEditor'));
 import { archiveStore, bindTabToUser, clearTabUser, completeMfaLogin, createStore, forgotPassword, getApiHealth, getSession, getSettings, getStores, login, logout, registerAccount, resetPassword, selectStore, verifyAccount } from './api';
@@ -59,8 +62,9 @@ const navGroups = [
   ]},
 ];
 
-function Logo({ compact = false }) {
-  return <div className={`brand ${compact ? 'compact' : ''}`}><img className="brand-symbol" src="/brand/pirat-mascot.png" alt=""/>{!compact && <img className="brand-wordmark" src="/brand/pirat-logo-on-light.png" alt="Pirat"/>}</div>;
+function Logo({ compact = false, merchantPreview = false }) {
+  const { theme } = useAppTheme();
+  return <div className={`brand ${compact ? 'compact' : ''}`}><img className="brand-symbol" src="/brand/pirat-mascot.png" alt=""/>{!compact && <img className="brand-wordmark" src={!merchantPreview && theme === 'dark' ? '/brand/pirat-logo-on-dark.png' : '/brand/pirat-logo-on-light.png'} alt="Pirat"/>}</div>;
 }
 
 function Badge({ children, tone = 'neutral' }) { return <span className={`badge ${tone}`}>{children}</span>; }
@@ -127,7 +131,7 @@ function Header({ toggleSidebar, apiStatus, csrfToken, storeKey, onNavigate, onO
     <button className="icon-btn menu-btn" onClick={toggleSidebar} aria-label="Abrir menu"><Menu size={21}/></button>
     <div className="topbar-context"><small>Painel</small><strong>{page}</strong></div>
     <button className="search" type="button" onClick={onOpenSearch} aria-label="Abrir busca avançada"><Search size={18}/><span>Buscar no painel...</span><kbd>Ctrl K</kbd></button>
-    <div className="top-actions"><span className={`sandbox api-status ${apiStatus}`} role="status"><span/> {statusLabel}</span>{!support && <NotificationCenter csrfToken={csrfToken} storeKey={storeKey} onNavigate={onNavigate}/>}</div>
+    <div className="top-actions"><ThemeToggle/><span className={`sandbox api-status ${apiStatus}`} role="status"><span/> {statusLabel}</span>{!support && <NotificationCenter csrfToken={csrfToken} storeKey={storeKey} onNavigate={onNavigate}/>}</div>
   </header>;
 }
 
@@ -191,12 +195,12 @@ function Checkout({ onBack, customConfig }) {
   const advance = e => { e.preventDefault(); if(valid) setStep(2); };
   const copy = () => { navigator.clipboard?.writeText('00020126580014BR.GOV.BCB.PIX0136solid-demo-pix-code'); setCopied(true); setTimeout(()=>setCopied(false),1800); };
   const cfg = customConfig || (()=>{try{return {...defaultCheckoutConfig,...JSON.parse(localStorage.getItem('solid-checkout-published-v1'))}}catch{return defaultCheckoutConfig}})();
-  return <div className="checkout-page" style={{'--primary':cfg.primary,'--bg':cfg.pageBg,'--surface':cfg.cardBg,'--text':cfg.textColor,'--border':cfg.borderColor,'--radius':`${cfg.radius}px`,fontFamily:cfg.font}}><header className="checkout-head"><Logo/><button className="ghost" onClick={onBack}><PanelLeftClose size={17}/> Voltar ao painel</button><div className="secure"><ShieldCheck size={19}/><span><b>Pagamento seguro</b><small>Ambiente protegido</small></span></div></header><div className="checkout-shell">
+  return <div className="checkout-page" style={{'--primary':cfg.primary,'--bg':cfg.pageBg,'--surface':cfg.cardBg,'--text':cfg.textColor,'--border':cfg.borderColor,'--radius':`${cfg.radius}px`,fontFamily:cfg.font}}><header className="checkout-head"><Logo merchantPreview/><button className="ghost" onClick={onBack}><PanelLeftClose size={17}/> Voltar ao painel</button><div className="secure"><ShieldCheck size={19}/><span><b>Pagamento seguro</b><small>Ambiente protegido</small></span></div></header><div className="checkout-shell">
     <section className="checkout-content"><div className="steps"><div className="step active"><span>{step>1?<Check size={15}/>:1}</span><b>Identificação</b></div><i/><div className={`step ${step>=2?'active':''}`}><span>2</span><b>Pagamento</b></div></div>
       {step===1 ? <form onSubmit={advance}><p className="checkout-kicker">FINALIZE SEU PEDIDO</p><h1>Você está a um passo.</h1><p className="lead">Preencha seus dados para gerar o Pix. Leva menos de um minuto.</p><div className="form-card"><div className="section-title"><span><Users size={18}/></span><div><h2>Seus dados</h2><p>Usaremos apenas para processar o pedido.</p></div></div><label>Nome completo<input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="Como aparece no documento" required/></label><div className="field-grid"><label>E-mail<input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="voce@email.com" required/></label><label>Celular / WhatsApp<input value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} placeholder="(11) 99999-9999" required/></label></div><label>CPF ou CNPJ<input value={form.cpf} onChange={e=>setForm({...form,cpf:e.target.value})} placeholder="000.000.000-00" required/></label></div><label className={`bump ${bump?'selected':''}`}><input type="checkbox" checked={bump} onChange={e=>setBump(e.target.checked)}/><span className="check-box">{bump&&<Check size={14}/>}</span><div className="bump-icon"><Zap size={21}/></div><div><Badge tone="purple">OFERTA ESPECIAL</Badge><h3>Adicione o Guia de Resultados</h3><p>Estratégias práticas para aproveitar ainda mais seu produto.</p></div><strong>+ {money.format(29.9)}</strong></label><button className="checkout-cta" type="submit" disabled={!valid}>Gerar Pix agora <ArrowRight size={19}/></button><p className="privacy"><ShieldCheck size={14}/> Seus dados estão protegidos e não serão compartilhados.</p></form> : <div className="pix-card"><div className="success-icon"><CheckCircle2 size={30}/></div><p className="checkout-kicker">PEDIDO CRIADO</p><h1>Escaneie e pague com Pix</h1><p className="lead">Abra o app do seu banco e escaneie o QR Code.</p><div className="qr"><div className="fake-qr">{Array.from({length:121}).map((_,i)=><i key={i} className={(i*7+i%3)%5<2?'dark':''}/>)}</div></div><strong className="pix-value">{money.format(total)}</strong><p className="expire"><Clock3 size={16}/> Expira em <b>14:59</b></p><button className="copy-btn" onClick={copy}>{copied?<Check size={18}/>:<Copy size={18}/>} {copied?'Código copiado!':'Copiar código Pix'}</button><button className="ghost wide" onClick={()=>setStep(1)}>Voltar e editar dados</button></div>}
     </section>
     <aside className="order-summary"><div className="product"><div className="product-image"><Box size={38}/></div><div><Badge tone="purple">MAIS VENDIDO</Badge><h2>Kit Performance</h2><p>O pacote completo para acelerar seus resultados.</p></div></div><div className="summary-row"><span>Kit Performance <small>Quantidade: 1</small></span><b>{money.format(148)}</b></div>{bump&&<div className="summary-row bump-row"><span>Guia de Resultados</span><b>{money.format(29.9)}</b></div>}<div className="divider"/><div className="summary-row total"><span>Total</span><strong>{money.format(total)}</strong></div><div className="pix-only"><div className="pix-logo">pix</div><div><b>Pagamento via Pix</b><small>Aprovação em poucos segundos</small></div></div><div className="guarantees"><span><ShieldCheck size={17}/> Compra 100% segura</span><span><Zap size={17}/> Liberação imediata</span><span><CreditCard size={17}/> Sem taxas adicionais</span></div></aside>
-  </div><footer className="checkout-footer"><Logo/><span>© 2026 Pirat Checkout. Todos os direitos reservados.</span><div><a href="#">Privacidade</a><a href="#">Termos</a></div></footer></div>;
+  </div><footer className="checkout-footer"><Logo merchantPreview/><span>© 2026 Pirat Checkout. Todos os direitos reservados.</span><div><a href="#">Privacidade</a><a href="#">Termos</a></div></footer></div>;
 }
 
 
@@ -213,7 +217,12 @@ function SessionConflict() {
   </main>;
 }
 
-export default function App(){
+export default function App() {
+  const { theme } = useAppTheme();
+  return <div className="pirat-app-theme" data-theme={theme}><AdminApplication/></div>;
+}
+
+function AdminApplication(){
   const closeSidebar = useCallback(() => setSidebar(false), []);
   const [sidebar,setSidebar]=useState(false); const [sidebarCollapsed,setSidebarCollapsed]=useState(()=>localStorage.getItem('solid-sidebar-collapsed-v1')==='true'); const [page,setPage]=useState(()=>window.location.hash === '#/admin/users' ? 'Usuários' : window.location.hash.startsWith('#/integrations')?'Integrações':'Início'); const [checkout,setCheckout]=useState(false); const [editor,setEditor]=useState(false); const [previewConfig,setPreviewConfig]=useState(null); const [apiStatus,setApiStatus]=useState('checking'); const [searchOpen,setSearchOpen]=useState(false);
   const [auth,setAuth]=useState({status:'checking',user:null,csrfToken:null});

@@ -10,7 +10,7 @@
   overflow: hidden;
   pointer-events: none;
   z-index: -1;
-  background: #050507;
+  background: #070505;
   mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
 }
 

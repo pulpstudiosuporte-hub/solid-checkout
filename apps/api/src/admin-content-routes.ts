@@ -66,6 +66,20 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260918-pirat-dark-mode',
+    category: 'IMPROVEMENT' as const,
+    title: 'Seu painel, claro ou escuro',
+    description: 'Alterne entre os modos claro e escuro no login, no painel e no editor. Sua preferência fica salva neste navegador, com cores adaptadas para leitura. A aparência dos checkouts da sua loja continua como você configurou.',
+    publishedAt: new Date('2026-09-18T17:20:00.000Z'),
+  },
+  {
+    publicId: 'auto-20260918-pirat-site-identity',
+    category: 'IMPROVEMENT' as const,
+    title: 'O site também está de cara nova',
+    description: 'Conheça a apresentação da Pirat, com novas cores, tipografia e o papagaio da marca. Explore os recursos e a demonstração do checkout no computador ou no celular.',
+    publishedAt: new Date('2026-09-18T17:00:00.000Z'),
+  },
+  {
     publicId: 'auto-20260918-pirat-app-identity',
     category: 'IMPROVEMENT' as const,
     title: 'Uma nova identidade: Pirat Checkout',

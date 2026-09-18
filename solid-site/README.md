@@ -1,4 +1,4 @@
-# Site institucional SOLID — deploy separado
+# Site institucional Pirat — deploy separado
 
 Esta pasta é um projeto independente. Pode ser copiada para outro local ou repositório sem os demais arquivos do aplicativo. Contém a página institucional, a demonstração interativa e as imagens utilizadas pelo site.
 
@@ -55,7 +55,7 @@ O site independente abre na raiz `/`. As cópias anteriores em `apps/web` perman
 - **Dúvidas:** busca sem distinção de acentos, expansão e recolhimento das respostas, mensagem de busca vazia e botão para limpar.
 - **Celular e teclado:** menu com acesso ao painel, fechamento por Escape, foco visível e controles nativos de formulário.
 
-Não há criação de Pix, envio de formulários, autenticação, armazenamento de dados pessoais ou conexão com gateways na demonstração. O símbolo de QR Code e o texto copiável não são instrumentos de pagamento. Os preços, descontos e prazos do exemplo não representam condições comerciais da SOLID. Os links de cadastro e painel continuam apontando para o aplicativo real.
+Não há criação de Pix, envio de formulários, autenticação, armazenamento de dados pessoais ou conexão com gateways na demonstração. O símbolo de QR Code e o texto copiável não são instrumentos de pagamento. Os preços, descontos e prazos do exemplo não representam condições comerciais da Pirat. Os links de cadastro e painel continuam apontando para o aplicativo real.
 
 ## Verificar
 

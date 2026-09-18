@@ -29,7 +29,7 @@
 .admin-assets-list small { font-size: 11px; }
 .admin-assets-group-title {
   margin: 12px 0 2px;
-  color: #625b56;
+  color: var(--mt,#625b56);
   font-size: 11px;
   letter-spacing: .06em;
   text-transform: uppercase;
@@ -53,14 +53,14 @@
   padding: 28px;
   border: 1px solid var(--solid-line);
   border-radius: 12px;
-  background: #fff;
-  color: #625b56;
+  background: var(--sf,#fff);
+  color: var(--mt,#625b56);
   text-align: center;
 }
 .release-state svg { color: var(--solid-purple-strong); }
-.release-state b { color: #2d2926; font-size: 16px; }
+.release-state b { color: var(--p-fg,#2d2926); font-size: 16px; }
 .release-state span { max-width: 440px; font-size: 13px; line-height: 1.5; }
-.release-state.error svg { color: #c6531d; }
+.release-state.error svg { color: var(--p-red,#c6531d); }
 .release-state button { min-height: 44px; margin-top: 6px; }
 
 .home-news-state {
@@ -70,11 +70,11 @@
   gap: 9px;
   padding: 0 8px;
   border-bottom: 1px solid var(--solid-line);
-  color: #625b56;
+  color: var(--mt,#625b56);
   font-size: 12px;
 }
 .home-news-state svg { color: var(--solid-purple-strong); }
-.home-news-state.error svg { color: #c6531d; }
+.home-news-state.error svg { color: var(--p-red,#c6531d); }
 
 @media (max-width: 640px) {
   .admin-feedback-card h2 { font-size: 16px; }

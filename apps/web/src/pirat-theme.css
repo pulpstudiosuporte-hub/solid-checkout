@@ -62,33 +62,33 @@
 .app.solid-admin.sidebar-collapsed .side-head { padding-inline: 17px; }
 .app.solid-admin :is(.sidebar-collapse, .sidebar .mobile-only),
 .app.solid-admin.sidebar-collapsed .sidebar .sidebar-collapse {
-  background: white; border-color: var(--border); color: #6d655f;
+  background: var(--sf,white); border-color: var(--border); color: var(--mt,#6d655f);
 }
-.app.solid-admin :is(.sidebar-collapse, .sidebar .mobile-only):hover { background: #fff0ed; color: #a8100a; }
+.app.solid-admin :is(.sidebar-collapse, .sidebar .mobile-only):hover { background: var(--p-alt,#fff0ed); color: var(--p-red,#a8100a); }
 .app.solid-admin .store-switcher > .store-switch,
 .app.solid-admin.sidebar-collapsed .sidebar .store-switcher > .store-switch {
-  background: white; color: var(--text); border-color: var(--border);
+  background: var(--sf,white); color: var(--text); border-color: var(--border);
 }
-.app.solid-admin .store-switcher > .store-switch:hover { border-color: #ffada7; background: #fff8f6; }
-.app.solid-admin :is(.store-switch small, .store-switch > svg, .resource-head small, .resource-head > span, .nav-title, .profile small) { color: #766b63; }
-.app.solid-admin :is(.store-switch .store-avatar, .profile .avatar) { background: #ffe3df; color: #a8100a; border-color: #ffd2cc; }
-.app.solid-admin .module-tabs { background: #f3ede7; border-color: #e8e2dc; }
-.app.solid-admin .module-tab { color: #746a63; }
-.app.solid-admin .module-tab:hover { background: #fff; color: #6b0a06; }
-.app.solid-admin .module-tab.active { background: white; color: #a8100a; box-shadow: 0 2px 6px #2b02000b; }
+.app.solid-admin .store-switcher > .store-switch:hover { border-color: var(--bd,#ffada7); background: var(--sf,#fff8f6); }
+.app.solid-admin :is(.store-switch small, .store-switch > svg, .resource-head small, .resource-head > span, .nav-title, .profile small) { color: var(--mt,#766b63); }
+.app.solid-admin :is(.store-switch .store-avatar, .profile .avatar) { background: var(--p-alt,#ffe3df); color: var(--p-red,#a8100a); border-color: var(--bd,#ffd2cc); }
+.app.solid-admin .module-tabs { background: var(--p-alt,#f3ede7); border-color: var(--bd,#e8e2dc); }
+.app.solid-admin .module-tab { color: var(--mt,#746a63); }
+.app.solid-admin .module-tab:hover { background: var(--sf,#fff); color: var(--p-red,#6b0a06); }
+.app.solid-admin .module-tab.active { background: var(--sf,white); color: var(--p-red,#a8100a); box-shadow: 0 2px 6px #2b02000b; }
 .app.solid-admin .module-tab.active svg { color: var(--pirat-action); }
-.app.solid-admin .nav-item { color: #5f5751; }
-.app.solid-admin .nav-item svg { color: #81766e; }
-.app.solid-admin .nav-item:hover { background: #f3ede7; color: #2b0200; }
+.app.solid-admin .nav-item { color: var(--mt,#5f5751); }
+.app.solid-admin .nav-item svg { color: var(--mt,#81766e); }
+.app.solid-admin .nav-item:hover { background: var(--p-alt,#f3ede7); color: var(--p-fg,#2b0200); }
 .app.solid-admin .nav-item.active {
-  color: #a8100a; background: #fff0ed; box-shadow: inset 3px 0 var(--pirat-red);
+  color: var(--p-red,#a8100a); background: var(--p-alt,#fff0ed); box-shadow: inset 3px 0 var(--pirat-red);
 }
-.app.solid-admin .nav-item.active svg { color: #c91d16; }
+.app.solid-admin .nav-item.active svg { color: var(--p-red,#c91d16); }
 .app.solid-admin .nav-item.active:after { background: #f52218; box-shadow: none; }
 .app.solid-admin :is(.side-bottom, .platform-nav) { border-color: var(--border); }
-.app.solid-admin .profile { background: white; border-color: var(--border); }
-.app.solid-admin .profile b { color: #332b26; }
-.app.solid-admin .profile .icon-btn { color: #766b63; }
+.app.solid-admin .profile { background: var(--sf,white); border-color: var(--border); }
+.app.solid-admin .profile b { color: var(--p-fg,#332b26); }
+.app.solid-admin .profile .icon-btn { color: var(--mt,#766b63); }
 .app.solid-admin .sidebar nav { scrollbar-color: #c9bdb3 transparent; }
 
 .app.solid-admin .primary,
@@ -98,8 +98,8 @@
 }
 .app.solid-admin .primary:hover:not(:disabled),
 .solid-auth .login-submit:hover:not(:disabled) { background: #a8100a; box-shadow: 0 6px 18px #c91d1621; }
-.app.solid-admin :is(.eyebrow, .ghost) { color: #a8100a; }
-.app.solid-admin .metric-icon.purple { background: #fff0ed; color: #c91d16; }
+.app.solid-admin :is(.eyebrow, .ghost) { color: var(--p-red,#a8100a); }
+.app.solid-admin .metric-icon.purple { background: var(--p-alt,#fff0ed); color: var(--p-red,#c91d16); }
 .app.solid-admin .dashboard-metric.purple { --metric-wash: #ffe3df; }
 .app.solid-admin :is(button, a, input, select, textarea):focus-visible,
 .solid-auth :focus-visible { outline: 3px solid #c91d16; outline-offset: 3px; }
@@ -126,40 +126,40 @@
 .solid-auth .login-security { border-color: #ffffff1a; color: #e8c9bc; }
 .solid-auth .login-security small { color: #dcb8a9; }
 .solid-auth .login-form-panel { background: var(--pirat-ivory); }
-.solid-auth .login-card h2 { color: #2b0200; font-size: 34px; }
-.solid-auth :is(.login-subtitle, .login-help, .signup-terms, .password-requirement) { color: #75685f; }
-.solid-auth .login-card > label, .solid-auth .password-label > label { color: #40332c; }
-.solid-auth .eyebrow, .solid-auth .login-help button, .solid-auth button.login-help { color: #a8100a; }
+.solid-auth .login-card h2 { color: var(--p-fg,#2b0200); font-size: 34px; }
+.solid-auth :is(.login-subtitle, .login-help, .signup-terms, .password-requirement) { color: var(--mt,#75685f); }
+.solid-auth .login-card > label, .solid-auth .password-label > label { color: var(--p-fg,#40332c); }
+.solid-auth .eyebrow, .solid-auth .login-help button, .solid-auth button.login-help { color: var(--p-red,#a8100a); }
 .solid-auth .login-card > input, .solid-auth .password-field {
-  border-color: #ded5cc; border-radius: 10px; background: white; color: #2b0200;
+  border-color: var(--bd,#ded5cc); border-radius: 10px; background: var(--sf,white); color: var(--p-fg,#2b0200);
 }
 .solid-auth .login-card > input:focus,
 .solid-auth .password-field:focus-within { border-color: #c91d16; box-shadow: 0 0 0 3px #f5221812; }
-.solid-auth .password-field input { background: transparent; color: #2b0200; box-shadow: none; }
-.solid-auth .password-field > button { color: #766b63; }
+.solid-auth .password-field input { background: transparent; color: var(--p-fg,#2b0200); box-shadow: none; }
+.solid-auth .password-field > button { color: var(--mt,#766b63); }
 .solid-auth .login-mobile-brand img { width: 112px; height: 101px; object-fit: contain; }
-.session-loading { background: #fffcf8; }
+.session-loading { background: var(--sf,#fffcf8); }
 .session-loading .loading-symbol { width: 80px; height: 80px; object-fit: contain; }
-.session-loading > svg { color: #c91d16; }
+.session-loading > svg { color: var(--p-red,#c91d16); }
 
 @media (max-width: 900px) {
   .app.solid-admin.sidebar-collapsed .side-head { padding: 12px 20px; }
   .solid-auth .login-brand-panel { padding-inline: 28px; }
 }
 @media (max-width: 700px) {
-  .solid-auth .login-form-panel { background: #fffcf8; padding: 28px 24px; }
+  .solid-auth .login-form-panel { background: var(--sf,#fffcf8); padding: 28px 24px; }
   .solid-auth .login-mobile-brand { margin-bottom: 28px; }
   .solid-auth .login-card h2 { font-size: 30px; }
 }
 
-.app.solid-admin :is(.badge.purple, .nav-item em, .customer > span, .module-icon) { background: #fff0ed; color: #a8100a; }
+.app.solid-admin :is(.badge.purple, .nav-item em, .customer > span, .module-icon) { background: var(--p-alt,#fff0ed); color: var(--p-red,#a8100a); }
 .app.solid-admin .dot.purple { background: #c91d16; }
 .app.solid-admin .image-dropzone:focus-within { outline: 3px solid #c91d16; outline-offset: 3px; }
 
 /* Geographic controls stay neutral; geographic data and Earth textures keep
    their natural colors. */
 .app.solid-admin .world-map-panel { background: #141414; }
-.app.solid-admin .world-map-panel.is-flat { background: #f7f5f2; }
+.app.solid-admin .world-map-panel.is-flat { background: var(--p-alt,#f7f5f2); }
 .app.solid-admin .world-map-panel .map-mode,
 .app.solid-admin .page .dot-map.world .world-map-panel select.globe-locations {
   background: #282421; color: #fffcf8; border-color: #ffffff30;
@@ -167,9 +167,9 @@
 .app.solid-admin .world-map-caption > span,
 .app.solid-admin .world-map-wait,
 .app.solid-admin .world-map-panel .globe-missing { color: #ddd0c3; }
-.app.solid-admin .world-map-panel.is-flat .world-map-caption { color: #2b0200; }
-.app.solid-admin .world-map-panel.is-flat .world-map-caption > span { color: #766b63; }
-.app.solid-admin .geo-empty-note { color: #766b63; }
+.app.solid-admin .world-map-panel.is-flat .world-map-caption { color: var(--p-fg,#2b0200); }
+.app.solid-admin .world-map-panel.is-flat .world-map-caption > span { color: var(--mt,#766b63); }
+.app.solid-admin .geo-empty-note { color: var(--mt,#766b63); }
 .app.solid-admin .globe-3d { background: radial-gradient(ellipse at center, #352821, #141414 70%); color: #fffcf8; }
 .app.solid-admin :is(.globe-loading, .globe-hint) { color: #ddd0c3; }
 .app.solid-admin .globe-3d .globe-controls button { background: #282421; color: #fffcf8; }

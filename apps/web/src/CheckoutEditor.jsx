@@ -1,3 +1,4 @@
+import ThemeToggle from './ThemeToggle';
 import ExitOfferSettings from './ExitOfferSettings';
 import React, { createContext, memo, useCallback, useContext, useDeferredValue, useEffect, useId, useMemo, useReducer, useRef, useState } from "react";
 import {
@@ -2035,6 +2036,7 @@ export default function CheckoutEditor({
       <header className="editor-top">
         <button className="editor-back" onClick={leave} disabled={busy} aria-label="Voltar para checkouts"><ArrowLeft size={20}/></button>
         <div className="editor-identity"><span className="editor-eyebrow">ESTÚDIO DO CHECKOUT</span><strong>{checkout?.name || "Personalizar checkout"}</strong><span className={`editor-save-state ${dirty ? "dirty" : ""}`} role="status"><i/>{busy ? "Processando..." : dirty ? "Alterações não salvas" : "Rascunho salvo"}</span></div>
+        <ThemeToggle/>
         <div className="editor-actions">
           <div className="editor-history"><button onClick={undo} disabled={busy || !history.past.length} aria-label="Desfazer alteração" title="Desfazer (Ctrl+Z)"><Undo2 size={18}/></button><button onClick={redo} disabled={busy || !history.future.length} aria-label="Refazer alteração" title="Refazer (Ctrl+Shift+Z)"><Redo2 size={18}/></button></div>
           <button className="editor-action preview-action" onClick={() => setPreviewOnly(value => !value)} aria-pressed={previewOnly}><Eye size={17}/><span>{previewOnly ? "Voltar à edição" : "Visualizar"}</span></button>

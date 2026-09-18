@@ -1,0 +1,93 @@
+/* Appearance tokens are local to the application. Original literal fallbacks
+   in component styles keep the light theme and public checkout unchanged.
+   Compact shared names: --sf = surface, --bd = border, --mt = muted text. */
+.pirat-app-theme { display: contents; }
+.pirat-app-theme[data-theme="dark"] :is(.solid-admin, .solid-auth, .session-loading, .solid-editor, .first-store-page) {
+  color-scheme: dark;
+  --sf: #241c19;
+  --p-alt: #2d2420;
+  --bd: #504039;
+  --p-fg: #fffcf8;
+  --mt: #c2b3a8;
+  --p-red: #ffada7;
+  --p-red-bg: #45221e;
+  --p-gold: #ffd077;
+  --p-gold-bg: #3d3020;
+  --p-green: #88dbb2;
+  --p-blue: #a8caff;
+  --solid-canvas: #171210;
+  --solid-surface: var(--sf);
+  --solid-surface-subtle: var(--p-alt);
+  --solid-text: var(--p-fg);
+  --solid-text-soft: var(--mt);
+  --solid-line: var(--bd);
+  --solid-purple: #c91d16;
+  --solid-purple-strong: #ffada7;
+  --solid-purple-soft: var(--p-red-bg);
+  --solid-shadow-sm: 0 4px 20px #00000020;
+  --pirat-ivory: #241c19;
+  --bg: var(--solid-canvas);
+  --surface: var(--sf);
+  --text: var(--p-fg);
+  --muted: var(--mt);
+  --border: var(--bd);
+  --primary: #c91d16;
+  --primary-dark: #a8100a;
+  --studio-ink: var(--p-fg);
+  --studio-muted: var(--mt);
+  --studio-line: var(--bd);
+  --studio-soft: var(--p-red-bg);
+  --studio-accent: var(--p-red);
+}
+
+/* A checkout preview is merchant content, including its native form controls. */
+.pirat-app-theme :is(.editor-preview-stage, .checkout-page) {
+  color-scheme: light;
+  --sf: initial;
+  --p-alt: initial;
+  --bd: initial;
+  --p-fg: initial;
+  --mt: initial;
+  --p-red: initial;
+  --p-red-bg: initial;
+  --p-gold: initial;
+  --p-gold-bg: initial;
+  --p-green: initial;
+  --p-blue: initial;
+}
+
+.pirat-theme-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 42px; width: 42px; height: 42px; padding: 0;
+  border: 1px solid var(--bd, #e8e2dc); border-radius: 10px;
+  background: var(--sf, #fff); color: var(--p-fg, #40332c);
+  cursor: pointer;
+}
+.pirat-theme-toggle:hover { background: var(--p-alt, #fff0ed); }
+.pirat-theme-toggle:focus-visible { outline: 3px solid #ffada7; outline-offset: 3px; }
+.solid-auth .login-form-panel { position: relative; padding-top: 84px; }
+.login-appearance { position: absolute; top: 22px; right: 24px; }
+.pirat-app-theme[data-theme="dark"] .solid-admin .topbar { background: #241c19f5; }
+.pirat-app-theme[data-theme="dark"] .solid-admin .home-greeting { background: radial-gradient(ellipse at 100% 0, #74282033, transparent 65%), #241c19; }
+.pirat-app-theme[data-theme="dark"] .solid-admin :is(.eyebrow, .ghost) { color: #ffada7 !important; }
+.pirat-app-theme[data-theme="dark"] .solid-admin .primary { background: #c91d16; color: #fff; }
+.pirat-app-theme[data-theme="dark"] .solid-admin .primary:hover:not(:disabled) { background: #a8100a; }
+.pirat-app-theme[data-theme="dark"] .solid-admin .module-tab.active svg { color: #ffada7; }
+.pirat-app-theme[data-theme="dark"] .solid-admin .dashboard-metric { --metric-wash: #45221e; }
+.pirat-app-theme[data-theme="dark"] .solid-admin .dashboard-metric.green { --metric-wash: #1c3b2d; }
+.pirat-app-theme[data-theme="dark"] .solid-admin .dashboard-metric.blue { --metric-wash: #26354b; }
+.pirat-app-theme[data-theme="dark"] .solid-admin .dashboard-metric.orange { --metric-wash: #493520; }
+.pirat-app-theme[data-theme="dark"] :is(.solid-auth, .solid-admin, .solid-editor) :is(input, textarea):not(.editor-preview-stage *)::placeholder { color: #ad9e93; opacity: 1; }
+.pirat-app-theme[data-theme="dark"] :is(.solid-admin, .solid-auth, .solid-editor) :focus-visible { outline-color: #ffada7; }
+.pirat-app-theme[data-theme="dark"] .solid-auth .eyebrow { color: #ffada7 !important; }
+.pirat-app-theme[data-theme="dark"] .solid-admin .world-map-panel.is-flat { background: #241c19; }
+.pirat-app-theme[data-theme="dark"] .solid-admin .world-map-panel.is-flat .world-map-caption { color: #fffcf8; }
+.pirat-app-theme[data-theme="dark"] .solid-admin .world-map-panel.is-flat .world-map-caption > span { color: #c2b3a8; }
+.pirat-app-theme[data-theme="dark"] .solid-editor .editor-preview-stage { background: #171210; }
+.solid-editor .editor-top > .pirat-theme-toggle { margin-left: auto; }
+.solid-editor .editor-actions { margin-left: 0; }
+@media (max-width: 700px) {
+  .solid-auth .login-form-panel { padding-top: 80px; }
+  .solid-editor .editor-actions { gap: 5px; }
+  .solid-editor .pirat-theme-toggle { flex-basis: 36px; width: 36px; height: 38px; }
+}

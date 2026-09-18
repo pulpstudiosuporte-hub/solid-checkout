@@ -1,4 +1,4 @@
-# Site institucional SOLID
+# Site institucional Pirat
 
 ## Versão independente para Dokploy
 
@@ -6,7 +6,7 @@ A pasta `solid-site/` contém uma cópia independente do site, com entrada próp
 
 O cadastro e o login dessa versão sempre apontam para `https://app.solidcheckout.xyz`, inclusive em domínios temporários. As instruções abaixo descrevem a versão anterior, ainda integrada ao serviço web do aplicativo.
 
-A apresentação institucional usa as cores da SOLID e é carregada separadamente do painel e do checkout público. Inclui demonstração de checkout com mudança de cor, order bump e conclusão simulada, abas de recursos, integrações, passo a passo e perguntas frequentes. A demonstração não chama a API de pagamentos. Preços, indicadores de conversão e depoimentos não foram inventados; as condições comerciais são consultadas no painel.
+A apresentação institucional usa as cores da Pirat e é carregada separadamente do painel e do checkout público. Inclui demonstração de checkout com mudança de cor, order bump e conclusão simulada, abas de recursos, integrações, passo a passo e perguntas frequentes. A demonstração não chama a API de pagamentos. Preços, indicadores de conversão e depoimentos não foram inventados; as condições comerciais são consultadas no painel.
 
 ## Visualizar e testar
 
@@ -33,3 +33,13 @@ Para colocar esta versão no ar:
 4. Emitir/renovar o HTTPS para cada nome e conferir a página inicial, as âncoras, o acesso ao painel e um link de checkout existente.
 
 O domínio canônico, título, descrição e metadados de compartilhamento estão em `apps/web/site.html`. A página institucional não registra o service worker do painel. O build não modifica DNS, certificados, CORS, gateways ou banco de dados. Esta alteração não precisa de migration. A publicação e o domínio real devem ser verificados no ambiente de hospedagem; o teste local não comprova que estão no ar.
+
+## Identidade Pirat
+
+As duas entradas (`apps/web` e `solid-site`) usam as logos originais do papagaio,
+vinho, vermelho, marfim e dourado. `pirat-site.css` concentra os tokens e as
+fontes locais Bricolage Grotesque e Inter. Mantenha esse arquivo sincronizado
+nas duas pastas. Os domínios existentes e os links de acesso ao aplicativo
+continuam válidos; a troca visual não migra endereços.
+
+Valide também a versão independente com `npm.cmd run test:site` em `solid-site`.

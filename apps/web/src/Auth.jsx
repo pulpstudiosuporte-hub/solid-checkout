@@ -1,8 +1,11 @@
+import { useAppTheme } from './app-theme';
+import ThemeToggle from './ThemeToggle';
 import React, { useState } from 'react';
 import { ArrowRight, CheckCircle2, Eye, EyeOff, LoaderCircle, LockKeyhole, ShieldCheck } from 'lucide-react';
 import Turnstile, { turnstileEnabled } from './Turnstile';
 
 export default function Login({ onSubmit, onMfaSubmit, onRegister, onVerify, onForgot, onReset }) {
+  const { theme } = useAppTheme();
   const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
   const urlToken = urlParams.get('token'); const urlVerificationEmail = urlParams.get('email'); const urlVerificationCode = urlParams.get('code');
   const resetRoute = window.location.hash.startsWith('#/redefinir-senha');
@@ -47,8 +50,8 @@ export default function Login({ onSubmit, onMfaSubmit, onRegister, onVerify, onF
       <div className="login-message"><span className="login-kicker"><ShieldCheck size={16}/> Operação protegida</span><h1>Seu checkout.<br/>Sua operação.<br/><em>Sob controle.</em></h1><p>Acompanhe pedidos, personalize sua experiência e gerencie suas vendas em um só lugar.</p></div>
       <div className="login-brand-features"><span><CheckCircle2 size={16}/> Pedidos organizados</span><span><CheckCircle2 size={16}/> Checkout com sua marca</span><span><CheckCircle2 size={16}/> Controle da operação</span></div><div className="login-security"><LockKeyhole size={18}/><span><strong>Acesso seguro</strong><small>Sessão criptografada e protegida</small></span></div>
     </section>
-    <section className="login-form-panel"><form className="login-card" onSubmit={submit} noValidate>
-      <div className="login-mobile-brand"><img src="/brand/pirat-logo-on-light.png" alt="Pirat"/></div>
+    <section className="login-form-panel"><div className="login-appearance"><ThemeToggle/></div><form className="login-card" onSubmit={submit} noValidate>
+      <div className="login-mobile-brand"><img src={theme === 'dark' ? '/brand/pirat-logo-on-dark.png' : '/brand/pirat-logo-on-light.png'} alt="Pirat"/></div>
       <p className="eyebrow">{mode === 'register' ? 'COMECE AGORA' : mode === 'verify' ? 'VALIDAÇÃO SEGURA' : mode === 'mfa' ? 'SEGUNDO FATOR' : mode === 'forgot' || mode === 'reset' ? 'RECUPERAÇÃO SEGURA' : 'PAINEL ADMINISTRATIVO'}</p>
       <h2>{mode === 'register' ? 'Crie sua conta' : mode === 'verify' ? 'Confirme seu e-mail' : mode === 'mfa' ? 'Confirme que é você' : mode === 'forgot' ? 'Recupere seu acesso' : mode === 'reset' ? 'Crie uma nova senha' : 'Bem-vindo de volta'}</h2>
       <p className="login-subtitle">{mode === 'forgot' ? 'Informe seu e-mail. A resposta não revela se ele está cadastrado.' : mode === 'reset' ? 'O link só pode ser usado uma vez e expira em 20 minutos.' : mode === 'register' ? 'Confirme seu e-mail e entre imediatamente, sem aprovação manual.' : mode === 'verify' ? 'Digite o código de 6 dígitos enviado ao seu e-mail.' : mode === 'mfa' ? 'Digite o código do aplicativo autenticador ou um código de recuperação.' : 'Entre com os dados cadastrados para acessar sua loja.'}</p>
