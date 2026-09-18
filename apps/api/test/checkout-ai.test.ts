@@ -81,6 +81,30 @@ describe('checkout AI drafts', () => {
     expect((await app.inject({ method: 'POST', url: '/checkouts/ai/preview', headers, payload: { prompt: 'test' } })).statusCode).toBe(429);
     expect(fetch).toHaveBeenCalledTimes(10);
   });
+  it('recovers a transient provider failure once without repeating permanent errors', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(new Response('', { status: 503 })).mockResolvedValueOnce(provider());
+    vi.stubGlobal('fetch', fetch);
+    const signal = new AbortController().signal;
+    expect((await generateCheckoutDesign(environment, { prompt: 'test', testimonials: [] }, undefined, undefined, signal)).logoText).toBe('Minha loja');
+    expect(fetch).toHaveBeenCalledTimes(2);
+    fetch.mockReset().mockResolvedValue(new Response('', { status: 429 }));
+    await expect(generateCheckoutDesign(environment, { prompt: 'test', testimonials: [] }, undefined, undefined, signal)).rejects.toMatchObject({ reason: 'quota' });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it('reports repeated timeout distinctly and cancels during retry backoff', async () => {
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => AbortSignal.abort(new DOMException('Slow provider', 'TimeoutError')));
+    const fetch = vi.fn().mockRejectedValue(new DOMException('Slow provider', 'TimeoutError'));
+    vi.stubGlobal('fetch', fetch);
+    await expect(generateCheckoutDesign(environment, { prompt: 'test', testimonials: [] }, undefined, undefined, new AbortController().signal)).rejects.toMatchObject({ reason: 'timeout' });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const controller = new AbortController();
+    fetch.mockReset().mockRejectedValue(new TypeError('Connection lost'));
+    const pending = generateCheckoutDesign(environment, { prompt: 'test', testimonials: [] }, undefined, undefined, controller.signal);
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    await new Promise(resolve => setTimeout(resolve, 10));
+    controller.abort(); await rejected;
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
   it('passes cancellation to the provider', async () => {
     const fetch = vi.fn((_url: string, init: RequestInit) => new Promise((_resolve, reject) => {
       init.signal!.addEventListener('abort', () => reject(new DOMException('Cancelled', 'AbortError')), { once: true });
@@ -88,7 +112,7 @@ describe('checkout AI drafts', () => {
     vi.stubGlobal('fetch', fetch);
     const controller = new AbortController();
     const pending = generateCheckoutDesign(environment, { prompt: 'test', testimonials: [] }, undefined, undefined, controller.signal);
-    const rejected = expect(pending).rejects.toThrow('Cancelled');
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
     controller.abort(); await rejected;
   });
 });

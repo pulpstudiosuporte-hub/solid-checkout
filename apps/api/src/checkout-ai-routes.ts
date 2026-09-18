@@ -43,8 +43,9 @@ export function registerCheckoutAiRoutes(app: FastifyInstance, environment: AppE
     try { return reply.send({ config: await generateCheckoutDesign(environment, idea, productTitle, reference, controller.signal) }); }
     catch (cause) {
       const quota = cause instanceof AssistantUnavailable && cause.reason === 'quota';
+      const timeout = cause instanceof AssistantUnavailable && cause.reason === 'timeout';
       request.log.warn({ reason: cause instanceof AssistantUnavailable ? cause.reason : 'connection' }, 'checkout_ai_unavailable');
-      return reply.code(503).send({ error: { message: quota ? 'A IA atingiu o limite de uso. Tente mais tarde.' : 'Não consegui montar a prévia agora. Sua ideia foi mantida; tente novamente.' } });
+      return reply.code(503).send({ error: { message: quota ? 'A IA atingiu o limite de uso. Tente mais tarde.' : timeout ? 'A IA demorou mais que o esperado. Sua ideia e a prévia anterior foram mantidas; tente novamente.' : 'Não consegui montar a prévia agora. Sua ideia foi mantida; tente novamente.' } });
     } finally { reference = undefined; reply.raw.off('close', disconnect); }
   });
 }

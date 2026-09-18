@@ -25,7 +25,10 @@ do Google; o processamento segue os termos do provedor.
 `POST /checkouts/ai/preview` exige sessão, CSRF/origem válidos e papel OWNER ou
 ADMIN na loja ativa. Sessões de suporte não geram checkouts. O produto é buscado
 no contexto da loja; somente o título é enviado ao modelo. Limite de 10 pedidos
-por conta/hora, corpo de 3 MB e geração de até 45 segundos. A chave e o modelo
+por conta/hora, corpo de 3 MB e até duas tentativas de 20 segundos, separadas por
+500 ms. Somente falhas de conexão, timeout e HTTP 408/500/502/503/504 são repetidas;
+cotas e erros permanentes não. Cancelar interrompe também a recuperação.
+A chave e o modelo
 usam as variáveis da API já configuradas para o papagaio.
 
 A saída passa por uma lista explícita de campos visuais. URLs, scripts, preços,

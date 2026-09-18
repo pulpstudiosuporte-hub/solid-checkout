@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260918-checkout-ai-recovery',
+    category: 'FIX' as const,
+    title: 'Recuperação automática na criação com IA',
+    description: 'O criador tenta novamente quando a IA demora ou enfrenta uma falha temporária. Se ainda não conseguir, sua ideia e a prévia anterior continuam disponíveis para você retomar.',
+    publishedAt: new Date('2026-09-18T22:05:00.000Z'),
+  },
+  {
     publicId: 'auto-20260918-checkout-ai-builder',
     category: 'NEWS' as const,
     title: 'Crie seu checkout com IA',
