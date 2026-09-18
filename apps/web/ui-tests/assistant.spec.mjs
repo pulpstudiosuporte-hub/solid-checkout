@@ -76,6 +76,20 @@ test('falha preserva pergunta para repetir e fechamento cancela a resposta', asy
   await expect(question(page)).toHaveValue('Como uso os cupons?');
   await expect(page.getByRole('log')).toBeEmpty();
 });
+test('explica limite, demora e indisponibilidade sem perder a pergunta', async ({ page }) => {
+  await setup(page);
+  await launcher(page).click();
+  for (const [code, text] of [['ASSISTANT_BUSY', 'atingiu o limite de uso'], ['ASSISTANT_TIMEOUT', 'demorou para responder'], ['ASSISTANT_UNAVAILABLE', 'temporariamente indisponível']]) {
+    await page.route('**/assistant/messages', route => route.fulfill({ status: 503, json: { error: { code } } }));
+    await question(page).fill('Coloquei o embed da Shopify. O que falta agora?');
+    await question(page).press('Enter');
+    await expect(page.getByRole('alert')).toContainText(text);
+    await expect(question(page)).toHaveValue('Coloquei o embed da Shopify. O que falta agora?');
+    await expect(page.getByRole('log')).toBeEmpty();
+    await page.unroute('**/assistant/messages');
+  }
+});
+
 test('não simula IA sem configuração nem aparece no login', async ({ page }) => {
   await setup(page, { available: false });
   await launcher(page).click();

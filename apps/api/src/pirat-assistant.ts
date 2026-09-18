@@ -1,4 +1,5 @@
 import type { AppEnvironment } from '@solid/config';
+import { setTimeout as delay } from 'node:timers/promises';
 
 export type HelpMessage = { role: 'user' | 'assistant'; text: string };
 export const assistantMoods = ['replying', 'happy', 'angry', 'sad'] as const;
@@ -24,16 +25,12 @@ Base de ajuda verificada:
 Se algo não estiver nessa base, deixe a incerteza clara e oriente buscar suporte pela opção disponível no painel, sem inventar contato.`;
 
 export class AssistantUnavailable extends Error {
-  constructor(public readonly reason: 'quota' | 'upstream' | 'response') { super('Assistant unavailable'); }
+  constructor(public readonly reason: 'quota' | 'upstream' | 'response' | 'timeout' | 'connection', public readonly providerStatus?: number) { super('Assistant unavailable'); }
 }
 
 export async function generateHelp(environment: AppEnvironment, messages: HelpMessage[], signal?: AbortSignal): Promise<HelpAnswer> {
   const model = environment.GEMINI_MODEL || 'gemini-3.1-flash-lite';
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-goog-api-key': environment.GEMINI_API_KEY! },
-    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
-    body: JSON.stringify({
+  const body = JSON.stringify({
       systemInstruction: { parts: [{ text: piratHelp }] },
       contents: messages.map(message => ({ role: message.role === 'assistant' ? 'model' : 'user', parts: [{ text: message.text }] })),
       generationConfig: {
@@ -41,12 +38,40 @@ export async function generateHelp(environment: AppEnvironment, messages: HelpMe
         responseMimeType: 'application/json',
         responseJsonSchema: { type: 'object', properties: { text: { type: 'string' }, mood: { type: 'string', enum: [...assistantMoods] } }, required: ['text', 'mood'], additionalProperties: false },
       },
-    }),
-  });
+    });
+  // Retry only transient failures once. Quotas, credentials and invalid requests
+  // must not be retried. One merchant request still consumes one local quota unit.
+  let response: Response | undefined;
+  let result: { candidates?: { finishReason?: string; content?: { parts?: { text?: string; thought?: boolean }[] } }[] } | undefined;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    signal?.throwIfAborted();
+    const timeout = AbortSignal.timeout(20_000);
+    try {
+      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': environment.GEMINI_API_KEY! },
+        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+        body,
+      });
+      if (response.ok) result = await response.json() as typeof result;
+    } catch (cause) {
+      signal?.throwIfAborted();
+      response = undefined;
+      if (cause instanceof SyntaxError) throw new AssistantUnavailable('response');
+      if (attempt === 1) throw new AssistantUnavailable(timeout.aborted ? 'timeout' : 'connection');
+      if (!(cause instanceof TypeError) && !timeout.aborted) throw cause;
+    }
+    if (response) {
+      if (response.ok || ![408, 500, 502, 503, 504].includes(response.status) || attempt === 1) break;
+      await response.body?.cancel();
+      response = undefined;
+    }
+    await delay(500, undefined, { signal });
+  }
+  if (!response) throw new AssistantUnavailable('connection');
   // Provider errors may contain sensitive details; never log or return the body.
-  if (!response.ok) { await response.body?.cancel(); throw new AssistantUnavailable(response.status === 429 ? 'quota' : 'upstream'); }
-  const body = await response.json() as { candidates?: { finishReason?: string; content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
-  const candidate = body.candidates?.[0];
+  if (!response.ok) { await response.body?.cancel(); throw new AssistantUnavailable(response.status === 429 ? 'quota' : 'upstream', response.status); }
+  const candidate = result?.candidates?.[0];
   if (candidate?.finishReason !== 'STOP') throw new AssistantUnavailable('response');
   let answer: HelpAnswer;
   try { answer = JSON.parse(candidate.content?.parts?.filter(part => !part.thought).map(part => part.text || '').join('') || '') as HelpAnswer; }

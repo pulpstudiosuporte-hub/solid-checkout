@@ -65,7 +65,8 @@ export default function PiratAssistant({ csrfToken }) {
       if (controller.signal.aborted) return;
       setMood('sad');
       if (cause?.code === 'ASSISTANT_NOT_CONFIGURED') setAvailability('unconfigured');
-      setError(cause?.status === 401 || cause?.status === 403 ? 'Sua sessão precisa ser atualizada. Recarregue o painel para continuar.' : cause?.status === 429 ? 'Vamos dar um descanso ao bico. O limite é de 20 perguntas por hora; tente mais tarde.' : 'Opa, perdi a conexão com o mapa. Sua pergunta continua aqui para tentar novamente.');
+      const preserved = ' Sua pergunta continua aqui para tentar novamente.';
+      setError(cause?.status === 401 || cause?.status === 403 ? 'Sua sessão precisa ser atualizada. Recarregue o painel para continuar.' : cause?.status === 429 ? 'Vamos dar um descanso ao bico. O limite é de 20 perguntas por hora; tente mais tarde.' : cause?.code === 'ASSISTANT_BUSY' ? `O serviço de IA atingiu o limite de uso. Tente mais tarde.${preserved}` : cause?.code === 'ASSISTANT_TIMEOUT' ? `O serviço de IA demorou para responder.${preserved}` : cause?.code === 'ASSISTANT_UNAVAILABLE' ? `O serviço de IA está temporariamente indisponível.${preserved}` : `Não consegui concluir a resposta.${preserved}`);
     } finally {
       if (request.current === controller) { request.current = null; setPending(''); input.current?.focus(); }
     }

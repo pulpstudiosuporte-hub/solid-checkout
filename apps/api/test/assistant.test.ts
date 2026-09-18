@@ -17,7 +17,7 @@ function app(overrides: Partial<AppEnvironment> = {}, actor = session) {
   const instance = buildApp({ ...environment, ...overrides }, { authRepository: auth });
   apps.push(instance); return instance;
 }
-afterEach(async () => { vi.unstubAllGlobals(); await Promise.all(apps.splice(0).map(instance => instance.close())); });
+afterEach(async () => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); await Promise.all(apps.splice(0).map(instance => instance.close())); });
 
 describe('Pirat assistant', () => {
   it('requires a session, trusted origin and CSRF before calling the provider', async () => {
@@ -82,6 +82,63 @@ describe('Pirat assistant', () => {
     expect(result.statusCode).toBe(503);
     expect(result.json<{ error: { code: string } }>().error.code).toBe('ASSISTANT_BUSY');
     expect(result.body).not.toContain('secret diagnostic');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it.each([500, 502, 503, 504, 408])('recovers once from transient provider status %s', async status => {
+    const fetch = vi.fn().mockResolvedValueOnce(new Response('temporary', { status })).mockResolvedValueOnce(providerResponse());
+    vi.stubGlobal('fetch', fetch);
+    const response = await app().inject({ method: 'POST', url: '/assistant/messages', headers, payload });
+    expect(response.statusCode).toBe(200);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const first = fetch.mock.calls[0] as [string, RequestInit];
+    const second = fetch.mock.calls[1] as [string, RequestInit];
+    expect(first[1].body).toEqual(second[1].body);
+  });
+  it.each([400, 401, 403, 404])('does not retry permanent provider status %s', async status => {
+    const fetch = vi.fn().mockResolvedValue(new Response('private provider diagnostic', { status }));
+    vi.stubGlobal('fetch', fetch);
+    await expect(generateHelp(environment, [{ role: 'user', text: 'oi' }])).rejects.toMatchObject({ reason: 'upstream', providerStatus: status });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it('recovers from a network failure and stops after two unsuccessful attempts', async () => {
+    const fetch = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed')).mockResolvedValueOnce(providerResponse());
+    vi.stubGlobal('fetch', fetch);
+    expect((await generateHelp(environment, [{ role: 'user', text: 'oi' }])).mood).toBe('replying');
+    fetch.mockReset().mockResolvedValue(new Response('private failure', { status: 503 }));
+    await expect(generateHelp(environment, [{ role: 'user', text: 'oi' }])).rejects.toMatchObject({ reason: 'upstream', providerStatus: 503 });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it('cancels the backoff without sending a second request', async () => {
+    const controller = new AbortController();
+    let firstAttempt!: () => void;
+    const called = new Promise<void>(resolve => { firstAttempt = resolve; });
+    const fetch = vi.fn(() => { firstAttempt(); return Promise.resolve(new Response('temporary', { status: 503 })); });
+    vi.stubGlobal('fetch', fetch);
+    const result = generateHelp(environment, [{ role: 'user', text: 'oi' }], controller.signal);
+    const rejected = expect(result).rejects.toThrow();
+    await called; controller.abort(); await rejected;
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it('recovers if the provider disconnects while reading the response body', async () => {
+    const interrupted = providerResponse();
+    vi.spyOn(interrupted, 'json').mockRejectedValue(new TypeError('connection reset'));
+    const fetch = vi.fn().mockResolvedValueOnce(interrupted).mockResolvedValueOnce(providerResponse());
+    vi.stubGlobal('fetch', fetch);
+    expect((await generateHelp(environment, [{ role: 'user', text: 'oi' }])).mood).toBe('replying');
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it('reports timeouts after two bounded attempts', async () => {
+    const nativeTimeout = AbortSignal.timeout.bind(AbortSignal);
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+      expect(ms).toBe(20_000);
+      return nativeTimeout(1);
+    });
+    const fetch = vi.fn((_url: string, init: RequestInit) => new Promise((_resolve, reject) => init.signal!.addEventListener('abort', () => reject(new DOMException('Timed out', 'TimeoutError')), { once: true })));
+    vi.stubGlobal('fetch', fetch);
+    const result = generateHelp(environment, [{ role: 'user', text: 'oi' }]);
+    const rejected = expect(result).rejects.toMatchObject({ reason: 'timeout' });
+    await rejected;
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
   it.each([null, { text: '', mood: 'happy' }, { text: 'ok', mood: '../../invalid' }])('rejects malformed provider output %s', async answer => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(providerResponse(answer))));

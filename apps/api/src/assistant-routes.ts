@@ -56,8 +56,9 @@ export function registerAssistantRoutes(app: FastifyInstance, environment: AppEn
     try { return reply.send(await generateHelp(environment, messages, controller.signal)); }
     catch (cause) {
       const quota = cause instanceof AssistantUnavailable && cause.reason === 'quota';
-      request.log.warn({ reason: cause instanceof AssistantUnavailable ? cause.reason : 'connection' }, 'pirat_assistant_unavailable');
-      return reply.code(503).send({ error: { code: quota ? 'ASSISTANT_BUSY' : 'ASSISTANT_UNAVAILABLE', message: quota ? 'O papagaio está com muitas perguntas. Tente novamente mais tarde.' : 'O papagaio perdeu o fio da conversa. Tente novamente em instantes.' } });
+      const timeout = cause instanceof AssistantUnavailable && cause.reason === 'timeout';
+      request.log.warn({ reason: cause instanceof AssistantUnavailable ? cause.reason : 'connection', providerStatus: cause instanceof AssistantUnavailable ? cause.providerStatus : undefined }, 'pirat_assistant_unavailable');
+      return reply.code(503).send({ error: { code: quota ? 'ASSISTANT_BUSY' : timeout ? 'ASSISTANT_TIMEOUT' : 'ASSISTANT_UNAVAILABLE', message: quota ? 'O serviço de IA atingiu o limite de uso. Tente novamente mais tarde.' : timeout ? 'O serviço de IA demorou para responder. Tente novamente em instantes.' : 'O serviço de IA está temporariamente indisponível. Tente novamente em instantes.' } });
     } finally { reply.raw.off('close', disconnect); }
   });
 }

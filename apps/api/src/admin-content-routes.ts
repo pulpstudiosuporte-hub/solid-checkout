@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260918-pirat-assistant-recovery',
+    category: 'FIX' as const,
+    title: 'Mais estabilidade nas respostas do papagaio',
+    description: 'O assistente tenta novamente quando a IA enfrenta uma falha temporária. Os avisos agora distinguem demora, indisponibilidade e limite de uso, mantendo sua pergunta para tentar de novo.',
+    publishedAt: new Date('2026-09-18T19:40:00.000Z'),
+  },
+  {
     publicId: 'auto-20260918-pirat-assistant',
     category: 'NEWS' as const,
     title: 'Um papagaio para tirar suas dúvidas',
