@@ -22,6 +22,8 @@ jobs:
           node-version: 22.12.0
           cache: npm
       - run: npm ci --ignore-scripts
+      # The root lint also checks the independently packaged marketing site.
+      - run: npm ci --prefix solid-site --ignore-scripts
       # Fresh runners need generated database types and shared runtime exports.
       - run: npm run build --workspace=@solid/contracts --workspace=@solid/config --workspace=@solid/authorization --workspace=@solid/database
       - run: npm run check

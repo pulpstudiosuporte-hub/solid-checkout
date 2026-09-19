@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { dashboardNewsItems, normalizePlatformReleases, releaseVideoSource } from '../src/platform-content.js';
+import { dashboardFeaturedRelease, dashboardNewsItems, normalizePlatformReleases, releaseVideoSource } from '../src/platform-content.js';
 
 describe('conteúdo dinâmico da plataforma', () => {
+  it('mantém a mídia em destaque quando chegam publicações só de texto', () => {
+    const text = { title: 'Correção nova' };
+    const image = { title: 'Imagem cadastrada', imageUrl: 'https://example.com/image.webp' };
+    const video = { title: 'Vídeo cadastrado', videoUrl: 'https://example.com/video.mp4' };
+    expect(dashboardFeaturedRelease([text, image, video])).toBe(image);
+    expect(dashboardFeaturedRelease([text, video, image])).toBe(video);
+    expect(dashboardFeaturedRelease([text])).toBe(text);
+    expect(dashboardFeaturedRelease([])).toBeUndefined();
+  });
   it('mantém listas vazias sem inventar publicações', () => {
     expect(normalizePlatformReleases([])).toEqual([]);
     expect(dashboardNewsItems([])).toEqual([]);

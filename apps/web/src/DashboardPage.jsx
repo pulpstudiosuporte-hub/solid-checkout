@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, ArrowRight, CircleDollarSign, Compass, LayoutTemplate, LoaderCircle, Radio, RotateCcw, ShoppingCart, Sparkles, TrendingUp } from 'lucide-react';
 import { getDashboard, getPlatformContent } from './api';
-import { dashboardNewsItems } from './platform-content';
+import { dashboardFeaturedRelease, dashboardNewsItems } from './platform-content';
+import ReleaseMedia from './ReleaseMedia';
 import RevenueOverview from './RevenueOverview';
 import './dashboard-captain.css';
 
@@ -48,6 +49,8 @@ export default function DashboardPage({ setPage, storeKey }) {
 
   const data = state.data;
   const newsItems = dashboardNewsItems(newsState.items);
+  const featuredNews = dashboardFeaturedRelease(newsState.items);
+  const hasFeaturedMedia = Boolean(featuredNews?.imageUrl || featuredNews?.videoUrl);
   const analytics = data.analytics || {
     sessions: data.paidOrders + data.pendingPix,
     generatedRevenueCents: data.revenueCents,
@@ -69,7 +72,7 @@ export default function DashboardPage({ setPage, storeKey }) {
     </section>
     <section className="home-main-grid">
       <article className="card home-geo"><div className="home-card-title"><div><h2>Alcance geográfico</h2><p>Localização aproximada dos visitantes por IP.</p></div><select value={geoPeriod} onChange={event => setGeoPeriod(event.target.value)} aria-label="Período do alcance"><option value="today">Hoje</option><option value="7d">Últimos 7 dias</option><option value="month">Este mês</option></select></div><div className={`dot-map world ${locations.length ? 'has-locations' : ''}`}><React.Suspense fallback={<LoaderCircle className="spin" aria-label="Carregando mapa"/>}><WorldMap locations={locations}/></React.Suspense></div>{!locations.length && <p className="geo-empty-note">{geoState.error && geoPeriod !== 'today' ? 'Não foi possível atualizar o mapa agora.' : 'O mapa começará a preencher com as próximas visitas identificadas pela Cloudflare.'}</p>}{locations.length > 0 && <div className="geo-location-list">{locations.slice(0,5).map((location,index)=><span key={`${location.country}-${location.region}-${location.city}-${index}`}><b>{location.city || location.region || location.country}</b><small>{location.region ? `${location.region} · ` : ''}{location.country} · {location.visitors}</small></span>)}</div>}<div className="home-geo-stats"><div><span>Cidades alcançadas</span><strong>{Number(geography.cities || 0)}</strong><small>{Number(geography.regions || 0)} regiões</small></div><div><span>Visitantes localizados</span><strong>{Number(geography.visitors || 0)}</strong><small>No período selecionado</small></div><div><span>Países alcançados</span><strong>{Number(geography.countries || 0)}</strong><small>Localização anonimizada</small></div></div></article>
-      <aside className="card home-news"><div className="home-news-cover"><span>NOVIDADES Pirat</span><b>{newsState.items[0]?.title || 'Acompanhe a evolução da plataforma'}</b></div><div className="home-news-list">{newsState.loading ? <div className="home-news-state"><LoaderCircle className="spin"/> Carregando novidades...</div> : newsState.error ? <div className="home-news-state error"><AlertCircle size={17}/> Novidades indisponíveis agora</div> : newsItems.length ? newsItems.map(([id,title,time]) => <button key={id} onClick={() => setPage('Novidades')}><span>{title}</span><small>{time}</small><ArrowRight size={15}/></button>) : <div className="home-news-state"><Sparkles size={17}/> Nenhuma novidade publicada</div>}</div><button className="home-news-cta" onClick={() => setPage('Novidades')}>Ver novidades e roadmap <ArrowRight size={16}/></button></aside>
+      <aside className="card home-news"><div className={`home-news-cover${hasFeaturedMedia ? ' has-media' : ''}`}><span>NOVIDADES Pirat</span>{hasFeaturedMedia ? <ReleaseMedia item={featuredNews}/> : <b>{featuredNews?.title || 'Acompanhe a evolução da plataforma'}</b>}</div><div className="home-news-list">{newsState.loading ? <div className="home-news-state"><LoaderCircle className="spin"/> Carregando novidades...</div> : newsState.error ? <div className="home-news-state error"><AlertCircle size={17}/> Novidades indisponíveis agora</div> : newsItems.length ? newsItems.map(([id,title,time]) => <button key={id} onClick={() => setPage('Novidades')}><span>{title}</span><small>{time}</small><ArrowRight size={15}/></button>) : <div className="home-news-state"><Sparkles size={17}/> Nenhuma novidade publicada</div>}</div><button className="home-news-cta" onClick={() => setPage('Novidades')}>Ver novidades e roadmap <ArrowRight size={16}/></button></aside>
     </section>
     </div>
     <RevenueOverview storeKey={storeKey} onOrders={() => setPage('Pedidos')}/>

@@ -1,7 +1,8 @@
+import ReleaseMedia from './ReleaseMedia';
 import { useEffect, useState } from 'react';
 import { AlertCircle, ArrowRight, Bug, CheckCircle2, Heart, Lightbulb, LoaderCircle, Plus, Rocket, Send, Sparkles, X } from 'lucide-react';
 import { createProductFeedback, getPlatformContent, getProductFeedback, toggleProductFeedbackVote } from './api';
-import { normalizePlatformReleases, releaseVideoSource } from './platform-content';
+import { normalizePlatformReleases } from './platform-content';
 
 const updateFilters = ['Todos', 'Novidades', 'Melhorias', 'Correções', 'Integrações', 'Segurança'];
 const columns = [
@@ -10,15 +11,6 @@ const columns = [
   { id: 'IN_PROGRESS', title: 'Estamos construindo', description: 'Em desenvolvimento pela equipe', tone: 'blue' },
   { id: 'DONE', title: 'Pronto', description: 'Já disponível na plataforma', tone: 'green' },
 ];
-function ReleaseMedia({ item }) {
-  if (item.videoUrl) {
-    const source = releaseVideoSource(item.videoUrl);
-    if (source.kind === 'embed') return <div className="release-video"><iframe src={source.url} title={`Vídeo: ${item.title}`} loading="lazy" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowFullScreen/></div>;
-    if (source.kind === 'media') return <video className="release-video" src={source.url} poster={item.imageUrl || undefined} controls preload="metadata">Seu navegador não consegue reproduzir este vídeo.</video>;
-  }
-  return item.imageUrl ? <img className="release-image" src={item.imageUrl} alt="" loading="lazy"/> : null;
-}
-
 function FeedbackDialog({ type, onClose, onSubmit, busy }) {
   const [form, setForm] = useState({ title: '', description: '' });
   const submit = event => { event.preventDefault(); onSubmit({ ...form, type }); };

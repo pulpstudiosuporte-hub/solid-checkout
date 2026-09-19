@@ -9,7 +9,7 @@ const products = [
 const orders = ['PAID', 'PENDING', 'PAID', 'EXPIRED', 'PAID'].map((status, index) => ({ publicId: `qa-order-000${index + 1}`, createdAt: `2026-09-10T${14 + index}:25:00.000Z`, status, totalCents: 14900 + index * 2900, country: 'BR', paymentProvider: 'ROAS', customer: { name: ['Ana Lima', 'Lucas Costa', 'Paula Souza', 'Bruno Alves', 'Camila Santos'][index], email: `cliente${index + 1}@example.com` }, items: [{ quantity: 1, titleSnapshot: 'Kit Essentials', totalCents: 14900 }] }));
 const releases = [{ publicId: 'qa-release', title: 'Novidades para sua operação', publishedAt: '2026-09-10T12:00:00Z', category: 'IMPROVEMENT', summary: 'Exemplo de atualização para revisão visual.' }];
 
-export async function mockAdmin(page, { anonymous = false, revenueError = false, empty = false, fullYear = false } = {}) {
+export async function mockAdmin(page, { anonymous = false, revenueError = false, empty = false, fullYear = false, platformReleases = releases } = {}) {
   page.on('pageerror', error => console.error('Browser error:', error.message));
   page.on('requestfailed', request => console.error('Request failed:', request.url(), request.failure()?.errorText));
   const unexpected = [];
@@ -27,7 +27,7 @@ export async function mockAdmin(page, { anonymous = false, revenueError = false,
     if (path === '/auth/session') return anonymous ? respond({ error: { message: 'Sem sessão de teste' } }, 401) : respond({ user, csrfToken: 'qa-token' });
     if (path === '/stores') return respond({ items: [store] });
     if (path === '/settings') return respond({ user, store: { ...store, profile: { legalName: 'Aurora Exemplo', businessModel: 'E-commerce', noWebsite: true } }, members: [{ user, role: 'OWNER' }], activation: { completed: true, missing: [] }, preferences: {} });
-    if (path === '/platform-content') return respond({ releases, assets: [] });
+    if (path === '/platform-content') return respond({ releases: platformReleases, assets: [] });
     if (path === '/notifications') return respond({ items: [], unread: 0 });
     if (path === '/notifications/push/config') return respond({ enabled: false });
     if (path === '/dashboard') {

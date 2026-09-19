@@ -13,6 +13,10 @@ export function dashboardNewsItems(items = [], limit = 4) {
   return items.slice(0, limit).map(item => [item.publicId, item.title, new Date(item.publishedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })]);
 }
 
+export function dashboardFeaturedRelease(items = []) {
+  return items.find(item => item.imageUrl || releaseVideoSource(item.videoUrl).kind !== 'invalid') || items[0];
+}
+
 export function releaseVideoSource(value) {
   try {
     const url = new URL(value);

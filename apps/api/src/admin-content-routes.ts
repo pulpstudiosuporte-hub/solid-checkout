@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260919-dashboard-news-media',
+    category: 'FIX' as const,
+    title: 'Imagens e vídeos no destaque de novidades',
+    description: 'O destaque do início agora mostra a imagem ou o vídeo da publicação mais recente com mídia. Vídeos têm controles de reprodução, e os demais lançamentos continuam na lista de novidades.',
+    publishedAt: new Date('2026-09-19T21:00:00.000Z'),
+  },
+  {
     publicId: 'auto-20260919-dashboard-navigation',
     category: 'IMPROVEMENT' as const,
     title: 'Indicadores juntos e navegação em destaque',

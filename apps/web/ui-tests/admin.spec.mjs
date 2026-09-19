@@ -196,3 +196,34 @@ test('gráfico anual permite navegar os 365 dias sem estourar a largura', async 
   await expect(page.locator('.dashboard-chart-tooltip')).toContainText('01/01');
   for (const width of [1440, 768, 390, 320]) { await page.setViewportSize({ width, height: 900 }); await fits(page); }
 });
+
+for (const format of ['image', 'video', 'youtube']) {
+  test(`novidades mostram mídia cadastrada: ${format}`, async ({ page }) => {
+    const imageUrl = '/brand/templates/varejo-art.webp';
+    const featured = { publicId: 'media', title: 'Conheça os modelos', publishedAt: '2026-09-10T12:00:00Z', imageUrl,
+      ...(format === 'video' ? { videoUrl: 'https://example.com/news.mp4' } : format === 'youtube' ? { videoUrl: 'https://youtu.be/dQw4w9WgXcQ' } : {}) };
+    await mockAdmin(page, { platformReleases: [{ publicId: 'newer', title: 'Correção sem mídia', publishedAt: '2026-09-11T12:00:00Z' }, featured] });
+    if (format !== 'image') await page.route(format === 'video' ? '**/news.mp4' : 'https://www.youtube-nocookie.com/**', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<p>Player de teste</p>' }));
+    await page.goto('/'); await ready(page);
+    const cover = page.locator('.home-news-cover');
+    if (format === 'image') {
+      await expect(cover.getByRole('img', { name: featured.title })).toBeVisible();
+      await expect.poll(() => cover.locator('img').evaluate(img => img.naturalWidth)).toBeGreaterThan(0);
+      for (const [width, height] of [[1366, 768], [390, 844]]) {
+        await page.setViewportSize({ width, height }); await fits(page);
+        await cover.scrollIntoViewIfNeeded();
+        expect(await cover.locator('img').evaluate(el => getComputedStyle(el).objectFit)).toBe('cover');
+        expect(Math.abs((await cover.locator('img').boundingBox()).width - (await cover.boundingBox()).width)).toBeLessThan(2);
+        await page.screenshot({ path: output(`news-media-${width}.png`), animations: 'disabled' });
+        expect(await cover.evaluate(el => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
+      }
+    } else if (format === 'video') {
+      const frame = await cover.locator('video').boundingBox();
+      expect(frame.width / frame.height).toBeCloseTo(16 / 9, 1);
+      await expect(cover.locator('video')).toHaveAttribute('controls', '');
+      await expect(cover.locator('video')).toHaveAttribute('poster', imageUrl);
+      await expect(cover.locator('video')).not.toHaveAttribute('autoplay', '');
+      await expect(cover.locator('img')).toHaveCount(0);
+    } else await expect(cover.locator('iframe')).toHaveAttribute('src', 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+  });
+}
