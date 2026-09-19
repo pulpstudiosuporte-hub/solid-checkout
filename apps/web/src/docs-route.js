@@ -1,3 +1,4 @@
+import { docsAliases } from './docs-aliases';
 export const docsOrigin = 'https://docs.apirat.io';
 
 export function isDocsHost({ hostname = '' }) {
@@ -12,7 +13,7 @@ export function resolveDocsRoute({ hash = '', hostname = '', pathname = '/' }) {
   }
   const [path, query = ''] = hash.slice(1).split('?');
   const slug = path.replace(/^\/docs\/?/, '').replace(/\/$/, '');
-  return { slug, section: new URLSearchParams(query).get('section') || '' };
+  return { slug: docsAliases[slug] || slug, section: docsAliases[slug] ? '' : new URLSearchParams(query).get('section') || '' };
 }
 
 export function docsHref(slug = '', section = '') {

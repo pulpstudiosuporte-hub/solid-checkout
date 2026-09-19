@@ -8,6 +8,7 @@ import './admin-styles.css';
 import './admin-refresh.css';
 import './pirat-theme.css';
 import './app-dark-theme.css';
+import './sidebar-pirat.css';
 import { defaultCheckoutConfig } from './checkout-config';
 const CheckoutEditor = lazy(() => import('./CheckoutEditor'));
 import { archiveStore, bindTabToUser, clearTabUser, completeMfaLogin, createStore, forgotPassword, getApiHealth, getSession, getSettings, getStores, login, logout, registerAccount, resetPassword, selectStore, verifyAccount } from './api';
@@ -63,9 +64,9 @@ const navGroups = [
   ]},
 ];
 
-function Logo({ compact = false, merchantPreview = false }) {
+function Logo({ compact = false, merchantPreview = false, onDark = false }) {
   const { theme } = useAppTheme();
-  return <div className={`brand ${compact ? 'compact' : ''}`}><img className="brand-symbol" src="/brand/pirat-mascot.png" alt=""/>{!compact && <img className="brand-wordmark" src={!merchantPreview && theme === 'dark' ? '/brand/pirat-logo-on-dark.png' : '/brand/pirat-logo-on-light.png'} alt="Pirat"/>}</div>;
+  return <div className={`brand ${compact ? 'compact' : ''}`}><img className="brand-symbol" src="/brand/pirat-mascot.png" alt=""/>{!compact && <img className="brand-wordmark" src={onDark || (!merchantPreview && theme === 'dark') ? '/brand/pirat-logo-on-dark.png' : '/brand/pirat-logo-on-light.png'} alt="Pirat"/>}</div>;
 }
 
 function Badge({ children, tone = 'neutral' }) { return <span className={`badge ${tone}`}>{children}</span>; }
@@ -102,7 +103,7 @@ function Sidebar({ open, collapsed, onClose, onToggleCollapsed, page, setPage, u
   return <>
     {open && <button className="backdrop" onClick={onClose} aria-label="Fechar menu" />}
     <aside ref={drawer} aria-label="Navegação da loja" className={`sidebar ${open ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
-      <div className="side-head"><Logo compact={collapsed}/><button className="icon-btn sidebar-collapse" onClick={onToggleCollapsed} aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'} title={collapsed ? 'Expandir menu' : 'Recolher menu'}>{collapsed ? <PanelLeftOpen size={18}/> : <PanelLeftClose size={18}/>}</button><button className="icon-btn mobile-only" aria-label="Fechar navegação" onClick={onClose}><X size={19}/></button></div>
+      <div className="side-head"><Logo compact={collapsed} onDark/><button className="icon-btn sidebar-collapse" onClick={onToggleCollapsed} aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'} title={collapsed ? 'Expandir menu' : 'Recolher menu'}>{collapsed ? <PanelLeftOpen size={18}/> : <PanelLeftClose size={18}/>}</button><button className="icon-btn mobile-only" aria-label="Fechar navegação" onClick={onClose}><X size={19}/></button></div>
       <StoreSwitcher stores={stores} busy={storeBusy} onSelect={onSelectStore} onCreate={onCreateStore} onArchive={onArchiveStore} support={support && support.mode !== 'FULL_ACCESS'}/>
       <nav aria-label="Menu principal">
         <section className="sidebar-navigation">

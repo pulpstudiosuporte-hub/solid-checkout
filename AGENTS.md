@@ -8,9 +8,9 @@ Para o site institucional, prefira `npm.cmd run test:site` (ou `npm run test:sit
 
 # Publicação e novidades
 
-Toda nova funcionalidade, integração, CLI ou mudança de fluxo deve atualizar a documentação pública correspondente no mesmo conjunto de alterações. Inclua exemplos executáveis, requisitos e limites reais; não documente capacidades planejadas como disponíveis.
+Toda nova capacidade de integração, CLI ou mudança de contrato para desenvolvedores deve atualizar a documentação pública correspondente no mesmo conjunto de alterações. Inclua exemplos executáveis, requisitos e limites reais; não documente capacidades planejadas como disponíveis.
 
-A documentação pública serve para ensinar a usar e integrar a Pirat. Não a use como histórico de novidades, anúncio de lançamento ou descrição de redesign. Mudanças apenas visuais não exigem atualização dos guias; atualize-os quando as instruções de uso realmente mudarem. Anúncios e melhorias entregues pertencem à área Novidades.
+A documentação pública é exclusiva para desenvolvedores: ensine a integrar e estender a Pirat com CLI, temas, contratos, autenticação, webhooks, exemplos executáveis, erros e limites. Atualize-a quando uma implementação mudar o que um desenvolvedor pode fazer ou como integrar. Não inclua tutoriais gerais de lojista, histórico de novidades, anúncios ou descrições de redesign. Mudanças apenas visuais não exigem atualização dos guias. Anúncios e melhorias entregues pertencem à área Novidades.
 
 A cada deploy com mudanças para o usuário, inclua no mesmo conjunto de alterações uma publicação em `automaticReleases` (`apps/api/src/admin-content-routes.ts`) descrevendo as funcionalidades, melhorias ou correções entregues. Use identificador estável e único, categoria adequada e texto curto em português voltado ao lojista. Preserve publicações e edições manuais existentes; não envie notificações em massa sem pedido explícito. Confirme separadamente push, deploy e validação em produção.
 

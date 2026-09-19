@@ -1,0 +1,14 @@
+/* The navigation uses existing brand colors independently of the content theme. */
+.app.solid-admin .sidebar{--nav-text:#fffcf8;background:var(--pirat-wine);color:var(--nav-text);--nav-line:color-mix(in srgb,var(--nav-text) 18%,transparent);border-color:var(--nav-line)}
+.app.solid-admin .sidebar :is(.nav-item,.module-tab,.profile b,.store-switch){color:var(--nav-text)}
+.app.solid-admin .sidebar :is(.nav-item svg,.store-switch small,.store-switch>svg,.resource-head small,.resource-head>span,.nav-title,.profile small,.profile .icon-btn){color:color-mix(in srgb,var(--nav-text) 78%,var(--pirat-wine))}
+.app.solid-admin .sidebar :is(.store-switcher>.store-switch,.profile,.module-tabs,.sidebar-collapse,.mobile-only){background:color-mix(in srgb,var(--nav-text) 7%,var(--pirat-wine));border-color:var(--nav-line);color:var(--nav-text)}
+.app.solid-admin .sidebar :is(.resource-panel,.platform-nav,.side-bottom){border-color:var(--nav-line)}
+.app.solid-admin .sidebar :is(.nav-item,.module-tab):hover{background:color-mix(in srgb,var(--pirat-gold) 16%,var(--pirat-wine));color:var(--nav-text)}
+.app.solid-admin .sidebar .module-tab.active{background:color-mix(in srgb,var(--pirat-gold) 20%,var(--pirat-wine));color:var(--pirat-gold);box-shadow:inset 0 -2px var(--pirat-gold)}
+.app.solid-admin .sidebar .module-tab.active svg{color:inherit}
+.app.solid-admin .sidebar .nav-item.active{background:var(--pirat-gold);color:var(--pirat-wine);box-shadow:0 3px 18px color-mix(in srgb,var(--pirat-gold) 26%,transparent),inset 0 1px color-mix(in srgb,white 50%,transparent);font-weight:700}
+.app.solid-admin .sidebar .nav-item.active svg{color:inherit}
+.app.solid-admin .sidebar .nav-item.active:after{background:var(--pirat-wine)}
+.app.solid-admin .sidebar nav{scrollbar-color:var(--nav-line) transparent}
+.app.solid-admin .sidebar :focus-visible{outline-color:var(--pirat-gold)}

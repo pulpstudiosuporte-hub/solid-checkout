@@ -13,5 +13,5 @@ export const cliGuide = ['cli-conectada', 'dev', 'CLI conectada: trabalhe na sua
   ],
   verify: ['Mude um título, confira a prévia, valide e envie. Reabra o rascunho no painel. A versão pública deve mudar somente após publicar.', 'Confira a loja com whoami. Revogue a conexão e confirme que novos comandos remotos são recusados.'],
   troubleshoot: ['Código expirado: execute login novamente e autorize em até 10 minutos.', 'Pasta já existe: pull exige uma nova pasta para preservar seu trabalho.', 'Conflito de revisão: baixe em outra pasta e compare antes de reenviar. Após restore, faça um novo pull.', 'Campo inválido: consulte os campos baixados e as opções do editor. Novos componentes arbitrários ainda não fazem parte do contrato.', 'Prévia não abre: confira a porta ou use node .pirat/tool/cli.mjs dev --port 4318.', 'Sem permissão para publicar: publique pelo painel ou autorize uma nova conexão com essa permissão.'],
-  related: ['temas-cli', 'contrato-temas', 'editor', 'publicar'],
+  related: ['cli-referencia', 'temas-cli', 'contrato-temas', 'autenticacao'],
 }];

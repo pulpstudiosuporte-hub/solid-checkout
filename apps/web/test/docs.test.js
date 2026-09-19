@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { docsHref, resolveDocsRoute } from '../src/docs-route';
 import { docsArticles, docsGroups, searchDocs } from '../src/docs-content';
 import { integrations } from '../src/integration-catalog';
+import { docsAliases } from '../src/docs-aliases';
+import { verifyWebhookExample } from '../src/developer-docs-content';
+import { createHmac } from 'node:crypto';
+import { Buffer } from 'node:buffer';
 
 describe('documentação pública', () => {
   it('abre a documentação na raiz do host próprio sem expor o painel', () => {
@@ -39,10 +43,31 @@ describe('documentação pública', () => {
   it('busca título e conteúdo sem distinguir acentos, com filtro por assunto', () => {
     expect(searchDocs('DOMINIO').map(article => article.slug)).toContain('dominio');
     expect(searchDocs('theme.liquid').map(article => article.slug)).toContain('shopify');
-    expect(searchDocs('cupom', 'checkout').map(article => article.slug)).toContain('oferta-de-saida');
-    expect(searchDocs('cupom', 'checkout').every(article => article.group === 'checkout')).toBe(true);
+    expect(searchDocs('assinatura', 'eventos').map(article => article.slug)).toContain('webhook-assinatura');
+    expect(searchDocs('assinatura', 'eventos').every(article => article.group === 'eventos')).toBe(true);
     expect(searchDocs('inexistente-xyz')).toEqual([]);
     expect(searchDocs('   ')).toHaveLength(docsArticles.length);
+  });
+  it('mantém foco técnico e encaminha os links anteriores a contratos existentes', () => {
+    for (const [oldSlug, slug] of Object.entries(docsAliases)) {
+      expect(docsArticles.some(article => article.slug === slug), oldSlug).toBe(true);
+      expect(resolveDocsRoute({ hash: `#/docs/${oldSlug}` })).toEqual({ slug, section: '' });
+    }
+    expect(docsArticles.some(article => ['criar-com-ia', 'oferta-de-saida', 'assistente', 'publicar', 'editor'].includes(article.slug))).toBe(false);
+  });
+  it('o exemplo publicado verifica bytes brutos, idade e correspondência do evento', async () => {
+    const { verifyPiratWebhook } = await import(`data:text/javascript;base64,${Buffer.from(verifyWebhookExample).toString('base64')}`);
+    const now = 1800000000000;
+    const secret = 'segredo-apenas-para-teste';
+    const payload = { id: 'evt_teste', event: 'order.paid', test: false, data: { order: { status: 'PAID' } } };
+    const raw = Buffer.from(JSON.stringify(payload));
+    const timestamp = String(now / 1000);
+    const headers = { 'x-solid-timestamp': timestamp, 'x-solid-event': 'order.paid', 'x-solid-signature': `sha256=${createHmac('sha256', secret).update(`${timestamp}.`).update(raw).digest('hex')}` };
+    expect(verifyPiratWebhook(raw, headers, secret, now)).toEqual(payload);
+    expect(() => verifyPiratWebhook(Buffer.from(raw.toString().replace('PAID', 'PENDING')), headers, secret, now)).toThrow();
+    expect(() => verifyPiratWebhook(raw, headers, secret, now + 301000)).toThrow();
+    expect(() => verifyPiratWebhook(raw, { ...headers, 'x-solid-signature': 'sha256=00' }, secret, now)).toThrow();
+    expect(() => verifyPiratWebhook(raw, { ...headers, 'x-solid-event': 'order.created' }, secret, now)).toThrow();
   });
   it('não inclui documentos internos ou artigos de operação privilegiada', () => {
     const content = JSON.stringify(docsArticles);

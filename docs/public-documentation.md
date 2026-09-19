@@ -6,31 +6,30 @@ O domínio aponta para o serviço web existente na porta 80 do Dokploy, com HTTP
 
 ## Manutenção
 
-A central é didática: ensina a configurar, usar e integrar os recursos. Não funciona como changelog nem divulga lançamentos ou redesigns; esse conteúdo pertence a Novidades. Ajustes apenas visuais não pedem novos trechos nos guias. Atualize instruções quando o uso do produto mudar.
+A central é exclusiva para desenvolvedores. Ensina CLI, temas, contratos, permissões, integração, eventos, assinatura, erros e idempotência com exemplos de código verificados. Não contém tutoriais gerais de operação do lojista nem funciona como changelog. Lançamentos e redesigns pertencem a Novidades; só atualize guias quando as capacidades ou instruções de integração mudarem.
 
-O conteúdo público e pesquisável fica em `apps/web/src/docs-content.js`. Não publique automaticamente a pasta `docs/`: ela também contém documentação interna, operações e segurança da plataforma. O catálogo público é deliberadamente separado.
+O catálogo público e pesquisável fica em `apps/web/src/docs-content.js`, com os contratos técnicos em `developer-docs-content.js` e o guia conectado em `cli-docs-content.js`. Não publique automaticamente a pasta `docs/`: ela também contém documentação interna, operações e segurança da plataforma. O catálogo público é deliberadamente separado.
 
-Ao entregar uma funcionalidade para lojistas:
+Ao entregar uma capacidade para desenvolvedores:
 
 1. Revise o guia correspondente ou adicione um artigo com slug permanente, categoria, resumo, palavras-chave e data de revisão.
 2. Documente pré-requisitos, passos, resultado esperado, como testar, limitações e erros comuns. Confira os nomes das telas e o comportamento no código atual.
 3. Adicione links relacionados válidos. Se mudar o título, preserve o slug para não quebrar compartilhamentos.
 4. Uma integração disponível precisa ter artigo com `integration` correspondente ao ID do catálogo compartilhado. O teste verifica essa cobertura. Recursos futuros devem ser identificados como indisponíveis, sem passos de ativação fictícios.
-5. Revise conteúdo sensível: não inclua credenciais, dados de clientes, procedimentos exclusivos de administração, infraestrutura privada nem mecanismos de acesso privilegiado. Exemplos técnicos devem usar placeholders e apenas contratos necessários à integração do lojista.
+5. Revise conteúdo sensível: não inclua credenciais, dados de clientes, procedimentos exclusivos de administração, infraestrutura privada nem mecanismos de acesso privilegiado. Exemplos técnicos devem usar placeholders e apenas contratos necessários à integração do desenvolvedor.
 6. Atualize a publicação em Novidades no mesmo deploy, conforme AGENTS.md. Adicionar um artigo requer alteração de conteúdo, revisão e deploy; não há importação automática nem editor de artigos na administração nesta versão.
 
 ## Fontes de implementação conferidas
 
-- Primeiros passos, produtos, modelos, editor e publicação: telas correspondentes em `apps/web/src`, `checkout-config`, `checkout-template-catalog` e fluxo de publicação.
-- IA: `CheckoutAiBuilder`, `docs/checkout-ai.md`.
-- Shopify: guia assistido `ShopifyOnboarding.jsx`. URLs e snippet dependentes da loja permanecem no guia autenticado, sem cópia fixa na central pública.
+- Catálogo e contratos públicos: `docs-content.js`, `developer-docs-content.js` e `cli-docs-content.js`. Redirecionamentos de guias antigos: `docs-aliases.js`.
+- CLI conectada: `apps/api/src/cli-routes.ts`, `scripts/connected-cli/` e `docs/connected-cli.md`.
+- Temas: contrato e normalização em `checkout-config`, catálogo de templates e `scripts/theme-kit/`.
+- Shopify: `ShopifyOnboarding.jsx`. URLs e snippet dependentes da loja permanecem no guia autenticado, sem cópia fixa na central pública.
 - Meta: `docs/meta-connection.md` e telas da integração.
-- Google: `docs/google-integrations.md` e telas da integração.
-- UTMify: `UtmifyIntegration.jsx`.
-- Webhooks: `webhook-routes.ts` e `WebhooksPage.jsx`; nomes dos cabeçalhos legados preservados.
-- Oferta de saída: `docs/exit-offer.md`.
-- Gateway e disponibilidade: `gateway-catalog.js` e `integration-catalog.js`.
-- Pedidos, análises e logística: telas e documentação dos recursos.
+- Google: `docs/google-integrations.md`, `google-tracking.js` e telas da integração.
+- UTMify: `UtmifyIntegration.jsx` e implementação de envio no backend.
+- Webhooks: `webhook-routes.ts`, emissão em `gateway-repository.ts` e configuração em `WebhooksPage.jsx`; nomes dos cabeçalhos legados preservados.
+- Cobertura de integrações disponíveis: `integration-catalog.js`.
 
 A data de revisão é editorial: não deve mudar só porque o site foi compilado. Preços de planos, prazos comerciais e metas de conversão não são fixados nos artigos.
 

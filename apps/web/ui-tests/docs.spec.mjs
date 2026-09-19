@@ -5,6 +5,24 @@ import { mockAdmin } from './fixtures.mjs';
 
 const output = name => fileURLToPath(new URL(`../../../.visual-check/${name}`, import.meta.url));
 
+test('contrato técnico: código copiável, mobile e link antigo', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.setViewportSize({ width: 390, height: 950 });
+  await page.goto('/#/docs/webhook-assinatura?section=node');
+  const code = page.getByLabel('Verificador em Node.js', { exact: true });
+  await expect(code).toContainText('timingSafeEqual');
+  await page.getByRole('button', { name: 'Copiar código: Verificador em Node.js' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Código copiado' })).toBeVisible();
+  // Windows clipboard normalizes line endings; the code content must stay intact.
+  expect((await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n')).toBe(await code.textContent());
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: output('docs-code-mobile.png'), animations: 'disabled' });
+  const audit = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+  expect(audit.violations.map(issue => issue.id)).toEqual([]);
+  await page.goto('/#/docs/criar-com-ia');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('CLI conectada: trabalhe na sua IDE');
+});
+
 for (const width of [1440, 768, 390]) {
   for (const theme of ['light', 'dark']) {
     test(`docs públicas ${width} ${theme}: leitura, navegação e contraste`, async ({ page }) => {
@@ -15,7 +33,7 @@ for (const width of [1440, 768, 390]) {
       await page.addInitScript(theme => localStorage.setItem('pirat-appearance-v1', theme), theme);
       await page.setViewportSize({ width, height: 950 });
       await page.goto('/#/docs');
-      await expect(page.getByRole('heading', { name: 'Sua loja no comando. O caminho está aqui.' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Construa com a Pirat. Do código à integração.' })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await page.screenshot({ path: output(`docs-home-${width}-${theme}.png`), fullPage: true, animations: 'disabled' });
       if (width === 1440 || width === 390) {
@@ -70,11 +88,11 @@ test('busca, link direto, histórico, guia ausente e teclado sem login', async (
   await page.goto('/#/docs/guia-inexistente');
   await expect(page.getByRole('heading', { name: 'Esse guia não foi encontrado.' })).toBeVisible();
   await page.getByRole('link', { name: 'Explorar documentação' }).click();
-  await page.getByRole('button', { name: /Conecte sua operação Shopify/ }).click();
+  await page.getByRole('button', { name: /Integrações Shopify/ }).click();
   await expect(page.getByLabel('Assunto', { exact: true })).toHaveValue('integracoes');
-  await expect(page.locator('.docs-result-list .docs-article-card')).toHaveCount(7);
+  await expect(page.locator('.docs-result-list .docs-article-card')).toHaveCount(6);
   await page.getByRole('button', { name: 'Limpar filtros' }).click();
-  await expect(page.getByRole('heading', { name: 'Sua loja no comando. O caminho está aqui.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Construa com a Pirat. Do código à integração.' })).toBeVisible();
 });
 
 test('atalho do painel abre docs em outra aba sem perder o painel', async ({ page }) => {
@@ -91,12 +109,12 @@ test('atalho do painel abre docs em outra aba sem perder o painel', async ({ pag
   const opened = page.waitForEvent('popup');
   await link.click();
   const docs = await opened;
-  await expect(docs.getByRole('heading', { name: 'Sua loja no comando. O caminho está aqui.' })).toBeVisible();
+  await expect(docs.getByRole('heading', { name: 'Construa com a Pirat. Do código à integração.' })).toBeVisible();
   await expect(docs).toHaveURL('https://docs.apirat.io/');
-  await docs.getByRole('link', { name: 'Começar pela primeira venda' }).click();
-  await expect(docs.getByRole('heading', { name: 'Sua primeira venda começa aqui', exact: true })).toBeVisible();
+  await docs.getByRole('link', { name: 'Começar a desenvolver' }).click();
+  await expect(docs.getByRole('heading', { name: 'Comece a desenvolver', exact: true })).toBeVisible();
   await docs.reload();
-  await expect(docs.getByRole('heading', { name: 'Sua primeira venda começa aqui', exact: true })).toBeVisible();
+  await expect(docs.getByRole('heading', { name: 'Comece a desenvolver', exact: true })).toBeVisible();
   await expect(page).not.toHaveURL(/#\/docs/);
   await docs.close();
 });

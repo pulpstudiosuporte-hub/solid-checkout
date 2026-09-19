@@ -66,6 +66,20 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260919-dashboard-navigation',
+    category: 'IMPROVEMENT' as const,
+    title: 'Indicadores juntos e navegação em destaque',
+    description: 'Indicadores, alcance geográfico e novidades voltam ao topo, com encaixe na altura dos monitores. A barra lateral ganhou fundo vinho e destaque dourado para a página selecionada.',
+    publishedAt: new Date('2026-09-19T20:00:00.000Z'),
+  },
+  {
+    publicId: 'auto-20260919-developer-docs',
+    category: 'IMPROVEMENT' as const,
+    title: 'Documentação dedicada a desenvolvedores',
+    description: 'A central técnica reúne CLI, temas, autenticação e integrações. Consulte payloads de webhook, exemplo de verificação de assinatura em Node.js, tratamento de reenvios e diagnóstico de erros.',
+    publishedAt: new Date('2026-09-19T19:30:00.000Z'),
+  },
+  {
     publicId: 'auto-20260919-dashboard-design',
     category: 'IMPROVEMENT' as const,
     title: 'Seu painel de bordo, com mais personalidade',

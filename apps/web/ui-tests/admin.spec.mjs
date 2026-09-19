@@ -28,6 +28,35 @@ async function fits(page) {
 }
 
 for (const theme of ['light', 'dark']) {
+  test(`primeira tela e barra lateral em ${theme}`, async ({ page }) => {
+    await mockAdmin(page);
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.goto('/'); await ready(page);
+    for (const [width, height] of [[1366, 768], [1440, 900], [1920, 1080]]) {
+      await page.setViewportSize({ width, height });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await fits(page);
+      for (const selector of ['.home-kpis', '.home-geo', '.home-news']) {
+        const box = await page.locator(selector).boundingBox();
+        expect(box.y + box.height, `${selector} em ${width}x${height}`).toBeLessThanOrEqual(height);
+      }
+      expect(await page.locator('.home-geo').evaluate(el => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
+      expect(await page.locator('.home-geo-stats').evaluate(el => {
+        const box = el.getBoundingClientRect();
+        return [...el.querySelectorAll('span,strong,small')].every(child => child.getBoundingClientRect().bottom <= box.bottom + 1);
+      })).toBe(true);
+      const geography = await page.locator('.home-main-grid').boundingBox();
+      const sales = await page.locator('.admin-revenue-layout').boundingBox();
+      expect(sales.y).toBeGreaterThanOrEqual(geography.y + geography.height);
+      await page.screenshot({ path: output(`dashboard-fold-${width}-${theme}.png`), animations: 'disabled' });
+    }
+    const audit = await new AxeBuilder({ page }).include('.sidebar').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+    expect(audit.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.target) }))).toEqual([]);
+    await page.locator('.sidebar').getByRole('button', { name: 'Pedidos', exact: true }).click();
+    await expect(page.locator('.sidebar .nav-item.active')).toHaveText('Pedidos');
+    await page.getByRole('button', { name: 'Recolher menu' }).click();
+    await expect(page.locator('.sidebar .nav-item.active')).toHaveAttribute('title', 'Pedidos');
+  });
   test(`painel de bordo: contraste e leitura dos valores em ${theme}`, async ({ page }) => {
     await mockAdmin(page);
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
@@ -100,7 +129,7 @@ test('menu compacto, busca, formulário e navegação móvel continuam utilizáv
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Abrir menu', exact: true }).click();
   await expect(page.locator('.sidebar')).toBeVisible();
-  await page.screenshot({ path: output('admin-mobile-menu.png') });
+  await page.screenshot({ path: output('admin-mobile-menu.png'), animations: 'disabled' });
   await page.keyboard.press('Escape');
   await expect(page.locator('.sidebar')).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Abrir menu', exact: true })).toBeFocused();
