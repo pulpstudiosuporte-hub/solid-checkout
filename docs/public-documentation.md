@@ -6,6 +6,8 @@ O domínio aponta para o serviço web existente na porta 80 do Dokploy, com HTTP
 
 ## Manutenção
 
+A central é didática: ensina a configurar, usar e integrar os recursos. Não funciona como changelog nem divulga lançamentos ou redesigns; esse conteúdo pertence a Novidades. Ajustes apenas visuais não pedem novos trechos nos guias. Atualize instruções quando o uso do produto mudar.
+
 O conteúdo público e pesquisável fica em `apps/web/src/docs-content.js`. Não publique automaticamente a pasta `docs/`: ela também contém documentação interna, operações e segurança da plataforma. O catálogo público é deliberadamente separado.
 
 Ao entregar uma funcionalidade para lojistas:
