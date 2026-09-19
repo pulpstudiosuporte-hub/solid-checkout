@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260919-retail-responsive-pix',
+    category: 'FIX' as const,
+    title: 'Melhor organização da entrega e do Pix no tema Varejo',
+    description: 'Campos, botões e informações do Pix se adaptam à largura do formulário, sem textos sobrepostos. Após gerar o Pix, a tela de pagamento aparece diretamente abaixo das etapas, sem a faixa de produtos isolada.',
+    publishedAt: new Date('2026-09-19T01:20:00.000Z'),
+  },
+  {
     publicId: 'auto-20260919-theme-kit-cli',
     category: 'NEWS' as const,
     title: 'Temas para baixar e personalizar com sua IA',

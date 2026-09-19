@@ -9,6 +9,8 @@ import '../src/public-checkout.css';
 const query = new URLSearchParams(location.search);
 const config = { ...defaultCheckoutConfig, ...structuralCheckoutTemplates[query.get('template') || 'retail'].preset, logoText: 'AURORA', title: 'Finalize seu pedido', subtitle: 'Informe seus dados para continuar.', showTrust: false, showBump: false, socialProofEnabled: false, footerCompanyName: 'Aurora', footerText: 'Loja de demonstração', footerPaymentMethods: ['pix'], showSummary: !query.has('no-summary') };
 const product = { publicId: 'demo-product', checkoutTitle: 'Tênis urbano · Branco', priceCents: 14900, fulfillmentType: 'PHYSICAL' };
+if (query.has('pink')) Object.assign(config, { primary: '#ff0797', pageBg: '#fff5fa', borderColor: '#ffc4e5', inputBg: '#fff8fc', radius: 18, font: 'Poppins' });
+if (query.has('narrow')) config.contentWidth = 760;
 const session = { publicId: 'template-session', source: 'DIRECT', status: 'OPEN', expiresAt: new Date(Date.now() + 1800000).toISOString(), quantity: 1, unitPriceCents: 14900, totalCents: 14900, discountCents: 0, shippingPriceCents: 0, customerCaptured: false, checkout: { name: 'Aurora', product, publishedConfig: config } };
 let payment = null;
 const method = { publicId: 'delivery', name: 'Entrega de teste', priceCents: 1000, minDays: 2, maxDays: 4 };

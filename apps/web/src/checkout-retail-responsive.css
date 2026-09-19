@@ -1,0 +1,78 @@
+/* Retail has narrow desktop columns: adapt to the form, not the viewport. */
+.public-checkout.template-retail .customer-step {
+  container: retail-form / inline-size;
+}
+.public-checkout.template-retail .customer-step .delivery-step-form,
+.public-checkout.template-retail .customer-step .payment-step {
+  max-width: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+@container retail-form (max-width: 480px) {
+  .session-checkout.template-retail .payment-step-checkout .pix-method-card {
+    grid-template-columns: 42px minmax(0, 1fr) 20px;
+    gap: 12px;
+    padding: 14px;
+  }
+  .session-checkout.template-retail .pix-method-card > div {
+    min-width: 0;
+    text-align: left;
+  }
+  .session-checkout.template-retail .pix-method-card > svg {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .session-checkout.template-retail .payment-step-checkout .pix-method-benefits {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: flex-start;
+    padding: 0;
+  }
+  .session-checkout.template-retail .pix-method-benefits em { white-space: nowrap; }
+  .session-checkout.template-retail .payment-order-bump-list,
+  .session-checkout.template-retail .payment-order-bump-card,
+  .session-checkout.template-retail .payment-order-bumps-title {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .session-checkout.template-retail .payment-order-bump-card > *,
+  .session-checkout.template-retail .payment-order-bumps-title > em {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+
+@container retail-form (max-width: 380px) {
+  .session-checkout.template-retail .delivery-step-form .customer-field-grid,
+  .session-checkout.template-retail .delivery-form-actions,
+  .session-checkout.template-retail .payment-step-checkout .payment-final-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .session-checkout.template-retail .delivery-form-actions .customer-back,
+  .session-checkout.template-retail .payment-final-actions .customer-back { order: 2; }
+  .session-checkout.template-retail .delivery-form-actions > button,
+  .session-checkout.template-retail .payment-step-checkout .payment-final-actions > button {
+    height: auto;
+    max-height: none;
+    min-height: 52px;
+    padding: 14px;
+  }
+  .session-checkout.template-retail .public-shipping-options > button {
+    grid-template-columns: 40px minmax(0, 1fr) 20px;
+  }
+  .session-checkout.template-retail .public-shipping-options > button > strong { grid-column: 2; }
+  .session-checkout.template-retail .public-shipping-options > button > svg { grid-column: 3; grid-row: 1; }
+}
+
+/* The generated Pix replaces the three-column form; keep it within its width. */
+@container retail-form (max-width: 720px) {
+  .session-checkout.template-retail .pix-payment-panel {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "intro" "card" "alternative";
+    gap: 22px;
+  }
+  .session-checkout.template-retail .pix-payment-intro { padding-top: 0; }
+}

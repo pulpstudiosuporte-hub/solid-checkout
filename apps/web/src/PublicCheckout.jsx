@@ -927,7 +927,7 @@ function SessionContent({ session: initialSession, token }) {
         style={{order:layoutOrder('block','content')}}
       >
         {config.template === 'retail' && checkoutProgress}
-        {config.template === 'retail' && config.showSummary && <aside className="retail-products-column" aria-label="Produtos do pedido"><h2>Produtos</h2>{orderItemsView}</aside>}
+        {config.template === 'retail' && config.showSummary && !payment && <aside className="retail-products-column" aria-label="Produtos do pedido"><h2>Produtos</h2>{orderItemsView}</aside>}
         <section className="customer-step">
       {config.template !== 'retail' && checkoutProgress}
           {step === 1 ? (
