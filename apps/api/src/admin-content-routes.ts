@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260919-dashboard-design',
+    category: 'IMPROVEMENT' as const,
+    title: 'Seu painel de bordo, com mais personalidade',
+    description: 'O início ganhou cards com mais destaque, receita e resumo lado a lado, atalhos ilustrados e o papagaio no cabeçalho. A identidade da Pirat continua a mesma, com uma composição adaptada ao computador e ao celular.',
+    publishedAt: new Date('2026-09-19T19:00:00.000Z'),
+  },
+  {
     publicId: 'auto-20260919-cli-connected',
     category: 'IMPROVEMENT' as const,
     title: 'Sua IDE conectada aos temas da Pirat',

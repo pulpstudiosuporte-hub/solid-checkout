@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import { mockAdmin } from './fixtures.mjs';
+import AxeBuilder from '@axe-core/playwright';
 const output = name => fileURLToPath(new URL(`../../../.visual-check/${name}`, import.meta.url));
 
 async function openPage(page, name) {
@@ -24,6 +25,31 @@ async function fits(page) {
       return (await shell.boundingBox()).x - (sidebar.x + sidebar.width);
     }).toBeGreaterThanOrEqual(-1);
   }
+}
+
+for (const theme of ['light', 'dark']) {
+  test(`painel de bordo: contraste e leitura dos valores em ${theme}`, async ({ page }) => {
+    await mockAdmin(page);
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.goto('/'); await ready(page);
+    for (const width of [320, 390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await fits(page);
+      // A price must never leave its last digit alone on a second line.
+      const price = page.locator('.dashboard-metric.purple > strong');
+      expect(await price.evaluate(element => {
+        const range = document.createRange(); range.selectNodeContents(element);
+        return [...range.getClientRects()].length;
+      })).toBe(1);
+    }
+    const result = await new AxeBuilder({ page }).include('.home-overview').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+    expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => ({ target: n.target, summary: n.failureSummary })) }))).toEqual([]);
+    await page.screenshot({ path: output(`dashboard-${theme}-desktop.png`), fullPage: true, animations: 'disabled' });
+    if (theme === 'light') await page.screenshot({ path: output('desktop.png'), fullPage: true, animations: 'disabled' });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: output(`dashboard-${theme}-mobile.png`), fullPage: true, animations: 'disabled' });
+    if (theme === 'light') await page.screenshot({ path: output('mobile.png'), fullPage: true, animations: 'disabled' });
+  });
 }
 
 test('visão geral mostra dados de teste da API e gráfico explorável', async ({ page }) => {

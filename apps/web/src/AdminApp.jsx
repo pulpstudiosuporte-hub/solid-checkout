@@ -13,7 +13,7 @@ const CheckoutEditor = lazy(() => import('./CheckoutEditor'));
 import { archiveStore, bindTabToUser, clearTabUser, completeMfaLogin, createStore, forgotPassword, getApiHealth, getSession, getSettings, getStores, login, logout, registerAccount, resetPassword, selectStore, verifyAccount } from './api';
 import { currentWebPushSubscription, disableWebPushOnThisDevice } from './web-push';
 import Login, { SessionLoading } from './Auth';
-import DashboardPage from './DashboardPage';
+const DashboardPage = lazy(() => import('./DashboardPage'));
 import StoreSwitcher from './StoreSwitcher';
 const CheckoutsPage = lazy(() => import('./CheckoutsPage'));
 import LogisticsPage from './LogisticsPage';
