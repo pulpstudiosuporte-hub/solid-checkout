@@ -57,7 +57,7 @@ a pausa geral e respeita a preferência por movimento reduzido. As cenas também
 podem ser selecionadas por botões; no celular esse é o modo de navegação.
 As demonstrações são ilustrativas e não geram pedidos ou cobranças reais.
 
-As fotografias de lojistas são ilustrativas, com créditos visíveis; não são
+As fotografias de lojistas são ilustrativas, sem créditos na interface; não são
 depoimentos ou identificação de clientes da Pirat. Os arquivos são servidos
 localmente em `public/brand/people`, com fontes registradas em `CREDITS.md`.
 As poses utilizadas ficam em `public/brand/assistant`.

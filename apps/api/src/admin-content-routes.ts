@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260919-site-photo-caption',
+    category: 'IMPROVEMENT' as const,
+    title: 'Apresentação mais limpa no site',
+    description: 'A seção de lojistas ficou mais direta, com as fotografias em destaque e sem a legenda adicional abaixo das imagens.',
+    publishedAt: new Date('2026-09-19T04:48:00.000Z'),
+  },
+  {
     publicId: 'auto-20260919-site-analytics-globe',
     category: 'IMPROVEMENT' as const,
     title: 'Uma nova visão dos recursos da Pirat',

@@ -36,6 +36,5 @@ test('fotografias ilustrativas e poses carregam sem imagens quebradas', async ({
     await image.scrollIntoViewIfNeeded();
     await expect.poll(() => image.evaluate(element => element.complete && element.naturalWidth > 0), { timeout: 20000 }).toBe(true);
   }
-  await expect(page.locator('.pirat-photo-credit')).toContainText('Fotografias:');
   await page.locator('.pirat-people').screenshot({ path: '.visual-check/site-people.png' });
 });
