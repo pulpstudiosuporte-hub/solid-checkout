@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260919-theme-kit-cli',
+    category: 'NEWS' as const,
+    title: 'Temas para baixar e personalizar com sua IA',
+    description: 'Baixe os temas Essencial, Varejo e Marketplace, ajuste o visual com a CLI e importe no editor para conferir antes de salvar. A documentação ganhou uma área para desenvolvedores com regras, comandos e exemplos de código.',
+    publishedAt: new Date('2026-09-19T01:10:00.000Z'),
+  },
+  {
     publicId: 'auto-20260919-checkout-ai-wait',
     category: 'IMPROVEMENT' as const,
     title: 'Mais continuidade na geração com IA',

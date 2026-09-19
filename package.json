@@ -22,7 +22,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "lint": "eslint .",
-    "check": "npm run check:utf8 && npm run lint && npm run typecheck && npm run test:security && npm run test && npm run build && npm run check:bundles",
+    "check": "npm run check:utf8 && npm run lint && npm run typecheck && npm run test:security && npm run test:themes && npm run test && npm run build && npm run check:bundles",
     "check:utf8": "node scripts/check-utf8.mjs",
     "audit:prod": "node scripts/audit-production.mjs",
     "db:generate": "npm run generate --workspace=@solid/database",
@@ -34,7 +34,9 @@
     "test:security": "node --test scripts/audit-policy.test.mjs",
     "test:integration": "vitest run --dir apps/api/integration",
     "check:headers": "node scripts/check-web-headers.mjs",
-    "check:bundles": "node scripts/check-web-budgets.mjs"
+    "check:bundles": "node scripts/check-web-budgets.mjs",
+    "build:themes": "node scripts/build-theme-kit.mjs",
+    "test:themes": "node --test scripts/theme-kit.test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.39.2",
@@ -44,6 +46,7 @@
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "7.1.1",
+    "fflate": "0.8.3",
     "globals": "16.5.0",
     "tsx": "4.21.0",
     "typescript": "5.9.3",

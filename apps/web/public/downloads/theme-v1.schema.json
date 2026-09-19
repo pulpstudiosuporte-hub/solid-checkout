@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pirat Theme v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "name",
+    "config"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "\\S"
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "template"
+      ],
+      "properties": {
+        "primary": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "pageBg": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "cardBg": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "headerBg": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "textColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "pageTextColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "headerTextColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "buttonTextColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "borderColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "inputBg": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "inputBorderColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "buttonBgColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "progressActiveColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "progressInactiveColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "progressActiveTextColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "progressInactiveTextColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "progressLabelColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "progressActiveLabelColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "footerBackgroundColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "footerTextColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "timerBgColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "timerTextColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "timerNumberColor": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "radius": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 28
+        },
+        "inputRadius": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 28
+        },
+        "contentWidth": {
+          "type": "integer",
+          "minimum": 650,
+          "maximum": 1280
+        },
+        "showProgress": {
+          "type": "boolean"
+        },
+        "showSummary": {
+          "type": "boolean"
+        },
+        "template": {
+          "enum": [
+            "minimal",
+            "conversion",
+            "showcase",
+            "compact",
+            "retail",
+            "marketplace"
+          ]
+        },
+        "layout": {
+          "enum": [
+            "split",
+            "centered"
+          ]
+        },
+        "font": {
+          "enum": [
+            "Plus Jakarta Sans",
+            "Poppins",
+            "Montserrat",
+            "DM Sans",
+            "Roboto",
+            "Inter",
+            "Arial",
+            "Georgia"
+          ]
+        },
+        "progressStyle": {
+          "enum": [
+            "outline",
+            "solid",
+            "icons",
+            "chevrons"
+          ]
+        },
+        "summaryDevice": {
+          "enum": [
+            "all",
+            "desktop",
+            "mobile"
+          ]
+        },
+        "buttonEffect": {
+          "enum": [
+            "lift",
+            "pulse",
+            "shine",
+            "glow",
+            "gradient",
+            "press",
+            "none"
+          ]
+        }
+      }
+    }
+  }
+}

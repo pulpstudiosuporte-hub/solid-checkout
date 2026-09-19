@@ -2,6 +2,7 @@
 export const docsGroups = [
   { id: 'comecar', title: 'Primeiros passos', description: 'Da sua loja ao primeiro checkout publicado.', icon: 'compass' },
   { id: 'checkout', title: 'Crie do seu jeito', description: 'Modelos, IA, imagens e recursos de conversão.', icon: 'layout' },
+  { id: 'dev', title: 'Para desenvolvedores', description: 'Temas para baixar, CLI, contratos e exemplos de código.', icon: 'plug' },
   { id: 'integracoes', title: 'Conecte sua operação', description: 'Shopify, pixels, Google e automações.', icon: 'plug' },
   { id: 'vendas', title: 'Acompanhe suas vendas', description: 'Pagamentos, entrega, pedidos e análises.', icon: 'bag' },
   { id: 'ajuda', title: 'Resolva e continue', description: 'Respostas para os obstáculos mais comuns.', icon: 'help' },
@@ -24,6 +25,35 @@ function article(slug, group, title, summary, options) {
 }
 
 export const docsArticles = [
+  article('temas-cli', 'dev', 'Temas e CLI: do código ao checkout', 'Baixe três temas prontos, personalize com sua IA e importe o resultado no editor da Pirat.', {
+    keywords: 'developer dev terminal CLI JSON schema tema download código IA',
+    before: ['Instale Node.js 22 ou superior. O kit funciona no Windows, macOS e Linux, sem instalar dependências.', 'O contrato v1 personaliza cores, fontes, estrutura, etapas e aparência dos componentes existentes. Não executa React, CSS, JavaScript ou Liquid enviados pelo desenvolvedor.'],
+    steps: ['Baixe e extraia o kit abaixo. Abra um terminal na pasta extraída.', 'Crie uma pasta nova com init, escolhendo minimal (Essencial), retail (Varejo) ou marketplace (Marketplace).', 'Abra a pasta na sua IA ou editor de código. Edite theme.json seguindo AGENTS.md e o schema do kit.', 'Execute validate e build. O arquivo para importar estará em minha-loja/dist/theme.pirat.json.', 'Na Pirat, abra um checkout em Personalizar → Modelos → Importar tema. Escolha o JSON, confira o nome e clique em Aplicar na prévia.', 'Revise computador e celular. Use Desfazer se precisar. Salve o rascunho; publique somente depois da revisão.'],
+    details: [
+      { id: 'download', title: 'Baixe o kit ou um tema pronto', items: ['O ZIP inclui a CLI, o validador compartilhado com o editor, o schema completo, as regras para IA e três modelos. Os JSON individuais podem ser importados diretamente.'], downloads: [
+        { href: '/downloads/pirat-theme-kit-v1.zip', label: 'Kit completo com CLI (ZIP)' },
+        { href: '/downloads/minimal.pirat.json', label: 'Tema Essencial (JSON)' },
+        { href: '/downloads/retail.pirat.json', label: 'Tema Varejo (JSON)' },
+        { href: '/downloads/marketplace.pirat.json', label: 'Tema Marketplace (JSON)' },
+        { href: '/downloads/theme-v1.schema.json', label: 'Contrato completo (JSON Schema)' },
+      ] },
+      { id: 'terminal', title: 'Comandos reais', items: ['Execute na pasta extraída do kit. Troque retail por minimal ou marketplace para começar com outro modelo.'], code: 'node pirat.mjs init minha-loja retail\nnode pirat.mjs validate minha-loja\nnode pirat.mjs build minha-loja' },
+      { id: 'json', title: 'Exemplo mínimo de theme.json', items: ['Somente os campos presentes no tema são aplicados. Este exemplo muda a estrutura e as cores do botão; use um dos modelos completos para definir toda a paleta.'], code: '{\n  "schemaVersion": 1,\n  "name": "Minha marca",\n  "config": {\n    "template": "retail",\n    "primary": "#202020",\n    "buttonBgColor": "#202020",\n    "buttonTextColor": "#ffffff"\n  }\n}' },
+      { id: 'ia', title: 'Como trabalhar com sua IA', items: ['O comando init coloca as regras em AGENTS.md na pasta do tema. Forneça também theme.schema.json à IA.', 'Peça: “Leia as regras do tema. Ajuste theme.json para minha marca usando somente os campos do contrato v1. Valide com a CLI antes de finalizar.”', 'Exportar visual atual no editor gera um tema das opções suportadas, sem incluir dados da loja. Renomeie esse arquivo para theme.json dentro do projeto se quiser continuar pela CLI.'] },
+    ],
+    verify: ['validate precisa informar Tema válido, e build deve gerar dist/theme.pirat.json. A CLI é local: não pede senha, não acessa sua conta e não publica.', 'Depois de importar, confira cores, campos, resumo e etapas nas duas larguras. Salve, reabra o rascunho e confira antes de publicar.'],
+    troubleshoot: ['Pasta já existe: init não sobrescreve projetos. Escolha outro nome ou edite o theme.json existente.', 'Campo desconhecido ou valor inválido: veja a propriedade indicada no erro e consulte o schema. O arquivo inteiro é rejeitado, sem aplicação parcial.', 'Arquivo muito grande: temas v1 têm limite de 32 KB. Não inclua imagens em base64 nem outros arquivos no JSON.', 'Logos, banners, depoimentos, blocos e integrações continuam no editor. A importação mantém esses dados e não altera preços, frete ou pagamentos. Novos layouts arbitrários e publicação remota por CLI ainda não fazem parte desta versão.'],
+    related: ['contrato-temas', 'modelos', 'publicar'],
+  }),
+  article('contrato-temas', 'dev', 'Contrato de temas v1', 'Campos aceitos, compatibilidade, limites e regras de importação para desenvolvedores.', {
+    keywords: 'schemaVersion config validação schema contrato código propriedades layout template',
+    before: ['Use o JSON Schema do kit como referência completa dos campos. O validador é o mesmo na CLI e na importação do editor.', 'Campos desconhecidos são erros, inclusive no nível raiz. Não inclua credenciais ou informações comerciais no arquivo.'],
+    steps: ['Defina schemaVersion como o número 1, name com 1 a 80 caracteres e config como objeto.', 'Defina config.template: minimal, conversion, showcase, compact, retail ou marketplace.', 'Use cores hexadecimais com seis dígitos (#RRGGBB), booleanos reais e números inteiros.', 'Configure contentWidth entre 650 e 1280, radius e inputRadius entre 0 e 28.', 'Escolha progressStyle entre outline, solid, icons e chevrons; layout entre split e centered.', 'Valide e importe o arquivo. O editor solicita aplicação explícita na prévia; salvar e publicar são etapas separadas.'],
+    details: [{ id: 'regras', title: 'Comportamento da importação', items: ['A importação mescla somente as opções visuais presentes. Ela não apaga campos ausentes, nem redefine textos, imagens, elementos ou integrações.', 'name identifica o tema na confirmação e não renomeia o checkout.', 'A validação aceita no máximo 32 KB de JSON UTF-8. A CLI retorna código de saída 1 se houver erro.', 'O build substitui apenas o arquivo gerado dist/theme.pirat.json. init exige uma pasta nova. Não há instalação ou execução de scripts do tema.', 'O contrato v1 é uma configuração dos componentes existentes; não permite criar componentes ou carregar uma aplicação completa.'] }],
+    verify: ['Confira um tema exportado pelo editor: somente campos do contrato devem aparecer. Nenhum depoimento, dado de cliente ou URL privada faz parte da exportação.', 'Teste também desfazer a aplicação antes de salvar o rascunho.'],
+    troubleshoot: ['Não altere schemaVersion para tentar habilitar recursos inexistentes. Versões desconhecidas são rejeitadas.', 'Quando adicionar cores, confira também os textos e estados ativos/inativos para manter contraste.'],
+    related: ['temas-cli', 'editor'],
+  }),
   article('primeiros-passos', 'comecar', 'Sua primeira venda começa aqui', 'Prepare a loja, conecte o pagamento e publique seu primeiro checkout.', {
     keywords: 'começar onboarding cadastro configuração loja plano',
     before: ['Tenha acesso à sua conta Pirat, aos dados da loja e ao provedor do seu domínio. As configurações se aplicam à loja selecionada no painel.', 'Você pode preparar o visual antes de concluir a ativação. Publicar e vender exige concluir os dados obrigatórios e configurar o domínio e o pagamento.'],

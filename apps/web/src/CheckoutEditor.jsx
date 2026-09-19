@@ -1,5 +1,6 @@
 import { normalizeCheckoutTestimonials } from './checkout-testimonials';
 import ThemeToggle from './ThemeToggle';
+import ThemeTransfer from './ThemeTransfer';
 import './checkout-progress.css';
 import CheckoutProgress from './CheckoutProgress';
 import { structuralCheckoutTemplates } from './checkout-template-catalog';
@@ -680,6 +681,7 @@ function Settings({ group, c, u, replaceConfig, scarcityView, setScarcityView, e
   if (group === "Modelos")
     return (
       <>
+        <ThemeTransfer config={c} replaceConfig={replaceConfig}/>
         <h3>Escolha um modelo</h3>
         <p className="panel-help">
           Cada modelo aplica uma direção visual completa sem apagar seus textos

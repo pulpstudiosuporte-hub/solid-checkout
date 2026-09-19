@@ -263,3 +263,8 @@
 .solid-editor .testimonial-elements .element-catalog-row.active { border-left-color:var(--p-red,#c91d16); }
 .solid-editor .testimonial-elements .element-row-copy { min-height:44px; overflow-wrap:anywhere; }
 .solid-editor .testimonial-elements .element-edit { min-height:44px; min-width:32px; }
+.theme-transfer { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border, #ddd); }
+.theme-transfer a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.theme-transfer-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.solid-editor .theme-transfer-actions button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--bd, #777); border-radius: 8px; background: var(--p-alt, #f4efea); color: var(--p-fg, #2b0200); cursor: pointer; }
+.theme-transfer-review { margin-top: 16px; padding: 12px; border: 1px solid currentColor; border-radius: 8px; overflow-wrap: anywhere; }
