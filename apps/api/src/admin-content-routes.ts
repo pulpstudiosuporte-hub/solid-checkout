@@ -69,7 +69,7 @@ const automaticReleases = [
     publicId: 'auto-20260919-site-mobile-atmosphere',
     category: 'IMPROVEMENT' as const,
     title: 'Mais movimento na apresentação da Pirat',
-    description: 'O fundo animado voltou ao site, com luzes e detalhes dourados ajustados para o celular. Os efeitos respeitam a pausa e a preferência por movimento reduzido.',
+    description: 'A curva de luz original voltou ao site junto com o papagaio e o layout novo, com fundo animado e detalhes dourados ajustados para o celular. Os efeitos respeitam a pausa e a preferência por movimento reduzido.',
     publishedAt: new Date('2026-09-19T03:36:00.000Z'),
   },
   {

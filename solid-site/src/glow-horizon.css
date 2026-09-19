@@ -1,0 +1,12 @@
+.pirat-hero > .site-horizon-background{position:absolute;inset:0 0 auto;height:480px;overflow:hidden;pointer-events:none;z-index:-1;background:#070505;mask-image:linear-gradient(to bottom,#000 70%,transparent 100%)}
+.horizon-enter{position:absolute;width:100%;height:100%;isolation:isolate;transform:translateY(-50%);animation:horizon-enter 2s cubic-bezier(.16,1,.3,1) both}
+.horizon-enter>i{position:absolute;inset:0;border-radius:100%;display:block}
+.horizon-rim{background:#fff;transform:scale(1.32);box-shadow:0 -4px 23px #ffffffb5}
+.horizon-soft{background:#fb6358;scale:1.2;filter:blur(31px);animation:horizon-layer 2s cubic-bezier(.16,1,.3,1) .6s both}
+.horizon-red{background:#e52f22;scale:1.24;filter:blur(21px);animation:horizon-layer 2s cubic-bezier(.16,1,.3,1) both}
+.horizon-core{background:#000;scale:1.2;filter:blur(51px);animation:horizon-layer 2s cubic-bezier(.16,1,.3,1) both}
+@keyframes horizon-enter{from{transform:translateY(-100%) scaleY(1.5);opacity:0}to{transform:translateY(-50%) scaleY(1);opacity:1}}
+@keyframes horizon-layer{from{translate:0 -40%}to{translate:0 0}}
+@media(max-width:900px){.pirat-hero > .site-horizon-background{height:420px}.horizon-enter{width:160%;left:-30%}}
+@media(max-width:600px){.pirat-hero > .site-horizon-background{height:300px}.horizon-enter{width:190%;left:-45%}}
+@media(prefers-reduced-motion:reduce){.horizon-enter,.horizon-enter>i{animation:none!important}}
