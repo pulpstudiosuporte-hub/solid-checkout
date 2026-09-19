@@ -6,6 +6,7 @@ import './color-surfaces.css';
 import { MotionScene } from './SiteMotion';
 import { PiratHero, CheckoutJourney, MerchantLife } from './PiratExperience';
 import { TemplateShowcase, TestimonialShowcase } from './SiteShowcase';
+import { AnalyticsGlobe } from './AnalyticsGlobe';
 import { marketingAccountUrl } from './site-route';
 
 const money = value => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -50,17 +51,17 @@ function CheckoutDemo({ compact = false }) {
         <label className="demo-bump"><input type="checkbox" aria-label="Adicionar ecobag por 29 reais" checked={bump} onChange={e => setBump(e.target.checked)}/><span><strong>Complete seu kit</strong><small>Adicione uma ecobag por {money(29)}</small></span><ShoppingBag size={21}/></label>
         <div className="demo-total"><span>Total do pedido</span><strong>{money(total)}</strong></div>
         <button className="demo-pay" onClick={() => setStep(1)}>Experimentar pagamento <ArrowRight size={15}/></button>
-      </> : <div className="demo-success" role="status"><span className="demo-success-icon"><CheckCheck size={31}/></span><p>É assim que uma boa<br/>experiência termina.</p><span>Pedido de {money(total)} confirmado na demonstração.</span><button onClick={() => setStep(0)}><RotateCcw size={13}/> Experimentar de novo</button></div>}
-      <div className="demo-caption"><ShieldCheck size={12}/> Demonstração interativa. Nenhuma cobrança real.</div>
+      </> : <div className="demo-success" role="status"><span className="demo-success-icon"><CheckCheck size={31}/></span><p>É assim que uma boa<br/>experiência termina.</p><span>Você percorreu um pedido de {money(total)}.</span><button onClick={() => setStep(0)}><RotateCcw size={13}/> Experimentar de novo</button></div>}
+      <div className="demo-caption"><ShieldCheck size={12}/> Ambiente interativo · Sem cobranças.</div>
     </div>
-    <div className="demo-customize"><span><SlidersHorizontal size={13}/> Deixe com a sua cara</span><div role="group" aria-label="Cor da demonstração">{[['red', 'Vermelho'], ['blue', 'Azul'], ['green', 'Verde']].map(([value, label]) => <button key={value} className={`color-swatch ${value}`} aria-label={label} aria-pressed={color === value} onClick={() => setColor(value)}>{color === value && <Check size={12}/>}</button>)}</div></div>
+    <div className="demo-customize"><span><SlidersHorizontal size={13}/> Deixe com a sua cara</span><div role="group" aria-label="Cor do checkout">{[['red', 'Vermelho'], ['blue', 'Azul'], ['green', 'Verde']].map(([value, label]) => <button key={value} className={`color-swatch ${value}`} aria-label={label} aria-pressed={color === value} onClick={() => setColor(value)}>{color === value && <Check size={12}/>}</button>)}</div></div>
   </div>;
 }
 
 function FeatureVisual({ active }) {
   if (active === 'marca') return <div className="feature-visual brand-visual"><div className="mini-editor"><div><Palette size={17}/><strong>Identidade da loja</strong></div><span>Paleta da marca</span><div className="editor-swatches"><i/><i/><i/><i/></div><span>Seu domínio</span><p><LockKeyhole size={13}/> checkout.suamarca.com <CircleCheck size={15}/></p><div className="editor-save"><Check size={13}/> Uma experiência com a sua identidade</div></div><div className="brand-orbit"><img src="/brand/pirat-mascot.png" alt="" width="64" height="64"/></div></div>;
   if (active === 'ofertas') return <div className="feature-visual offers-visual"><div className="offer-ticket"><span><Sparkles size={16}/> UMA OFERTA QUE FAZ SENTIDO</span><ProductArt small/><h4>Uma combinação melhor.</h4><p>Seu produto + o complemento ideal.</p><div><span>Oferta complementar</span><strong>Order bump <Plus size={14}/></strong></div></div><div className="offer-coupon"><span>CUPOM</span><strong>BEMVINDO</strong><div className="ticket-dots"/></div></div>;
-  if (active === 'gestao') return <div className="feature-visual analytics-visual"><div className="mini-analytics"><div><span>Visão geral</span><span>Exemplo ilustrativo</span></div><strong>Sua operação,<br/>em perspectiva.</strong><div className="analytics-bars" aria-hidden="true">{[24, 36, 31, 49, 43, 64, 57, 74, 70, 91, 84, 100].map((height, i) => <i key={i} style={{ '--bar-height': `${height}%` }}/>)}</div><div className="analytics-legend"><span><i/> Vendas</span><span>Pedidos · Canais · Cupons</span></div></div></div>;
+  if (active === 'gestao') return <div className="feature-visual analytics-visual"><div className="mini-analytics"><div><span>Visão geral</span><span>Vendas, pedidos e canais</span></div><strong>Sua operação,<br/>em perspectiva.</strong><div className="analytics-bars" aria-hidden="true">{[24, 36, 31, 49, 43, 64, 57, 74, 70, 91, 84, 100].map((height, i) => <i key={i} style={{ '--bar-height': `${height}%` }}/>)}</div><div className="analytics-legend"><span><i/> Vendas</span><span>Pedidos · Canais · Cupons</span></div></div></div>;
   return <div className="feature-visual flow-visual"><div className="flow-line"/>{[[UserIcon, 'Identificação', 'Dados do cliente'], [Truck, 'Entrega', 'Opções para cada pedido'], [QrCode, 'Pagamento', 'Pix com status acompanhado']].map(([Icon, title, text], i) => <div className="flow-node" key={title}><span><Icon size={21}/></span><div><strong>{title}</strong><small>{text}</small></div><b>{i < 2 ? <Check size={16}/> : <ArrowRight size={16}/>}</b></div>)}<small className="flow-caption">Cada etapa tem seu lugar.</small></div>;
 }
 const UserIcon = Users;
@@ -85,9 +86,10 @@ export default function LandingPage() {
       <section className="integration-strip" aria-label="Ecossistema de integrações"><div className="site-container"><p>Conectado às ferramentas<br/><strong>que movem sua operação.</strong></p><div><span><ShoppingBag/> Shopify</span><span className="wordmark-meta">∞ <b>Meta</b></span><span className="wordmark-utm"><BarChart3/> utmify</span><span className="wordmark-roas">roas<span>pay</span></span><span className="wordmark-west"><Zap/> westpay</span></div></div></section>
       <CheckoutJourney/>
       <TemplateShowcase signup={signup}/>
-      <section className="pirat-demo-section site-container" id="demonstracao" aria-labelledby="demo-title"><div className="section-heading"><span className="site-eyebrow">CHEGA DE SÓ OLHAR.</span><h2 id="demo-title">Pode clicar.<br/><span>O checkout é seu.</span></h2><p>Troque a cor, adicione uma oferta e experimente a jornada. Aqui é uma demonstração: você explora, sem gerar uma cobrança.</p><a href="#jornada" className="site-text-link lavender">Rever a apresentação <ArrowRight size={17}/></a></div><div className="hero-stage"><CheckoutDemo/><span className="try-hint"><MousePointer2 size={15}/> Explore a demonstração.</span></div></section>
+      <section className="pirat-demo-section site-container" id="demonstracao" aria-labelledby="demo-title"><div className="section-heading"><span className="site-eyebrow">CHEGA DE SÓ OLHAR.</span><h2 id="demo-title">Pode clicar.<br/><span>O checkout é seu.</span></h2><p>Troque a cor, adicione uma oferta e percorra cada etapa da jornada de compra.</p><a href="#jornada" className="site-text-link lavender">Rever a apresentação <ArrowRight size={17}/></a></div><div className="hero-stage"><CheckoutDemo/><span className="try-hint"><MousePointer2 size={15}/> Experimente do seu jeito.</span></div></section>
       <MerchantLife/>
       <TestimonialShowcase/>
+      <AnalyticsGlobe signup={signup}/>
 
 
       <section className="site-section site-container" id="recursos"><div className="section-heading"><span className="site-eyebrow">PENSADO PARA A SUA OPERAÇÃO</span><h2>Uma experiência completa.<br/><span>Do seu jeito.</span></h2><p>O que seu cliente vê precisa ser simples.<br/>O que você gerencia precisa estar conectado.</p></div>

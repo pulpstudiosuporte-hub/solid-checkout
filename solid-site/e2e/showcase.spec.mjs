@@ -26,7 +26,9 @@ test('vitrine navega entre artes dos modelos com botões e teclado', async ({ pa
   await expect(page.getByRole('link', { name: 'Criar meu checkout' })).toHaveAttribute('href', /cadastro/);
   await page.locator('#depoimentos').scrollIntoViewIfNeeded();
   await expect(page.locator('.testimonial-card')).toHaveCount(6);
-  await expect(page.locator('.testimonial-disclaimer')).toContainText('Pessoas e falas fictícias');
+  await expect(page.locator('.segment-card')).toHaveCount(6);
+  await expect(page.locator('#depoimentos blockquote, #depoimentos figcaption')).toHaveCount(0);
+  await expect(page.locator('#depoimentos')).not.toContainText('Marina Alves');
   await page.locator('#depoimentos').screenshot({ path: '.visual-check/site-testimonials-desktop.png', style: '.site-header,.site-skip,.motion-toggle,.reading-progress{visibility:hidden!important}' });
 });
 

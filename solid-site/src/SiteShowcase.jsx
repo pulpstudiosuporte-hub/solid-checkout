@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUpRight, Pause, Play, Quote } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUpRight, Pause, Play, Palette, Package, Sparkles, Smartphone, Heart, ShoppingBag } from 'lucide-react';
 import { useSiteMotion } from './SiteMotion';
 import './site-showcase.css';
 
@@ -41,30 +41,30 @@ export function TemplateShowcase({ signup }) {
         {models.map((model, index) => {
           const offset = ((index - active + models.length + 2) % models.length) - 2;
           return <button type="button" key={model.id} className={`template-slide ${offset === 0 ? 'is-selected' : ''}`} data-offset={offset} style={{ '--offset': offset, '--distance': Math.abs(offset), zIndex: 5 - Math.abs(offset) }} onKeyDown={event => { if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') { event.preventDefault(); select(active + (event.key === 'ArrowRight' ? 1 : -1)); } }} aria-label={`Ver modelo ${model.name}`} aria-pressed={active === index} onClick={() => { if (suppressClick.current) { suppressClick.current = false; return; } select(index); }}>
-            <img src={`/brand/templates/${model.id}-art.webp`} alt={`Composição ilustrativa do checkout ${model.name} no computador e no celular`} width="1536" height="1024" loading={visible || active === index ? 'eager' : 'lazy'}/>
+            <img src={`/brand/templates/${model.id}-art.webp`} alt={`Visual do checkout ${model.name} no computador e no celular`} width="1536" height="1024" loading={visible || active === index ? 'eager' : 'lazy'}/>
             <span className="template-slide-label">{model.name}<ArrowUpRight size={17}/></span>
           </button>;
         })}
       </div>
       <div className="template-controls"><button type="button" aria-label="Modelo anterior" onClick={() => select(active - 1)}><ArrowLeft size={19}/></button><span aria-live={playing ? 'off' : 'polite'}>{String(active + 1).padStart(2, '0')} <span>/ {String(models.length).padStart(2, '0')}</span></span><button type="button" aria-label="Próximo modelo" onClick={() => select(active + 1)}><ArrowRight size={19}/></button><button type="button" disabled={!running} aria-label={playing ? 'Pausar carrossel' : 'Reproduzir carrossel'} aria-pressed={playing} onClick={() => setPlaying(!playing)}>{playing ? <Pause size={16}/> : <Play size={16}/>}</button></div>
-      <div className="template-description" aria-live={playing ? 'off' : 'polite'} aria-atomic="true"><span>{selected.type}</span><h3>{selected.name}</h3><p>{selected.text}</p><small>{selected.detail}</small></div>
+      <div className="template-description" aria-live={playing ? 'off' : 'polite'} aria-atomic="true"><span>{selected.type}</span><h3>{selected.name}</h3><p>{selected.text}</p></div>
     </div>
-    <div className="template-bottom"><a className="site-button light" href={signup}>Criar meu checkout <ArrowUpRight size={18}/></a><p>Composições ilustrativas criadas com IA, inspiradas nas opções de personalização.<br/>Ateliê e Botânica exploram a base Essencial. O resultado depende da configuração no editor.</p></div>
+    <div className="template-bottom"><a className="site-button light" href={signup}>Criar meu checkout <ArrowUpRight size={18}/></a></div>
   </section>;
 }
 
-const examples = [
-  { name: 'Marina Alves', role: 'Moda e acessórios', initials: 'MA', tone: 'ivory', text: 'Escolher as cores e organizar cada detalhe é o que faz a experiência parecer uma continuação da minha loja.', color: 'rose' },
-  { name: 'Rafael Costa', role: 'Loja de decoração', initials: 'RC', text: 'Gosto de um checkout direto: o cliente encontra o produto, confere a entrega e entende o próximo passo.', color: 'sage' },
-  { name: 'Clara Martins', role: 'Marca independente', initials: 'CM', text: 'Começar por um modelo e deixar tudo com a minha identidade torna a criação muito mais fácil de visualizar.', color: 'gold' },
-  { name: 'Lucas Oliveira', role: 'Esporte e lifestyle', initials: 'LO', text: 'Na minha loja, o celular vem primeiro. Quero uma compra que seja simples de acompanhar em cada etapa.', color: 'gold' },
-  { name: 'Beatriz Lima', role: 'Beleza e autocuidado', initials: 'BL', tone: 'gold', text: 'O cuidado que eu tenho com a embalagem também precisa aparecer na hora de comprar. Cada detalhe conta.', color: 'rose' },
-  { name: 'Pedro Santos', role: 'Produtos para casa', initials: 'PS', text: 'Ter os pedidos organizados e o resumo claro ajuda a pensar na experiência inteira, do produto ao pagamento.', color: 'sage' },
+const segments = [
+  { title: 'Moda e acessórios', subtitle: 'Identidade em cada detalhe', icon: Palette, tone: 'ivory', text: 'Cores, fontes e organização que fazem o checkout continuar a experiência da sua marca.' },
+  { title: 'Casa e decoração', subtitle: 'Uma compra bem organizada', icon: Package, text: 'Produto, entrega e resumo do pedido reunidos em uma jornada fácil de acompanhar.' },
+  { title: 'Marcas independentes', subtitle: 'Liberdade para criar', icon: Sparkles, text: 'Comece por um modelo e personalize a composição para dar espaço à personalidade da sua loja.' },
+  { title: 'Esporte e lifestyle', subtitle: 'Do computador ao celular', icon: Smartphone, text: 'Uma experiência responsiva para o cliente escolher, revisar e concluir o pedido onde estiver.' },
+  { title: 'Beleza e autocuidado', subtitle: 'Cuidado até o pagamento', icon: Heart, tone: 'gold', text: 'Leve o cuidado com a apresentação dos seus produtos para as cores, imagens e textos do checkout.' },
+  { title: 'Seu próximo negócio', subtitle: 'Sua operação conectada', icon: ShoppingBag, text: 'Organize catálogo, ofertas e pedidos. Construa a experiência de compra com a sua marca no comando.' },
 ];
 
 export function TestimonialShowcase() {
   return <section className="testimonial-showcase site-container" id="depoimentos" aria-labelledby="testimonials-title">
-    <div className="section-heading"><span className="site-eyebrow">LOJAS DIFERENTES. CUIDADO EM COMUM.</span><h2 id="testimonials-title">Tem uma pessoa<br/><span>por trás de cada marca.</span></h2><p>Uma prévia do espaço para as histórias de quem empreende.</p><span className="testimonial-disclaimer">Exemplos ilustrativos · Pessoas e falas fictícias, não são avaliações de clientes.</span></div>
-    <div className="testimonial-columns">{[0, 1, 2].map(column => <div className="testimonial-column" key={column}>{[examples[column], examples[column + 3]].map(person => <figure className="testimonial-card" data-card-tone={person.tone} key={person.name}><Quote size={25} aria-hidden="true"/><blockquote>{person.text}</blockquote><figcaption><span className={`testimonial-avatar ${person.color}`} aria-hidden="true">{person.initials}</span><div><strong>{person.name}</strong><span>{person.role}</span></div></figcaption><small>Depoimento de exemplo</small></figure>)}</div>)}</div>
+    <div className="section-heading"><span className="site-eyebrow">LOJAS DIFERENTES. CUIDADO EM COMUM.</span><h2 id="testimonials-title">Cada negócio tem seu jeito.<br/><span>O checkout também.</span></h2><p>Uma base versátil para acompanhar a personalidade da sua loja.</p></div>
+    <div className="testimonial-columns">{[0, 1, 2].map(column => <div className="testimonial-column" key={column}>{[segments[column], segments[column + 3]].map(({ title, subtitle, icon: Icon, tone, text }) => <article className="testimonial-card segment-card" data-card-tone={tone} key={title}><Icon size={27} aria-hidden="true"/><h3>{title}</h3><p>{text}</p><span className="segment-subtitle">{subtitle}</span></article>)}</div>)}</div>
   </section>;
 }

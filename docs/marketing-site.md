@@ -72,9 +72,29 @@ O carrossel oferece botões, setas do teclado nos cards, gesto horizontal e
 reprodução opcional. A reprodução pausa com foco, cursor, aba oculta, seção
 fora da tela, movimento reduzido e controle global de efeitos.
 
-As cinco artes em `public/brand/templates/*-art.webp` são composições geradas
-por IA, identificadas como ilustrativas na página. Não são novos temas
-instalados nem capturas exatas. Prompts e origem estão em
-`docs/site-showcase-images.md`. Os depoimentos usam nomes e falas fictícias,
-com aviso na seção e em cada card; devem ser substituídos por conteúdo real
-autorizado quando estiver disponível.
+As cinco artes em `public/brand/templates/*-art.webp` são composições visuais
+das possibilidades do editor, não novos temas instalados nem capturas exatas.
+Prompts e origem estão em `docs/site-showcase-images.md`. A vitrine apresenta
+os recursos sem legendas sobre o processo de produção. O antigo espaço de
+depoimentos contém agora cards de segmentos e benefícios, sem pessoas,
+atribuições ou falas fictícias. O ID `depoimentos` foi preservado para os links existentes.
+
+## Globo de análise avançada
+
+`AnalyticsGlobe.jsx`, `analytics-globe-engine.js`, `globe-land.js` e
+`analytics-globe.css` são compartilhados entre as duas entradas. O globo é
+uma implementação própria em Canvas 2D com projeção e rotação de coordenadas
+3D, sem React Bits Pro, chave de licença ou dependência adicional.
+Contornos: Natural Earth 1:110m (domínio público), amostrados em uma grade esférica
+de 1,7 grau. Fonte: https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_110m_land.geojson.
+
+O código e os pontos são carregados ao se aproximar da seção. A animação limita
+a densidade de pixels a 1,5 e o desenho a cerca de 30 fps, pausa fora da tela,
+com a aba oculta, com movimento reduzido ou pelo controle global. Arrastar e os
+botões permitem girar manualmente mesmo com a animação pausada. ResizeObserver,
+eventos e requestAnimationFrame são descartados ao desmontar. Uma esfera CSS
+permanece caso o Canvas ou o chunk não possam carregar.
+
+As rotas são decorativas e não indicam clientes, vendas ou cobertura geográfica.
+Os textos descrevem indicadores, períodos e pedidos existentes no painel.
+Nenhuma API de analytics ou pagamentos é chamada pelo globo.

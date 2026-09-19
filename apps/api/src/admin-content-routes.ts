@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260919-site-analytics-globe',
+    category: 'IMPROVEMENT' as const,
+    title: 'Uma nova visão dos recursos da Pirat',
+    description: 'A apresentação de análise avançada ganhou um globo interativo com controle de movimento. A vitrine de modelos está mais direta e os cards mostram possibilidades para diferentes tipos de loja, no computador e no celular.',
+    publishedAt: new Date('2026-09-19T04:38:00.000Z'),
+  },
+  {
     publicId: 'auto-20260919-site-dark-color-cards',
     category: 'IMPROVEMENT' as const,
     title: 'Novo contraste na apresentação da Pirat',
