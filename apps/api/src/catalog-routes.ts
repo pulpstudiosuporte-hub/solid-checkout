@@ -13,7 +13,7 @@ const text = (value: unknown, max: number): string | null => typeof value === 's
 const optionalText = (value: unknown, max: number): string | undefined | null => value === undefined || value === null || value === '' ? undefined : text(value, max);
 const integer = (value: unknown, min: number, max: number): number | null => typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max ? value : null;
 const hexColor = (value: unknown, fallback: string): string | null => { const candidate = value ?? fallback; return typeof candidate === 'string' && /^#[0-9a-fA-F]{6}$/.test(candidate) ? candidate.toLowerCase() : null; };
-const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
+export const checkoutConfig = (value: unknown): CheckoutConfigInput | null => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const input = value as Record<string, unknown>; const result: Record<string, unknown> = {};
   const seoTitle = optionalText(input.seoTitle, 70);

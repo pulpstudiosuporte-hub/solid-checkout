@@ -36,7 +36,10 @@
     "check:headers": "node scripts/check-web-headers.mjs",
     "check:bundles": "node scripts/check-web-budgets.mjs",
     "build:themes": "node scripts/build-theme-kit.mjs",
-    "test:themes": "node --test scripts/theme-kit.test.mjs"
+    "test:themes": "node --test scripts/theme-kit.test.mjs",
+    "build:cli": "node scripts/build-connected-cli.mjs",
+    "test:cli": "node --test scripts/connected-cli.test.mjs",
+    "test:cli:ui": "playwright test --config scripts/cli-ui.config.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.39.2",

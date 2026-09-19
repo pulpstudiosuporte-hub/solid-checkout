@@ -1,0 +1,8 @@
+{
+  "name": "@pirat/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": { "pirat": "cli.mjs" },
+  "engines": { "node": ">=22.12.0" },
+  "files": ["cli.mjs", "evaluate.mjs", "preview", "defaults.json", "templates.json", "README.md", "PROJECT.md"]
+}

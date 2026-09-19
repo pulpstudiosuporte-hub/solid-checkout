@@ -1,5 +1,7 @@
 # Temas para desenvolvedores
 
+Este documento cobre o kit offline v1. A CLI conectada está documentada em [connected-cli.md](connected-cli.md); os downloads e contratos são separados.
+
 O contrato v1 é visual e declarativo: estrutura existente, cores, fonte, bordas, botão, indicador de etapas e resumo. A CLI não autentica nem publica; o usuário importa o JSON, revisa e salva o rascunho pelo editor autenticado. Textos, imagens, elementos, checkout/produto e configurações comerciais permanecem no editor.
 
 ## Fontes

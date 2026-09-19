@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260919-cli-connected',
+    category: 'IMPROVEMENT' as const,
+    title: 'Sua IDE conectada aos temas da Pirat',
+    description: 'Baixe um projeto editável, confira a prévia local e envie mudanças ao rascunho pela CLI. Autorize a conexão por loja, escolha se permite publicar e consulte o novo guia para desenvolvedores.',
+    publishedAt: new Date('2026-09-19T18:00:00.000Z'),
+  },
+  {
     publicId: 'auto-20260919-site-mobile-header-hero',
     category: 'IMPROVEMENT' as const,
     title: 'Navegação e leitura melhores no celular',

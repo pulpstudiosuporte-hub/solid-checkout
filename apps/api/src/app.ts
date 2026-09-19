@@ -43,6 +43,7 @@ import { registerChromaSenseRoutes } from './chromasense-routes.js';
 import { registerSettingsRoutes } from './settings-routes.js';
 import { registerAssistantRoutes } from './assistant-routes.js';
 import { registerCheckoutAiRoutes } from './checkout-ai-routes.js';
+import { registerCliRoutes } from './cli-routes.js';
 
 export function buildApp(environment: AppEnvironment, dependencies: { authRepository?: AuthRepository; catalogRepository?: CatalogRepository; storeRepository?: StoreRepository; shopifyRepository?: ShopifyRepository; gatewayRepository?: PrismaGatewayRepository; orderRepository?: OrderRepository; dokployClient?: DokployDomainClient; database?: PrismaClient } = {}): FastifyInstance {
   const checkoutOriginCache = new Map<string, { allowed: boolean; expiresAt: number }>();
@@ -53,7 +54,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
         paths: [
           'req.headers.x-solid-support-session', 'req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie',
           'req.body.password', 'req.body.currentPassword', 'req.body.newPassword',
-          'req.body.token', 'req.body.code', 'req.body.accessToken', 'req.body.apiKey', 'req.body.messages',
+          'req.body.token', 'req.body.code', 'req.body.accessToken', 'req.body.apiKey', 'req.body.messages', 'req.body.deviceToken', 'req.body.verifier',
           'req.body.publicKey', 'req.body.secretKey', 'req.body.cpf',
           'req.body.values.document', 'req.body.values.legalName',
           'req.body.values.birthDate', 'req.body.values.zipCode',
@@ -101,6 +102,7 @@ export function buildApp(environment: AppEnvironment, dependencies: { authReposi
     void app.register((assistantApp, _options, done) => {
       registerAssistantRoutes(assistantApp, environment, authRepository);
       if (dependencies.catalogRepository) registerCheckoutAiRoutes(assistantApp, environment, authRepository, dependencies.catalogRepository);
+      if (dependencies.catalogRepository && dependencies.database) registerCliRoutes(assistantApp, environment, authRepository, dependencies.catalogRepository, dependencies.database);
       done();
     });
   }

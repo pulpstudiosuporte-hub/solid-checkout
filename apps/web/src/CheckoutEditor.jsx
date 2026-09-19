@@ -1412,7 +1412,7 @@ function EditorRegionElements({
   );
 }
 
-function Preview({
+export function Preview({
   c,
   device,
   onAddElement,

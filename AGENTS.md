@@ -8,6 +8,8 @@ Para o site institucional, prefira `npm.cmd run test:site` (ou `npm run test:sit
 
 # Publicação e novidades
 
+Toda nova funcionalidade, integração, CLI ou mudança de fluxo deve atualizar a documentação pública correspondente no mesmo conjunto de alterações. Inclua exemplos executáveis, requisitos e limites reais; não documente capacidades planejadas como disponíveis.
+
 A cada deploy com mudanças para o usuário, inclua no mesmo conjunto de alterações uma publicação em `automaticReleases` (`apps/api/src/admin-content-routes.ts`) descrevendo as funcionalidades, melhorias ou correções entregues. Use identificador estável e único, categoria adequada e texto curto em português voltado ao lojista. Preserve publicações e edições manuais existentes; não envie notificações em massa sem pedido explícito. Confirme separadamente push, deploy e validação em produção.
 
 Toda nova integração do catálogo deve aparecer também no seletor de imagens em Administração → Conteúdo → Integrações. Mantenha `apps/web/src/integration-catalog.js` como fonte compartilhada desses itens e reutilize a imagem cadastrada nas telas da integração.

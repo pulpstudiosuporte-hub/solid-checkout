@@ -129,6 +129,7 @@ enum ChromaSenseEventType {
 }
 
 model User {
+  cliConnections CliConnection[]
   id              String        @id @default(uuid()) @db.Uuid
   publicId        String        @unique @default(cuid()) @map("public_id") @db.VarChar(32)
   email           String        @unique @db.VarChar(320)
@@ -184,6 +185,7 @@ model PendingSignup {
 }
 
 model Store {
+  cliConnections CliConnection[]
   id        String        @id @default(uuid()) @db.Uuid
   publicId  String        @unique @default(cuid()) @map("public_id") @db.VarChar(32)
   name      String        @db.VarChar(120)
@@ -478,6 +480,7 @@ model ProductCollection {
 }
 
 model Checkout {
+  cliVersions CheckoutCliVersion[]
   id          String         @id @default(uuid()) @db.Uuid
   publicId    String         @unique @default(cuid()) @map("public_id") @db.VarChar(32)
   storeId     String         @map("store_id") @db.Uuid
@@ -503,6 +506,48 @@ model Checkout {
   @@index([storeId, productId])
   @@index([storeId, archivedAt])
   @@map("checkouts")
+}
+
+model CliDevice {
+  id String @id @default(cuid()) @db.VarChar(32)
+  tokenHash String @unique @map("token_hash") @db.VarChar(64)
+  challenge String @db.VarChar(64)
+  userCode String @unique @map("user_code") @db.VarChar(16)
+  label String @db.VarChar(80)
+  userId String? @map("user_id") @db.Uuid
+  storeId String? @map("store_id") @db.Uuid
+  canPublish Boolean @default(false) @map("can_publish")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(3)
+  @@index([expiresAt])
+  @@map("cli_devices")
+}
+
+model CliConnection {
+  id String @id @default(cuid()) @db.VarChar(32)
+  tokenHash String @unique @map("token_hash") @db.VarChar(64)
+  userId String @map("user_id") @db.Uuid
+  storeId String @map("store_id") @db.Uuid
+  label String @db.VarChar(80)
+  canPublish Boolean @default(false) @map("can_publish")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  @@index([storeId, userId])
+  @@map("cli_connections")
+}
+
+model CheckoutCliVersion {
+  id String @id @default(cuid()) @db.VarChar(32)
+  checkoutId String @map("checkout_id") @db.Uuid
+  config Json
+  action String @db.VarChar(24)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  checkout Checkout @relation(fields: [checkoutId], references: [id], onDelete: Cascade)
+  @@index([checkoutId, createdAt(sort: Desc)])
+  @@map("checkout_cli_versions")
 }
 
 model CheckoutSession {

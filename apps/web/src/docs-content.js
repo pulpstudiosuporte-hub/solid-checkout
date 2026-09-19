@@ -1,4 +1,5 @@
 // Public, merchant-facing content only. See docs/public-documentation.md before adding articles.
+import { cliGuide } from './cli-docs-content';
 export const docsGroups = [
   { id: 'comecar', title: 'Primeiros passos', description: 'Da sua loja ao primeiro checkout publicado.', icon: 'compass' },
   { id: 'checkout', title: 'Crie do seu jeito', description: 'Modelos, IA, imagens e recursos de conversão.', icon: 'layout' },
@@ -25,6 +26,7 @@ function article(slug, group, title, summary, options) {
 }
 
 export const docsArticles = [
+  { ...article(...cliGuide), updated: '19 de setembro de 2026' },
   article('temas-cli', 'dev', 'Temas e CLI: do código ao checkout', 'Baixe três temas prontos, personalize com sua IA e importe o resultado no editor da Pirat.', {
     keywords: 'developer dev terminal CLI JSON schema tema download código IA',
     before: ['Instale Node.js 22 ou superior. O kit funciona no Windows, macOS e Linux, sem instalar dependências.', 'O contrato v1 personaliza cores, fontes, estrutura, etapas e aparência dos componentes existentes. Não executa React, CSS, JavaScript ou Liquid enviados pelo desenvolvedor.'],
