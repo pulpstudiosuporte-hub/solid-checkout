@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260919-site-mobile-header-hero',
+    category: 'IMPROVEMENT' as const,
+    title: 'Navegação e leitura melhores no celular',
+    description: 'No site, o menu fica à esquerda, a logo ao centro e o acesso para começar à direita. O título e a descrição da abertura ganharam proporções e quebras mais equilibradas nas telas menores.',
+    publishedAt: new Date('2026-09-19T04:52:00.000Z'),
+  },
+  {
     publicId: 'auto-20260919-site-photo-caption',
     category: 'IMPROVEMENT' as const,
     title: 'Apresentação mais limpa no site',

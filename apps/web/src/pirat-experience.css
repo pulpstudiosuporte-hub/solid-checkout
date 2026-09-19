@@ -55,3 +55,15 @@
   .pirat-hero-lines i:nth-child(3){width:200vw;height:160vw;left:-50%;top:6%}
   .pirat-hero > .hero-atmosphere .light-particle:nth-of-type(n+7){display:none}
 }
+
+/* Keep both phrases on the same typographic scale; let narrow screens wrap naturally. */
+.solid-site .pirat-hero-copy h1>.hero-title-main{display:block;color:var(--site-text)}
+.solid-site .pirat-hero-copy h1>.hero-title-accent{display:block;color:var(--site-accent)}
+@media(max-width:720px){
+  .solid-site .pirat-hero-copy h1{font-size:clamp(38px,12.8vw,58px);line-height:1.07;letter-spacing:-.045em;margin:22px auto 0;max-width:12ch}
+  .solid-site .pirat-hero-copy h1>span{max-width:100%;text-wrap:balance}
+  .solid-site .pirat-hero-copy h1 br{display:none}
+  .solid-site .pirat-hero-copy>p{font-size:15px;line-height:1.65;max-width:32ch;text-wrap:pretty;margin:24px auto 0}
+  .solid-site .pirat-hero-copy>p br{display:initial}
+  .pirat-hero-actions{margin-top:26px}
+}

@@ -80,3 +80,18 @@ body.solid-marketing-body { background: #0e080d; }
   .solid-site .site-menu-toggle { min-width: 44px; min-height: 44px; }
   .solid-site .footer-brand img { width: 90px; height: 82px; }
 }
+
+/* Mobile header: menu / centered brand / primary action. */
+@media(max-width:720px){
+  .solid-site .header-inner{width:calc(100% - 32px);display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;height:84px;min-height:84px}
+  .solid-site .header-inner>.site-menu-toggle{grid-column:1;grid-row:1;justify-self:start}
+  .solid-site .header-inner>.solid-site-brand{grid-column:2;grid-row:1;justify-self:center}
+  .solid-site .header-inner>.header-actions{grid-column:3;grid-row:1;justify-self:end;min-width:0}
+  .solid-site .header-inner .site-button.small{padding:10px;font-size:11px;gap:6px;white-space:nowrap}
+  .solid-site .header-inner .site-button.small>svg{display:none}
+  .solid-site .site-nav{top:84px}
+}
+@media(max-width:360px){
+  .solid-site .header-inner>.solid-site-brand img{width:64px;height:60px}
+  .solid-site .header-inner .site-button.small{font-size:10px;padding-inline:8px}
+}
