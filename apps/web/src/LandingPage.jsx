@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { ArrowRight, ArrowUpRight, BarChart3, Check, CheckCheck, ChevronRight, CircleCheck, Code2, Globe2, Layers3, LockKeyhole, Menu, MousePointer2, Package, Palette, Plus, QrCode, RotateCcw, ShieldCheck, ShoppingBag, SlidersHorizontal, Sparkles, Store, Truck, Users, X, Zap } from 'lucide-react';
 import './landing.css';
 import './pirat-site.css';
+import { MotionScene } from './SiteMotion';
+import { PiratHero, CheckoutJourney, MerchantLife } from './PiratExperience';
+import { TemplateShowcase, TestimonialShowcase } from './SiteShowcase';
 import { marketingAccountUrl } from './site-route';
 
 const money = value => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -73,15 +76,18 @@ export default function LandingPage() {
     window.addEventListener('keydown', escape);
     return () => { document.title = previous; document.body.classList.remove('solid-marketing-body'); window.removeEventListener('keydown', escape); };
   }, []);
-  return <div className="solid-site" id="inicio">
+  return <MotionScene><div className="solid-site" id="inicio">
     <a className="site-skip" href="#conteudo">Pular para o conteúdo</a>
     <header className="site-header"><div className="site-container header-inner"><Brand/><nav aria-label="Navegação principal" className={menuOpen ? 'site-nav open' : 'site-nav'} id="site-navigation">{[['Recursos', '#recursos'], ['Como funciona', '#como-funciona'], ['Integrações', '#integracoes'], ['Dúvidas', '#duvidas'], ['Documentação', 'https://docs.apirat.io/']].map(([label, href]) => <a href={href} key={href} onClick={() => setMenuOpen(false)}>{label}</a>)}</nav><div className="header-actions"><a href={login} className="site-login">Entrar <ArrowUpRight size={14}/></a><a href={signup} className="site-button small">Começar agora <ArrowRight size={14}/></a><button className="site-menu-toggle" aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'} aria-expanded={menuOpen} aria-controls="site-navigation" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={22}/> : <Menu size={22}/>}</button></div></div></header>
     <main id="conteudo">
-      <section className="site-hero site-container" aria-labelledby="hero-title">
-        <div className="hero-copy"><span className="site-eyebrow"><i/> SUA MARCA NO COMANDO.</span><h1 id="hero-title">Sua marca no comando.<br/><span>Um checkout à altura.</span></h1><p>Seu cliente quer comprar. Bora facilitar? Checkout Pix, personalização e gestão em um só lugar.</p><div className="hero-actions"><a href={signup} className="site-button">Criar minha conta <ArrowUpRight size={19}/></a><a href="#demonstracao" className="site-text-link"><span className="play-icon"><MousePointer2 size={15}/></span> Conhecer na prática</a></div><div className="hero-footnote"><span><Check size={14}/> Sua identidade</span><span><Check size={14}/> Seu domínio</span><span><Check size={14}/> Seu controle</span></div></div>
-        <div className="hero-stage" id="demonstracao"><div className="hero-grid" aria-hidden="true"/><div className="stage-orbit orbit-one" aria-hidden="true"/><div className="stage-orbit orbit-two" aria-hidden="true"/><div className="demo-floating-label"><span><Zap size={15}/></span><div><b>Pode chegar. O comando é seu.</b><small>Do carrinho ao pagamento.</small></div></div><CheckoutDemo/><div className="demo-floating-bottom"><div><Check size={14}/></div><span>Uma jornada.<br/><strong>Todo o controle.</strong></span><svg width="85" height="33" viewBox="0 0 85 33" aria-hidden="true"><path d="M2 29 15 23 24 26 39 13 49 18 62 8 72 12 83 2" fill="none" stroke="#ff9e97" strokeWidth="2.5"/></svg></div><span className="try-hint"><MousePointer2 size={15}/> Pode clicar. O checkout é interativo.</span></div>
-      </section>
+      <PiratHero signup={signup}/>
       <section className="integration-strip" aria-label="Ecossistema de integrações"><div className="site-container"><p>Conectado às ferramentas<br/><strong>que movem sua operação.</strong></p><div><span><ShoppingBag/> Shopify</span><span className="wordmark-meta">∞ <b>Meta</b></span><span className="wordmark-utm"><BarChart3/> utmify</span><span className="wordmark-roas">roas<span>pay</span></span><span className="wordmark-west"><Zap/> westpay</span></div></div></section>
+      <CheckoutJourney/>
+      <TemplateShowcase signup={signup}/>
+      <section className="pirat-demo-section site-container" id="demonstracao" aria-labelledby="demo-title"><div className="section-heading"><span className="site-eyebrow">CHEGA DE SÓ OLHAR.</span><h2 id="demo-title">Pode clicar.<br/><span>O checkout é seu.</span></h2><p>Troque a cor, adicione uma oferta e experimente a jornada. Aqui é uma demonstração: você explora, sem gerar uma cobrança.</p><a href="#jornada" className="site-text-link lavender">Rever a apresentação <ArrowRight size={17}/></a></div><div className="hero-stage"><CheckoutDemo/><span className="try-hint"><MousePointer2 size={15}/> Explore a demonstração.</span></div></section>
+      <MerchantLife/>
+      <TestimonialShowcase/>
+
 
       <section className="site-section site-container" id="recursos"><div className="section-heading"><span className="site-eyebrow">PENSADO PARA A SUA OPERAÇÃO</span><h2>Uma experiência completa.<br/><span>Do seu jeito.</span></h2><p>O que seu cliente vê precisa ser simples.<br/>O que você gerencia precisa estar conectado.</p></div>
         <div className="feature-tabs" role="group" aria-label="Explorar recursos">{features.map(({ id, name, icon: Icon }) => <button key={id} aria-pressed={active === id} aria-controls="feature-detail" onClick={() => setActive(id)} className={active === id ? 'active' : ''}><Icon size={18}/>{name}<ChevronRight size={14}/></button>)}</div>
@@ -99,5 +105,5 @@ export default function LandingPage() {
       <section className="site-container final-section"><div className="final-cta"><div className="final-lines" aria-hidden="true"/><img className="pirat-cta-mascot" src="/brand/pirat-mascot.png" width="100" height="100" alt="" loading="lazy"/><span className="site-eyebrow">BORA TIRAR ESSA LOJA DO CAIS?</span><h2>Sua marca no comando.<br/>A Pirat vai junto.</h2><p>Crie uma experiência de compra à altura do que você vende.</p><a className="site-button light" href={signup}>Bora de Pirat <ArrowUpRight size={19}/></a><span className="final-note">Crie sua conta e conheça os recursos e planos disponíveis.</span></div></section>
     </main>
     <footer className="site-footer site-container"><div className="footer-top"><div><Brand footer/><p>Sua marca no comando.<br/>Sua próxima venda à vista.</p></div><div className="footer-links"><div><strong>Plataforma</strong><a href="#recursos">Recursos</a><a href="#como-funciona">Como funciona</a><a href="#integracoes">Integrações</a></div><div><strong>Comece aqui</strong><a href={signup}>Criar conta</a><a href={login}>Acessar painel</a><a href="#duvidas">Perguntas frequentes</a><a href="https://docs.apirat.io/">Documentação</a></div></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} Pirat Checkout. Todos os direitos reservados.</span><a href="#inicio">Feito para seguir em frente. <ArrowUpRight size={14}/></a></div></footer>
-  </div>;
+  </div></MotionScene>;
 }

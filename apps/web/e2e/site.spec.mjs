@@ -16,7 +16,7 @@ test('demonstração funciona sem carregar painel ou criar uma cobrança', async
   await page.getByRole('button', { name: 'Azul', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Azul', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Experimentar pagamento' }).click();
-  await expect(page.getByRole('status')).toContainText('178,00');
+  await expect(page.locator('.demo-success')).toContainText('178,00');
   await page.getByRole('button', { name: 'Experimentar de novo' }).click();
   await expect(page.getByRole('checkbox')).toBeChecked();
   expect(requests.some(request => /AdminApp|PublicApp/.test(request.url))).toBe(false);
@@ -45,7 +45,13 @@ test('captura desktop e seções completas', async ({ page }) => {
   await page.goto('/site.html');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
+  for (const image of await page.locator('.pirat-people img').all()) {
+    await image.scrollIntoViewIfNeeded();
+    await expect.poll(() => image.evaluate(element => element.complete && element.naturalWidth > 0)).toBe(true);
+  }
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: output('site-desktop.png'), fullPage: true });
+  await page.locator('.pirat-hero').screenshot({ path: output('site-hero.png') });
   await page.locator('#recursos').screenshot({ path: output('site-recursos.png') });
   await page.locator('#integracoes').screenshot({ path: output('site-integracoes.png') });
   await page.locator('#duvidas').screenshot({ path: output('site-duvidas.png') });

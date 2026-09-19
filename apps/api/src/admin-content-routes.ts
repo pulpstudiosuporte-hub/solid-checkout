@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260919-pirat-site-showcase',
+    category: 'IMPROVEMENT' as const,
+    title: 'Conheça a nova apresentação da Pirat',
+    description: 'O site ganhou o papagaio interativo, uma apresentação das etapas durante a rolagem e um carrossel com inspirações visuais de checkout. Explore a demonstração no computador ou celular e pause os efeitos quando preferir.',
+    publishedAt: new Date('2026-09-19T02:38:00.000Z'),
+  },
+  {
     publicId: 'auto-20260919-retail-responsive-pix',
     category: 'FIX' as const,
     title: 'Melhor organização da entrega e do Pix no tema Varejo',

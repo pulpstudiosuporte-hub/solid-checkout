@@ -4,7 +4,7 @@
 
 A pasta `solid-site/` contém uma cópia independente do site, com entrada própria, dependências, imagens, Dockerfile e Nginx. Para publicar separadamente, use `solid-site-dokploy.zip` no provedor **Drag and Drop .zip** de uma nova Application no Dokploy, com build **Dockerfile** e porta **80**. Consulte `../solid-site/README.md` para os passos completos. Gere novamente o ZIP após alterações com `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-site.ps1`, na raiz do projeto.
 
-O cadastro e o login dessa versão sempre apontam para `https://app.solidcheckout.xyz`, inclusive em domínios temporários. As instruções abaixo descrevem a versão anterior, ainda integrada ao serviço web do aplicativo.
+O cadastro e o login dessa versão sempre apontam para `https://app.apirat.io`, inclusive em domínios temporários. As instruções abaixo descrevem a versão anterior, ainda integrada ao serviço web do aplicativo.
 
 A apresentação institucional usa as cores da Pirat e é carregada separadamente do painel e do checkout público. Inclui demonstração de checkout com mudança de cor, order bump e conclusão simulada, abas de recursos, integrações, passo a passo e perguntas frequentes. A demonstração não chama a API de pagamentos. Preços, indicadores de conversão e depoimentos não foram inventados; as condições comerciais são consultadas no painel.
 
@@ -43,3 +43,38 @@ nas duas pastas. Os domínios existentes e os links de acesso ao aplicativo
 continuam válidos; a troca visual não migra endereços.
 
 Valide também a versão independente com `npm.cmd run test:site` em `solid-site`.
+
+## Apresentação com personagem e movimento
+
+`PiratExperience.jsx` e `pirat-experience.css` compõem a abertura com o papagaio,
+as três cenas de produto controladas pela rolagem e a seção de lojistas.
+Mantenha esses arquivos sincronizados entre `solid-site/src` e `apps/web/src`.
+As referências CartFlami e Corvex orientam a composição; cores, tipografia,
+textos e personagem continuam sendo da Pirat.
+
+O personagem alterna as poses originais e reage ao clique. `SiteMotion` controla
+a pausa geral e respeita a preferência por movimento reduzido. As cenas também
+podem ser selecionadas por botões; no celular esse é o modo de navegação.
+As demonstrações são ilustrativas e não geram pedidos ou cobranças reais.
+
+As fotografias de lojistas são ilustrativas, com créditos visíveis; não são
+depoimentos ou identificação de clientes da Pirat. Os arquivos são servidos
+localmente em `public/brand/people`, com fontes registradas em `CREDITS.md`.
+As poses utilizadas ficam em `public/brand/assistant`.
+
+Além das capturas gerais, os testes produzem `site-hero.png` e `site-people.png`
+em `.visual-check`. Verificam reação do mascote, mudança das cenas, teclado,
+pausa, movimento reduzido, carregamento das fotos e largura móvel.
+
+`SiteShowcase.jsx` e `site-showcase.css` adicionam o carrossel de artes dos temas
+e a área de depoimentos de exemplo, também compartilhados pelas duas entradas.
+O carrossel oferece botões, setas do teclado nos cards, gesto horizontal e
+reprodução opcional. A reprodução pausa com foco, cursor, aba oculta, seção
+fora da tela, movimento reduzido e controle global de efeitos.
+
+As cinco artes em `public/brand/templates/*-art.webp` são composições geradas
+por IA, identificadas como ilustrativas na página. Não são novos temas
+instalados nem capturas exatas. Prompts e origem estão em
+`docs/site-showcase-images.md`. Os depoimentos usam nomes e falas fictícias,
+com aviso na seção e em cada card; devem ser substituídos por conteúdo real
+autorizado quando estiver disponível.

@@ -187,7 +187,13 @@ test('captura desktop e seções completas', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
   await page.getByRole('button', { name: 'Pausar efeitos' }).click();
+  for (const image of await page.locator('.pirat-people img').all()) {
+    await image.scrollIntoViewIfNeeded();
+    await expect.poll(() => image.evaluate(element => element.complete && element.naturalWidth > 0)).toBe(true);
+  }
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: output('site-desktop.png'), fullPage: true });
+  await page.locator('.pirat-hero').screenshot({ path: output('site-hero.png') });
   await page.locator('#em-movimento').screenshot({ path: output('site-graficos.png'), style: '.site-header,.site-skip,.motion-toggle,.reading-progress{visibility:hidden!important}' });
   await page.locator('#recursos').screenshot({ path: output('site-recursos.png') });
   await page.locator('#integracoes').screenshot({ path: output('site-integracoes.png') });
@@ -251,7 +257,7 @@ test('movimento reduzido desliga animações e mantém os gráficos interativos'
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Movimento reduzido' })).toBeDisabled();
   await expect(page.locator('.motion-scene')).toHaveAttribute('data-motion', 'paused');
-  await expect(page.locator('.aurora-one')).toHaveCSS('animation-name', 'none');
+  await expect(page.locator('.pirat-host-button img')).toHaveCSS('animation-name', 'none');
   await page.getByRole('button', { name: 'Simular nova venda' }).click();
   await expect(page.locator('.dashboard-footnote')).toContainText('Pedido fictício adicionado');
   await page.getByRole('button', { name: '30 dias', exact: true }).click();
@@ -260,7 +266,7 @@ test('movimento reduzido desliga animações e mantém os gráficos interativos'
 
 test('animações e brilho respondem ao cursor sem cobrir controles', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('.aurora-one')).toHaveCSS('animation-name', 'aurora-drift');
+  await expect(page.locator('.pirat-host-button img')).toHaveCSS('animation-name', 'pirat-breathe');
   const card = page.locator('.foundation-card').first();
   await card.hover();
   await expect.poll(() => card.evaluate(element => element.style.getPropertyValue('--spot-opacity'))).toBe('1');
@@ -268,7 +274,7 @@ test('animações e brilho respondem ao cursor sem cobrir controles', async ({ p
   await card.locator('summary').click();
   await expect(card.locator('details')).toHaveAttribute('open', '');
   await page.getByRole('button', { name: 'Pausar efeitos' }).click();
-  await expect(page.locator('.aurora-one')).toHaveCSS('animation-name', 'none');
+  await expect(page.locator('.pirat-host-button img')).toHaveCSS('animation-name', 'none');
   await expect(card).toHaveCSS('transform', 'none');
 });
 
