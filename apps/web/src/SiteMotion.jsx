@@ -44,7 +44,7 @@ export function MotionScene({ children }) {
       reveal.observe(element);
     });
     const ambience = new IntersectionObserver(entries => entries.forEach(entry => entry.target.classList.toggle('motion-offscreen', !entry.isIntersecting)));
-    scene.querySelectorAll('.hero-stage, .integration-network, .final-cta, .feature-sandbox, .pirat-hero-art').forEach(element => ambience.observe(element));
+    scene.querySelectorAll('.hero-stage, .integration-network, .final-cta, .feature-sandbox, .pirat-hero-art, .pirat-hero > .hero-atmosphere').forEach(element => ambience.observe(element));
     return () => {
       reveal.disconnect(); ambience.disconnect(); cancelAnimationFrame(scrollFrame);
       window.removeEventListener('scroll', updateProgress); window.removeEventListener('resize', updateProgress);

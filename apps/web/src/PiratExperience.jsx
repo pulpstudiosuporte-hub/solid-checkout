@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowRight, ArrowUpRight, Check, CheckCheck, Layers3, LockKeyhole, MousePointer2, Package, Palette, ShieldCheck, Sparkles, Truck } from 'lucide-react';
-import { useSiteMotion } from './SiteMotion';
+import { HeroAtmosphere, useSiteMotion } from './SiteMotion';
 import './pirat-experience.css';
 
 const scenes = [
@@ -53,7 +53,7 @@ export function PiratHero({ signup }) {
   }, [running]);
   const greet = () => { setHello(true); clearTimeout(timeout.current); timeout.current = setTimeout(() => setHello(false), 4500); };
   return <section className="pirat-hero" ref={root} aria-labelledby="hero-title">
-    <div className="pirat-hero-halo" aria-hidden="true"/><div className="pirat-hero-lines" aria-hidden="true"><i/><i/><i/></div>
+    <HeroAtmosphere/><div className="pirat-hero-halo" aria-hidden="true"/><div className="pirat-hero-lines" aria-hidden="true"><i/><i/><i/></div>
     <div className="site-container pirat-hero-grid">
       <div className="pirat-hero-copy"><span className="site-eyebrow"><i/> CHECKOUT COM PERSONALIDADE.</span><h1 id="hero-title">Sua marca<br/>no comando.<br/><span>Um checkout<br/> à altura.</span></h1><p>Você cuida da próxima grande ideia.<br/>A Pirat conecta o checkout, o Pix e a gestão da sua loja.</p><div className="pirat-hero-actions"><a href={signup} className="site-button light">Criar minha conta <ArrowUpRight size={20}/></a><a href="#demonstracao" className="site-text-link">Ver na prática <ArrowRight size={18}/></a></div><div className="pirat-hero-proof"><span><Check size={15}/> Sua marca</span><span><Check size={15}/> Seu domínio</span><span><Check size={15}/> Seu controle</span></div></div>
       <div className="pirat-hero-art">

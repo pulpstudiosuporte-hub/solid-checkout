@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260919-site-mobile-atmosphere',
+    category: 'IMPROVEMENT' as const,
+    title: 'Mais movimento na apresentação da Pirat',
+    description: 'O fundo animado voltou ao site, com luzes e detalhes dourados ajustados para o celular. Os efeitos respeitam a pausa e a preferência por movimento reduzido.',
+    publishedAt: new Date('2026-09-19T03:36:00.000Z'),
+  },
+  {
     publicId: 'auto-20260919-pirat-site-showcase',
     category: 'IMPROVEMENT' as const,
     title: 'Conheça a nova apresentação da Pirat',

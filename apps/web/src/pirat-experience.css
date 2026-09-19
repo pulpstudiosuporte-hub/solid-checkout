@@ -40,3 +40,18 @@
 @media(prefers-reduced-motion:reduce){.pirat-hero-art,.pirat-hero-halo,.pirat-hero-lines{transform:none!important}.pirat-hero-preview{transform:none}.pirat-people figure:hover img{transform:none}}
 .motion-scene[data-motion=paused] .pirat-hero-preview{transform:none}.motion-scene[data-motion=paused] .pirat-people figure:hover img{transform:none}
 .pirat-people-grid>figure img{object-position:center top}
+
+/* Restore the moving atmosphere across the hero, including touch screens. */
+.pirat-hero > .hero-atmosphere{inset:0;z-index:-1;border-radius:0}
+.pirat-hero > .hero-atmosphere .aurora-one{inset:-15% -20% 0 10%;background:radial-gradient(ellipse at 65% 45%,#eb462b80,transparent 62%);animation-duration:18s}
+.pirat-hero > .hero-atmosphere .aurora-two{inset:15% 15% -35% -25%;background:radial-gradient(ellipse at 35% 55%,#bc6b254d,transparent 63%);animation-duration:22s}
+.pirat-hero > .hero-atmosphere .light-particle{background:#ffd18a;box-shadow:0 0 12px #ffbc2199}
+@media(max-width:900px){
+  .pirat-hero > .hero-atmosphere .aurora-one{inset:-8% -55% 24% -45%;background:radial-gradient(ellipse at 70% 35%,#ef40278c,transparent 62%)}
+  .pirat-hero > .hero-atmosphere .aurora-two{inset:28% -50% -12%;background:radial-gradient(ellipse at 25% 60%,#d9873266,transparent 60%)}
+  .pirat-hero-halo{inset:32% -40% -15%;background:radial-gradient(ellipse at 65% 55%,#b9231859,transparent 60%)}
+  .pirat-hero-lines i{width:150vw;height:110vw;left:-25%;top:14%;border-color:#ffc16b29;transform:rotate(-32deg)}
+  .pirat-hero-lines i:nth-child(2){width:175vw;height:135vw;left:-38%;top:10%}
+  .pirat-hero-lines i:nth-child(3){width:200vw;height:160vw;left:-50%;top:6%}
+  .pirat-hero > .hero-atmosphere .light-particle:nth-of-type(n+7){display:none}
+}
