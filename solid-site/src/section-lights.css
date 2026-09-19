@@ -20,9 +20,9 @@
 .solid-site :is(.site-section, .final-section)::before {
   background:
     radial-gradient(ellipse 7% 11% at var(--light-x) var(--light-y), #ff9c9545, transparent 100%),
-    radial-gradient(ellipse 42% 46% at var(--light-x) var(--light-y), #fb635830, #d7423715 46%, transparent 100%),
+    radial-gradient(ellipse 42% 46% at var(--light-x) var(--light-y), #a1497226, #68233812 46%, transparent 100%),
     radial-gradient(ellipse 6% 9% at var(--light-secondary-x) var(--light-secondary-y), #ff9c9538, transparent 100%),
-    radial-gradient(ellipse 37% 43% at var(--light-secondary-x) var(--light-secondary-y), #e52f2232, transparent 100%);
+    radial-gradient(ellipse 37% 43% at var(--light-secondary-x) var(--light-secondary-y), #80355026, transparent 100%);
   mask-image: linear-gradient(transparent, #000 12%, #000 86%, transparent);
 }
 

@@ -66,6 +66,13 @@ const categories = [
 ] as const;
 const automaticReleases = [
   {
+    publicId: 'auto-20260919-site-dark-color-cards',
+    category: 'IMPROVEMENT' as const,
+    title: 'Novo contraste na apresentação da Pirat',
+    description: 'O site ganhou um fundo vinho mais escuro e cards em marfim e amarelo para destacar recursos e exemplos. A curva de luz e o papagaio continuam presentes, com leitura revisada no celular e no computador.',
+    publishedAt: new Date('2026-09-19T04:12:00.000Z'),
+  },
+  {
     publicId: 'auto-20260919-site-mobile-atmosphere',
     category: 'IMPROVEMENT' as const,
     title: 'Mais movimento na apresentação da Pirat',

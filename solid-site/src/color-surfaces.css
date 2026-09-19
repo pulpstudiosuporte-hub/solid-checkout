@@ -1,0 +1,23 @@
+
+/* Contrasting surfaces keep the dark wine canvas while giving key cards a rhythm. */
+.solid-site [data-card-tone="ivory"]{--card-bg:#fff5e5;--card-ink:#291521;--card-muted:#614e57;--card-line:#29152126;--card-inset:#29152109}
+.solid-site [data-card-tone="gold"]{--card-bg:#ffca3a;--card-ink:#291521;--card-muted:#574021;--card-line:#29152130;--card-inset:#2915210c}
+.solid-site :is(.foundation-card,.testimonial-card)[data-card-tone]{background:var(--card-bg);color:var(--card-ink);border-color:var(--card-line);box-shadow:0 16px 40px #00000018}
+.solid-site .foundation-card[data-card-tone] :is(h3,summary,.domain-address,.domain-address b,.catalog-items>span){color:var(--card-ink)}
+.solid-site .foundation-card[data-card-tone] :is(p,.foundation-help p){color:var(--card-muted)}
+.solid-site .foundation-card[data-card-tone] :is(.feature-icon,.domain-address){background:var(--card-inset);border-color:var(--card-line);color:var(--card-ink)}
+.solid-site .foundation-card[data-card-tone] :is(.foundation-help,.catalog-items>span){border-color:var(--card-line)}
+.solid-site .foundation-card[data-card-tone] :is(.catalog-items svg,.domain-address svg){color:#6c3e26}
+.solid-site .foundation-card[data-card-tone] .domain-echo{color:#2915210a}
+.solid-site .foundation-card[data-card-tone]:hover{border-color:#a47737}
+.solid-site .foundation-card[data-card-tone] :focus-visible{outline-color:#562044}
+.solid-site .testimonial-card[data-card-tone] :is(blockquote,figcaption strong){color:var(--card-ink)}
+.solid-site .testimonial-card[data-card-tone] :is(figcaption div>span,small){color:var(--card-muted)}
+.solid-site .testimonial-card[data-card-tone]>svg{color:#825330;fill:#82533020}
+.solid-site .final-cta{background:radial-gradient(ellipse at 90% 0,#fff2b4a8,transparent 55%),#ffca3a;color:#291521;border-color:#ffdb6d;box-shadow:0 25px 90px #ffbc2112}
+.solid-site .final-cta :is(h2,.site-eyebrow,p,.final-note){color:#291521}
+.solid-site .final-cta .site-eyebrow{color:#6c4026}
+.solid-site .final-cta .final-lines{opacity:.28}
+.solid-site .final-cta .site-button.light{background:#291521;color:#fff5e5!important;border-color:#291521;box-shadow:0 6px 22px #29152120}
+.solid-site .final-cta .site-button.light:hover{background:#472139}
+.solid-site .final-cta :focus-visible{outline-color:#562044}

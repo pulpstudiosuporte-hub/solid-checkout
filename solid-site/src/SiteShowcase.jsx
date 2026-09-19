@@ -54,17 +54,17 @@ export function TemplateShowcase({ signup }) {
 }
 
 const examples = [
-  { name: 'Marina Alves', role: 'Moda e acessórios', initials: 'MA', text: 'Escolher as cores e organizar cada detalhe é o que faz a experiência parecer uma continuação da minha loja.', color: 'rose' },
+  { name: 'Marina Alves', role: 'Moda e acessórios', initials: 'MA', tone: 'ivory', text: 'Escolher as cores e organizar cada detalhe é o que faz a experiência parecer uma continuação da minha loja.', color: 'rose' },
   { name: 'Rafael Costa', role: 'Loja de decoração', initials: 'RC', text: 'Gosto de um checkout direto: o cliente encontra o produto, confere a entrega e entende o próximo passo.', color: 'sage' },
   { name: 'Clara Martins', role: 'Marca independente', initials: 'CM', text: 'Começar por um modelo e deixar tudo com a minha identidade torna a criação muito mais fácil de visualizar.', color: 'gold' },
   { name: 'Lucas Oliveira', role: 'Esporte e lifestyle', initials: 'LO', text: 'Na minha loja, o celular vem primeiro. Quero uma compra que seja simples de acompanhar em cada etapa.', color: 'gold' },
-  { name: 'Beatriz Lima', role: 'Beleza e autocuidado', initials: 'BL', text: 'O cuidado que eu tenho com a embalagem também precisa aparecer na hora de comprar. Cada detalhe conta.', color: 'rose' },
+  { name: 'Beatriz Lima', role: 'Beleza e autocuidado', initials: 'BL', tone: 'gold', text: 'O cuidado que eu tenho com a embalagem também precisa aparecer na hora de comprar. Cada detalhe conta.', color: 'rose' },
   { name: 'Pedro Santos', role: 'Produtos para casa', initials: 'PS', text: 'Ter os pedidos organizados e o resumo claro ajuda a pensar na experiência inteira, do produto ao pagamento.', color: 'sage' },
 ];
 
 export function TestimonialShowcase() {
   return <section className="testimonial-showcase site-container" id="depoimentos" aria-labelledby="testimonials-title">
     <div className="section-heading"><span className="site-eyebrow">LOJAS DIFERENTES. CUIDADO EM COMUM.</span><h2 id="testimonials-title">Tem uma pessoa<br/><span>por trás de cada marca.</span></h2><p>Uma prévia do espaço para as histórias de quem empreende.</p><span className="testimonial-disclaimer">Exemplos ilustrativos · Pessoas e falas fictícias, não são avaliações de clientes.</span></div>
-    <div className="testimonial-columns">{[0, 1, 2].map(column => <div className="testimonial-column" key={column}>{[examples[column], examples[column + 3]].map(person => <figure className="testimonial-card" key={person.name}><Quote size={25} aria-hidden="true"/><blockquote>{person.text}</blockquote><figcaption><span className={`testimonial-avatar ${person.color}`} aria-hidden="true">{person.initials}</span><div><strong>{person.name}</strong><span>{person.role}</span></div></figcaption><small>Depoimento de exemplo</small></figure>)}</div>)}</div>
+    <div className="testimonial-columns">{[0, 1, 2].map(column => <div className="testimonial-column" key={column}>{[examples[column], examples[column + 3]].map(person => <figure className="testimonial-card" data-card-tone={person.tone} key={person.name}><Quote size={25} aria-hidden="true"/><blockquote>{person.text}</blockquote><figcaption><span className={`testimonial-avatar ${person.color}`} aria-hidden="true">{person.initials}</span><div><strong>{person.name}</strong><span>{person.role}</span></div></figcaption><small>Depoimento de exemplo</small></figure>)}</div>)}</div>
   </section>;
 }

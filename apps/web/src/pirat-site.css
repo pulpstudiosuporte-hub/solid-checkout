@@ -12,10 +12,10 @@
 }
 
 /* Shared Pirat identity for the integrated and standalone marketing entries. */
-body.solid-marketing-body { background: #2b0200; }
+body.solid-marketing-body { background: #0e080d; }
 .solid-site {
-  --site-bg: #2b0200;
-  --site-surface: #37100c;
+  --site-bg: #0e080d;
+  --site-surface: #1b1019;
   --site-text: #fffcf8;
   --site-muted: #d3bab0;
   --site-accent: #ffbc21;
@@ -29,7 +29,7 @@ body.solid-marketing-body { background: #2b0200; }
 }
 .solid-site ::selection { background: #ffbc21; color: #2b0200; }
 .solid-site :focus-visible { outline-color: #ffbc21; }
-.solid-site .site-header { background: #2b0200ed; border-bottom-color: var(--site-line); }
+.solid-site .site-header { background: #0e080ded; border-bottom-color: var(--site-line); }
 .solid-site .header-inner { min-height: 100px; }
 .solid-site .solid-site-brand { gap: 8px; }
 .solid-site .solid-site-brand img { width: 88px; height: 80px; object-fit: contain; }
@@ -66,7 +66,7 @@ body.solid-marketing-body { background: #2b0200; }
 .solid-site .color-swatch.red { background: #c91d16; }
 .solid-site .network-center { background: #fffcf8; border-color: #ffbc2166; }
 .solid-site .network-center img { object-fit: contain; }
-.solid-site .final-cta { background: radial-gradient(ellipse at 15% 0, #f5221830, transparent 60%), #37100c; border-color: #ffbc2155; }
+.solid-site .final-cta { background: radial-gradient(ellipse at 15% 0, #9f426426, transparent 60%), #1b1019; border-color: #ffbc2155; }
 .solid-site .final-cta .site-eyebrow { color: #ffbc21; }
 .solid-site .pirat-cta-mascot { display: block; object-fit: contain; margin: 0 auto 24px; }
 .solid-site .final-cta p,
@@ -75,7 +75,7 @@ body.solid-marketing-body { background: #2b0200; }
 @media (max-width: 720px) {
   .solid-site .header-inner { height: 88px; min-height: 88px; }
   .solid-site .solid-site-brand img { width: 72px; height: 66px; }
-  .solid-site .site-nav { top: 88px; background: #2b0200; }
+  .solid-site .site-nav { top: 88px; background: #0e080d; }
   .solid-site .site-button.small { min-height: 44px; }
   .solid-site .site-menu-toggle { min-width: 44px; min-height: 44px; }
   .solid-site .footer-brand img { width: 90px; height: 82px; }
